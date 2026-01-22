@@ -12,62 +12,8 @@
     </div>
 </div>
 
-{{-- PACKING DEPARTMENT DASHBOARD --}}
-@if($userRole === 'packing_department')
-<div class="row mb-4">
-    <!-- Total Pallets Today -->
-    <div class="col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <p class="card-text mb-2" style="color: #9ca3af;">Pallet Hari Ini</p>
-                        <h3 class="mb-0" style="color: #1f2937;">{{ $stats['today_pallets'] ?? 0 }}</h3>
-                    </div>
-                    <i class="bi bi-box2-heart" style="font-size: 2.5rem; color: #0C7779; opacity: 0.7;"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Total Pallets All Time -->
-    <div class="col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <p class="card-text mb-2" style="color: #9ca3af;">Total Pallet</p>
-                        <h3 class="mb-0" style="color: #1f2937;">{{ $stats['total_pallets'] ?? 0 }}</h3>
-                    </div>
-                    <i class="bi bi-boxes" style="font-size: 2.5rem; color: #249E94; opacity: 0.7;"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row">
-    <!-- Input Pallet Action Card -->
-    <div class="col-md-12 mb-4">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-top: 4px solid #0C7779;">
-            <div class="card-body text-center">
-                <div class="mb-3">
-                    <i class="bi bi-plus-circle" style="font-size: 3rem; color: #0C7779;"></i>
-                </div>
-                <h5 class="card-title" style="color: #1f2937;">Input Pallet Baru</h5>
-                <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
-                    Buat pallet baru dan input item dengan nomor part berbeda
-                </p>
-                <a href="{{ route('pallet-input.create') }}" class="btn btn-lg" style="background: #0C7779; color: white; border: none;">
-                    <i class="bi bi-arrow-right"></i> Buat Pallet
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
 {{-- WAREHOUSE OPERATOR DASHBOARD --}}
-@elseif($userRole === 'warehouse_operator')
+@if($userRole === 'warehouse_operator')
 <div class="row mb-4">
     <!-- Total Items in Warehouse -->
     <div class="col-md-4 mb-3">
@@ -257,12 +203,12 @@
                 <div class="mb-3">
                     <i class="bi bi-plus-circle" style="font-size: 3rem; color: #5b8fc4;"></i>
                 </div>
-                <h5 class="card-title" style="color: #2c3e50;">Input Pallet Baru</h5>
+                <h5 class="card-title" style="color: #2c3e50;">Kelola Box QR</h5>
                 <p class="card-text" style="color: #7d8fa3; margin-bottom: 1.5rem;">
-                    Kelola pallet dan item warehouse
+                    Generate kode QR unik untuk setiap box
                 </p>
-                <a href="{{ route('pallet-input.create') }}" class="btn" style="background: #5b8fc4; color: white; border: none;">
-                    <i class="bi bi-arrow-right"></i> Buat Pallet
+                <a href="{{ route('boxes.create') }}" class="btn" style="background: #5b8fc4; color: white; border: none;">
+                    <i class="bi bi-arrow-right"></i> Buat Box QR
                 </a>
             </div>
         </div>

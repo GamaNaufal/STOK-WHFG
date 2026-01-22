@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class StockWithdrawal extends Model
 {
     protected $fillable = [
+        'withdrawal_batch_id',
         'user_id',
         'pallet_item_id',
         'part_number',

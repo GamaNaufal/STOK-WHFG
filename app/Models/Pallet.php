@@ -19,4 +19,10 @@ class Pallet extends Model
     {
         return $this->hasOne(StockLocation::class);
     }
+
+    // Relationship ke boxes melalui pallet_boxes table
+    public function boxes()
+    {
+        return $this->belongsToMany(Box::class, 'pallet_boxes');
+    }
 }

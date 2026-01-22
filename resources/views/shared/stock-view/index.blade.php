@@ -141,7 +141,7 @@
                                                 <strong style="color: #1f2937;">{{ $item->pallet->pallet_number }}</strong>
                                             </td>
                                             <td style="text-align: center;">
-                                                <strong style="color: #1f2937;">{{ (int) ceil($item->pcs_quantity / $item->box_quantity) }}</strong>
+                                                <strong style="color: #1f2937;">{{ (int) $item->box_quantity }}</strong>
                                             </td>
                                             <td style="text-align: center;">
                                                 <strong style="color: #1f2937;">{{ $item->pcs_quantity }}</strong>

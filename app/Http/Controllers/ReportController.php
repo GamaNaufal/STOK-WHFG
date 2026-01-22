@@ -6,6 +6,7 @@ use App\Models\StockWithdrawal;
 use App\Models\StockLocation;
 use App\Models\PalletItem;
 use App\Models\Pallet;
+use App\Models\StockInput;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -72,57 +73,54 @@ class ReportController extends Controller
      */
     public function stockInputReport(Request $request)
     {
-        // Get pallets that have been input location (has stockLocation)
-        $query = Pallet::with(['items', 'stockLocation'])->has('stockLocation');
+        // Get stock inputs from stock_inputs table
+        $query = StockInput::with(['pallet', 'palletItem', 'user']);
 
-        // Date range filter - based on pallet creation
+        // Date range filter
         if ($request->filled('start_date')) {
-            $query->whereDate('created_at', '>=', $request->input('start_date'));
+            $query->whereDate('stored_at', '>=', $request->input('start_date'));
         }
 
         if ($request->filled('end_date')) {
-            $query->whereDate('created_at', '<=', $request->input('end_date'));
+            $query->whereDate('stored_at', '<=', $request->input('end_date'));
         }
 
         // Part number filter
         if ($request->filled('part_number')) {
-            $query->whereHas('items', function ($q) {
-                $q->where('part_number', 'like', '%' . request()->input('part_number') . '%');
+            $query->where('pallet_item_id', function ($q) {
+                $q->select('id')
+                  ->from('pallet_items')
+                  ->where('part_number', 'like', '%' . request()->input('part_number') . '%');
             });
         }
 
         // Location filter
         if ($request->filled('warehouse_location')) {
-            $query->whereHas('stockLocation', function ($q) {
-                $q->where('warehouse_location', 'like', '%' . request()->input('warehouse_location') . '%');
-            });
+            $query->where('warehouse_location', 'like', '%' . request()->input('warehouse_location') . '%');
         }
 
-        $pallets = $query->orderBy('created_at', 'desc')->paginate(50);
+        $stockInputs = $query->orderBy('stored_at', 'desc')->paginate(50);
 
-        // Get statistics - only from pallets with location
-        $totalPalletsWithLocation = Pallet::has('stockLocation')->count();
-        $itemsWithLocation = PalletItem::whereHas('pallet', function ($q) {
-            $q->has('stockLocation');
-        });
-        $totalItems = $itemsWithLocation->sum('pcs_quantity');
-        $totalBoxesRaw = $itemsWithLocation->sum('box_quantity');
+        // Get statistics from stock_inputs table
+        $totalRecords = StockInput::count();
+        $totalPcs = StockInput::sum('pcs_quantity');
+        $totalBoxesRaw = StockInput::sum('box_quantity');
         
-        // Calculate actual boxes based on PCS
-        if ($totalBoxesRaw > 0 && $totalItems > 0) {
-            $pcsPerBox = $totalItems / $totalBoxesRaw;
-            $totalBoxes = ceil($totalItems / $pcsPerBox);
+        // Calculate actual boxes based on PCS average
+        if ($totalBoxesRaw > 0 && $totalPcs > 0) {
+            $pcsPerBox = $totalPcs / $totalBoxesRaw;
+            $totalBoxes = ceil($totalPcs / $pcsPerBox);
         } else {
             $totalBoxes = 0;
         }
 
-        // Get unique warehouse locations
-        $locations = StockLocation::pluck('warehouse_location')->unique();
+        // Get unique warehouse locations from stock_inputs
+        $locations = StockInput::distinct('warehouse_location')->pluck('warehouse_location');
 
         return view('reports.stock-input', [
-            'pallets' => $pallets,
-            'totalPallets' => $totalPalletsWithLocation,
-            'totalItems' => $totalItems,
+            'stockInputs' => $stockInputs,
+            'totalRecords' => $totalRecords,
+            'totalItems' => $totalPcs,
             'totalBoxes' => $totalBoxes,
             'locations' => $locations,
             'filters' => [
@@ -181,33 +179,31 @@ class ReportController extends Controller
      */
     public function exportStockInputCsv(Request $request)
     {
-        $query = Pallet::with(['items', 'stockLocation']);
+        $query = StockInput::with(['pallet', 'palletItem', 'user']);
 
         if ($request->filled('start_date')) {
-            $query->whereDate('created_at', '>=', $request->input('start_date'));
+            $query->whereDate('stored_at', '>=', $request->input('start_date'));
         }
 
         if ($request->filled('end_date')) {
-            $query->whereDate('created_at', '<=', $request->input('end_date'));
+            $query->whereDate('stored_at', '<=', $request->input('end_date'));
         }
 
-        $pallets = $query->orderBy('created_at', 'desc')->get();
+        $stockInputs = $query->orderBy('stored_at', 'desc')->get();
 
-        $csv = "No,Pallet Number,Part Number,Box Qty,PCS Qty,Lokasi,Tanggal Input\n";
+        $csv = "No,Pallet Number,Part Number,Box Qty,PCS Qty,Lokasi,Operator,Tanggal Input\n";
 
         $idx = 1;
-        foreach ($pallets as $pallet) {
-            foreach ($pallet->items as $item) {
-                $location = $pallet->stockLocation ? $pallet->stockLocation->warehouse_location : '-';
-                $csv .= $idx . "," . 
-                        $pallet->pallet_number . "," . 
-                        $item->part_number . "," . 
-                        $item->box_quantity . "," . 
-                        $item->pcs_quantity . "," . 
-                        $location . "," . 
-                        $pallet->created_at->format('d/m/Y H:i') . "\n";
-                $idx++;
-            }
+        foreach ($stockInputs as $input) {
+            $csv .= $idx . "," . 
+                    $input->pallet->pallet_number . "," . 
+                    $input->palletItem->part_number . "," . 
+                    (int)$input->box_quantity . "," . 
+                    $input->pcs_quantity . "," . 
+                    $input->warehouse_location . "," . 
+                    $input->user->name . "," . 
+                    $input->stored_at->format('d/m/Y H:i') . "\n";
+            $idx++;
         }
 
         return response($csv, 200, [

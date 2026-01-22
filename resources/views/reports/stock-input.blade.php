@@ -26,8 +26,8 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
-                        <p class="text-muted mb-1">Total Pallet</p>
-                        <h3 class="mb-0" style="color: #0C7779;">{{ $totalPallets }}</h3>
+                        <p class="text-muted mb-1">Total Pencatatan Input</p>
+                        <h3 class="mb-0" style="color: #0C7779;">{{ $totalRecords }}</h3>
                     </div>
                     <i class="bi bi-box2" style="font-size: 1.8rem; color: #0C7779; opacity: 0.3;"></i>
                 </div>
@@ -110,7 +110,7 @@
         <i class="bi bi-table"></i> Detail Input Stok
     </div>
     <div class="card-body p-0">
-        @if($pallets->count() > 0)
+        @if($stockInputs->count() > 0)
             <div class="table-responsive">
                 <table class="table table-hover mb-0">
                     <thead style="background-color: #f5f7fa; color: #0C7779;">
@@ -122,49 +122,42 @@
                             <th>Box</th>
                             <th>PCS</th>
                             <th>Lokasi</th>
-                            <th>Total Items</th>
+                            <th>Operator</th>
                         </tr>
                     </thead>
                     <tbody>
                         @php
-                            $counter = $pallets->firstItem();
+                            $counter = $stockInputs->firstItem();
                         @endphp
-                        @foreach($pallets as $pallet)
-                            @foreach($pallet->items as $item)
-                                <tr>
-                                    <td>{{ $counter }}</td>
-                                    <td>
-                                        <small class="text-muted">
-                                            {{ $pallet->created_at->format('d/m/Y') }}<br>
-                                            <strong>{{ $pallet->created_at->format('H:i') }}</strong>
-                                        </small>
-                                    </td>
-                                    <td>
-                                        <strong>{{ $pallet->pallet_number }}</strong>
-                                    </td>
-                                    <td>
-                                        <span class="badge" style="background-color: #e0f5f3; color: #0C7779;">
-                                            {{ $item->part_number }}
-                                        </span>
-                                    </td>
-                                    <td>{{ (int) $item->box_quantity }}</td>
-                                    <td>
-                                        <strong>{{ $item->pcs_quantity }} PCS</strong>
-                                    </td>
-                                    <td>
-                                        @if($pallet->stockLocation)
-                                            <small>{{ $pallet->stockLocation->warehouse_location }}</small><br>
-                                            <span class="text-muted" style="font-size: 0.75rem;">
-                                                {{ $pallet->stockLocation->stored_at->format('d/m/Y H:i') }}
-                                            </span>
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
-                                    </td>
-                                    <td>{{ $pallet->items->count() }}</td>
-                                </tr>
-                                @php $counter++; @endphp
-                            @endforeach
+                        @foreach($stockInputs as $input)
+                            <tr>
+                                <td>{{ $counter }}</td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ $input->stored_at->format('d/m/Y') }}<br>
+                                        <strong>{{ $input->stored_at->format('H:i') }}</strong>
+                                    </small>
+                                </td>
+                                <td>
+                                    <strong>{{ $input->pallet->pallet_number }}</strong>
+                                </td>
+                                <td>
+                                    <span class="badge" style="background-color: #e0f5f3; color: #0C7779;">
+                                        {{ $input->palletItem->part_number }}
+                                    </span>
+                                </td>
+                                <td>{{ (int) $input->box_quantity }}</td>
+                                <td>
+                                    <strong>{{ $input->pcs_quantity }} PCS</strong>
+                                </td>
+                                <td>
+                                    <small>{{ $input->warehouse_location }}</small>
+                                </td>
+                                <td>
+                                    <small>{{ $input->user->name }}</small>
+                                </td>
+                            </tr>
+                            @php $counter++; @endphp
                         @endforeach
                     </tbody>
                 </table>
@@ -172,7 +165,7 @@
 
             <!-- Pagination -->
             <div class="p-3">
-                {{ $pallets->appends(request()->query())->links() }}
+                {{ $stockInputs->appends(request()->query())->links() }}
             </div>
         @else
             <div class="p-5 text-center">

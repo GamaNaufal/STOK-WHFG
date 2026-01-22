@@ -8,6 +8,7 @@ use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class StockWithdrawalController extends Controller
 {
@@ -115,6 +116,9 @@ class StockWithdrawalController extends Controller
         try {
             DB::beginTransaction();
 
+            // Generate unique batch ID for this withdrawal request
+            $batchId = Str::uuid();
+
             $remainingQty = $requestedQty;
             $withdrawals = [];
 
@@ -153,6 +157,7 @@ class StockWithdrawalController extends Controller
 
                 // Create withdrawal record
                 $withdrawal = StockWithdrawal::create([
+                    'withdrawal_batch_id' => $batchId,
                     'user_id' => auth()->id(),
                     'pallet_item_id' => $item->id,
                     'part_number' => $partNumber,
@@ -171,14 +176,8 @@ class StockWithdrawalController extends Controller
                 $item->box_quantity -= $boxesToReduce;
                 $item->save();
 
-                // Check if pallet is now empty
-                $totalPalletQty = $item->pallet->items()->sum('pcs_quantity');
-                if ($totalPalletQty <= 0) {
-                    // Delete empty pallet and related data
-                    $item->pallet->stockLocation()->delete();
-                    $item->pallet->items()->delete();
-                    $item->pallet->delete();
-                }
+                // Don't delete pallet immediately - keep it for undo operations
+                // Just mark items with 0 quantity (logical deletion)
 
                 $remainingQty -= $takeQty;
             }
@@ -216,18 +215,27 @@ class StockWithdrawalController extends Controller
                 ], 422);
             }
 
-            $palletItem = $withdrawal->palletItem;
+            // Get all withdrawals in this batch
+            $batchId = $withdrawal->withdrawal_batch_id;
+            $batchWithdrawals = StockWithdrawal::where('withdrawal_batch_id', $batchId)
+                ->where('status', 'completed')
+                ->get();
 
-            if ($palletItem) {
-                // Restore both PCS and Box quantity
-                $palletItem->pcs_quantity += $withdrawal->pcs_quantity;
-                $palletItem->box_quantity += $withdrawal->box_quantity;
-                $palletItem->save();
+            // Undo all withdrawals in the batch
+            foreach ($batchWithdrawals as $w) {
+                $palletItem = $w->palletItem;
+
+                if ($palletItem) {
+                    // Restore both PCS and Box quantity
+                    $palletItem->pcs_quantity += $w->pcs_quantity;
+                    $palletItem->box_quantity += $w->box_quantity;
+                    $palletItem->save();
+                }
+
+                // Mark withdrawal as reversed
+                $w->status = 'reversed';
+                $w->save();
             }
-
-            // Mark withdrawal as reversed
-            $withdrawal->status = 'reversed';
-            $withdrawal->save();
 
             DB::commit();
 
@@ -245,11 +253,12 @@ class StockWithdrawalController extends Controller
     }
 
     /**
-     * Get total stock for a part number
+     * Get total stock for a part number (exclude items with 0 quantity)
      */
     private function getTotalStockForPart($partNumber)
     {
         return PalletItem::where('part_number', $partNumber)
+            ->where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation');
             })
@@ -276,8 +285,9 @@ class StockWithdrawalController extends Controller
         $locations = [];
         $remainingQty = $requestedQty;
 
-        // Get pallet items sorted by FIFO (oldest first)
+        // Get pallet items sorted by FIFO (oldest first), exclude items with 0 quantity
         $palletItems = PalletItem::where('part_number', $partNumber)
+            ->where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation');
             })

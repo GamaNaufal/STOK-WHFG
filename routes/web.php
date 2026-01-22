@@ -2,8 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BoxController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\PalletInputController;
 use App\Http\Controllers\StockInputController;
 use App\Http\Controllers\StockViewController;
 use App\Http\Controllers\StockWithdrawalController;
@@ -18,22 +18,21 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Packing Department - Input Pallet Routes
-    Route::middleware('role:packing_department,admin')->group(function () {
-        Route::get('/pallet-input', [PalletInputController::class, 'index'])->name('pallet-input.index');
-        Route::get('/pallet-input/create', [PalletInputController::class, 'create'])->name('pallet-input.create');
-        Route::post('/pallet-input', [PalletInputController::class, 'store'])->name('pallet-input.store');
-        Route::get('/pallet-input/{pallet}/edit', [PalletInputController::class, 'edit'])->name('pallet-input.edit');
-        Route::put('/pallet-input/{pallet}', [PalletInputController::class, 'update'])->name('pallet-input.update');
-        Route::delete('/pallet-input/{pallet}', [PalletInputController::class, 'destroy'])->name('pallet-input.destroy');
-        Route::get('/api/pallet-input/part-numbers', [PalletInputController::class, 'getPartNumbers'])->name('pallet-input.api.parts');
+    // Admin Routes - Box Management (QR Code Generation)
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/boxes', [BoxController::class, 'index'])->name('boxes.index');
+        Route::get('/boxes/create', [BoxController::class, 'create'])->name('boxes.create');
+        Route::post('/boxes', [BoxController::class, 'store'])->name('boxes.store');
+        Route::get('/boxes/{box}', [BoxController::class, 'show'])->name('boxes.show');
+        Route::delete('/boxes/{box}', [BoxController::class, 'destroy'])->name('boxes.destroy');
     });
 
-    // Stock Input Routes (Warehouse Operator)
+    // Stock Input Routes (Warehouse Operator) - Scan QR Box
     Route::middleware('role:warehouse_operator,admin')->group(function () {
         Route::get('/stock-input', [StockInputController::class, 'index'])->name('stock-input.index');
-        Route::get('/api/stock-input/pallets', [StockInputController::class, 'getPallets'])->name('stock-input.get-pallets');
-        Route::post('/stock-input/search', [StockInputController::class, 'searchPallet'])->name('stock-input.search');
+        Route::post('/stock-input/scan-box', [StockInputController::class, 'scanBox'])->name('stock-input.scan-box');
+        Route::get('/stock-input/get-pallet-data', [StockInputController::class, 'getCurrentPalletData'])->name('stock-input.get-pallet-data');
+        Route::post('/stock-input/clear-session', [StockInputController::class, 'clearSession'])->name('stock-input.clear-session');
         Route::post('/stock-input/store', [StockInputController::class, 'store'])->name('stock-input.store');
     });
 
@@ -63,3 +62,4 @@ Route::middleware('auth')->group(function () {
         Route::get('/reports/stock-input-export', [ReportController::class, 'exportStockInputCsv'])->name('reports.stock-input.export');
     });
 });
+

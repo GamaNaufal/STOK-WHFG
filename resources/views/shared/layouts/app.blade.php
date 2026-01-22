@@ -157,28 +157,12 @@
                             </li>
                         @endif
 
-                        <!-- Packing Department Menu -->
-                        @if(auth()->check() && auth()->user()->role === 'packing_department')
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" 
-                                   href="{{ route('dashboard') }}">
-                                    <i class="bi bi-house"></i> Dashboard
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('pallet-input*') ? 'active' : '' }}" 
-                                   href="{{ route('pallet-input.index') }}">
-                                    <i class="bi bi-plus-lg"></i> Input Pallet Baru
-                                </a>
-                            </li>
-                        @endif
-
                         <!-- Admin Menu -->
                         @if(auth()->check() && auth()->user()->role === 'admin')
                             <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('pallet-input*') ? 'active' : '' }}" 
-                                   href="{{ route('pallet-input.index') }}">
-                                    <i class="bi bi-plus-lg"></i> Input Pallet Baru
+                                <a class="nav-link {{ request()->routeIs('boxes*') ? 'active' : '' }}" 
+                                   href="{{ route('boxes.index') }}">
+                                    <i class="bi bi-qr-code"></i> Kelola Box QR
                                 </a>
                             </li>
                             <hr class="my-2" style="border-color: rgba(255,255,255,0.2);">
