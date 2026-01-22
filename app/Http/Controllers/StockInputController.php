@@ -17,6 +17,133 @@ class StockInputController extends Controller
         return view('warehouse-operator.stock-input.index');
     }
 
+    // API untuk scan Barcode box (dari hardware scanner)
+    public function scanBarcode(Request $request)
+    {
+        $validated = $request->validate([
+            'barcode' => 'required|string',
+        ]);
+
+        $barcode = $validated['barcode'];
+
+        // Cari box berdasarkan barcode/box_number
+        $box = Box::where('box_number', $barcode)->first();
+
+        if (!$box) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Box tidak ditemukan: ' . $barcode
+            ], 404);
+        }
+
+        // Check if box already attached to a pallet with stock location (SUDAH TERSIMPAN)
+        $existingPallet = $box->pallets()
+            ->whereHas('stockLocation')
+            ->first();
+
+        if ($existingPallet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Box ini sudah tersimpan di palet ' . $existingPallet->pallet_number
+            ], 400);
+        }
+
+        // Get pallet from session or create new one
+        $pallet_id = session('current_pallet_id');
+        $pallet = null;
+
+        if ($pallet_id) {
+            $pallet = Pallet::find($pallet_id);
+        }
+
+        // If no pallet yet, auto-generate new pallet number
+        if (!$pallet) {
+            $today = Carbon::now()->format('Ymd');
+            $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-' . $today . '%')
+                ->orderBy('pallet_number', 'desc')
+                ->first();
+
+            $nextNumber = 1;
+            if ($lastPallet) {
+                $lastNumber = (int) substr($lastPallet->pallet_number, -3);
+                $nextNumber = $lastNumber + 1;
+            }
+
+            $palletNumber = 'PLT-' . $today . '-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+            // Create new pallet
+            $pallet = Pallet::create([
+                'pallet_number' => $palletNumber,
+            ]);
+
+            // Store pallet ID in session
+            session(['current_pallet_id' => $pallet->id]);
+        }
+
+        // Check if box already in this pallet
+        $existingBox = $pallet->boxes()->where('box_id', $box->id)->first();
+        if ($existingBox) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Box ini sudah di-scan dalam palet ini'
+            ], 400);
+        }
+
+        // Check if box already scanned dalam session ini
+        $scannedBoxes = session('scanned_boxes', []);
+        $boxAlreadyScanned = collect($scannedBoxes)->contains('box_id', $box->id);
+        
+        if ($boxAlreadyScanned) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Box ' . $barcode . ' sudah di-scan dalam palet ini'
+            ], 400);
+        }
+
+        // Simpan ke session untuk preview
+        $scannedBoxes[] = [
+            'box_id' => $box->id,
+            'box_number' => $box->box_number,
+            'part_number' => $box->part_number,
+            'part_name' => $box->part_name,
+            'pcs_quantity' => $box->pcs_quantity,
+            'qty_box' => $box->qty_box,
+            'type_box' => $box->type_box,
+        ];
+        session(['scanned_boxes' => $scannedBoxes]);
+
+        // Create pallet item for preview
+        $palletItem = $pallet->items()
+            ->where('part_number', $box->part_number)
+            ->first();
+
+        if (!$palletItem) {
+            $palletItem = PalletItem::create([
+                'pallet_id' => $pallet->id,
+                'part_number' => $box->part_number,
+                'box_quantity' => 1,
+                'pcs_quantity' => $box->pcs_quantity,
+            ]);
+        } else {
+            $palletItem->increment('box_quantity');
+            $palletItem->increment('pcs_quantity', $box->pcs_quantity);
+        }
+
+        // Get updated pallet info
+        $pallet->load('boxes');
+
+        return response()->json([
+            'success' => true,
+            'pallet_id' => $pallet->id,
+            'pallet_number' => $pallet->pallet_number,
+            'box_number' => $box->box_number,
+            'part_number' => $box->part_number,
+            'part_name' => $box->part_name,
+            'pcs_quantity' => $box->pcs_quantity,
+            'boxes_in_pallet' => count($scannedBoxes),
+        ]);
+    }
+
     // API untuk scan QR box dan create/update palet
     public function scanBox(Request $request)
     {

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BoxController;
+use App\Http\Controllers\BarcodeController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\StockInputController;
 use App\Http\Controllers\StockViewController;
@@ -27,10 +28,17 @@ Route::middleware('auth')->group(function () {
         Route::delete('/boxes/{box}', [BoxController::class, 'destroy'])->name('boxes.destroy');
     });
 
+    // Barcode Scanner Routes
+    Route::middleware('role:admin,warehouse_operator')->group(function () {
+        Route::get('/barcode-scanner', [BarcodeController::class, 'scanner'])->name('barcode.scanner');
+        Route::post('/barcode-scanner/scan', [BarcodeController::class, 'scan'])->name('barcode.scan');
+    });
+
     // Stock Input Routes (Warehouse Operator) - Scan QR Box
     Route::middleware('role:warehouse_operator,admin')->group(function () {
         Route::get('/stock-input', [StockInputController::class, 'index'])->name('stock-input.index');
         Route::post('/stock-input/scan-box', [StockInputController::class, 'scanBox'])->name('stock-input.scan-box');
+        Route::post('/stock-input/scan-barcode', [StockInputController::class, 'scanBarcode'])->name('stock-input.scan-barcode');
         Route::get('/stock-input/get-pallet-data', [StockInputController::class, 'getCurrentPalletData'])->name('stock-input.get-pallet-data');
         Route::post('/stock-input/clear-session', [StockInputController::class, 'clearSession'])->name('stock-input.clear-session');
         Route::post('/stock-input/store', [StockInputController::class, 'store'])->name('stock-input.store');

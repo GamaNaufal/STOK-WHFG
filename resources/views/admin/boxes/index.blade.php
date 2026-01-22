@@ -12,9 +12,11 @@
                 </h1>
                 <p class="text-muted">Daftar box yang sudah dibuat dengan kode QR unik</p>
             </div>
-            <a href="{{ route('boxes.create') }}" class="btn btn-lg" style="background: #0C7779; color: white; border: none;">
-                <i class="bi bi-plus-circle"></i> Buat Box Baru
-            </a>
+            <div class="gap-2" style="display: flex; gap: 10px;">
+                <a href="{{ route('boxes.create') }}" class="btn btn-lg" style="background: #0C7779; color: white; border: none;">
+                    <i class="bi bi-plus-circle"></i> Buat Box Baru
+                </a>
+            </div>
         </div>
     </div>
 </div>
@@ -80,7 +82,65 @@
                 </table>
             </div>
             <div class="card-footer bg-white border-top">
-                {{ $boxes->links() }}
+                <nav aria-label="Page navigation">
+                    <ul class="pagination justify-content-center mb-0" style="gap: 8px;">
+                        {{-- Previous Button --}}
+                        @if ($boxes->onFirstPage())
+                            <li class="page-item disabled">
+                                <span class="page-link" style="background: #f0f0f0; border: 2px solid #ddd; color: #ccc; border-radius: 8px; padding: 8px 16px; cursor: not-allowed;">
+                                    <i class="bi bi-chevron-left"></i> Sebelumnya
+                                </span>
+                            </li>
+                        @else
+                            <li class="page-item">
+                                <a class="page-link" href="{{ $boxes->previousPageUrl() }}" style="background: #0C7779; border: 2px solid #0C7779; color: white; border-radius: 8px; padding: 8px 16px; text-decoration: none; transition: all 0.3s ease;">
+                                    <i class="bi bi-chevron-left"></i> Sebelumnya
+                                </a>
+                            </li>
+                        @endif
+
+                        {{-- Page Numbers --}}
+                        @foreach ($boxes->getUrlRange(1, $boxes->lastPage()) as $page => $url)
+                            @if ($page == $boxes->currentPage())
+                                <li class="page-item active">
+                                    <span class="page-link" style="background: #0C7779; border: 2px solid #0C7779; color: white; border-radius: 8px; padding: 8px 12px; min-width: 40px; text-align: center;">
+                                        {{ $page }}
+                                    </span>
+                                </li>
+                            @else
+                                <li class="page-item">
+                                    <a class="page-link" href="{{ $url }}" style="background: white; border: 2px solid #ddd; color: #0C7779; border-radius: 8px; padding: 8px 12px; min-width: 40px; text-align: center; text-decoration: none; transition: all 0.3s ease;">
+                                        {{ $page }}
+                                    </a>
+                                </li>
+                            @endif
+                        @endforeach
+
+                        {{-- Next Button --}}
+                        @if ($boxes->hasMorePages())
+                            <li class="page-item">
+                                <a class="page-link" href="{{ $boxes->nextPageUrl() }}" style="background: #0C7779; border: 2px solid #0C7779; color: white; border-radius: 8px; padding: 8px 16px; text-decoration: none; transition: all 0.3s ease;">
+                                    Berikutnya <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        @else
+                            <li class="page-item disabled">
+                                <span class="page-link" style="background: #f0f0f0; border: 2px solid #ddd; color: #ccc; border-radius: 8px; padding: 8px 16px; cursor: not-allowed;">
+                                    Berikutnya <i class="bi bi-chevron-right"></i>
+                                </span>
+                            </li>
+                        @endif
+                    </ul>
+                </nav>
+
+                <style>
+                    .page-link:hover:not(.disabled) {
+                        background: #0a5a5c !important;
+                        border-color: #0a5a5c !important;
+                        transform: translateY(-2px);
+                        box-shadow: 0 4px 8px rgba(12, 119, 121, 0.3);
+                    }
+                </style>
             </div>
         </div>
     </div>
