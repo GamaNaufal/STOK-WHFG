@@ -17,7 +17,7 @@ class StockWithdrawalController extends Controller
      */
     public function index()
     {
-        return view('warehouse-operator.stock-withdrawal.index');
+        return view('warehouse.stock-withdrawal.index');
     }
 
     /**
@@ -199,6 +199,162 @@ class StockWithdrawalController extends Controller
     }
 
     /**
+     * Store withdrawal - process multiple items from cart
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            'items' => 'required|array',
+            'items.*.part_number' => 'required|string',
+            'items.*.pcs_quantity' => 'required|integer|min:1',
+        ]);
+
+        $items = $request->input('items');
+
+        try {
+            DB::beginTransaction();
+
+            $batchId = Str::uuid();
+
+            // Process each item in the cart
+            foreach ($items as $cartItem) {
+                $partNumber = $cartItem['part_number'];
+                $requestedQty = $cartItem['pcs_quantity'];
+
+                // Get total available stock
+                $totalStock = $this->getTotalStockForPart($partNumber);
+
+                if ($totalStock < $requestedQty) {
+                    throw new \Exception("Stok tidak cukup untuk part {$partNumber}! Available: {$totalStock} PCS, Requested: {$requestedQty} PCS");
+                }
+
+                $remainingQty = $requestedQty;
+
+                // Get all pallet items with this part number, sorted by FIFO
+                $palletItems = PalletItem::where('part_number', $partNumber)
+                    ->where('pcs_quantity', '>', 0)
+                    ->whereHas('pallet', function ($q) {
+                        $q->whereHas('stockLocation');
+                    })
+                    ->with(['pallet' => function ($q) {
+                        $q->with('stockLocation');
+                    }])
+                    ->orderBy('created_at', 'asc')
+                    ->get();
+
+                foreach ($palletItems as $item) {
+                    if ($remainingQty <= 0) {
+                        break;
+                    }
+
+                    if ($item->pcs_quantity <= 0) {
+                        continue;
+                    }
+
+                    // Determine how much to take from this pallet item
+                    $takeQty = min($remainingQty, $item->pcs_quantity);
+                    
+                    // Calculate PCS per box
+                    $pcsPerBox = $item->box_quantity > 0 ? $item->pcs_quantity / $item->box_quantity : 0;
+                    
+                    // Calculate how many boxes to reduce
+                    $boxesToReduce = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
+                    
+                    // Get warehouse location
+                    $stockLocation = $item->pallet->stockLocation;
+                    $warehouseLocation = $stockLocation ? $stockLocation->warehouse_location : 'Unknown';
+
+                    // Create withdrawal record
+                    StockWithdrawal::create([
+                        'withdrawal_batch_id' => $batchId,
+                        'user_id' => auth()->id(),
+                        'pallet_item_id' => $item->id,
+                        'part_number' => $partNumber,
+                        'pcs_quantity' => $takeQty,
+                        'box_quantity' => $boxesToReduce,
+                        'warehouse_location' => $warehouseLocation,
+                        'status' => 'completed',
+                        'notes' => null,
+                        'withdrawn_at' => now(),
+                    ]);
+
+                    // Update pallet item quantity
+                    $item->pcs_quantity -= $takeQty;
+                    $item->box_quantity -= $boxesToReduce;
+                    $item->save();
+
+                    $remainingQty -= $takeQty;
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengambilan stok dari ' . count($items) . ' part berhasil diproses',
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+    }
+
+    /**
+     * Preview locations for multiple items from cart
+     */
+    public function previewCart(Request $request)
+    {
+        $request->validate([
+            'items' => 'required|array',
+            'items.*.part_number' => 'required|string',
+            'items.*.pcs_quantity' => 'required|integer|min:1',
+        ]);
+
+        $items = $request->input('items');
+        $previewData = [];
+
+        try {
+            foreach ($items as $cartItem) {
+                $partNumber = $cartItem['part_number'];
+                $requestedQty = $cartItem['pcs_quantity'];
+
+                // Get total available stock
+                $totalStock = $this->getTotalStockForPart($partNumber);
+
+                if ($totalStock < $requestedQty) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Stok tidak cukup untuk part {$partNumber}! Available: {$totalStock} PCS, Requested: {$requestedQty} PCS",
+                    ], 422);
+                }
+
+                // Get locations in FIFO order
+                $locations = $this->getLocationsByFIFO($partNumber, $requestedQty);
+
+                $previewData[] = [
+                    'part_number' => $partNumber,
+                    'requested_qty' => $requestedQty,
+                    'total_available' => $totalStock,
+                    'locations' => $locations,
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'preview' => $previewData,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Undo a withdrawal
      */
     public function undo($withdrawalId)
@@ -341,7 +497,7 @@ class StockWithdrawalController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(50);
 
-        return view('warehouse-operator.stock-withdrawal.history', [
+        return view('warehouse.stock-withdrawal.history', [
             'withdrawals' => $withdrawals,
         ]);
     }

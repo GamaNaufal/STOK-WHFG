@@ -47,8 +47,10 @@ Route::middleware('auth')->group(function () {
     // Stock Withdrawal Routes (Warehouse Operator)
     Route::middleware('role:warehouse_operator,admin')->group(function () {
         Route::get('/stock-withdrawal', [StockWithdrawalController::class, 'index'])->name('stock-withdrawal.index');
+        Route::post('/stock-withdrawal', [StockWithdrawalController::class, 'store'])->name('stock-withdrawal.store');
         Route::post('/stock-withdrawal/search', [StockWithdrawalController::class, 'searchParts'])->name('stock-withdrawal.search');
         Route::post('/stock-withdrawal/preview', [StockWithdrawalController::class, 'preview'])->name('stock-withdrawal.preview');
+        Route::post('/stock-withdrawal/preview-cart', [StockWithdrawalController::class, 'previewCart'])->name('stock-withdrawal.preview-cart');
         Route::post('/stock-withdrawal/confirm', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm');
         Route::post('/stock-withdrawal/{withdrawal}/undo', [StockWithdrawalController::class, 'undo'])->name('stock-withdrawal.undo');
         Route::get('/stock-withdrawal/history', [StockWithdrawalController::class, 'history'])->name('stock-withdrawal.history');
@@ -57,6 +59,10 @@ Route::middleware('auth')->group(function () {
     // Stock View Routes (All users)
     Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
     Route::get('/stock-view/{pallet}', [StockViewController::class, 'show'])->name('stock-view.show');
+
+    // API Routes
+    Route::get('/api/stock/by-part', [StockViewController::class, 'apiGetStockByPart']);
+    Route::get('/api/stock/part-detail/{partNumber}', [StockViewController::class, 'apiGetPartDetail']);
 
     // Report Routes (Warehouse Operator & Admin)
     Route::middleware('role:warehouse_operator,admin')->group(function () {

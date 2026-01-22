@@ -53,4 +53,66 @@ class StockViewController extends Controller
 
         return view('shared.stock-view.detail', compact('pallet'));
     }
+
+    // API: Get stock grouped by part number
+    public function apiGetStockByPart()
+    {
+        $items = PalletItem::where(function ($q) {
+                $q->where('pcs_quantity', '>', 0)
+                  ->orWhere('box_quantity', '>', 0);
+            })
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        $groupedByPart = $items->groupBy('part_number')->map(function ($itemGroup) {
+            $totalPcs = $itemGroup->sum('pcs_quantity');
+            $totalBox = $itemGroup->sum('box_quantity');
+            
+            return [
+                'part_number' => $itemGroup->first()->part_number,
+                'total_box' => (int)$totalBox,
+                'total_pcs' => $totalPcs,
+            ];
+        })->values();
+
+        return response()->json($groupedByPart);
+    }
+
+    // API: Get detailed information for a specific part number
+    public function apiGetPartDetail($partNumber)
+    {
+        $items = PalletItem::with('pallet.stockLocation')
+            ->where('part_number', $partNumber)
+            ->where(function ($q) {
+                $q->where('pcs_quantity', '>', 0)
+                  ->orWhere('box_quantity', '>', 0);
+            })
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        if ($items->isEmpty()) {
+            return response()->json(['error' => 'Part not found'], 404);
+        }
+
+        $totalPcs = $items->sum('pcs_quantity');
+        $totalBox = $items->sum('box_quantity');
+
+        $palletDetails = $items->map(function ($item) {
+            return [
+                'pallet_number' => $item->pallet->pallet_number,
+                'pcs_quantity' => $item->pcs_quantity,
+                'box_quantity' => $item->box_quantity,
+                'location' => $item->pallet->stockLocation ? $item->pallet->stockLocation->warehouse_location : 'N/A',
+                'created_at' => $item->created_at->format('d/m/Y H:i'),
+            ];
+        });
+
+        return response()->json([
+            'part_number' => $partNumber,
+            'total_pcs' => $totalPcs,
+            'total_box' => $totalBox,
+            'pallet_count' => $items->count(),
+            'pallets' => $palletDetails,
+        ]);
+    }
 }

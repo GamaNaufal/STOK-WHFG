@@ -52,7 +52,7 @@ class ReportController extends Controller
         // Get all users for filter
         $users = \App\Models\User::whereIn('role', ['warehouse_operator', 'admin'])->get();
 
-        return view('reports.withdrawal', [
+        return view('warehouse.reports.withdrawal', [
             'withdrawals' => $withdrawals,
             'totalWithdrawals' => $totalWithdrawals,
             'totalPcsWithdrawn' => $totalPcsWithdrawn,
@@ -117,7 +117,7 @@ class ReportController extends Controller
         // Get unique warehouse locations from stock_inputs
         $locations = StockInput::distinct('warehouse_location')->pluck('warehouse_location');
 
-        return view('reports.stock-input', [
+        return view('warehouse.reports.stock-input', [
             'stockInputs' => $stockInputs,
             'totalRecords' => $totalRecords,
             'totalItems' => $totalPcs,
