@@ -9,6 +9,7 @@ use App\Models\StockLocation;
 use App\Models\StockInput;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class StockInputController extends Controller
 {
@@ -350,64 +351,101 @@ class StockInputController extends Controller
     {
         $validated = $request->validate([
             'pallet_id' => 'required|exists:pallets,id',
-            'warehouse_location' => 'required|string',
+            // 'warehouse_location' => 'required|string', // Validasi manual di bawah karena bisa 'location_id' atau text
         ]);
-
-        $pallet = Pallet::with(['items'])->findOrFail($validated['pallet_id']);
-
-        // Verify pallet has items (scanned QR)
-        if ($pallet->items->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Palet harus memiliki minimal 1 box yang di-scan'
-            ], 400);
-        }
-
-        // Get scanned boxes dari session
-        $scannedBoxes = session('scanned_boxes', []);
         
-        if (empty($scannedBoxes)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Tidak ada box yang ter-scan'
-            ], 400);
+        // Validasi lokasi wajib
+        if (!$request->input('location_id') && !$request->input('warehouse_location')) {
+             return response()->json(['message' => 'Lokasi penyimpanan harus diisi!'], 422);
         }
 
-        // Attach boxes ke palet sekarang (saat user klik Save)
-        foreach ($scannedBoxes as $scannedBox) {
-            // Double check box ada di database
-            $box = Box::find($scannedBox['box_id']);
-            if ($box) {
-                // Attach box ke palet (jika belum)
-                $pallet->boxes()->syncWithoutDetaching([$box->id]);
+        DB::beginTransaction(); // Start transaction to ensure data integrity
+
+        try {
+
+            $pallet = Pallet::with(['items'])->findOrFail($validated['pallet_id']);
+
+            // Verify pallet has items (scanned QR) (INI KHUSUS UNTUK FLOW SCAN QR BARU - JIKA KITA PAKAI LOGIC DI BAWAH, LOGIC INI MUNGKIN PERLU DISESUAIKAN)
+            // KARENA SAAT INI ITEM BELUM DI ATTACH KE PALLET (MASIH DI SESSION)
+            // TAPI DI KODE SEBELUMNYA `items` RELASI KE `PalletItems` SUDAH DIBUAT SAAT SCAN? TIDAK, SAAT SCAN HANYA SESSION.
+            
+            // LOGIC KOREKSI: Relasi items (PalletItems) baru dibuat di bawah, jadi pengecekan valid disini harusnya check Session.
+            
+            // Get scanned boxes dari session
+            $scannedBoxes = session('scanned_boxes', []);
+            
+            if (empty($scannedBoxes)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada box yang ter-scan'
+                ], 400);
             }
-        }
 
-        // Create stock location
-        StockLocation::create([
-            'pallet_id' => $validated['pallet_id'],
-            'warehouse_location' => $validated['warehouse_location'],
-            'stored_at' => now(),
-        ]);
+            // Attach boxes ke palet sekarang (saat user klik Save)
+            foreach ($scannedBoxes as $scannedBox) {
+                // Double check box ada di database
+                $box = Box::find($scannedBox['box_id']);
+                if ($box) {
+                    // Cek duplikasi di database untuk box ini kalau-kalau sudah ada orang lain yang submit
+                    // (Logic ini ada di BoxController tapi disini kita lakukan manual input data)
+                    // Disini kita asumsi aman karena Box unik
 
-        // Create stock input record for each pallet item
-        foreach ($pallet->items as $item) {
-            StockInput::create([
+                    // Attach ke pivot pallet_boxes
+                    $pallet->boxes()->attach($box->id);
+
+                    // Buat record PalletItem (untuk history dan tracking qty detail)
+                    PalletItem::create([
+                        'pallet_id' => $pallet->id,
+                        'part_number' => $box->part_number,
+                        'box_quantity' => 1, // Per box selalu 1 box
+                        'pcs_quantity' => $box->pcs_quantity
+                    ]);
+                }
+            }
+
+            // 2. Simpan lokasi palet
+            $locationId = $request->input('location_id'); // ID dari MasterLocation
+            $locationCode = null;
+
+            if ($locationId) {
+                // Cari MasterLocation
+                $masterLocation = \App\Models\MasterLocation::find($locationId);
+                if ($masterLocation && !$masterLocation->is_occupied) {
+                     $locationCode = $masterLocation->code;
+                     
+                     // Update status MasterLocation
+                     $masterLocation->update([
+                         'is_occupied' => true,
+                         'current_pallet_id' => $pallet->id
+                     ]);
+                } else {
+                     // Fallback jika lokasi sudah terisi tapi user maksa (seharusnya divalidasi UI)
+                     throw new \Exception("Lokasi yang dipilih sudah terisi!");
+                }
+            } else {
+                 $locationCode = $request->input('warehouse_location'); 
+                 // Kalau input text manual, kita tidak update master location
+            }
+
+            StockLocation::create([
                 'pallet_id' => $pallet->id,
-                'pallet_item_id' => $item->id,
-                'user_id' => auth()->id(),
-                'warehouse_location' => $validated['warehouse_location'],
-                'pcs_quantity' => $item->pcs_quantity,
-                'box_quantity' => $item->box_quantity,
+                'warehouse_location' => $locationCode ?? 'Unknown',
                 'stored_at' => now(),
             ]);
+
+            // Clear session data
+            session()->forget('scanned_boxes');
+            session()->forget('current_pallet_id'); // Jangan lupa clear pallet ID juga
+
+            DB::commit(); // Commit transaction
+
+            return response()->json(['message' => 'Stok berhasil disimpan!'], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack(); // Rollback transaction on error
+            // Log the error for debugging
+             \Illuminate\Support\Facades\Log::error('Stock Input Error: ' . $e->getMessage());
+            return response()->json(['message' => 'Terjadi kesalahan saat menyimpan data: ' . $e->getMessage()], 500);
         }
-
-        // Clear session
-        session()->forget('current_pallet_id');
-        session()->forget('scanned_boxes');
-
-        return redirect()->route('stock-input.index')
-            ->with('success', 'Stok berhasil disimpan ke gudang!');
     }
 }

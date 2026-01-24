@@ -19,13 +19,16 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Admin Routes - Box Management (QR Code Generation)
+    // Admin Routes - Box Management (QR Code Generation) & Master Locations
     Route::middleware('role:admin')->group(function () {
         Route::get('/boxes', [BoxController::class, 'index'])->name('boxes.index');
         Route::get('/boxes/create', [BoxController::class, 'create'])->name('boxes.create');
         Route::post('/boxes', [BoxController::class, 'store'])->name('boxes.store');
         Route::get('/boxes/{box}', [BoxController::class, 'show'])->name('boxes.show');
         Route::delete('/boxes/{box}', [BoxController::class, 'destroy'])->name('boxes.destroy');
+
+        // CRUD Master Locations
+        Route::resource('locations', \App\Http\Controllers\MasterLocationController::class);
     });
 
     // Barcode Scanner Routes
@@ -63,6 +66,8 @@ Route::middleware('auth')->group(function () {
     // API Routes
     Route::get('/api/stock/by-part', [StockViewController::class, 'apiGetStockByPart']);
     Route::get('/api/stock/part-detail/{partNumber}', [StockViewController::class, 'apiGetPartDetail']);
+    Route::get('/api/stock/pallet-detail/{palletId}', [StockViewController::class, 'apiGetPalletDetail']);
+    Route::get('/api/locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable']); // Search Available Locations
 
     // Report Routes (Warehouse Operator & Admin)
     Route::middleware('role:warehouse_operator,admin')->group(function () {

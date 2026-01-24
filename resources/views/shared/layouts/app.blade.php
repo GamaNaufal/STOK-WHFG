@@ -165,6 +165,12 @@
                                     <i class="bi bi-qr-code"></i> Kelola Box QR
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('locations*') ? 'active' : '' }}" 
+                                   href="{{ route('locations.index') }}">
+                                    <i class="bi bi-geo-alt"></i> Kelola Lokasi
+                                </a>
+                            </li>
                             <hr class="my-2" style="border-color: rgba(255,255,255,0.2);">
                             <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('stock-input*') ? 'active' : '' }}" 

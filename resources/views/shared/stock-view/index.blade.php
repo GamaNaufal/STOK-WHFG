@@ -40,6 +40,7 @@
     <div class="col-12">
         <div class="position-relative">
             <form method="GET" action="{{ route('stock-view.index') }}" id="searchForm" class="input-group input-group-lg">
+                <input type="hidden" name="view_mode" value="{{ $viewMode }}">
                 <span class="input-group-text border-0" style="background: #0C7779; color: white; border-radius: 10px 0 0 10px; font-size: 1.2rem;">
                     <i class="bi bi-search"></i>
                 </span>
@@ -52,7 +53,7 @@
                     <i class="bi bi-search"></i> Cari
                 </button>
                 @if($search)
-                    <a href="{{ route('stock-view.index') }}" class="btn btn-outline-danger border-0" style="border-radius: 0 10px 10px 0; background: white;">
+                    <a href="{{ route('stock-view.index') }}?view_mode={{ $viewMode }}" class="btn btn-outline-danger border-0" style="border-radius: 0 10px 10px 0; background: white;">
                         <i class="bi bi-x-circle"></i> Reset
                     </a>
                 @endif
@@ -67,41 +68,54 @@
 </div>
 
 <!-- Summary Statistics -->
-@if($groupedByPart->count() > 0)
+@if($summaryTotalParts > 0 || $summaryTotalBox > 0)
     <div class="row mb-4 g-3">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
                 <div class="card-body" style="padding: 24px;">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Part Numbers</p>
-                            <h2 class="fw-bold" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $groupedByPart->count() }}</h2>
+                            <h2 class="fw-bold" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $summaryTotalParts }}</h2>
                         </div>
                         <i class="bi bi-tag" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
+                <div class="card-body" style="padding: 24px;">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Pallet</p>
+                            <h2 class="fw-bold" style="color: #005461; margin: 0; font-size: 2.5rem;">{{ $totalPallets }}</h2>
+                        </div>
+                        <i class="bi bi-layers" style="font-size: 2.5rem; color: #005461; opacity: 0.2;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
             <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
                 <div class="card-body" style="padding: 24px;">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Box</p>
-                            <h2 class="fw-bold" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ (int) $groupedByPart->sum('total_box') }}</h2>
+                            <h2 class="fw-bold" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ (int) $summaryTotalBox }}</h2>
                         </div>
                         <i class="bi bi-box2" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
                     </div>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
             <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
                 <div class="card-body" style="padding: 24px;">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
                             <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total PCS</p>
-                            <h2 class="fw-bold" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $groupedByPart->sum('total_pcs') }}</h2>
+                            <h2 class="fw-bold" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $summaryTotalPcs }}</h2>
                         </div>
                         <i class="bi bi-stack" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
                     </div>
@@ -111,10 +125,28 @@
     </div>
 @endif
 
+<!-- View Mode Toggle -->
+<div class="row mb-3">
+    <div class="col-12 d-flex justify-content-end">
+        <div class="btn-group shadow-sm" style="border-radius: 8px;">
+            <a href="{{ route('stock-view.index', ['view_mode' => 'part', 'search' => $search]) }}" 
+               class="btn {{ $viewMode === 'part' ? 'btn-primary' : 'btn-light' }}"
+               style="{{ $viewMode === 'part' ? 'background: #0C7779; border-color: #0C7779;' : '' }}">
+                <i class="bi bi-tag"></i> By Part Number
+            </a>
+            <a href="{{ route('stock-view.index', ['view_mode' => 'pallet', 'search' => $search]) }}" 
+               class="btn {{ $viewMode === 'pallet' ? 'btn-primary' : 'btn-light' }}"
+               style="{{ $viewMode === 'pallet' ? 'background: #0C7779; border-color: #0C7779;' : '' }}">
+                <i class="bi bi-layers"></i> By Pallet
+            </a>
+        </div>
+    </div>
+</div>
+
 <!-- Main Table -->
 <div class="row">
     <div class="col-12">
-        @if($groupedByPart->count() > 0)
+        @if(($viewMode === 'part' && $groupedByPart->count() > 0) || ($viewMode === 'pallet' && $groupedByPallet->count() > 0))
             <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
                 <!-- Table Header -->
                 <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
@@ -130,50 +162,104 @@
                     <table class="table table-hover mb-0" style="margin-bottom: 0;">
                         <thead style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
                             <tr>
-                                <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                    <i class="bi bi-tag"></i> No Part
-                                </th>
-                                <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                    <i class="bi bi-box2"></i> Total Box
-                                </th>
-                                <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                    <i class="bi bi-stack"></i> Total PCS
-                                </th>
-                                <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                    Aksi
-                                </th>
+                                @if($viewMode === 'part')
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                        <i class="bi bi-tag"></i> No Part
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                        <i class="bi bi-box2"></i> Total Box
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                        <i class="bi bi-stack"></i> Total PCS
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                        Aksi
+                                    </th>
+                                @else
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                        <i class="bi bi-layers"></i> No Pallet
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                        <i class="bi bi-geo-alt"></i> Lokasi
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                        <i class="bi bi-box2"></i> Total Box
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                        <i class="bi bi-stack"></i> Total PCS
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                        Aksi
+                                    </th>
+                                @endif
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($groupedByPart as $partData)
-                                <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
-                                    <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
-                                        <span style="background: #f0f4f8; color: #0C7779; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
-                                            {{ $partData['part_number'] }}
-                                        </span>
-                                    </td>
-                                    <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
-                                        {{ (int) $partData['total_box'] }}
-                                    </td>
-                                    <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
-                                        {{ $partData['total_pcs'] }}
-                                    </td>
-                                    <td style="padding: 16px 20px; text-align: center;">
-                                        <button type="button" class="btn btn-sm" 
-                                                onclick="viewDetail('{{ $partData['part_number'] }}', {{ $partData['total_box'] }}, {{ $partData['total_pcs'] }}, {{ $partData['items']->count() }})"
-                                                style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
-                                                       color: white; 
-                                                       border: none; 
-                                                       border-radius: 8px;
-                                                       padding: 8px 16px;
-                                                       font-weight: 600;
-                                                       font-size: 13px;
-                                                       transition: all 0.3s ease;">
-                                            <i class="bi bi-eye"></i> Detail
-                                        </button>
-                                    </td>
-                                </tr>
-                            @endforeach
+                            @if($viewMode === 'part')
+                                @foreach($groupedByPart as $partData)
+                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
+                                            <span style="background: #f0f4f8; color: #0C7779; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
+                                                {{ $partData['part_number'] }}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
+                                            {{ (int) $partData['total_box'] }}
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
+                                            {{ $partData['total_pcs'] }}
+                                        </td>
+                                        <td style="padding: 16px 20px; text-align: center;">
+                                            <button type="button" class="btn btn-sm" 
+                                                    onclick="viewDetail('{{ $partData['part_number'] }}', {{ $partData['total_box'] }}, {{ $partData['total_pcs'] }}, {{ $partData['items']->count() }})"
+                                                    style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
+                                                           color: white; 
+                                                           border: none; 
+                                                           border-radius: 8px;
+                                                           padding: 8px 16px;
+                                                           font-weight: 600;
+                                                           font-size: 13px;
+                                                           transition: all 0.3s ease;">
+                                                <i class="bi bi-eye"></i> Detail
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @else
+                                @foreach($groupedByPallet as $palletData)
+                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
+                                            <span style="background: #fff8e1; color: #b45309; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
+                                                {{ $palletData['pallet_number'] }}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #4b5563; font-size: 14px;">
+                                            <i class="bi bi-geo-alt me-1"></i> {{ $palletData['location'] }}
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
+                                            {{ (int) $palletData['total_box'] }}
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
+                                            {{ $palletData['total_pcs'] }}
+                                        </td>
+                                        <td style="padding: 16px 20px; text-align: center;">
+                                            <button type="button" class="btn btn-sm"
+                                               onclick="viewPalletDetail({{ $palletData['pallet_id'] }})" 
+                                               style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
+                                                      color: white; 
+                                                      border: none; 
+                                                      border-radius: 8px;
+                                                      padding: 8px 16px;
+                                                      font-weight: 600;
+                                                      font-size: 13px;
+                                                      transition: all 0.3s ease;
+                                                      display: inline-block;">
+                                                <i class="bi bi-eye"></i> Lihat Isi
+                                            </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @endif
                         </tbody>
                     </table>
                 </div>
@@ -285,6 +371,74 @@
     </div>
 </div>
 
+<!-- Modal Pallet Detail -->
+<div class="modal fade" id="palletDetailModal" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(5px);">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
+                        color: white; 
+                        padding: 24px;
+                        border-radius: 12px 12px 0 0;
+                        position: sticky;
+                        top: 0;
+                        z-index: 1020;">
+                <h5 class="modal-title fw-bold" style="margin: 0; font-size: 18px;">
+                    <i class="bi bi-layers"></i> Detail Isi Pallet
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 24px;">
+                <div id="palletDetailLoadingSpinner" style="text-align: center; padding: 40px;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div id="palletDetailContent" style="display: none;">
+                    <div class="row g-3 mb-4">
+                        <div class="col-6">
+                            <p class="text-muted small" style="margin-bottom: 4px; font-weight: 600;">No Pallet</p>
+                            <p style="font-size: 18px; font-weight: 700; color: #0C7779; margin: 0;" id="modalPalletNumber">-</p>
+                        </div>
+                        <div class="col-6">
+                            <p class="text-muted small" style="margin-bottom: 4px; font-weight: 600;">Lokasi</p>
+                            <p style="font-size: 18px; font-weight: 700; color: #4b5563; margin: 0;" id="modalPalletLocation">-</p>
+                        </div>
+                    </div>
+
+                    <!-- Items Table -->
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <h6 class="fw-bold text-dark mb-3" style="color: #0C7779; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px;">
+                                <i class="bi bi-box-seam"></i> Daftar Item
+                            </h6>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover" style="margin: 0;">
+                                    <thead style="background: #f9fafb; border-top: 1px solid #e5e7eb;">
+                                        <tr>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">No Part</th>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Box</th>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">PCS</th>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Tanggal Masuk</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="palletItemsTable">
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted py-4">Loading...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #e5e7eb; padding: 16px 24px;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" style="border-radius: 8px; font-weight: 600;">Tutup</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
     .search-dropdown {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -327,6 +481,7 @@
     const searchDropdown = document.getElementById('searchDropdown');
     const searchForm = document.getElementById('searchForm');
     const detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+    const palletDetailModal = new bootstrap.Modal(document.getElementById('palletDetailModal'));
 
     function loadSearchSuggestions(searchTerm) {
         let filtered = allParts;
@@ -445,6 +600,52 @@
             });
 
         detailModal.show();
+    }
+
+    // View pallet detail modal
+    function viewPalletDetail(palletId) {
+        // Show loading spinner
+        document.getElementById('palletDetailLoadingSpinner').style.display = 'block';
+        document.getElementById('palletDetailContent').style.display = 'none';
+        
+        // Fetch detailed pallet information from API
+        fetch(`/api/stock/pallet-detail/${palletId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                    return;
+                }
+
+                // Populate summary
+                document.getElementById('modalPalletNumber').textContent = data.pallet_number;
+                document.getElementById('modalPalletLocation').textContent = data.location;
+
+                // Populate items table
+                const tableBody = document.getElementById('palletItemsTable');
+                if (data.items.length === 0) {
+                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Tidak ada item di pallet ini</td></tr>';
+                } else {
+                    tableBody.innerHTML = data.items.map(item => `
+                        <tr>
+                            <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.part_number}</td>
+                            <td style="color: #6b7280; padding: 12px 8px;">${item.box_quantity}</td>
+                            <td style="color: #6b7280; padding: 12px 8px;">${item.pcs_quantity}</td>
+                            <td style="color: #6b7280; padding: 12px 8px;">${item.created_at}</td>
+                        </tr>
+                    `).join('');
+                }
+
+                // Show content and hide spinner
+                document.getElementById('palletDetailContent').style.display = 'block';
+                document.getElementById('palletDetailLoadingSpinner').style.display = 'none';
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('palletDetailLoadingSpinner').innerHTML = '<p class="text-danger">Gagal memuat data</p>';
+            });
+            
+        palletDetailModal.show();
     }
 
     // Export to Excel

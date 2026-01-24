@@ -180,16 +180,30 @@
                                 <label class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
                                     <i class="bi bi-geo-alt" style="color: #0C7779;"></i> Lokasi Penyimpanan
                                 </label>
-                                <input type="text" class="form-control form-control-lg" id="warehouse_location" 
-                                       placeholder="Contoh: A-1-1 (Rak A, Baris 1, Posisi 1)"
-                                       style="border: 2px solid #e5e7eb;
-                                              border-radius: 10px;
-                                              padding: 12px 16px;
-                                              font-size: 16px;
-                                              transition: all 0.3s ease;">
-                                <small class="text-muted d-block mt-3" style="font-size: 14px;">
-                                    <i class="bi bi-info-circle"></i> Format lokasi: [RAK]-[BARIS]-[POSISI]<br>
-                                    Contoh: A-1-1, B-2-3, C-3-5, dll
+                                
+                                <!-- Searchable Location Input -->
+                                <div class="position-relative">
+                                    <div class="input-group">
+                                        <span class="input-group-text bg-white border-end-0" style="border: 2px solid #e5e7eb; border-right: none; border-radius: 10px 0 0 10px;"><i class="bi bi-search"></i></span>
+                                        <input type="text" id="locationSearchInput" class="form-control form-control-lg border-start-0 border-end-0" 
+                                               placeholder="Pilih atau ketik kode lokasi..." autocomplete="off"
+                                               style="border-top: 2px solid #e5e7eb; border-bottom: 2px solid #e5e7eb; padding: 12px 16px; font-size: 16px;">
+                                        <button class="btn btn-outline-secondary border-start-0" type="button" id="locationDropdownBtn" 
+                                                style="border-color: #e5e7eb; border-top: 2px solid #e5e7eb; border-bottom: 2px solid #e5e7eb; border-right: 2px solid #e5e7eb; border-radius: 0 10px 10px 0;">
+                                            <i class="bi bi-chevron-down"></i>
+                                        </button>
+                                        <input type="hidden" id="selectedLocationId" name="location_id">
+                                        <input type="hidden" id="selectedLocationCode" name="warehouse_location">
+                                    </div>
+                                    
+                                    <!-- Dropdown Results -->
+                                    <div id="locationSearchResults" class="list-group position-absolute w-100 shadow mt-1" style="z-index: 1000; display: none; max-height: 200px; overflow-y: auto;">
+                                        <!-- Items will be populated via JS -->
+                                    </div>
+                                </div>
+                                
+                                <small class="text-muted d-block mt-3" style="font-size: 14px;" id="locationStatusText">
+                                    <i class="bi bi-info-circle"></i> Cari lokasi kosong. Jika tidak ditemukan data master, lokasi akan disimpan sebagai teks manual.
                                 </small>
 
                                 <!-- Action Buttons -->
@@ -409,6 +423,7 @@
             success: function(data) {
                 if (data.success) {
                     const pallet = data.pallet;
+                    currentPalletId = pallet.id;
                     document.getElementById('display_pallet_number').textContent = pallet.pallet_number;
                     document.getElementById('box_count').textContent = pallet.total_boxes;
                     
@@ -513,16 +528,24 @@
 
     // Save Button
     document.getElementById('save-btn').addEventListener('click', function() {
-        const warehouse_location = document.getElementById('warehouse_location').value.trim();
+        const searchInputVal = document.getElementById('locationSearchInput').value.trim();
+        const selectedId = document.getElementById('selectedLocationId').value;
+        const selectedCode = document.getElementById('selectedLocationCode').value;
+
+        // Use selected ID/Code if available, otherwise fallback to typed text (manual input)
+        const finalLocation = selectedId ? selectedCode : searchInputVal;
         
-        if (!warehouse_location) {
+        if (!finalLocation) {
             showError('Masukkan lokasi penyimpanan terlebih dahulu');
             return;
         }
 
         const form = new FormData();
         form.append('pallet_id', currentPalletId);
-        form.append('warehouse_location', warehouse_location);
+        if (selectedId) {
+            form.append('location_id', selectedId);
+        }
+        form.append('warehouse_location', finalLocation);
         form.append('_token', '{{ csrf_token() }}');
 
         fetch('{{ route("stock-input.store") }}', {
@@ -532,14 +555,117 @@
             },
             body: form
         })
-        .then(response => response.text())
-        .then(html => {
+        .then(response => {
+            if (!response.ok) {
+                 return response.json().then(err => { throw new Error(err.message || 'Error saving stock'); });
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Success
+            alert('Stok berhasil disimpan di lokasi: ' + finalLocation); // Simple feedback
             window.location.href = '{{ route("stock-input.index") }}';
         })
         .catch(error => {
-            showError('Terjadi kesalahan saat menyimpan: ' + error);
+            showError('Terjadi kesalahan saat menyimpan: ' + error.message);
         });
     });
+
+    // --- LOCATION SEARCH LOGIC ---
+    const searchInput = document.getElementById('locationSearchInput');
+    const searchResults = document.getElementById('locationSearchResults');
+    const dropdownBtn = document.getElementById('locationDropdownBtn');
+    const selectedLocationId = document.getElementById('selectedLocationId');
+    const selectedLocationCode = document.getElementById('selectedLocationCode');
+    let searchTimeout;
+
+    // Function to perform search
+    function performSearch(query) {
+        // Clear ID if typing (forcing re-selection or manual mode)
+        selectedLocationId.value = ''; 
+        
+        // Show loading or empty state if needed
+        searchResults.style.display = 'block';
+        searchResults.innerHTML = '<div class="list-group-item text-muted">Mencari...</div>';
+
+        fetch(`/api/locations/search?q=${encodeURIComponent(query)}`)
+            .then(res => res.json())
+            .then(data => {
+                searchResults.innerHTML = '';
+                if (data.length > 0) {
+                    data.forEach(loc => {
+                        const item = document.createElement('a');
+                        item.href = '#';
+                        item.className = 'list-group-item list-group-item-action';
+                        item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
+                                            <strong>${loc.code}</strong>
+                                            <span class="badge bg-success rounded-pill" style="font-size: 0.7em;">Available</span>
+                                          </div>`;
+                        item.style.cursor = 'pointer';
+                        item.dataset.value = loc.code; // For testing
+                        item.onclick = (e) => {
+                            e.preventDefault();
+                            searchInput.value = loc.code;
+                            selectedLocationId.value = loc.id;
+                            selectedLocationCode.value = loc.code;
+                            searchResults.style.display = 'none';
+                        };
+                        searchResults.appendChild(item);
+                    });
+                    searchResults.style.display = 'block';
+                } else {
+                    if(query === '') {
+                         searchResults.innerHTML = '<div class="list-group-item text-muted">Tidak ada lokasi tersedia.</div>';
+                    } else {
+                         // Allow manual input
+                         searchResults.innerHTML = '<div class="list-group-item text-muted">Lokasi tidak ditemukan di Master. Gunakan sebagai lokasi baru?</div>';
+                    }
+                    searchResults.style.display = 'block';
+                }
+            })
+            .catch(err => {
+                console.error('Search error:', err);
+                searchResults.style.display = 'none';
+            });
+    }
+
+    if (searchInput) {
+        // Input event (typing)
+        searchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            searchTimeout = setTimeout(() => {
+                performSearch(query);
+            }, 300);
+        });
+
+        // Focus event (clicked or tabbed into)
+        searchInput.addEventListener('focus', function() {
+            if(this.value.trim() === '') {
+                 performSearch('');
+            } else {
+                 searchResults.style.display = 'block'; // Show previous results/state
+            }
+        });
+
+        // Dropdown button click
+        if (dropdownBtn) {
+            dropdownBtn.addEventListener('click', function() {
+                searchInput.focus();
+                // Toggle logic could be added here, but search('') functions as "Open Dropdown"
+                performSearch(searchInput.value.trim()); 
+            });
+        }
+
+        // Hide results on click outside
+        document.addEventListener('click', function(e) {
+            if (!searchInput.contains(e.target) && 
+                !searchResults.contains(e.target) && 
+                (!dropdownBtn || !dropdownBtn.contains(e.target))) {
+                searchResults.style.display = 'none';
+            }
+        });
+    }
 
     function showError(message) {
         errorText.textContent = message;

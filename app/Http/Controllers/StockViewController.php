@@ -13,6 +13,7 @@ class StockViewController extends Controller
     public function index(Request $request)
     {
         $search = $request->input('search');
+        $viewMode = $request->input('view_mode', 'part'); // Default view by part
 
         // Get pallet items grouped by part_number with their pallet and stock location
         // Order by created_at ASC untuk FIFO (First In First Out)
@@ -25,26 +26,70 @@ class StockViewController extends Controller
             ->orderBy('created_at', 'asc');
 
         if ($search) {
-            $query->where('part_number', 'like', '%' . $search . '%');
+            $query->where(function($q) use ($search) {
+                $q->where('part_number', 'like', '%' . $search . '%')
+                  ->orWhereHas('pallet', function($q2) use ($search) {
+                      $q2->where('pallet_number', 'like', '%' . $search . '%');
+                  });
+            });
         }
 
         $items = $query->get();
+        // Calculate total pallets from the filtered items
+        $totalPallets = $items->pluck('pallet_id')->unique()->count();
 
-        // Group by part_number and calculate totals
-        // Keep items sorted by FIFO order
-        $groupedByPart = $items->groupBy('part_number')->map(function ($itemGroup) {
-            $totalPcs = $itemGroup->sum('pcs_quantity');
-            $totalBox = $itemGroup->sum('box_quantity');
-            
-            return [
-                'part_number' => $itemGroup->first()->part_number,
-                'total_box' => (int)$totalBox, // Direct box quantity
-                'total_pcs' => $totalPcs,
-                'items' => $itemGroup->sortBy('created_at'), // FIFO order
-            ];
-        });
+        // Data for "By Part" view
+        $groupedByPart = collect();
+        if ($viewMode === 'part') {
+            $groupedByPart = $items->groupBy('part_number')->map(function ($itemGroup) {
+                $totalPcs = $itemGroup->sum('pcs_quantity');
+                $totalBox = $itemGroup->sum('box_quantity');
+                
+                return [
+                    'part_number' => $itemGroup->first()->part_number,
+                    'total_box' => (int)$totalBox, // Direct box quantity
+                    'total_pcs' => $totalPcs,
+                    'items' => $itemGroup->sortBy('created_at'), // FIFO order
+                ];
+            });
+        }
 
-        return view('shared.stock-view.index', compact('groupedByPart', 'search'));
+        // Data for "By Pallet" view
+        $groupedByPallet = collect();
+        if ($viewMode === 'pallet') {
+            $groupedByPallet = $items->groupBy('pallet_id')->map(function ($itemGroup) {
+                $firstItem = $itemGroup->first();
+                $pallet = $firstItem->pallet;
+                $totalPcs = $itemGroup->sum('pcs_quantity');
+                $totalBox = $itemGroup->sum('box_quantity');
+                
+                return [
+                    'pallet_id' => $pallet->id,
+                    'pallet_number' => $pallet->pallet_number,
+                    'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
+                    'total_box' => (int)$totalBox,
+                    'total_pcs' => $totalPcs,
+                    'items' => $itemGroup
+                ];
+            });
+        }
+        
+        // Calculate totals for summary cards regardless of view mode
+        // We use the raw items collection to calculate these compatible with both views
+        $summaryTotalBox = $items->sum('box_quantity');
+        $summaryTotalPcs = $items->sum('pcs_quantity');
+        $summaryTotalParts = $items->pluck('part_number')->unique()->count();
+
+        return view('shared.stock-view.index', compact(
+            'groupedByPart', 
+            'groupedByPallet', 
+            'search', 
+            'viewMode', 
+            'totalPallets',
+            'summaryTotalBox',
+            'summaryTotalPcs',
+            'summaryTotalParts'
+        ));
     }
 
     public function show($pallet_id)
@@ -100,19 +145,48 @@ class StockViewController extends Controller
         $palletDetails = $items->map(function ($item) {
             return [
                 'pallet_number' => $item->pallet->pallet_number,
-                'pcs_quantity' => $item->pcs_quantity,
                 'box_quantity' => $item->box_quantity,
-                'location' => $item->pallet->stockLocation ? $item->pallet->stockLocation->warehouse_location : 'N/A',
-                'created_at' => $item->created_at->format('d/m/Y H:i'),
+                'pcs_quantity' => $item->pcs_quantity,
+                'location' => $item->pallet->stockLocation->warehouse_location ?? 'Unknown',
+                'created_at' => $item->created_at->format('d M Y H:i'),
             ];
         });
 
         return response()->json([
             'part_number' => $partNumber,
+            'total_box' => (int)$totalBox,
             'total_pcs' => $totalPcs,
-            'total_box' => $totalBox,
-            'pallet_count' => $items->count(),
-            'pallets' => $palletDetails,
+            'pallet_count' => $items->pluck('pallet_id')->unique()->count(),
+            'pallets' => $palletDetails
+        ]);
+    }
+
+    // API: Get detailed information for a specific pallet
+    public function apiGetPalletDetail($palletId)
+    {
+        $pallet = Pallet::with(['items', 'stockLocation'])->find($palletId);
+
+        if (!$pallet) {
+            return response()->json(['error' => 'Pallet not found'], 404);
+        }
+
+        $items = $pallet->items->where(function ($q) {
+             // Filter hanya item yang masih ada stoknya (optional, tergantung kebutuhan user mau liat semua history atau current stock)
+             // Asumsi user ingin melihat apa yang ada di pallet SEKARANG.
+             return $q->pcs_quantity > 0 || $q->box_quantity > 0;
+        })->map(function ($item) {
+            return [
+                'part_number' => $item->part_number,
+                'box_quantity' => (int)$item->box_quantity,
+                'pcs_quantity' => (int)$item->pcs_quantity,
+                'created_at' => $item->created_at->format('d M Y H:i'),
+            ];
+        }); // Re-index keys
+
+        return response()->json([
+            'pallet_number' => $pallet->pallet_number,
+            'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
+            'items' => $items->values() // Ensure array, not object with keys
         ]);
     }
 }
