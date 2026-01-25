@@ -12,7 +12,16 @@ class DashboardController extends Controller
 {
     public function index()
     {
-        $userRole = auth()->user()->role;
+        $user = auth()->user();
+        if ($user->role !== 'admin') {
+            if ($user->role === 'warehouse_operator') return redirect()->route('stock-input.index');
+            if ($user->role === 'sales') return redirect()->route('delivery.create');
+            if ($user->role === 'ppc') return redirect()->route('delivery.approvals');
+            // If unknown role?
+            return redirect()->route('login');
+        }
+
+        $userRole = $user->role;
         $stats = [];
         
         // Helper function to calculate actual boxes based on PCS

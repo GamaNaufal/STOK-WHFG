@@ -13,11 +13,12 @@ use Illuminate\Support\Str;
 class StockWithdrawalController extends Controller
 {
     /**
-     * Show the stock withdrawal index page
+     * Show the fulfillment page for a delivery order
      */
-    public function index()
+    public function fulfillOrder($id)
     {
-        return view('warehouse.stock-withdrawal.index');
+        $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+        return view('delivery.fulfill', compact('order'));
     }
 
     /**
@@ -180,6 +181,37 @@ class StockWithdrawalController extends Controller
                 // Just mark items with 0 quantity (logical deletion)
 
                 $remainingQty -= $takeQty;
+            }
+
+            // DELIVERY ORDER FULFILLMENT LOGIC
+            // If this withdrawal is linked to a DeliveryOrderItem
+            $deliveryOrderItemId = $request->input('delivery_order_item_id');
+            if ($deliveryOrderItemId) {
+                $deliveryItem = \App\Models\DeliveryOrderItem::find($deliveryOrderItemId);
+                if ($deliveryItem) {
+                    $deliveryItem->fulfilled_quantity += $requestedQty; // Assuming full success of requested
+                    $deliveryItem->save();
+
+                    // Check if Parent Order is Complete
+                    $order = $deliveryItem->order;
+                    $isComplete = true;
+                    foreach ($order->items as $checkItem) {
+                        if ($checkItem->fulfilled_quantity < $checkItem->quantity) {
+                            $isComplete = false;
+                            break;
+                        }
+                    }
+                    if ($isComplete) {
+                        $order->status = 'completed';
+                        $order->save();
+                    } else {
+                        // Mark as processing if not already
+                        if($order->status !== 'processing') {
+                            $order->status = 'processing';
+                            $order->save();
+                        }
+                    }
+                }
             }
 
             DB::commit();

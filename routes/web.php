@@ -29,6 +29,9 @@ Route::middleware('auth')->group(function () {
 
         // CRUD Master Locations
         Route::resource('locations', \App\Http\Controllers\MasterLocationController::class);
+        
+        // CRUD Users (Kelola User)
+        Route::resource('users', \App\Http\Controllers\UserController::class);
     });
 
     // Barcode Scanner Routes
@@ -47,38 +50,55 @@ Route::middleware('auth')->group(function () {
         Route::post('/stock-input/store', [StockInputController::class, 'store'])->name('stock-input.store');
     });
 
-    // Stock Withdrawal Routes (Warehouse Operator)
-    Route::middleware('role:warehouse_operator,admin')->group(function () {
-        Route::get('/stock-withdrawal', [StockWithdrawalController::class, 'index'])->name('stock-withdrawal.index');
-        Route::post('/stock-withdrawal', [StockWithdrawalController::class, 'store'])->name('stock-withdrawal.store');
+    // Delivery Stock Routes (Sales, PPC, Warehouse, Admin) - Replaces Stock Withdrawal
+    Route::middleware('auth')->group(function () {
+        
+        // Main Dashboard (Schedule Only)
+        Route::get('/delivery-stock', [\App\Http\Controllers\DeliveryOrderController::class, 'index'])->name('delivery.index');
+        
+        // Sales Side (Input & History)
+        Route::get('/delivery-stock/sales-input', [\App\Http\Controllers\DeliveryOrderController::class, 'createOrder'])->name('delivery.create');
+        Route::post('/delivery-stock/store', [\App\Http\Controllers\DeliveryOrderController::class, 'store'])->name('delivery.store');
+        
+        // PPC Side (Approvals)
+        Route::get('/delivery-stock/approvals', [\App\Http\Controllers\DeliveryOrderController::class, 'pendingApprovals'])->name('delivery.approvals');
+        Route::post('/delivery-stock/{id}/status', [\App\Http\Controllers\DeliveryOrderController::class, 'updateStatus'])->name('delivery.status');
+        
+        // Warehouse Execution (Fulfillment) - Uses StockWithdrawalController logic
+        Route::get('/delivery-stock/{id}/fulfill', [StockWithdrawalController::class, 'fulfillOrder'])->name('delivery.fulfill');
+        Route::post('/delivery-stock/confirm-withdrawal', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm'); // Keep logic
+        
+        // Legacy/Utility routes for withdrawal logic (Search, Preview)
         Route::post('/stock-withdrawal/search', [StockWithdrawalController::class, 'searchParts'])->name('stock-withdrawal.search');
         Route::post('/stock-withdrawal/preview', [StockWithdrawalController::class, 'preview'])->name('stock-withdrawal.preview');
-        Route::post('/stock-withdrawal/preview-cart', [StockWithdrawalController::class, 'previewCart'])->name('stock-withdrawal.preview-cart');
-        Route::post('/stock-withdrawal/confirm', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm');
-        Route::post('/stock-withdrawal/{withdrawal}/undo', [StockWithdrawalController::class, 'undo'])->name('stock-withdrawal.undo');
-        Route::get('/stock-withdrawal/history', [StockWithdrawalController::class, 'history'])->name('stock-withdrawal.history');
     });
 
-    // Stock View Routes (All users)
-    Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
-    Route::get('/stock-view/{pallet}', [StockViewController::class, 'show'])->name('stock-view.show');
+    // Merge Pallet Routes (Admin Only)
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/merge-pallet', [\App\Http\Controllers\MergePalletController::class, 'index'])->name('merge-pallet.index');
+        Route::get('/merge-pallet/search', [\App\Http\Controllers\MergePalletController::class, 'searchPallet'])->name('merge-pallet.search');
+        Route::post('/merge-pallet/store', [\App\Http\Controllers\MergePalletController::class, 'store'])->name('merge-pallet.store');
+    });
 
-    // API Routes
+    // Stock View Routes (Warehouse Operator & Admin Only)
+    Route::middleware('role:warehouse_operator,admin')->group(function () {
+        Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
+        Route::get('/stock-view/{pallet}', [StockViewController::class, 'show'])->name('stock-view.show');
+        
+        // Reports
+        Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');
+        Route::get('/reports/stock-input', [ReportController::class, 'stockInputReport'])->name('reports.stock-input');
+        
+        // Export
+        Route::get('/reports/withdrawal-export', [ReportController::class, 'exportWithdrawalCsv'])->name('reports.withdrawal.export');
+        Route::get('/reports/stock-input-export', [ReportController::class, 'exportStockInputCsv'])->name('reports.stock-input.export');
+    });
+
+    // API Routes (Accessible by auth users, usually consumed by frontend scripts on allowed pages)
     Route::get('/api/stock/by-part', [StockViewController::class, 'apiGetStockByPart']);
     Route::get('/api/stock/part-detail/{partNumber}', [StockViewController::class, 'apiGetPartDetail']);
     Route::get('/api/stock/pallet-detail/{palletId}', [StockViewController::class, 'apiGetPalletDetail']);
     Route::get('/api/locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable']); // Search Available Locations
 
-    // Report Routes (Warehouse Operator & Admin)
-    Route::middleware('role:warehouse_operator,admin')->group(function () {
-        Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');
-        Route::get('/reports/stock-input', [ReportController::class, 'stockInputReport'])->name('reports.stock-input');
-    });
-
-    // Export Routes with query parameter handling
-    Route::middleware('role:warehouse_operator,admin')->group(function () {
-        Route::get('/reports/withdrawal-export', [ReportController::class, 'exportWithdrawalCsv'])->name('reports.withdrawal.export');
-        Route::get('/reports/stock-input-export', [ReportController::class, 'exportStockInputCsv'])->name('reports.stock-input.export');
-    });
 });
 

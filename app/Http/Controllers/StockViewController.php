@@ -164,29 +164,40 @@ class StockViewController extends Controller
     // API: Get detailed information for a specific pallet
     public function apiGetPalletDetail($palletId)
     {
-        $pallet = Pallet::with(['items', 'stockLocation'])->find($palletId);
+        $pallet = Pallet::with(['items', 'boxes', 'stockLocation'])->find($palletId);
 
         if (!$pallet) {
             return response()->json(['error' => 'Pallet not found'], 404);
         }
 
-        $items = $pallet->items->where(function ($q) {
-             // Filter hanya item yang masih ada stoknya (optional, tergantung kebutuhan user mau liat semua history atau current stock)
-             // Asumsi user ingin melihat apa yang ada di pallet SEKARANG.
-             return $q->pcs_quantity > 0 || $q->box_quantity > 0;
-        })->map(function ($item) {
-            return [
-                'part_number' => $item->part_number,
-                'box_quantity' => (int)$item->box_quantity,
-                'pcs_quantity' => (int)$item->pcs_quantity,
-                'created_at' => $item->created_at->format('d M Y H:i'),
-            ];
-        }); // Re-index keys
+        // Priority 1: Use Boxes (Source of Truth for FIFO created_at)
+        if ($pallet->boxes->count() > 0) {
+            $items = $pallet->boxes->map(function ($box) {
+                return [
+                    'part_number' => $box->part_number,
+                    'box_quantity' => 1,
+                    'pcs_quantity' => (int)$box->pcs_quantity,
+                    'created_at' => $box->created_at->format('d M Y H:i'),
+                ];
+            });
+        } else {
+            // Priority 2: Fallback using PalletItem (Legacy / No Box Data)
+            $items = $pallet->items->where(function ($q) {
+                 return $q->pcs_quantity > 0 || $q->box_quantity > 0;
+            })->map(function ($item) {
+                return [
+                    'part_number' => $item->part_number,
+                    'box_quantity' => (int)$item->box_quantity,
+                    'pcs_quantity' => (int)$item->pcs_quantity,
+                    'created_at' => $item->created_at->format('d M Y H:i'),
+                ];
+            });
+        }
 
         return response()->json([
             'pallet_number' => $pallet->pallet_number,
             'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
-            'items' => $items->values() // Ensure array, not object with keys
+            'items' => $items->values() 
         ]);
     }
 }

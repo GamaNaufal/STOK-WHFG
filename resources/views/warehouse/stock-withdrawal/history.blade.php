@@ -12,8 +12,8 @@
                 </h1>
                 <p class="text-muted">Daftar semua pengambilan stok dan fitur undo</p>
             </div>
-            <a href="{{ route('stock-withdrawal.index') }}" class="btn btn-lg" style="background-color: #0C7779; color: white; border: none;">
-                <i class="bi bi-arrow-left"></i> Kembali ke Form
+            <a href="{{ route('delivery.index') }}" class="btn btn-lg" style="background-color: #0C7779; color: white; border: none;">
+                <i class="bi bi-arrow-left"></i> Kembali ke Delivery
             </a>
         </div>
     </div>

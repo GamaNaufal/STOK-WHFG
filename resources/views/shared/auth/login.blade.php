@@ -203,6 +203,16 @@
                     <strong>Warehouse Op:</strong><br>
                     Email: andi@warehouse.local | Password: password
                 </div>
+
+                <div class="cred-item">
+                    <strong>Sales:</strong><br>
+                    Email: siti@sales.local | Password: password
+                </div>
+
+                <div class="cred-item">
+                    <strong>PPC:</strong><br>
+                    Email: pepe@ppc.local | Password: password
+                </div>
             </div>
         </div>
     </div>

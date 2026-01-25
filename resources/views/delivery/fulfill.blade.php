@@ -1,0 +1,219 @@
+@extends('shared.layouts.app')
+
+@section('title', 'Fulfill Delivery Order')
+
+@section('content')
+<div class="row mb-4">
+    <div class="col-12 d-flex justify-content-between align-items-center">
+        <div>
+            <h1 class="h3 text-gray-800">
+                <i class="bi bi-box-seam"></i> Fulfill Order #{{ $order->id }}
+            </h1>
+            <p class="text-muted">Customer: <strong>{{ $order->customer_name }}</strong> | Date: {{ $order->delivery_date->format('d M Y') }}</p>
+        </div>
+        <a href="{{ route('delivery.index') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light fw-bold">Items to Withdraw</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-3">Part Number</th>
+                                <th class="text-center">Required</th>
+                                <th class="text-center">Fulfilled</th>
+                                <th class="text-center">Remaining</th>
+                                <th class="text-end pe-3">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($order->items as $item)
+                            @php
+                                $remaining = $item->quantity - $item->fulfilled_quantity;
+                                $statusClass = $remaining <= 0 ? 'bg-light text-muted' : '';
+                            @endphp
+                            <tr class="{{ $statusClass }}">
+                                <td class="ps-3 fw-bold">{{ $item->part_number }}</td>
+                                <td class="text-center">{{ $item->quantity }}</td>
+                                <td class="text-center text-success">{{ $item->fulfilled_quantity }}</td>
+                                <td class="text-center">{{ max(0, $remaining) }}</td>
+                                <td class="text-end pe-3">
+                                    @if($remaining > 0)
+                                    <button class="btn btn-sm btn-primary" onclick="openWithdrawModal('{{ $item->part_number }}', {{ $remaining }}, {{ $item->id }})">
+                                        <i class="bi bi-box-arrow-up"></i> Withdraw
+                                    </button>
+                                    @else
+                                    <span class="badge bg-success"><i class="bi bi-check"></i> Done</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Withdrawal Modal --}}
+<div class="modal fade" id="withdrawModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Withdraw Stock</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <p>Withdrawing Part: <strong id="modalPartNumber"></strong></p>
+                    <p>Quantity Needed: <strong id="modalQty"></strong></p>
+                </div>
+                
+                <div id="loading" class="text-center py-4" style="display:none;">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Calculating FIFO locations...</p>
+                </div>
+
+                <div id="fifo-recommendation" style="display:none;">
+                    <h6 class="fw-bold border-bottom pb-2">FIFO Recommendation</h6>
+                    <table class="table table-sm table-bordered">
+                        <thead class="bg-light">
+                            <tr>
+                                <th>Location</th>
+                                <th>Pallet</th>
+                                <th>Date In</th>
+                                <th>Available</th>
+                                <th width="100">Take</th>
+                            </tr>
+                        </thead>
+                        <tbody id="fifoTableBody"></tbody>
+                    </table>
+                    <div class="alert alert-info small">
+                        <i class="bi bi-info-circle"></i> System automatically selects oldest stock.
+                    </div>
+                </div>
+
+                <div id="error-msg" class="alert alert-danger" style="display:none;"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnConfirmWithdraw">Confirm Withdrawal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentPart = '';
+    let currentQty = 0;
+    let currentitemId = 0;
+
+    const modal = new bootstrap.Modal(document.getElementById('withdrawModal'));
+    
+    function openWithdrawModal(part, qty, itemId) {
+        currentPart = part;
+        currentQty = qty;
+        currentitemId = itemId;
+
+        document.getElementById('modalPartNumber').textContent = part;
+        document.getElementById('modalQty').textContent = qty;
+        document.getElementById('fifo-recommendation').style.display = 'none';
+        document.getElementById('error-msg').style.display = 'none';
+        
+        modal.show();
+        loadFifoPreview();
+    }
+
+    function loadFifoPreview() {
+        document.getElementById('loading').style.display = 'block';
+        
+        fetch('{{ route("stock-withdrawal.preview") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                part_number: currentPart,
+                pcs_quantity: currentQty
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('loading').style.display = 'none';
+            if(data.success) {
+                renderFifoTable(data.locations);
+                document.getElementById('fifo-recommendation').style.display = 'block';
+                document.getElementById('btnConfirmWithdraw').disabled = false;
+            } else {
+                showError(data.message);
+                document.getElementById('btnConfirmWithdraw').disabled = true;
+            }
+        })
+        .catch(err => {
+            document.getElementById('loading').style.display = 'none';
+            showError("Network Error");
+        });
+    }
+
+    function renderFifoTable(locations) {
+        const tbody = document.getElementById('fifoTableBody');
+        tbody.innerHTML = '';
+        locations.forEach(loc => {
+            tbody.innerHTML += `
+                <tr>
+                    <td>${loc.location}</td>
+                    <td>${loc.pallet}</td>
+                    <td>${loc.date_in}</td>
+                    <td>${loc.available}</td>
+                    <td class="fw-bold text-primary">${loc.take}</td>
+                </tr>
+            `;
+        });
+    }
+
+    function showError(msg) {
+        const el = document.getElementById('error-msg');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+
+    document.getElementById('btnConfirmWithdraw').addEventListener('click', function() {
+        // Reuse existing StockWithdrawal logic, but we might need to update the Order Item too.
+        // We will send 'delivery_order_item_id' in the payload if the controller supports it,
+        // OR we modify the controller to accept it.
+        
+        fetch('{{ route("stock-withdrawal.confirm") }}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                part_number: currentPart,
+                pcs_quantity: currentQty,
+                delivery_order_item_id: currentitemId, // Passing this to link it
+                notes: 'Order Fulfillment'
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if(data.success) {
+                alert('Withdrawal Successful');
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(err => alert('Error connecting to server'));
+    });
+</script>
+@endsection

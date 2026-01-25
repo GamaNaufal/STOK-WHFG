@@ -37,5 +37,21 @@ class UserSeeder extends Seeder
             'password' => Hash::make('password'),
             'role' => 'warehouse_operator',
         ]);
+
+        // Sales User
+        User::create([
+            'name' => 'Siti Sales',
+            'email' => 'siti@sales.local',
+            'password' => Hash::make('password'),
+            'role' => 'sales',
+        ]);
+
+        // PPC User
+        User::create([
+            'name' => 'Pepe PPC',
+            'email' => 'pepe@ppc.local',
+            'password' => Hash::make('password'),
+            'role' => 'ppc',
+        ]);
     }
 }
