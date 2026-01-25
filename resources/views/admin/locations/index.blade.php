@@ -54,7 +54,10 @@
                         <tr>
                             <td class="ps-4 fw-bold">{{ $location->code }}</td>
                             <td class="text-center">
-                                @if($location->is_occupied)
+                                @php
+                                    $isOccupied = $location->is_occupied && $location->currentPallet;
+                                @endphp
+                                @if($isOccupied)
                                     <span class="badge bg-danger">Terisi</span>
                                 @else
                                     <span class="badge bg-success">Kosong</span>
@@ -64,13 +67,18 @@
                                 {{ $location->currentPallet ? $location->currentPallet->pallet_number : '-' }}
                             </td>
                             <td class="text-center">
-                                <form action="{{ route('locations.destroy', $location->id) }}" method="POST" onsubmit="return confirm('Hapus lokasi {{ $location->code }}?');">
-                                    @csrf
-                                    @method('DELETE')
-                                    <button type="submit" class="btn btn-sm btn-outline-danger border-0" {{ $location->is_occupied ? 'disabled' : '' }}>
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </form>
+                                <div class="d-inline-flex gap-1">
+                                    <a href="{{ route('locations.edit', $location->id) }}" class="btn btn-sm btn-outline-primary border-0">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form action="{{ route('locations.destroy', $location->id) }}" method="POST" onsubmit="return confirm('Hapus lokasi {{ $location->code }}?');" class="d-inline">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
                             </td>
                         </tr>
                         @empty

@@ -67,6 +67,8 @@ Route::middleware('auth')->group(function () {
         // Sales Side (Input & History)
         Route::get('/delivery-stock/sales-input', [\App\Http\Controllers\DeliveryOrderController::class, 'createOrder'])->name('delivery.create');
         Route::post('/delivery-stock/store', [\App\Http\Controllers\DeliveryOrderController::class, 'store'])->name('delivery.store');
+        Route::get('/delivery-stock/{id}/edit', [\App\Http\Controllers\DeliveryOrderController::class, 'edit'])->name('delivery.edit');
+        Route::put('/delivery-stock/{id}', [\App\Http\Controllers\DeliveryOrderController::class, 'update'])->name('delivery.update');
         
         // PPC Side (Approvals)
         Route::get('/delivery-stock/approvals', [\App\Http\Controllers\DeliveryOrderController::class, 'pendingApprovals'])->name('delivery.approvals');
@@ -74,6 +76,7 @@ Route::middleware('auth')->group(function () {
         
         // Warehouse Execution (Fulfillment) - Uses StockWithdrawalController logic
         Route::get('/delivery-stock/{id}/fulfill', [StockWithdrawalController::class, 'fulfillOrder'])->name('delivery.fulfill');
+        Route::get('/delivery-stock/{id}/fulfill-data', [\App\Http\Controllers\DeliveryOrderController::class, 'fulfillData'])->name('delivery.fulfill-data');
         Route::post('/delivery-stock/confirm-withdrawal', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm'); // Keep logic
         
         // Legacy/Utility routes for withdrawal logic (Search, Preview)

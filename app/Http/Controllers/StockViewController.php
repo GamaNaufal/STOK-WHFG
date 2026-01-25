@@ -19,6 +19,9 @@ class StockViewController extends Controller
         // Order by created_at ASC untuk FIFO (First In First Out)
         // Filter: hanya items dengan stok > 0 (pcs_quantity > 0 atau box_quantity > 0)
         $query = PalletItem::with('pallet.stockLocation')
+            ->whereHas('pallet.stockLocation', function ($q) {
+                $q->where('warehouse_location', '!=', 'Unknown');
+            })
             ->where(function ($q) {
                 $q->where('pcs_quantity', '>', 0)
                   ->orWhere('box_quantity', '>', 0);
@@ -128,6 +131,9 @@ class StockViewController extends Controller
     {
         $items = PalletItem::with('pallet.stockLocation')
             ->where('part_number', $partNumber)
+            ->whereHas('pallet.stockLocation', function ($q) {
+                $q->where('warehouse_location', '!=', 'Unknown');
+            })
             ->where(function ($q) {
                 $q->where('pcs_quantity', '>', 0)
                   ->orWhere('box_quantity', '>', 0);

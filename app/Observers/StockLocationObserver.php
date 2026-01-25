@@ -11,7 +11,14 @@ class StockLocationObserver
      */
     public function created(StockLocation $stockLocation): void
     {
-        //
+        $masterLocation = \App\Models\MasterLocation::where('code', $stockLocation->warehouse_location)->first();
+
+        if ($masterLocation) {
+            $masterLocation->update([
+                'is_occupied' => true,
+                'current_pallet_id' => $stockLocation->pallet_id,
+            ]);
+        }
     }
 
     /**
@@ -19,7 +26,31 @@ class StockLocationObserver
      */
     public function updated(StockLocation $stockLocation): void
     {
-        //
+        $originalCode = $stockLocation->getOriginal('warehouse_location');
+        $originalPalletId = $stockLocation->getOriginal('pallet_id');
+
+        if ($originalCode && $originalCode !== $stockLocation->warehouse_location) {
+            $oldLocation = \App\Models\MasterLocation::where('code', $originalCode)->first();
+
+            if ($oldLocation && $oldLocation->current_pallet_id == $originalPalletId) {
+                $oldLocation->update([
+                    'is_occupied' => false,
+                    'current_pallet_id' => null,
+                ]);
+            }
+        }
+
+        $newCode = $stockLocation->warehouse_location;
+        if ($newCode) {
+            $newLocation = \App\Models\MasterLocation::where('code', $newCode)->first();
+
+            if ($newLocation) {
+                $newLocation->update([
+                    'is_occupied' => true,
+                    'current_pallet_id' => $stockLocation->pallet_id,
+                ]);
+            }
+        }
     }
 
     /**

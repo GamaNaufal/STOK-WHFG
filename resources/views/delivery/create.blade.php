@@ -96,6 +96,11 @@
                                             <div class="alert alert-danger py-1 px-2 small mt-1 mb-0">
                                                 <strong>Note:</strong> {{ $order->notes }}
                                             </div>
+                                            <div class="mt-2">
+                                                <a href="{{ route('delivery.edit', $order->id) }}" class="btn btn-sm btn-warning">
+                                                    <i class="bi bi-pencil"></i> Edit Koreksi
+                                                </a>
+                                            </div>
                                         @endif
                                     </td>
                                     <td class="small">
