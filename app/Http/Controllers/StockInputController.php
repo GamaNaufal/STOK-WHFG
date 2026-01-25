@@ -61,18 +61,19 @@ class StockInputController extends Controller
 
         // If no pallet yet, auto-generate new pallet number
         if (!$pallet) {
-            $today = Carbon::now()->format('Ymd');
-            $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-' . $today . '%')
-                ->orderBy('pallet_number', 'desc')
+            $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
+                ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
                 ->first();
 
             $nextNumber = 1;
             if ($lastPallet) {
-                $lastNumber = (int) substr($lastPallet->pallet_number, -3);
+                // Extract only the last number (after the last hyphen) to handle both formats
+                preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
+                $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
                 $nextNumber = $lastNumber + 1;
             }
 
-            $palletNumber = 'PLT-' . $today . '-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
             // Create new pallet
             $pallet = Pallet::create([
@@ -243,18 +244,19 @@ class StockInputController extends Controller
 
         // If no pallet yet, auto-generate new pallet number
         if (!$pallet) {
-            $today = Carbon::now()->format('Ymd');
-            $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-' . $today . '%')
-                ->orderBy('pallet_number', 'desc')
+            $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
+                ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
                 ->first();
 
             $nextNumber = 1;
             if ($lastPallet) {
-                $lastNumber = (int) substr($lastPallet->pallet_number, -3);
+                // Extract only the last number (after the last hyphen) to handle both formats
+                preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
+                $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
                 $nextNumber = $lastNumber + 1;
             }
 
-            $palletNumber = 'PLT-' . $today . '-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
             // Create new pallet
             $pallet = Pallet::create([

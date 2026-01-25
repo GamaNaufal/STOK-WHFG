@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('stock_withdrawals', function (Blueprint $table) {
             $table->id();
+            $table->uuid('withdrawal_batch_id')->nullable()->index();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('pallet_item_id')->nullable()->constrained('pallet_items')->onDelete('set null');
             $table->string('part_number');

@@ -6,7 +6,7 @@
 <div class="row mb-4">
     <div class="col-12">
         <h1 class="h3 text-gray-800">
-            <i class="bi bi-intersect"></i> Penggabungan & Regenerasi Pallet
+            <i class="bi bi-intersect"></i> Merge Pallet
         </h1>
         <p class="text-muted">Pilih beberapa pallet existing untuk digabungkan menjadi <strong>Satu Pallet Baru</strong>.</p>
     </div>
@@ -21,7 +21,7 @@
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label">Scan Barcode Pallet / Box</label>
+                    <label class="form-label">Scan Barcode Pallet</label>
                     <div class="input-group">
                         <input type="text" id="scanInput" class="form-control" placeholder="Scan QR (PLT-XXXX)..." autofocus>
                         <button class="btn text-white" style="background-color: #0C7779;" type="button" onclick="searchForAdd()">
@@ -127,6 +127,8 @@
             <div class="card-footer bg-white p-3">
                 <div class="mb-3">
                     <label class="form-label fw-bold"><i class="bi bi-geo-alt"></i> Lokasi Pallet Baru</label>
+                    
+                    <!-- Pilih Lokasi (dari DB atau dari Pallet Lama) -->
                     <div class="position-relative">
                         <div class="input-group">
                             <span class="input-group-text bg-white border-end-0"><i class="bi bi-search"></i></span>
@@ -172,6 +174,36 @@
             .then(res => res.json())
             .then(data => {
                 searchResults.innerHTML = '';
+
+                // Collect locations from selected pallets
+                const selectedLocations = new Set();
+                selectedPallets.forEach(p => {
+                    if(p.location && p.location !== '-' && p.location !== 'Not Stored') {
+                        selectedLocations.add(p.location);
+                    }
+                });
+
+                // Add selected pallets locations first
+                selectedLocations.forEach(loc => {
+                    const item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action';
+                    item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
+                                        <strong>${loc}</strong>
+                                        <span class="badge bg-info rounded-pill" style="font-size: 0.7em;">From Selected</span>
+                                      </div>`;
+                    item.style.cursor = 'pointer';
+                    item.onclick = (e) => {
+                        e.preventDefault();
+                        searchInput.value = loc;
+                        selectedLocationId.value = '';
+                        selectedLocationCode.value = loc;
+                        searchResults.style.display = 'none';
+                    };
+                    searchResults.appendChild(item);
+                });
+
+                // Add available locations from DB
                 if (data.length > 0) {
                     data.forEach(loc => {
                         const item = document.createElement('a');
@@ -192,13 +224,18 @@
                         searchResults.appendChild(item);
                     });
                 } else {
-                     if(query === '') {
-                         searchResults.innerHTML = '<div class="list-group-item text-muted">Tidak ada lokasi tersedia.</div>';
+                    if(query === '') {
+                        if(selectedLocations.size === 0) {
+                            searchResults.innerHTML = '<div class="list-group-item text-muted">Tidak ada lokasi tersedia.</div>';
+                        }
                     } else {
-                         searchResults.innerHTML = '<div class="list-group-item text-muted">Lokasi tidak ditemukan. Gunakan sbg teks manual?</div>';
+                        searchResults.innerHTML = '<div class="list-group-item text-muted">Lokasi tidak ditemukan. Gunakan sbg teks manual?</div>';
                     }
                 }
-                searchResults.style.display = 'block';
+                
+                if(searchResults.children.length > 0) {
+                    searchResults.style.display = 'block';
+                }
             })
             .catch(err => {
                 console.error('Search error:', err);
