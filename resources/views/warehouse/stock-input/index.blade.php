@@ -266,8 +266,7 @@
                                 </div>
                                 
                                 <small class="text-muted d-block mt-3" style="font-size: 14px;" id="locationStatusText">
-                                    <i class="bi bi-info-circle"></i> Cari lokasi kosong. Jika tidak ditemukan data master, lokasi akan disimpan sebagai teks manual.
-                                </small>
+                    <i class="bi bi-info-circle"></i> Pilih lokasi kosong dari dropdown. Tidak boleh menaruh di lokasi yang sudah ada palet lain.
 
                                 <!-- Action Buttons -->
                                 <div class="d-grid gap-3 d-md-flex justify-content-md-end mt-4">
@@ -742,20 +741,16 @@
         const selectedId = document.getElementById('selectedLocationId').value;
         const selectedCode = document.getElementById('selectedLocationCode').value;
 
-        // Use selected ID/Code if available, otherwise fallback to typed text (manual input)
-        const finalLocation = selectedId ? selectedCode : searchInputVal;
-        
-        if (!finalLocation) {
-            showError('Masukkan lokasi penyimpanan terlebih dahulu');
+        // REQUIRE selection from dropdown - no manual text input allowed
+        if (!selectedId || !selectedCode) {
+            showError('Pilih lokasi dari list yang tersedia. Lokasi tidak boleh diketik manual.');
             return;
         }
 
         const form = new FormData();
         form.append('pallet_id', currentPalletId);
-        if (selectedId) {
-            form.append('location_id', selectedId);
-        }
-        form.append('warehouse_location', finalLocation);
+        form.append('location_id', selectedId);
+        form.append('warehouse_location', selectedCode);
         form.append('_token', '{{ csrf_token() }}');
 
         fetch('{{ route("stock-input.store") }}', {
@@ -773,7 +768,7 @@
         })
         .then(data => {
             // Success
-            alert('Stok berhasil disimpan di lokasi: ' + finalLocation); // Simple feedback
+            alert('Stok berhasil disimpan di lokasi: ' + selectedCode); // Simple feedback
             window.location.href = '{{ route("stock-input.index") }}';
         })
         .catch(error => {

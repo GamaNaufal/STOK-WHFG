@@ -128,8 +128,15 @@ class MergePalletController extends Controller
                 // Delete source items history
                 $sourcePallet->items()->delete();
 
-                // Free Location if exists
+                // Free Location if exists (set back to not occupied)
                 if ($sourcePallet->stockLocation) {
+                    $oldLocation = \App\Models\MasterLocation::where('code', $sourcePallet->stockLocation->warehouse_location)->first();
+                    if ($oldLocation) {
+                        $oldLocation->update([
+                            'is_occupied' => false,
+                            'current_pallet_id' => null
+                        ]);
+                    }
                     $sourcePallet->stockLocation->delete(); 
                     // Observer handles MasterLocation update
                 }
