@@ -228,6 +228,16 @@
                                 </li>
                             @endif
 
+                            <!-- Merge Pallet: Admin IT only -->
+                            @if(auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('merge-pallet*') ? 'active' : '' }}" 
+                                       href="{{ route('merge-pallet.index') }}">
+                                        <i class="bi bi-box-seam"></i> Merge Pallet
+                                    </a>
+                                </li>
+                            @endif
+
                             <!-- Lihat Stok: PPC + Admin Warehouse + Supervisi + Admin IT -->
                             @if(in_array(auth()->user()->role, ['ppc', 'admin_warehouse', 'supervisi', 'admin'], true))
                                 <li class="nav-item">

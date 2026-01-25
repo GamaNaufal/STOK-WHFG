@@ -24,8 +24,12 @@
             </div>
             <div>
                 <form method="GET" action="{{ route('stock-view.index') }}" class="d-flex gap-2">
-                    @if($groupedByPart->count() > 0)
-                        <button type="button" onclick="exportToExcel()" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600;">
+                    @if($viewMode === 'part' && $groupedByPart->count() > 0)
+                        <button type="button" onclick="exportToExcel('part')" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600;">
+                            <i class="bi bi-download"></i> Export Excel
+                        </button>
+                    @elseif($viewMode === 'pallet' && $groupedByPallet->count() > 0)
+                        <button type="button" onclick="exportToExcel('pallet')" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600;">
                             <i class="bi bi-download"></i> Export Excel
                         </button>
                     @endif
@@ -45,7 +49,7 @@
                     <i class="bi bi-search"></i>
                 </span>
                 <input type="text" name="search" id="searchInput" class="form-control form-control-lg border-0" 
-                       placeholder="Cari berdasarkan No Part..." 
+                       placeholder="{{ $viewMode === 'pallet' ? 'Cari berdasarkan No Pallet...' : 'Cari berdasarkan No Part...' }}" 
                        value="{{ $search ?? '' }}"
                        autocomplete="off"
                        style="font-size: 1rem; padding: 14px 16px;">
@@ -60,7 +64,7 @@
             </form>
             <!-- Dropdown Suggestions -->
             <div id="searchDropdown" class="search-dropdown dropdown-list border-0 bg-white rounded-3 mt-2" 
-                 style="display: none; max-height: 300px; overflow-y: auto; position: absolute; width: 100%; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+                 style="display: none; max-height: 300px; overflow-y: auto; position: absolute; width: 100%; z-index: 1000; box-shadow: 0 8px 16px rgba(0,0,0,0.12); border: 1px solid #e5e7eb;">
                 <!-- Suggestions akan di-populate via JavaScript -->
             </div>
         </div>
@@ -197,17 +201,17 @@
                         <tbody>
                             @if($viewMode === 'part')
                                 @foreach($groupedByPart as $partData)
-                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
+                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;" onmouseenter="this.style.backgroundColor='#f9fafb';" onmouseleave="this.style.backgroundColor='transparent';">
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
-                                            <span style="background: #f0f4f8; color: #0C7779; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
+                                            <span style="background: linear-gradient(135deg, #f0f4f8 0%, #e0f2fe 100%); color: #0C7779; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; display: inline-block; box-shadow: 0 2px 4px rgba(12, 119, 121, 0.1);">
                                                 {{ $partData['part_number'] }}
                                             </span>
                                         </td>
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
-                                            {{ (int) $partData['total_box'] }}
+                                            <span style="background: #f0f4f8; padding: 6px 12px; border-radius: 8px; display: inline-block;">{{ (int) $partData['total_box'] }}</span>
                                         </td>
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
-                                            {{ $partData['total_pcs'] }}
+                                            <span style="background: #f0f4f8; padding: 6px 12px; border-radius: 8px; display: inline-block;">{{ $partData['total_pcs'] }}</span>
                                         </td>
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <button type="button" class="btn btn-sm" 
@@ -219,7 +223,8 @@
                                                            padding: 8px 16px;
                                                            font-weight: 600;
                                                            font-size: 13px;
-                                                           transition: all 0.3s ease;">
+                                                           transition: all 0.3s ease;
+                                                           box-shadow: 0 4px 8px rgba(12, 119, 121, 0.15);">
                                                 <i class="bi bi-eye"></i> Detail
                                             </button>
                                         </td>
@@ -283,9 +288,9 @@
 </div>
 
 <!-- Detail Modal -->
-<div class="modal fade" id="detailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15); max-height: 90vh; overflow-y: auto;">
+<div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(5px);">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
             <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                         color: white; 
                         padding: 24px;
@@ -294,7 +299,7 @@
                         top: 0;
                         z-index: 1020;">
                 <h5 class="modal-title fw-bold" style="margin: 0; font-size: 18px;">
-                    <i class="bi bi-info-circle"></i> Detail Stok
+                    <i class="bi bi-tag"></i> Detail Stok Per Part Number
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
@@ -475,8 +480,10 @@
 
 @section('scripts')
 <script>
-    // Get all available part numbers
+    // Get all available part numbers and pallets
     const allParts = @json($groupedByPart->pluck('part_number')->values());
+    const allPallets = @json($groupedByPallet->pluck('pallet_number')->values());
+    const viewMode = '{{ $viewMode }}';
     const searchInput = document.getElementById('searchInput');
     const searchDropdown = document.getElementById('searchDropdown');
     const searchForm = document.getElementById('searchForm');
@@ -484,11 +491,12 @@
     const palletDetailModal = new bootstrap.Modal(document.getElementById('palletDetailModal'));
 
     function loadSearchSuggestions(searchTerm) {
-        let filtered = allParts;
+        const dataSource = viewMode === 'pallet' ? allPallets : allParts;
+        let filtered = dataSource;
         
         if (searchTerm.trim()) {
-            filtered = allParts.filter(part => 
-                part.toLowerCase().includes(searchTerm.toLowerCase())
+            filtered = dataSource.filter(item => 
+                item.toLowerCase().includes(searchTerm.toLowerCase())
             );
         }
         
@@ -497,33 +505,60 @@
         if (filtered.length === 0 && searchTerm.trim()) {
             const noResult = document.createElement('div');
             noResult.className = 'dropdown-item text-muted';
-            noResult.textContent = 'Tidak ada hasil untuk "' + searchTerm + '"';
+            noResult.style.padding = '12px 16px';
+            noResult.innerHTML = '<i class="bi bi-search me-2"></i>Tidak ada hasil untuk "' + searchTerm + '"';
             searchDropdown.appendChild(noResult);
             return;
         }
         
-        filtered.forEach(part => {
-            const item = document.createElement('div');
-            item.className = 'dropdown-item';
-            item.textContent = part;
+        // Show header if no search term
+        if (!searchTerm.trim() && filtered.length > 0) {
+            const header = document.createElement('div');
+            header.style.cssText = 'padding: 12px 16px; font-weight: 600; color: #0C7779; border-bottom: 1px solid #e5e7eb; font-size: 12px; text-transform: uppercase;';
+            header.textContent = viewMode === 'pallet' ? '📦 Rekomendasi Pallet' : '🏷️ Rekomendasi Part';
+            searchDropdown.appendChild(header);
+        }
+        
+        filtered.slice(0, 8).forEach(item => {
+            const suggestion = document.createElement('div');
+            suggestion.className = 'dropdown-item';
+            suggestion.style.cssText = 'padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: all 0.2s ease; font-size: 14px; background: white;';
             
-            item.addEventListener('click', function(e) {
+            const icon = viewMode === 'pallet' ? '📦' : '🏷️';
+            suggestion.innerHTML = `<i class="bi bi-check-circle" style="color: #0C7779; margin-right: 8px; opacity: 0;"></i> ${icon} ${item}`;
+            
+            suggestion.addEventListener('click', function(e) {
                 e.stopPropagation();
-                searchInput.value = part;
+                searchInput.value = item;
                 searchDropdown.style.display = 'none';
                 searchForm.submit();
             });
             
-            item.addEventListener('mouseover', function() {
-                this.classList.add('active');
+            suggestion.addEventListener('mouseover', function() {
+                this.style.backgroundColor = '#f0f4f8';
+                this.style.color = '#0C7779';
+                this.style.fontWeight = '600';
+                this.querySelector('i').style.opacity = '1';
             });
             
-            item.addEventListener('mouseout', function() {
-                this.classList.remove('active');
+            suggestion.addEventListener('mouseout', function() {
+                this.style.backgroundColor = 'white';
+                this.style.color = '#374151';
+                this.style.fontWeight = '400';
+                this.querySelector('i').style.opacity = '0';
             });
             
-            searchDropdown.appendChild(item);
+            searchDropdown.appendChild(suggestion);
         });
+        
+        // Show "See more" if filtered results exceed 8
+        if (filtered.length > 8 && searchTerm.trim()) {
+            const seeMore = document.createElement('div');
+            seeMore.style.cssText = 'padding: 12px 16px; text-align: center; color: #0C7779; font-weight: 600; border-top: 1px solid #e5e7eb; font-size: 12px; cursor: pointer;';
+            seeMore.textContent = `+ ${filtered.length - 8} lainnya`;
+            seeMore.addEventListener('click', () => searchForm.submit());
+            searchDropdown.appendChild(seeMore);
+        }
     }
 
     searchInput.addEventListener('focus', function() {
@@ -649,32 +684,53 @@
     }
 
     // Export to Excel
-    function exportToExcel() {
+    function exportToExcel(viewType) {
         const table = document.querySelector('table');
         if (!table) {
             alert('Tidak ada data untuk diexport');
             return;
         }
 
-        let csv = 'No Part,Total Box,Total PCS\n';
-        
-        const rows = table.querySelectorAll('tbody tr');
-        rows.forEach(row => {
-            const cells = row.querySelectorAll('td');
-            if (cells.length >= 3) {
-                const partNumber = cells[0].textContent.trim();
-                const totalBox = cells[1].textContent.trim();
-                const totalPcs = cells[2].textContent.trim();
-                csv += `"${partNumber}","${totalBox}","${totalPcs}"\n`;
-            }
-        });
+        let csv = '';
+        let fileName = '';
+
+        if (viewType === 'part') {
+            csv = 'No Part,Total Box,Total PCS\n';
+            fileName = `Stok_ByPart_${new Date().toISOString().split('T')[0]}.csv`;
+            
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 3) {
+                    const partNumber = cells[0].textContent.trim();
+                    const totalBox = cells[1].textContent.trim();
+                    const totalPcs = cells[2].textContent.trim();
+                    csv += `"${partNumber}","${totalBox}","${totalPcs}"\n`;
+                }
+            });
+        } else if (viewType === 'pallet') {
+            csv = 'No Pallet,Lokasi,Total Box,Total PCS\n';
+            fileName = `Stok_ByPallet_${new Date().toISOString().split('T')[0]}.csv`;
+            
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 4) {
+                    const palletNumber = cells[0].textContent.trim();
+                    const location = cells[1].textContent.trim();
+                    const totalBox = cells[2].textContent.trim();
+                    const totalPcs = cells[3].textContent.trim();
+                    csv += `"${palletNumber}","${location}","${totalBox}","${totalPcs}"\n`;
+                }
+            });
+        }
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
         
         link.setAttribute('href', url);
-        link.setAttribute('download', `Stok_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute('download', fileName);
         link.style.visibility = 'hidden';
         
         document.body.appendChild(link);

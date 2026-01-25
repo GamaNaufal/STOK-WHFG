@@ -92,13 +92,6 @@ class StockViewController extends Controller
         ));
     }
 
-    public function show($pallet_id)
-    {
-        $pallet = Pallet::with('items', 'stockLocation')->findOrFail($pallet_id);
-
-        return view('shared.stock-view.detail', compact('pallet'));
-    }
-
     // API: Get stock grouped by part number
     public function apiGetStockByPart()
     {

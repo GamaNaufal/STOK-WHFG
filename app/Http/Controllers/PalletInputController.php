@@ -49,19 +49,20 @@ class PalletInputController extends Controller
             'items.*.pcs_quantity' => 'required|integer|min:1',
         ]);
 
-        // Auto-generate pallet number based on date
-        $today = Carbon::now()->format('Ymd');
-        $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-' . $today . '%')
-            ->orderBy('pallet_number', 'desc')
+        // Auto-generate pallet number - Format: PLT-001, PLT-002, etc.
+        $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
+            ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
             ->first();
 
         $nextNumber = 1;
         if ($lastPallet) {
-            $lastNumber = (int) substr($lastPallet->pallet_number, -3);
+            // Extract only the last number (after the last hyphen)
+            preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
+            $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
             $nextNumber = $lastNumber + 1;
         }
 
-        $palletNumber = 'PLT-' . $today . '-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+        $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
         // Create pallet
         $pallet = Pallet::create([

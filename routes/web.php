@@ -91,7 +91,6 @@ Route::middleware('auth')->group(function () {
     // Stock View Routes (PPC, Admin Warehouse, Supervisi, Admin IT)
     Route::middleware('role:ppc,admin_warehouse,supervisi,admin')->group(function () {
         Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
-        Route::get('/stock-view/{pallet}', [StockViewController::class, 'show'])->name('stock-view.show');
     });
 
     // Reports - Supervisi + Admin IT
