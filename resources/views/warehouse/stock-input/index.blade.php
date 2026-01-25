@@ -40,33 +40,96 @@
                             <i class="bi bi-upc-scan"></i> Step 1: Scan Barcode dengan Alat Scanner
                         </div>
 
-                        <label class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
-                            <i class="bi bi-barcode" style="color: #0C7779;"></i> Input Barcode
-                        </label>
-                        
-                        <div class="input-group input-group-lg">
-                            <span class="input-group-text" style="background: #0C7779; 
-                                                                 color: white; 
-                                                                 border: 2px solid #0C7779;
-                                                                 border-radius: 10px 0 0 10px;
-                                                                 padding: 12px 16px;">
-                                <i class="bi bi-barcode"></i>
-                            </span>
-                            <input type="text" 
-                                   id="barcodeInput" 
-                                   class="form-control" 
-                                   placeholder="Scan barcode dengan alat scanner..." 
-                                   style="font-size: 16px; 
-                                          border: 2px solid #0C7779;
-                                          border-radius: 0 10px 10px 0;
-                                          padding: 12px 16px;
-                                          transition: all 0.3s ease;"
-                                   autofocus>
-                        </div>
+                        <form id="scanForm" autocomplete="off">
+                            <label class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
+                                <i class="bi bi-barcode" style="color: #0C7779;"></i> Input ID Box
+                            </label>
+                            
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text" style="background: #0C7779; 
+                                                                     color: white; 
+                                                                     border: 2px solid #0C7779;
+                                                                     border-radius: 10px 0 0 10px;
+                                                                     padding: 12px 16px;">
+                                    <i class="bi bi-barcode"></i>
+                                </span>
+                                <input type="text" 
+                                       id="barcodeInput" 
+                                       class="form-control" 
+                                       placeholder="Scan/ketik ID Box..." 
+                                       style="font-size: 16px; 
+                                              border: 2px solid #0C7779;
+                                              border-radius: 0;
+                                              padding: 12px 16px;
+                                              transition: all 0.3s ease;"
+                                       autofocus>
+                                <button type="button" id="barcodeSubmitBtn" class="btn" 
+                                        style="background: #0C7779; color: white; border: 2px solid #0C7779; border-radius: 0 10px 10px 0;">
+                                    Proses
+                                </button>
+                            </div>
 
-                        <small class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
-                            <i class="bi bi-info-circle"></i> Arahkan scanner ke barcode dan tekan tombol pada alat
-                        </small>
+                            <small class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
+                                <i class="bi bi-info-circle"></i> Scan ID Box terlebih dahulu, lalu scan No Part
+                            </small>
+
+                            <div class="mt-4">
+                                <label class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
+                                    <i class="bi bi-upc" style="color: #0C7779;"></i> Input No Part
+                                </label>
+                                
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text" style="background: #0C7779; 
+                                                                         color: white; 
+                                                                         border: 2px solid #0C7779;
+                                                                         border-radius: 10px 0 0 10px;
+                                                                         padding: 12px 16px;">
+                                        <i class="bi bi-upc"></i>
+                                    </span>
+                                    <input type="text" 
+                                           id="partInput" 
+                                           class="form-control" 
+                                           placeholder="Scan no part untuk konfirmasi..." 
+                                           style="font-size: 16px; 
+                                                  border: 2px solid #0C7779;
+                                                  border-radius: 0;
+                                                  padding: 12px 16px;
+                                                  transition: all 0.3s ease;"
+                                           disabled>
+                                    <button type="button" id="partSubmitBtn" class="btn" 
+                                            style="background: #0C7779; color: white; border: 2px solid #0C7779; border-radius: 0 10px 10px 0;"
+                                            disabled>
+                                        Proses
+                                    </button>
+                                </div>
+
+                                <small class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
+                                    <i class="bi bi-info-circle"></i> Scan No Part setelah scan ID Box
+                                </small>
+                            </div>
+                        </form>
+
+                            <!-- Part Status -->
+                            <div id="part-status" class="alert mt-3" style="display: none; 
+                                                                           background: #e8f5e9; 
+                                                                           border: 2px solid #10b981; 
+                                                                           color: #047857;
+                                                                           border-radius: 10px;
+                                                                           padding: 14px 16px;">
+                                <i class="bi bi-check-circle"></i> <span id="part-status-text">-</span>
+                            </div>
+
+                            <!-- Part Error -->
+                            <div id="part-error" class="alert alert-dismissible fade show mt-3" style="display: none;
+                                                                                                       background: #fee2e2;
+                                                                                                       border: 2px solid #dc2626;
+                                                                                                       color: #991b1b;
+                                                                                                       border-radius: 10px;
+                                                                                                       padding: 14px 16px;">
+                                <i class="bi bi-exclamation-triangle"></i> <span id="part-error-text"></span>
+                                <button type="button" class="btn-close" onclick="document.getElementById('part-error').style.display='none';" style="filter: invert(0.3);"></button>
+                            </div>
+                        </div>
 
                         <!-- Barcode Result -->
                         <div id="barcode-status" class="alert mt-3" style="display: none; 
@@ -362,14 +425,60 @@
 <script>
     // ===== BARCODE SCANNER INPUT =====
     const barcodeInput = document.getElementById('barcodeInput');
+    const partInput = document.getElementById('partInput');
+    const scanForm = document.getElementById('scanForm');
+    const barcodeSubmitBtn = document.getElementById('barcodeSubmitBtn');
+    const partSubmitBtn = document.getElementById('partSubmitBtn');
     
     // Auto-focus barcode input on page load
     document.addEventListener('DOMContentLoaded', function() {
         barcodeInput.focus();
     });
+
+    scanForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (!barcodeInput.disabled) {
+            const barcode = barcodeInput.value.trim();
+            if (barcode) {
+                scanBarcodeHardware(barcode);
+                barcodeInput.value = '';
+            }
+            return;
+        }
+
+        if (!partInput.disabled) {
+            const partNumber = partInput.value.trim();
+            if (partNumber) {
+                scanPartNumber(partNumber);
+                partInput.value = '';
+            }
+        }
+    });
+
+    if (barcodeSubmitBtn) {
+        barcodeSubmitBtn.addEventListener('click', function() {
+            if (barcodeInput.disabled) return;
+            const barcode = barcodeInput.value.trim();
+            if (barcode) {
+                scanBarcodeHardware(barcode);
+                barcodeInput.value = '';
+            }
+        });
+    }
+
+    if (partSubmitBtn) {
+        partSubmitBtn.addEventListener('click', function() {
+            if (partInput.disabled) return;
+            const partNumber = partInput.value.trim();
+            if (partNumber) {
+                scanPartNumber(partNumber);
+                partInput.value = '';
+            }
+        });
+    }
     
-    barcodeInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
+    barcodeInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
             e.preventDefault();
             let barcode = this.value.trim();
             if (barcode) {
@@ -379,9 +488,43 @@
         }
     });
 
+    partInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+            e.preventDefault();
+            let partNumber = this.value.trim();
+            if (partNumber) {
+                scanPartNumber(partNumber);
+                this.value = '';
+            }
+        }
+    });
+
+    // Global fallback: handle Enter based on focused input
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.keyCode === 13) {
+            const active = document.activeElement;
+            if (active === barcodeInput && !barcodeInput.disabled) {
+                e.preventDefault();
+                const barcode = barcodeInput.value.trim();
+                if (barcode) {
+                    scanBarcodeHardware(barcode);
+                    barcodeInput.value = '';
+                }
+            }
+            if (active === partInput && !partInput.disabled) {
+                e.preventDefault();
+                const partNumber = partInput.value.trim();
+                if (partNumber) {
+                    scanPartNumber(partNumber);
+                    partInput.value = '';
+                }
+            }
+        }
+    });
+
     function scanBarcodeHardware(barcode) {
         showBarcodeStatus('Memproses: ' + barcode);
-        
+
         $.ajax({
             url: "{{ route('stock-input.scan-barcode') }}",
             method: 'POST',
@@ -392,15 +535,23 @@
             success: function(response) {
                 if (response.success) {
                     currentPalletId = response.pallet_id;
-                    showBarcodeStatus('✓ Berhasil scan: ' + response.box_number + ' (' + response.boxes_in_pallet + ' box dalam palet)');
-                    loadAndDisplayPalletData();
-                    // Show step 2 & 3
+                    showBarcodeStatus('✓ Box: ' + response.box_number + ' | Lanjut scan No Part');
+
+                    barcodeInput.disabled = true;
+                    partInput.disabled = false;
+                    if (barcodeSubmitBtn) barcodeSubmitBtn.disabled = true;
+                    if (partSubmitBtn) partSubmitBtn.disabled = false;
+
                     document.getElementById('step-2').style.display = 'block';
                     document.getElementById('step-3').style.display = 'block';
-                    // Refresh focus
-                    setTimeout(() => barcodeInput.focus(), 500);
+                    setTimeout(() => partInput.focus(), 300);
                 } else {
                     showBarcodeError(response.message);
+                    barcodeInput.disabled = false;
+                    partInput.disabled = true;
+                    if (barcodeSubmitBtn) barcodeSubmitBtn.disabled = false;
+                    if (partSubmitBtn) partSubmitBtn.disabled = true;
+                    setTimeout(() => barcodeInput.focus(), 300);
                 }
             },
             error: function(xhr) {
@@ -409,6 +560,47 @@
                     msg = xhr.responseJSON.message;
                 }
                 showBarcodeError(msg);
+                barcodeInput.disabled = false;
+                partInput.disabled = true;
+                if (barcodeSubmitBtn) barcodeSubmitBtn.disabled = false;
+                if (partSubmitBtn) partSubmitBtn.disabled = true;
+                setTimeout(() => barcodeInput.focus(), 300);
+            }
+        });
+    }
+
+    function scanPartNumber(partNumber) {
+        showPartStatus('Memproses: ' + partNumber);
+
+        $.ajax({
+            url: "{{ route('stock-input.scan-part') }}",
+            method: 'POST',
+            data: {
+                _token: "{{ csrf_token() }}",
+                part_number: partNumber
+            },
+            success: function(response) {
+                if (response.success) {
+                    showPartStatus('✓ Part sesuai: ' + response.part_number);
+                    loadAndDisplayPalletData();
+
+                    partInput.disabled = true;
+                    barcodeInput.disabled = false;
+                    if (partSubmitBtn) partSubmitBtn.disabled = true;
+                    if (barcodeSubmitBtn) barcodeSubmitBtn.disabled = false;
+                    setTimeout(() => barcodeInput.focus(), 300);
+                } else {
+                    showPartError(response.message);
+                    setTimeout(() => partInput.focus(), 300);
+                }
+            },
+            error: function(xhr) {
+                let msg = 'Terjadi kesalahan';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    msg = xhr.responseJSON.message;
+                }
+                showPartError(msg);
+                setTimeout(() => partInput.focus(), 300);
             }
         });
     }
@@ -436,17 +628,21 @@
                             const boxRow = document.createElement('div');
                             boxRow.className = 'row mb-2 p-2 bg-light rounded';
                             boxRow.innerHTML = `
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <small class="text-muted">Box</small>
                                     <div class="fw-bold">${box.box_number}</div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <small class="text-muted">Part</small>
                                     <div class="fw-bold">${box.part_number}</div>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <small class="text-muted">PCS</small>
                                     <div class="fw-bold">${box.pcs_quantity}</div>
+                                </div>
+                                <div class="col-md-3">
+                                    <small class="text-muted">Qty Box</small>
+                                    <div class="fw-bold">${box.qty_box ?? '-'}</div>
                                 </div>
                             `;
                             itemsList.appendChild(boxRow);
@@ -472,6 +668,20 @@
         document.getElementById('barcode-error-text').textContent = text;
         errorEl.style.display = 'block';
         document.getElementById('barcode-status').style.display = 'none';
+    }
+
+    function showPartStatus(text) {
+        const statusEl = document.getElementById('part-status');
+        document.getElementById('part-status-text').textContent = text;
+        statusEl.style.display = 'block';
+        document.getElementById('part-error').style.display = 'none';
+    }
+
+    function showPartError(text) {
+        const errorEl = document.getElementById('part-error');
+        document.getElementById('part-error-text').textContent = text;
+        errorEl.style.display = 'block';
+        document.getElementById('part-status').style.display = 'none';
     }
 
     // ===== VARIABLES =====

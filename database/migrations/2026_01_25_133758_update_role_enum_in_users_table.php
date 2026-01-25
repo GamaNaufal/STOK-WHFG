@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         // Using raw SQL to modify ENUM column (MySQL specific)
-        \Illuminate\Support\Facades\DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'packing_department', 'warehouse_operator', 'sales', 'ppc') NOT NULL DEFAULT 'warehouse_operator'");
+        \Illuminate\Support\Facades\DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'warehouse_operator', 'admin_warehouse', 'sales', 'ppc') NOT NULL DEFAULT 'warehouse_operator'");
     }
 
     /**
@@ -20,6 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        \Illuminate\Support\Facades\DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'packing_department', 'warehouse_operator') NOT NULL DEFAULT 'warehouse_operator'");
+        \Illuminate\Support\Facades\DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('admin', 'warehouse_operator', 'admin_warehouse') NOT NULL DEFAULT 'warehouse_operator'");
     }
 };

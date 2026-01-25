@@ -25,10 +25,10 @@ class PalletInputController extends Controller
 
     public function index()
     {
-        // Packing department hanya bisa create, bukan lihat list
-        if (auth()->user()->role === 'packing_department') {
-            return redirect()->route('pallet-input.create');
-        }
+        // Warehouse operator (Staff Warehouse) can create and view list
+        // if (auth()->user()->role === 'warehouse_operator') {
+        //     return redirect()->route('pallet-input.create');
+        // }
 
         $pallets = Pallet::with('items')->latest()->paginate(10);
         return view('packing-department.pallet-input.index', compact('pallets'));

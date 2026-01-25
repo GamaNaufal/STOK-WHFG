@@ -15,43 +15,63 @@ class UserSeeder extends Seeder
     public function run(): void
     {
         // Admin User
-        User::create([
-            'name' => 'Admin Yamato',
-            'email' => 'admin@yamato.local',
-            'password' => Hash::make('password'),
-            'role' => 'admin',
-        ]);
+        User::firstOrCreate(
+            ['email' => 'admin@yamato.local'],
+            [
+                'name' => 'Admin Yamato',
+                'password' => Hash::make('password'),
+                'role' => 'admin',
+            ]
+        );
 
-        // Packing Department User
-        User::create([
-            'name' => 'Budi Packing',
-            'email' => 'budi@packing.local',
-            'password' => Hash::make('password'),
-            'role' => 'packing_department',
-        ]);
+        // Admin Warehouse User
+        User::firstOrCreate(
+            ['email' => 'admin.wh@warehouse.local'],
+            [
+                'name' => 'Admin Warehouse',
+                'password' => Hash::make('password'),
+                'role' => 'admin_warehouse',
+            ]
+        );
 
         // Warehouse Operator User
-        User::create([
-            'name' => 'Andi Warehouse',
-            'email' => 'andi@warehouse.local',
-            'password' => Hash::make('password'),
-            'role' => 'warehouse_operator',
-        ]);
+        User::firstOrCreate(
+            ['email' => 'andi@warehouse.local'],
+            [
+                'name' => 'Andi Warehouse',
+                'password' => Hash::make('password'),
+                'role' => 'warehouse_operator',
+            ]
+        );
 
         // Sales User
-        User::create([
-            'name' => 'Siti Sales',
-            'email' => 'siti@sales.local',
-            'password' => Hash::make('password'),
-            'role' => 'sales',
-        ]);
+        User::firstOrCreate(
+            ['email' => 'siti@sales.local'],
+            [
+                'name' => 'Siti Sales',
+                'password' => Hash::make('password'),
+                'role' => 'sales',
+            ]
+        );
 
         // PPC User
-        User::create([
-            'name' => 'Pepe PPC',
-            'email' => 'pepe@ppc.local',
-            'password' => Hash::make('password'),
-            'role' => 'ppc',
-        ]);
+        User::firstOrCreate(
+            ['email' => 'pepe@ppc.local'],
+            [
+                'name' => 'Pepe PPC',
+                'password' => Hash::make('password'),
+                'role' => 'ppc',
+            ]
+        );
+
+        // Supervisi User
+        User::firstOrCreate(
+            ['email' => 'spv@supervisi.local'],
+            [
+                'name' => 'SPV Yamato',
+                'password' => Hash::make('password'),
+                'role' => 'supervisi',
+            ]
+        );
     }
 }

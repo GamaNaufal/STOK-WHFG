@@ -19,6 +19,11 @@ class CheckRole
             return redirect()->route('login');
         }
 
+        // Admin (Super Admin) always allowed
+        if (auth()->user()->role === 'admin') {
+            return $next($request);
+        }
+
         if (in_array(auth()->user()->role, $roles)) {
             return $next($request);
         }

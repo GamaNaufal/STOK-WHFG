@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Box;
 use App\Models\Pallet;
 use App\Models\PalletItem;
+use App\Models\PartSetting;
 use App\Models\StockLocation;
 use App\Models\StockInput;
 use Illuminate\Http\Request;
@@ -27,26 +28,27 @@ class StockInputController extends Controller
 
         $barcode = $validated['barcode'];
 
-        // Cari box berdasarkan barcode/box_number
-        $box = Box::where('box_number', $barcode)->first();
-
-        if (!$box) {
+        // Pastikan tidak ada box pending yang belum di-scan no part
+        if (session()->has('pending_box')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box tidak ditemukan: ' . $barcode
-            ], 404);
+                'message' => 'Selesaikan scan No Part untuk box sebelumnya terlebih dahulu.'
+            ], 400);
         }
 
-        // Check if box already attached to a pallet with stock location (SUDAH TERSIMPAN)
-        $existingPallet = $box->pallets()
-            ->whereHas('stockLocation')
-            ->first();
+        // Jika box sudah ada di DB dan sudah tersimpan, tolak
+        $existingBox = Box::where('box_number', $barcode)->first();
+        if ($existingBox) {
+            $existingPallet = $existingBox->pallets()
+                ->whereHas('stockLocation')
+                ->first();
 
-        if ($existingPallet) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Box ini sudah tersimpan di palet ' . $existingPallet->pallet_number
-            ], 400);
+            if ($existingPallet) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Box ini sudah tersimpan di palet ' . $existingPallet->pallet_number
+                ], 400);
+            }
         }
 
         // Get pallet from session or create new one
@@ -81,19 +83,9 @@ class StockInputController extends Controller
             session(['current_pallet_id' => $pallet->id]);
         }
 
-        // Check if box already in this pallet
-        $existingBox = $pallet->boxes()->where('box_id', $box->id)->first();
-        if ($existingBox) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Box ini sudah di-scan dalam palet ini'
-            ], 400);
-        }
-
         // Check if box already scanned dalam session ini
         $scannedBoxes = session('scanned_boxes', []);
-        $boxAlreadyScanned = collect($scannedBoxes)->contains('box_id', $box->id);
-        
+        $boxAlreadyScanned = collect($scannedBoxes)->contains('box_number', $barcode);
         if ($boxAlreadyScanned) {
             return response()->json([
                 'success' => false,
@@ -101,46 +93,97 @@ class StockInputController extends Controller
             ], 400);
         }
 
-        // Simpan ke session untuk preview
-        $scannedBoxes[] = [
-            'box_id' => $box->id,
-            'box_number' => $box->box_number,
-            'part_number' => $box->part_number,
-            'part_name' => $box->part_name,
-            'pcs_quantity' => $box->pcs_quantity,
-            'qty_box' => $box->qty_box,
-            'type_box' => $box->type_box,
-        ];
-        session(['scanned_boxes' => $scannedBoxes]);
-
-        // Create pallet item for preview
-        $palletItem = $pallet->items()
-            ->where('part_number', $box->part_number)
-            ->first();
-
-        if (!$palletItem) {
-            $palletItem = PalletItem::create([
-                'pallet_id' => $pallet->id,
-                'part_number' => $box->part_number,
-                'box_quantity' => 1,
-                'pcs_quantity' => $box->pcs_quantity,
-            ]);
-        } else {
-            $palletItem->increment('box_quantity');
-            $palletItem->increment('pcs_quantity', $box->pcs_quantity);
-        }
-
-        // Get updated pallet info
-        $pallet->load('boxes');
+        // Simpan sementara sebagai pending box sampai no part di-scan
+        session(['pending_box' => [
+            'box_number' => $barcode,
+        ]]);
 
         return response()->json([
             'success' => true,
             'pallet_id' => $pallet->id,
             'pallet_number' => $pallet->pallet_number,
-            'box_number' => $box->box_number,
-            'part_number' => $box->part_number,
-            'part_name' => $box->part_name,
-            'pcs_quantity' => $box->pcs_quantity,
+            'box_number' => $barcode,
+            'message' => 'Scan No Part untuk konfirmasi.'
+        ]);
+    }
+
+    // API untuk scan No Part (konfirmasi setelah scan box)
+    public function scanPartNumber(Request $request)
+    {
+        $validated = $request->validate([
+            'part_number' => 'required|string',
+        ]);
+
+        $pendingBox = session('pending_box');
+        if (!$pendingBox) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Scan box terlebih dahulu.'
+            ], 400);
+        }
+
+        $partNumber = $validated['part_number'];
+
+        $partSetting = PartSetting::where('part_number', $partNumber)->first();
+        if (!$partSetting) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No Part belum terdaftar di Master Part.'
+            ], 400);
+        }
+
+        $pallet_id = session('current_pallet_id');
+        $pallet = $pallet_id ? Pallet::find($pallet_id) : null;
+        if (!$pallet) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Palet tidak ditemukan. Ulangi scan box.'
+            ], 400);
+        }
+
+        // Simpan ke session untuk preview
+        $scannedBoxes = session('scanned_boxes', []);
+        $boxAlreadyScanned = collect($scannedBoxes)->contains('box_number', $pendingBox['box_number']);
+        if ($boxAlreadyScanned) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Box ' . $pendingBox['box_number'] . ' sudah di-scan dalam palet ini'
+            ], 400);
+        }
+
+        $scannedBoxes[] = [
+            'box_number' => $pendingBox['box_number'],
+            'part_number' => $partNumber,
+            'pcs_quantity' => $partSetting->qty_box,
+            'qty_box' => $partSetting->qty_box,
+        ];
+        session(['scanned_boxes' => $scannedBoxes]);
+
+        $palletItem = $pallet->items()
+            ->where('part_number', $partNumber)
+            ->first();
+
+        if (!$palletItem) {
+            PalletItem::create([
+                'pallet_id' => $pallet->id,
+                'part_number' => $partNumber,
+                'box_quantity' => 1,
+                'pcs_quantity' => $partSetting->qty_box,
+            ]);
+        } else {
+            $palletItem->increment('box_quantity');
+            $palletItem->increment('pcs_quantity', $partSetting->qty_box);
+        }
+
+        session()->forget('pending_box');
+
+        return response()->json([
+            'success' => true,
+            'pallet_id' => $pallet->id,
+            'pallet_number' => $pallet->pallet_number,
+            'box_number' => $pendingBox['box_number'],
+            'part_number' => $partNumber,
+            'qty_box' => $partSetting->qty_box,
             'boxes_in_pallet' => count($scannedBoxes),
         ]);
     }
@@ -340,6 +383,7 @@ class StockInputController extends Controller
 
         session()->forget('current_pallet_id');
         session()->forget('scanned_boxes');
+        session()->forget('pending_box');
 
         return response()->json([
             'success' => true,
@@ -383,24 +427,19 @@ class StockInputController extends Controller
 
             // Attach boxes ke palet sekarang (saat user klik Save)
             foreach ($scannedBoxes as $scannedBox) {
-                // Double check box ada di database
-                $box = Box::find($scannedBox['box_id']);
-                if ($box) {
-                    // Cek duplikasi di database untuk box ini kalau-kalau sudah ada orang lain yang submit
-                    // (Logic ini ada di BoxController tapi disini kita lakukan manual input data)
-                    // Disini kita asumsi aman karena Box unik
-
-                    // Attach ke pivot pallet_boxes
-                    $pallet->boxes()->attach($box->id);
-
-                    // Buat record PalletItem (untuk history dan tracking qty detail)
-                    PalletItem::create([
-                        'pallet_id' => $pallet->id,
-                        'part_number' => $box->part_number,
-                        'box_quantity' => 1, // Per box selalu 1 box
-                        'pcs_quantity' => $box->pcs_quantity
+                $box = Box::where('box_number', $scannedBox['box_number'])->first();
+                if (!$box) {
+                    $box = Box::create([
+                        'box_number' => $scannedBox['box_number'],
+                        'part_number' => $scannedBox['part_number'],
+                        'pcs_quantity' => $scannedBox['qty_box'],
+                        'qr_code' => $scannedBox['box_number'] . '|' . $scannedBox['part_number'] . '|' . $scannedBox['qty_box'],
+                        'user_id' => auth()->id(),
+                        'qty_box' => $scannedBox['qty_box'],
                     ]);
                 }
+
+                $pallet->boxes()->attach($box->id);
             }
 
             // 2. Simpan lokasi palet

@@ -147,8 +147,7 @@
                     </div>
                     
                     <ul class="nav flex-column px-2">
-                        <!-- Admin Menu (All Access) -->
-                        @if(auth()->check() && auth()->user()->role === 'admin')
+                        @if(auth()->check())
                             <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" 
                                    href="{{ route('dashboard') }}">
@@ -156,132 +155,115 @@
                                 </a>
                             </li>
 
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('locations*') ? 'active' : '' }}" 
-                                   href="{{ route('locations.index') }}">
-                                    <i class="bi bi-geo-alt"></i> Kelola Lokasi
-                                </a>
-                            </li>
-                            
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('users*') ? 'active' : '' }}" 
-                                   href="{{ route('users.index') }}">
-                                    <i class="bi bi-people"></i> Kelola User
-                                </a>
-                            </li>
+                            @if(auth()->user()->role === 'admin')
+                                <div class="mt-2 mb-1 text-muted px-2" style="font-size: 0.75rem;">ADMIN IT</div>
+                            @endif
 
-                            <div class="my-2 border-top border-secondary"></div>
+                            <!-- Kelola Lokasi: Admin Warehouse + Admin IT -->
+                            @if(auth()->user()->role === 'admin_warehouse' || auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('locations*') ? 'active' : '' }}" 
+                                       href="{{ route('locations.index') }}">
+                                        <i class="bi bi-geo-alt"></i> Kelola Lokasi
+                                    </a>
+                                </li>
+                            @endif
 
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('delivery.create') ? 'active' : '' }}" 
-                                   href="{{ route('delivery.create') }}">
-                                    <i class="bi bi-cart-plus"></i> Sales Input
-                                </a>
-                            </li>
+                            <!-- Master No Part & Qty: Admin Warehouse + Admin IT -->
+                            @if(auth()->user()->role === 'admin_warehouse' || auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('part-settings*') ? 'active' : '' }}" 
+                                       href="{{ route('part-settings.index') }}">
+                                        <i class="bi bi-list-check"></i> Master No Part
+                                    </a>
+                                </li>
+                            @endif
 
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('delivery.approvals') ? 'active' : '' }}" 
-                                   href="{{ route('delivery.approvals') }}">
-                                    <i class="bi bi-clipboard-check"></i> Pending Approval
-                                    @if(isset($pendingDeliveryCount) && $pendingDeliveryCount > 0)
-                                        <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingDeliveryCount }}</span>
-                                    @endif
-                                </a>
-                            </li>
+                            <!-- Kelola User: Admin IT only -->
+                            @if(auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('users*') ? 'active' : '' }}" 
+                                       href="{{ route('users.index') }}">
+                                        <i class="bi bi-people"></i> Kelola User
+                                    </a>
+                                </li>
+                            @endif
 
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('stock-input*') ? 'active' : '' }}" 
-                                   href="{{ route('stock-input.index') }}">
-                                    <i class="bi bi-plus-circle"></i> Input Stok
-                                </a>
-                            </li>
+                            <!-- Sales Input: Sales + Admin IT -->
+                            @if(auth()->user()->role === 'sales' || auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.create') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.create') }}">
+                                        <i class="bi bi-cart-plus"></i> Sales Input
+                                    </a>
+                                </li>
+                            @endif
 
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('delivery.index') ? 'active' : '' }}" 
-                                   href="{{ route('delivery.index') }}">
-                                    <i class="bi bi-truck"></i> Delivery Stock
-                                </a>
-                            </li>
+                            <!-- Pending Approval: PPC + Admin IT -->
+                            @if(auth()->user()->role === 'ppc' || auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.approvals') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.approvals') }}">
+                                        <i class="bi bi-clipboard-check"></i> Pending Approval
+                                        @if(isset($pendingDeliveryCount) && $pendingDeliveryCount > 0)
+                                            <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingDeliveryCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endif
 
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" 
-                                   href="{{ route('stock-view.index') }}">
-                                    <i class="bi bi-eye"></i> Lihat Stok
-                                </a>
-                            </li>
-                       
-                            {{-- Admin Extra: Reports & Others just in case they need them, but hiding to stick to strict prompt if needed. 
-                                 However, Admin usually needs Reports. I'll include Reports as "Extra" or just stick to the list. 
-                                 Prompt says: "Admin berperan sebagai superuser yang dapat mengakses seluruh fitur". 
-                                 The list might be highlighting Key Roles. I will keep Reports for Admin as it's critical. --}}
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('reports*') ? 'active' : '' }}" 
-                                data-bs-toggle="collapse" href="#laporanMenu" role="button" aria-expanded="{{ request()->routeIs('reports*') ? 'true' : 'false' }}" aria-controls="laporanMenu">
-                                    <i class="bi bi-file-earmark-pdf"></i> Laporan
-                                    <i class="bi bi-chevron-down" style="float: right; margin-top: 3px;"></i>
-                                </a>
-                                <div class="collapse {{ request()->routeIs('reports*') ? 'show' : '' }}" id="laporanMenu">
-                                    <ul class="nav flex-column ms-3 mt-2">
-                                        <li class="nav-item">
-                                            <a class="nav-link {{ request()->routeIs('reports.stock-input') ? 'active' : '' }}" 
-                                                href="{{ route('reports.stock-input') }}">
-                                                <i class="bi bi-arrow-right-short"></i> Laporan Input Stok
-                                            </a>
-                                        </li>
-                                        <li class="nav-item">
-                                            <a class="nav-link {{ request()->routeIs('reports.withdrawal') ? 'active' : '' }}" 
-                                                href="{{ route('reports.withdrawal') }}">
-                                                <i class="bi bi-arrow-right-short"></i> Laporan Pengambilan
-                                            </a>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </li>
-                        @endif
+                            <!-- Input Stok & Delivery Stock: Warehouse Operator + Admin IT -->
+                            @if(auth()->user()->role === 'warehouse_operator' || auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('stock-input*') ? 'active' : '' }}" 
+                                       href="{{ route('stock-input.index') }}">
+                                        <i class="bi bi-plus-circle"></i> Input Stok
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.index') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.index') }}">
+                                        <i class="bi bi-truck"></i> Delivery Stock
+                                    </a>
+                                </li>
+                            @endif
 
-                        <!-- Warehouse Operator Menu -->
-                        @if(auth()->check() && auth()->user()->role === 'warehouse_operator')
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('stock-input*') ? 'active' : '' }}" 
-                                   href="{{ route('stock-input.index') }}">
-                                    <i class="bi bi-plus-circle"></i> Input Stok
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('delivery.index') ? 'active' : '' }}" 
-                                   href="{{ route('delivery.index') }}">
-                                    <i class="bi bi-truck"></i> Delivery Stock
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" 
-                                   href="{{ route('stock-view.index') }}">
-                                    <i class="bi bi-eye"></i> Lihat Stok
-                                </a>
-                            </li>
-                        @endif
+                            <!-- Lihat Stok: PPC + Admin Warehouse + Supervisi + Admin IT -->
+                            @if(in_array(auth()->user()->role, ['ppc', 'admin_warehouse', 'supervisi', 'admin'], true))
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" 
+                                       href="{{ route('stock-view.index') }}">
+                                        <i class="bi bi-eye"></i> Lihat Stok
+                                    </a>
+                                </li>
+                            @endif
 
-                        <!-- Sales Menu -->
-                        @if(auth()->check() && auth()->user()->role === 'sales')
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('delivery.create') ? 'active' : '' }}" 
-                                   href="{{ route('delivery.create') }}">
-                                    <i class="bi bi-cart-plus"></i> Sales Input
-                                </a>
-                            </li>
-                        @endif
-
-                        <!-- PPC Menu -->
-                        @if(auth()->check() && auth()->user()->role === 'ppc')
-                            <li class="nav-item">
-                                <a class="nav-link {{ request()->routeIs('delivery.approvals') ? 'active' : '' }}" 
-                                   href="{{ route('delivery.approvals') }}">
-                                    <i class="bi bi-clipboard-check"></i> Pending Approval
-                                    @if(isset($pendingDeliveryCount) && $pendingDeliveryCount > 0)
-                                        <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingDeliveryCount }}</span>
-                                    @endif
-                                </a>
-                            </li>
+                            <!-- Laporan: Supervisi + Admin IT -->
+                            @if(auth()->user()->role === 'supervisi' || auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('reports*') ? 'active' : '' }}" 
+                                    data-bs-toggle="collapse" href="#laporanMenu" role="button" aria-expanded="{{ request()->routeIs('reports*') ? 'true' : 'false' }}" aria-controls="laporanMenu">
+                                        <i class="bi bi-file-earmark-pdf"></i> Laporan
+                                        <i class="bi bi-chevron-down" style="float: right; margin-top: 3px;"></i>
+                                    </a>
+                                    <div class="collapse {{ request()->routeIs('reports*') ? 'show' : '' }}" id="laporanMenu">
+                                        <ul class="nav flex-column ms-3 mt-2">
+                                            <li class="nav-item">
+                                                <a class="nav-link {{ request()->routeIs('reports.stock-input') ? 'active' : '' }}" 
+                                                    href="{{ route('reports.stock-input') }}">
+                                                    <i class="bi bi-arrow-right-short"></i> Laporan Input Stok
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link {{ request()->routeIs('reports.withdrawal') ? 'active' : '' }}" 
+                                                    href="{{ route('reports.withdrawal') }}">
+                                                    <i class="bi bi-arrow-right-short"></i> Laporan Pengambilan
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            @endif
                         @endif
                     </ul>
 

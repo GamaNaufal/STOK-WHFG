@@ -13,7 +13,9 @@ class DashboardController extends Controller
     public function index()
     {
         $user = auth()->user();
-        if ($user->role !== 'admin') {
+        
+        // Allowed roles for Dashboard: admin, supervisi, admin_warehouse
+        if ($user->role !== 'admin' && $user->role !== 'supervisi' && $user->role !== 'admin_warehouse') {
             if ($user->role === 'warehouse_operator') return redirect()->route('stock-input.index');
             if ($user->role === 'sales') return redirect()->route('delivery.create');
             if ($user->role === 'ppc') return redirect()->route('delivery.approvals');
@@ -38,10 +40,7 @@ class DashboardController extends Controller
             return (int)$totalBox;
         };
 
-        if ($userRole === 'packing_department') {
-            // Packing department - DEPRECATED, no longer used
-            $stats = [];
-        } elseif ($userRole === 'warehouse_operator') {
+        if ($userRole === 'warehouse_operator') {
             // Warehouse operator - show stock location statistics
             // pallets_with_location = pallets yang saat ini memiliki stok aktual dan punya lokasi
             $palletsWithActiveStock = Pallet::whereHas('items', function ($q) {
@@ -65,8 +64,8 @@ class DashboardController extends Controller
                       ->orWhere('box_quantity', '>', 0);
                 })->sum('pcs_quantity') ?? 0,
             ];
-        } elseif ($userRole === 'admin') {
-            // Admin - show all statistics + box management
+        } elseif (in_array($userRole, ['admin', 'supervisi', 'admin_warehouse'], true)) {
+            // Admin / Supervisi / Admin Warehouse - show all statistics
             $palletsWithActiveStock = Pallet::whereHas('items', function ($q) {
                 $q->where(function ($subQ) {
                     $subQ->where('pcs_quantity', '>', 0)

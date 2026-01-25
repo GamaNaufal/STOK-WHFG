@@ -1,0 +1,35 @@
+@extends('shared.layouts.app')
+
+@section('title', 'Tambah No Part - Warehouse FG Yamato')
+
+@section('content')
+<div class="container-fluid">
+    <h1 class="h4 mb-4"><i class="bi bi-plus-circle"></i> Tambah No Part</h1>
+
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <form method="POST" action="{{ route('part-settings.store') }}">
+                @csrf
+                <div class="mb-3">
+                    <label class="form-label">No Part</label>
+                    <input type="text" name="part_number" class="form-control" value="{{ old('part_number') }}" required>
+                    @error('part_number')
+                        <div class="text-danger small">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Qty Box (Tetap)</label>
+                    <input type="number" name="qty_box" class="form-control" value="{{ old('qty_box') }}" min="1" required>
+                    @error('qty_box')
+                        <div class="text-danger small">{{ $message }}</div>
+                    @enderror
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{{ route('part-settings.index') }}" class="btn btn-secondary">Batal</a>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endsection

@@ -12,6 +12,7 @@ class Box extends Model
         'pcs_quantity',
         'qr_code',
         'user_id',
+        'qty_box',
     ];
 
     public function user()

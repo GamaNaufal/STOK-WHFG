@@ -11,8 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->enum('role', ['admin', 'warehouse_operator', 'admin_warehouse'])->default('warehouse_operator')->after('email');
+        Schema::create('part_settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('part_number')->unique();
+            $table->unsignedInteger('qty_box');
+            $table->timestamps();
         });
     }
 
@@ -21,8 +24,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            $table->dropColumn('role');
-        });
+        Schema::dropIfExists('part_settings');
     }
 };

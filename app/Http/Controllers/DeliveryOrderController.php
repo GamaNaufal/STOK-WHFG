@@ -11,8 +11,8 @@ class DeliveryOrderController extends Controller
     {
         $user = \Illuminate\Support\Facades\Auth::user();
         
-        // Strict Role Check: Admin & Warehouse Operator only
-        if ($user->role !== 'warehouse_operator' && $user->role !== 'admin') {
+           // Strict Role Check: Admin & Warehouse Operator only
+           if ($user->role !== 'warehouse_operator' && $user->role !== 'admin') {
              if ($user->role === 'sales') return redirect()->route('delivery.create');
              if ($user->role === 'ppc') return redirect()->route('delivery.approvals');
              return redirect('/')->with('error', 'Unauthorized access to Schedule.');

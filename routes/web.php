@@ -19,19 +19,26 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-    // Admin Routes - Box Management (QR Code Generation) & Master Locations
+    // Admin Routes - Box Management (QR Code Generation)
     Route::middleware('role:admin')->group(function () {
         Route::get('/boxes', [BoxController::class, 'index'])->name('boxes.index');
         Route::get('/boxes/create', [BoxController::class, 'create'])->name('boxes.create');
         Route::post('/boxes', [BoxController::class, 'store'])->name('boxes.store');
         Route::get('/boxes/{box}', [BoxController::class, 'show'])->name('boxes.show');
         Route::delete('/boxes/{box}', [BoxController::class, 'destroy'])->name('boxes.destroy');
-
-        // CRUD Master Locations
-        Route::resource('locations', \App\Http\Controllers\MasterLocationController::class);
         
         // CRUD Users (Kelola User)
         Route::resource('users', \App\Http\Controllers\UserController::class);
+    });
+
+    // Master Locations - Admin Warehouse + Admin IT
+    Route::middleware('role:admin_warehouse,admin')->group(function () {
+        Route::resource('locations', \App\Http\Controllers\MasterLocationController::class);
+    });
+
+    // Admin Warehouse Routes - Master Part & Qty
+    Route::middleware('role:admin_warehouse,admin')->group(function () {
+        Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
     });
 
     // Barcode Scanner Routes
@@ -45,6 +52,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/stock-input', [StockInputController::class, 'index'])->name('stock-input.index');
         Route::post('/stock-input/scan-box', [StockInputController::class, 'scanBox'])->name('stock-input.scan-box');
         Route::post('/stock-input/scan-barcode', [StockInputController::class, 'scanBarcode'])->name('stock-input.scan-barcode');
+        Route::post('/stock-input/scan-part', [StockInputController::class, 'scanPartNumber'])->name('stock-input.scan-part');
         Route::get('/stock-input/get-pallet-data', [StockInputController::class, 'getCurrentPalletData'])->name('stock-input.get-pallet-data');
         Route::post('/stock-input/clear-session', [StockInputController::class, 'clearSession'])->name('stock-input.clear-session');
         Route::post('/stock-input/store', [StockInputController::class, 'store'])->name('stock-input.store');
@@ -80,15 +88,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/merge-pallet/store', [\App\Http\Controllers\MergePalletController::class, 'store'])->name('merge-pallet.store');
     });
 
-    // Stock View Routes (Warehouse Operator & Admin Only)
-    Route::middleware('role:warehouse_operator,admin')->group(function () {
+    // Stock View Routes (PPC, Admin Warehouse, Supervisi, Admin IT)
+    Route::middleware('role:ppc,admin_warehouse,supervisi,admin')->group(function () {
         Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
         Route::get('/stock-view/{pallet}', [StockViewController::class, 'show'])->name('stock-view.show');
-        
-        // Reports
+    });
+
+    // Reports - Supervisi + Admin IT
+    Route::middleware('role:supervisi,admin')->group(function () {
         Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');
         Route::get('/reports/stock-input', [ReportController::class, 'stockInputReport'])->name('reports.stock-input');
-        
+
         // Export
         Route::get('/reports/withdrawal-export', [ReportController::class, 'exportWithdrawalCsv'])->name('reports.withdrawal.export');
         Route::get('/reports/stock-input-export', [ReportController::class, 'exportStockInputCsv'])->name('reports.stock-input.export');

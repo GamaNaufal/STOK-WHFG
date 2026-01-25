@@ -99,8 +99,8 @@
     </div>
 </div>
 
-{{-- ADMIN DASHBOARD --}}
-@elseif($userRole === 'admin')
+{{-- ADMIN, SUPERVISI & ADMIN WAREHOUSE DASHBOARD --}}
+@elseif($userRole === 'admin' || $userRole === 'supervisi' || $userRole === 'admin_warehouse')
 <div class="row mb-4">
     <!-- Total Pallets -->
     <div class="col-md-3 mb-3">
@@ -196,23 +196,25 @@
 </div>
 
 <div class="row">
-    <!-- All Action Cards -->
-    <div class="col-md-6 mb-4">
-        <div class="card shadow-sm border-0 h-100" style="background: #f0f4f8; border-top: 4px solid #5b8fc4;">
-            <div class="card-body text-center">
-                <div class="mb-3">
-                    <i class="bi bi-plus-circle" style="font-size: 3rem; color: #5b8fc4;"></i>
+    @if($userRole === 'admin')
+        <!-- Admin Only Action: Create Box -->
+        <div class="col-md-6 mb-4">
+            <div class="card shadow-sm border-0 h-100" style="background: #f0f4f8; border-top: 4px solid #5b8fc4;">
+                <div class="card-body text-center">
+                    <div class="mb-3">
+                        <i class="bi bi-plus-circle" style="font-size: 3rem; color: #5b8fc4;"></i>
+                    </div>
+                    <h5 class="card-title" style="color: #2c3e50;">Kelola Box QR</h5>
+                    <p class="card-text" style="color: #7d8fa3; margin-bottom: 1.5rem;">
+                        Generate kode QR unik untuk setiap box
+                    </p>
+                    <a href="{{ route('boxes.create') }}" class="btn" style="background: #5b8fc4; color: white; border: none;">
+                        <i class="bi bi-arrow-right"></i> Buat Box QR
+                    </a>
                 </div>
-                <h5 class="card-title" style="color: #2c3e50;">Kelola Box QR</h5>
-                <p class="card-text" style="color: #7d8fa3; margin-bottom: 1.5rem;">
-                    Generate kode QR unik untuk setiap box
-                </p>
-                <a href="{{ route('boxes.create') }}" class="btn" style="background: #5b8fc4; color: white; border: none;">
-                    <i class="bi bi-arrow-right"></i> Buat Box QR
-                </a>
             </div>
         </div>
-    </div>
+    @endif
 
     <div class="col-md-6 mb-4">
         <div class="card shadow-sm border-0 h-100" style="background: #f0f4f8; border-top: 4px solid #6b9bd1;">
