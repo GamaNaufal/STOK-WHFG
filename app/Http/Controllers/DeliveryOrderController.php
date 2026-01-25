@@ -23,6 +23,46 @@ class DeliveryOrderController extends Controller
             ->orderBy('delivery_date', 'asc')
             ->get();
 
+        // Precompute available stock per part (PCS)
+        $availableByPart = \App\Models\PalletItem::select('part_number', \Illuminate\Support\Facades\DB::raw('SUM(pcs_quantity) as total'))
+            ->where('pcs_quantity', '>', 0)
+            ->whereHas('pallet', function ($q) {
+                $q->whereHas('stockLocation');
+            })
+            ->groupBy('part_number')
+            ->pluck('total', 'part_number');
+
+        $runningRequired = [];
+
+        $approvedOrders->each(function ($order) use ($availableByPart, &$runningRequired) {
+            $allAvailable = true;
+
+            $today = now()->timezone(config('app.timezone'))->startOfDay();
+            $deliveryDate = \Carbon\Carbon::parse($order->delivery_date)->timezone(config('app.timezone'))->startOfDay();
+            $order->days_remaining = $today->diffInDays($deliveryDate, false);
+
+            $order->items->each(function ($item) use ($availableByPart, &$runningRequired, &$allAvailable) {
+                $partNumber = $item->part_number;
+                $available = (int) ($availableByPart[$partNumber] ?? 0);
+
+                $runningRequired[$partNumber] = ($runningRequired[$partNumber] ?? 0) + (int) $item->quantity;
+
+                $previousRequired = $runningRequired[$partNumber] - (int) $item->quantity;
+                $remainingBefore = $available - $previousRequired;
+
+                $item->available_total = $available;
+                $item->remaining_before = max(0, $remainingBefore);
+                $item->display_fulfilled = max(0, min((int) $item->quantity, $remainingBefore));
+                $item->is_fulfillable = $remainingBefore >= (int) $item->quantity;
+
+                if (!$item->is_fulfillable) {
+                    $allAvailable = false;
+                }
+            });
+
+            $order->has_sufficient_stock = $allAvailable;
+        });
+
         return view('delivery.index', compact('approvedOrders'));
     }
 
@@ -56,7 +96,117 @@ class DeliveryOrderController extends Controller
             ->orderBy('delivery_date', 'asc')
             ->get();
 
-        return view('delivery.approvals', compact('pendingOrders'));
+        $historyOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
+            ->whereIn('status', ['approved', 'rejected', 'correction', 'processing', 'completed'])
+            ->orderBy('updated_at', 'desc')
+            ->limit(15)
+            ->get();
+
+        return view('delivery.approvals', compact('pendingOrders', 'historyOrders'));
+    }
+
+    // Fetch order items for fulfill modal
+    public function fulfillData($id)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+
+        $items = $order->items->map(function ($item) {
+            $remaining = max(0, $item->quantity - $item->fulfilled_quantity);
+            return [
+                'id' => $item->id,
+                'part_number' => $item->part_number,
+                'required' => $item->quantity,
+                'fulfilled' => $item->fulfilled_quantity,
+                'remaining' => $remaining,
+            ];
+        })->values();
+
+        return response()->json([
+            'order_id' => $order->id,
+            'customer_name' => $order->customer_name,
+            'delivery_date' => $order->delivery_date->format('d M Y'),
+            'items' => $items,
+        ]);
+    }
+
+    // Sales: Edit correction request
+    public function edit($id)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $order = \App\Models\DeliveryOrder::with(['items'])->findOrFail($id);
+
+        if ($user->role !== 'sales' && $user->role !== 'admin') {
+            return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
+        }
+
+        if ($order->sales_user_id !== $user->id && $user->role !== 'admin') {
+            return redirect()->route('delivery.create')->with('error', 'Order ini bukan milik Anda.');
+        }
+
+        if ($order->status !== 'correction') {
+            return redirect()->route('delivery.create')->with('error', 'Order tidak dalam status koreksi.');
+        }
+
+        return view('delivery.edit', compact('order'));
+    }
+
+    // Sales: Update correction request
+    public function update(Request $request, $id)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+
+        if ($user->role !== 'sales' && $user->role !== 'admin') {
+            return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
+        }
+
+        if ($order->sales_user_id !== $user->id && $user->role !== 'admin') {
+            return redirect()->route('delivery.create')->with('error', 'Order ini bukan milik Anda.');
+        }
+
+        $request->validate([
+            'customer_name' => 'required|string',
+            'delivery_date' => 'required|date',
+            'items' => 'required|array|min:1',
+            'items.*.part_number' => 'required|string',
+            'items.*.quantity' => 'required|integer|min:1',
+            'notes' => 'nullable|string'
+        ]);
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            $order->customer_name = $request->customer_name;
+            $order->delivery_date = $request->delivery_date;
+            $order->status = 'pending';
+
+            if ($request->notes) {
+                $order->notes = ($order->notes ? $order->notes . "\n[Sales]: " : "[Sales]: ") . $request->notes;
+            }
+
+            $order->save();
+
+            // Replace items
+            $order->items()->delete();
+            foreach ($request->items as $item) {
+                \App\Models\DeliveryOrderItem::create([
+                    'delivery_order_id' => $order->id,
+                    'part_number' => $item['part_number'],
+                    'quantity' => $item['quantity'],
+                ]);
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return redirect()->route('delivery.create')->with('success', 'Perbaikan berhasil dikirim ulang ke PPC.');
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            return redirect()->back()->with('error', 'Error update order: ' . $e->getMessage());
+        }
     }
 
     // Sales: Store new Delivery Order

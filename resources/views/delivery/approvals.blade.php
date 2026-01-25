@@ -70,6 +70,58 @@
             @endforeach
         </div>
     @endif
+
+    <div class="mt-5">
+        <h5 class="mb-3"><i class="bi bi-clock-history"></i> Approval History</h5>
+        <div class="card shadow-sm">
+            <div class="card-body">
+                @if($historyOrders->isEmpty())
+                    <div class="text-muted">Belum ada riwayat approval.</div>
+                @else
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Updated At</th>
+                                    <th>Customer</th>
+                                    <th>Sales</th>
+                                    <th>Status</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($historyOrders as $order)
+                                    <tr>
+                                        <td>{{ $order->updated_at->format('d M Y H:i') }}</td>
+                                        <td>{{ $order->customer_name }}</td>
+                                        <td>{{ $order->salesUser->name ?? 'Unknown' }}</td>
+                                        <td>
+                                            @if($order->status == 'approved')
+                                                <span class="badge bg-primary">Approved</span>
+                                            @elseif($order->status == 'rejected')
+                                                <span class="badge bg-danger">Rejected</span>
+                                            @elseif($order->status == 'correction')
+                                                <span class="badge bg-warning text-dark">Correction</span>
+                                            @elseif($order->status == 'completed')
+                                                <span class="badge bg-success">Completed</span>
+                                            @elseif($order->status == 'processing')
+                                                <span class="badge bg-info">Processing</span>
+                                            @else
+                                                <span class="badge bg-secondary">{{ $order->status }}</span>
+                                            @endif
+                                        </td>
+                                        <td class="small text-muted" style="max-width: 320px;">
+                                            {{ $order->notes ?? '-' }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
 </div>
 
 <!-- Status Update Modal -->

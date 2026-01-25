@@ -24,6 +24,14 @@ class MasterLocationController extends Controller
     }
 
     /**
+     * Show the form for editing the specified resource.
+     */
+    public function edit(\App\Models\MasterLocation $location)
+    {
+        return view('admin.locations.edit', compact('location'));
+    }
+
+    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
@@ -41,11 +49,31 @@ class MasterLocationController extends Controller
     }
 
     /**
+     * Update the specified resource in storage.
+     */
+    public function update(Request $request, \App\Models\MasterLocation $location)
+    {
+        if ($location->is_occupied) {
+            return redirect()->route('locations.index')->with('error', 'Gagal edit! Lokasi ini sedang terisi.');
+        }
+
+        $request->validate([
+            'code' => 'required|max:255|unique:master_locations,code,' . $location->id,
+        ]);
+
+        $location->update([
+            'code' => strtoupper($request->code),
+        ]);
+
+        return redirect()->route('locations.index')->with('success', 'Lokasi berhasil diperbarui!');
+    }
+
+    /**
      * Remove the specified resource from storage.
      */
     public function destroy(\App\Models\MasterLocation $location)
     {
-        if ($location->is_occupied) {
+        if ($location->is_occupied && $location->current_pallet_id) {
              return redirect()->route('locations.index')->with('error', 'Gagal hapus! Lokasi ini sedang terisi.');
         }
         

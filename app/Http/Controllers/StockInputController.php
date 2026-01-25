@@ -464,8 +464,25 @@ class StockInputController extends Controller
                      throw new \Exception("Lokasi yang dipilih sudah terisi!");
                 }
             } else {
-                 $locationCode = $request->input('warehouse_location'); 
-                 // Kalau input text manual, kita tidak update master location
+                 $locationCode = $request->input('warehouse_location');
+                 if ($locationCode) {
+                     $locationCode = strtoupper($locationCode);
+                 }
+
+                 // Kalau input text manual, cek apakah ada di master location
+                 if ($locationCode) {
+                     $masterLocation = \App\Models\MasterLocation::where('code', $locationCode)->first();
+                     if ($masterLocation) {
+                         if ($masterLocation->is_occupied) {
+                             throw new \Exception("Lokasi {$locationCode} sudah terisi!");
+                         }
+
+                         $masterLocation->update([
+                             'is_occupied' => true,
+                             'current_pallet_id' => $pallet->id,
+                         ]);
+                     }
+                 }
             }
 
             StockLocation::create([

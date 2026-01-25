@@ -74,7 +74,13 @@
             <div class="modal-body">
                 <div class="mb-3">
                     <p>Withdrawing Part: <strong id="modalPartNumber"></strong></p>
-                    <p>Quantity Needed: <strong id="modalQty"></strong></p>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="mb-0">Quantity Needed:</label>
+                        <input type="number" id="modalQtyInput" class="form-control form-control-sm" style="width: 140px;" min="1">
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="btnRecalc">
+                            <i class="bi bi-arrow-repeat"></i> Recalc FIFO
+                        </button>
+                    </div>
                 </div>
                 
                 <div id="loading" class="text-center py-4" style="display:none;">
@@ -124,7 +130,7 @@
         currentitemId = itemId;
 
         document.getElementById('modalPartNumber').textContent = part;
-        document.getElementById('modalQty').textContent = qty;
+        document.getElementById('modalQtyInput').value = qty;
         document.getElementById('fifo-recommendation').style.display = 'none';
         document.getElementById('error-msg').style.display = 'none';
         
@@ -134,6 +140,8 @@
 
     function loadFifoPreview() {
         document.getElementById('loading').style.display = 'block';
+        const qtyValue = parseInt(document.getElementById('modalQtyInput').value, 10) || 0;
+        currentQty = qtyValue;
         
         fetch('{{ route("stock-withdrawal.preview") }}', {
             method: 'POST',
@@ -214,6 +222,10 @@
             }
         })
         .catch(err => alert('Error connecting to server'));
+    });
+
+    document.getElementById('btnRecalc').addEventListener('click', function() {
+        loadFifoPreview();
     });
 </script>
 @endsection
