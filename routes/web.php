@@ -78,6 +78,13 @@ Route::middleware('auth')->group(function () {
         Route::get('/delivery-stock/{id}/fulfill', [StockWithdrawalController::class, 'fulfillOrder'])->name('delivery.fulfill');
         Route::get('/delivery-stock/{id}/fulfill-data', [\App\Http\Controllers\DeliveryOrderController::class, 'fulfillData'])->name('delivery.fulfill-data');
         Route::post('/delivery-stock/confirm-withdrawal', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm'); // Keep logic
+
+        // Picklist + Scan Flow
+        Route::post('/delivery-stock/{id}/start-pick', [\App\Http\Controllers\DeliveryPickController::class, 'startPick'])->name('delivery.pick.start');
+        Route::get('/delivery-stock/{order}/pick/{session}/pdf', [\App\Http\Controllers\DeliveryPickController::class, 'pdf'])->name('delivery.pick.pdf');
+        Route::get('/delivery-stock/{order}/pick/{session}/scan', [\App\Http\Controllers\DeliveryPickController::class, 'showScan'])->name('delivery.pick.scan');
+        Route::post('/delivery-pick/{session}/scan', [\App\Http\Controllers\DeliveryPickController::class, 'scanBox'])->name('delivery.pick.scan.submit');
+        Route::post('/delivery-pick/{session}/complete', [\App\Http\Controllers\DeliveryPickController::class, 'complete'])->name('delivery.pick.complete');
         
         // Legacy/Utility routes for withdrawal logic (Search, Preview)
         Route::post('/stock-withdrawal/search', [StockWithdrawalController::class, 'searchParts'])->name('stock-withdrawal.search');
@@ -104,6 +111,13 @@ Route::middleware('auth')->group(function () {
         // Export
         Route::get('/reports/withdrawal-export', [ReportController::class, 'exportWithdrawalCsv'])->name('reports.withdrawal.export');
         Route::get('/reports/stock-input-export', [ReportController::class, 'exportStockInputCsv'])->name('reports.stock-input.export');
+    });
+
+    // Scan Issue Notifications (Admin Warehouse + Admin IT)
+    Route::middleware('role:admin_warehouse,admin')->group(function () {
+        Route::get('/delivery-scan-issues', [\App\Http\Controllers\DeliveryPickController::class, 'issues'])->name('delivery.pick.issues');
+        Route::post('/delivery-scan-issues/{issue}/approve', [\App\Http\Controllers\DeliveryPickController::class, 'approveIssue'])->name('delivery.pick.issue.approve');
+        Route::post('/delivery-completions/{completion}/redo', [\App\Http\Controllers\DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');
     });
 
     // API Routes (Accessible by auth users, usually consumed by frontend scripts on allowed pages)

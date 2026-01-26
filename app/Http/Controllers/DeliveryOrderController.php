@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Box;
+use App\Models\PalletItem;
+use Illuminate\Support\Facades\DB;
 
 class DeliveryOrderController extends Controller
 {
@@ -12,25 +15,40 @@ class DeliveryOrderController extends Controller
         $user = \Illuminate\Support\Facades\Auth::user();
         
            // Strict Role Check: Admin & Warehouse Operator only
-           if ($user->role !== 'warehouse_operator' && $user->role !== 'admin') {
+                     if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
              if ($user->role === 'sales') return redirect()->route('delivery.create');
              if ($user->role === 'ppc') return redirect()->route('delivery.approvals');
              return redirect('/')->with('error', 'Unauthorized access to Schedule.');
         }
 
         $approvedOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
-            ->whereIn('status', ['approved', 'processing', 'completed']) 
+            ->whereIn('status', ['approved', 'processing']) 
             ->orderBy('delivery_date', 'asc')
             ->get();
 
         // Precompute available stock per part (PCS)
-        $availableByPart = \App\Models\PalletItem::select('part_number', \Illuminate\Support\Facades\DB::raw('SUM(pcs_quantity) as total'))
+        $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->where('boxes.is_withdrawn', false)
+            ->groupBy('boxes.part_number')
+            ->pluck('total', 'boxes.part_number');
+
+        $legacyTotals = PalletItem::select('part_number', DB::raw('SUM(pcs_quantity) as total'))
             ->where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
-                $q->whereHas('stockLocation');
+                $q->whereHas('stockLocation')
+                  ->doesntHave('boxes');
             })
             ->groupBy('part_number')
             ->pluck('total', 'part_number');
+
+        $availableByPart = $boxTotals->toArray();
+        foreach ($legacyTotals as $partNumber => $total) {
+            $availableByPart[$partNumber] = ($availableByPart[$partNumber] ?? 0) + (int) $total;
+        }
 
         $runningRequired = [];
 
@@ -63,7 +81,26 @@ class DeliveryOrderController extends Controller
             $order->has_sufficient_stock = $allAvailable;
         });
 
-        return view('delivery.index', compact('approvedOrders'));
+        $completedOrders = \App\Models\DeliveryCompletion::with('order')
+            ->where('status', 'completed')
+            ->where('redo_until', '>=', now())
+            ->orderBy('completed_at', 'desc')
+            ->limit(20)
+            ->get();
+
+        $historyOrders = \App\Models\DeliveryCompletion::with('order')
+            ->where(function ($q) {
+                $q->where('status', 'redone')
+                  ->orWhere(function ($q2) {
+                      $q2->where('status', 'completed')
+                         ->where('redo_until', '<', now());
+                  });
+            })
+            ->orderBy('completed_at', 'desc')
+            ->limit(50)
+            ->get();
+
+        return view('delivery.index', compact('approvedOrders', 'completedOrders', 'historyOrders'));
     }
 
     // Sales Page: Input Form & History
@@ -80,7 +117,10 @@ class DeliveryOrderController extends Controller
             ->limit(50)
             ->get();
 
-        return view('delivery.create', compact('myOrders'));
+        $partNumbers = \App\Models\PartSetting::orderBy('part_number', 'asc')
+            ->pluck('part_number');
+
+        return view('delivery.create', compact('myOrders', 'partNumbers'));
     }
 
     // PPC Page: Pending Approvals

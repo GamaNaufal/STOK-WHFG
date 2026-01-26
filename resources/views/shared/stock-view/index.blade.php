@@ -420,6 +420,7 @@
                                 <table class="table table-sm table-hover" style="margin: 0;">
                                     <thead style="background: #f9fafb; border-top: 1px solid #e5e7eb;">
                                         <tr>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">ID Box</th>
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">No Part</th>
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Box</th>
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">PCS</th>
@@ -428,7 +429,7 @@
                                     </thead>
                                     <tbody id="palletItemsTable">
                                         <tr>
-                                            <td colspan="4" class="text-center text-muted py-4">Loading...</td>
+                                            <td colspan="5" class="text-center text-muted py-4">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -663,6 +664,7 @@
                 } else {
                     tableBody.innerHTML = data.items.map(item => `
                         <tr>
+                            <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.box_number || '-'}</td>
                             <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.part_number}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.box_quantity}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.pcs_quantity}</td>

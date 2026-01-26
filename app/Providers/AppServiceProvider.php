@@ -27,6 +27,11 @@ class AppServiceProvider extends ServiceProvider
                 $count = \App\Models\DeliveryOrder::where('status', 'pending')->count();
                 $view->with('pendingDeliveryCount', $count);
             }
+
+            if (auth()->check() && in_array(auth()->user()->role, ['admin_warehouse', 'admin'], true)) {
+                $issueCount = \App\Models\DeliveryScanIssue::where('status', 'pending')->count();
+                $view->with('pendingScanIssueCount', $issueCount);
+            }
         });
     }
 }

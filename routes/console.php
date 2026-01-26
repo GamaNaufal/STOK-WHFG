@@ -35,3 +35,19 @@ Artisan::command('locations:sync', function () {
 
     $this->info('Done.');
 })->purpose('Sync master_locations occupancy from latest stock_locations');
+
+Artisan::command('delivery:purge-completions', function () {
+    $expired = \App\Models\DeliveryCompletion::where('status', 'completed')
+        ->where('redo_until', '<', now())
+        ->get();
+
+    foreach ($expired as $completion) {
+        $sessionId = $completion->pick_session_id;
+        \App\Models\DeliveryPickItem::where('pick_session_id', $sessionId)->delete();
+        \App\Models\DeliveryScanIssue::where('pick_session_id', $sessionId)->delete();
+        \App\Models\DeliveryPickSession::where('id', $sessionId)->delete();
+        $completion->delete();
+    }
+
+    $this->info('Expired completion data purged.');
+})->purpose('Purge completed delivery data after redo window');

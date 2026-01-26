@@ -9,6 +9,115 @@
     </div>
 </div>
 
+@if(isset($completedOrders) && $completedOrders->count() > 0)
+<div class="card shadow mb-4">
+    <div class="card-header py-3 bg-white">
+        <h6 class="m-0 font-weight-bold text-primary">Completed Orders (Redo 5 Hari)</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Completed At</th>
+                        <th>Redo Until</th>
+                        <th class="text-end">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($completedOrders as $completion)
+                        <tr>
+                            <td>#{{ $completion->order->id }}</td>
+                            <td>{{ $completion->order->customer_name }}</td>
+                            <td>{{ $completion->completed_at->format('d M Y H:i') }}</td>
+                            <td>{{ $completion->redo_until->format('d M Y H:i') }}</td>
+                            <td class="text-end">
+                                @if(Auth::user()->role === 'admin_warehouse' || Auth::user()->role === 'admin')
+                                    <form method="POST" action="{{ route('delivery.pick.redo', $completion->id) }}" class="d-inline">
+                                        @csrf
+                                        <button class="btn btn-sm btn-warning" {{ $completion->status !== 'completed' || now()->greaterThan($completion->redo_until) ? 'disabled' : '' }}>
+                                            <i class="bi bi-arrow-counterclockwise"></i> Redo
+                                        </button>
+                                    </form>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@endif
+
+@if(isset($historyOrders) && $historyOrders->count() > 0)
+<div class="card shadow mb-4">
+    <div class="card-header py-3 bg-white">
+        <h6 class="m-0 font-weight-bold text-primary">History Orders</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Completed At</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($historyOrders as $history)
+                        <tr>
+                            <td>#{{ $history->order->id }}</td>
+                            <td>{{ $history->order->customer_name }}</td>
+                            <td>{{ $history->completed_at->format('d M Y H:i') }}</td>
+                            <td>
+                                @if($history->status === 'redone')
+                                    <span class="badge bg-warning text-dark">Redone</span>
+                                @else
+                                    <span class="badge bg-secondary">Expired</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@endif
+
+<!-- Picklist Modal -->
+<div class="modal fade" id="picklistModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-pdf"></i> Dokumen Pengambilan</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Silakan download atau print pick list sebelum scan.</p>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-outline-primary" id="btnDownloadPdf" target="_blank">
+                    <i class="bi bi-download"></i> Download PDF
+                </a>
+                <a href="#" class="btn btn-outline-secondary" id="btnPrintPdf" target="_blank">
+                    <i class="bi bi-printer"></i> Print
+                </a>
+                <a href="#" class="btn btn-success" id="btnStartScan">
+                    <i class="bi bi-upc-scan"></i> Mulai Scan
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="container-fluid py-4">
     <!-- Buttons Moved to Sidebar -->
 
@@ -26,7 +135,7 @@
                             <th style="width: 20%">Customer</th>
                             <th>Order Details (Part No. & Qty)</th>
                             <th style="width: 12%">Due Time</th>
-                            @if(Auth::user()->role === 'warehouse_operator' || Auth::user()->role === 'admin')
+                            @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
                             <th style="width: 15%" class="text-end">Action</th>
                             @endif
                         </tr>
@@ -57,9 +166,11 @@
                                     <span class="badge bg-success">H-{{ $order->days_remaining }}</span>
                                 @endif
                             </td>
-                            @if(Auth::user()->role === 'warehouse_operator' || Auth::user()->role === 'admin')
+                            @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
                             <td class="text-end">
-                                @if($order->has_sufficient_stock)
+                                @if($order->status === 'completed')
+                                    <span class="badge bg-success"><i class="bi bi-check"></i> Selesai</span>
+                                @elseif($order->has_sufficient_stock)
                                     <button class="btn btn-sm btn-dark" onclick="openFulfillModal({{ $order->id }})">
                                         <i class="bi bi-box-seam"></i> Process
                                     </button>
@@ -73,7 +184,7 @@
                         </tr>
                         @empty
                         <tr>
-                            <td colspan="{{ (Auth::user()->role === 'warehouse_operator' || Auth::user()->role === 'admin') ? 5 : 4 }}" class="text-center text-muted py-5">
+                            <td colspan="{{ (in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) ? 5 : 4 }}" class="text-center text-muted py-5">
                                 <h5>No scheduled deliveries yet.</h5>
                                 <p>Once PPC approves an order, it will appear here.</p>
                             </td>
@@ -114,8 +225,11 @@
 @section('scripts')
 <script>
     const fulfillModal = new bootstrap.Modal(document.getElementById('fulfillModal'));
+    const picklistModal = new bootstrap.Modal(document.getElementById('picklistModal'));
+    let currentOrderId = null;
 
     function openFulfillModal(orderId) {
+        currentOrderId = orderId;
         document.getElementById('fulfillItems').innerHTML = '';
         document.getElementById('fulfillInfo').innerHTML = 'Loading...';
         fulfillModal.show();
@@ -248,32 +362,26 @@
             return;
         }
 
-        const requests = pendingProcessItems.map(item => {
-            return fetch('{{ route("stock-withdrawal.confirm") }}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                body: JSON.stringify({
-                    part_number: item.part_number,
-                    pcs_quantity: item.remaining,
-                    delivery_order_item_id: item.id,
-                    notes: 'Order Fulfillment'
-                })
-            }).then(res => res.json());
-        });
-
-        Promise.all(requests)
-            .then(results => {
-                const failed = results.find(r => !r.success);
-                if (failed) {
-                    alert(failed.message || 'Gagal proses.');
-                    return;
-                }
-                location.reload();
-            })
-            .catch(() => alert('Gagal proses.'));
+        fetch(`/delivery-stock/${currentOrderId}/start-pick`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.session_id) {
+                document.getElementById('btnDownloadPdf').href = data.pdf_url;
+                document.getElementById('btnPrintPdf').href = data.pdf_url;
+                document.getElementById('btnStartScan').href = data.scan_url;
+                fulfillModal.hide();
+                picklistModal.show();
+            } else {
+                alert(data.message || 'Gagal membuat pick session.');
+            }
+        })
+        .catch(() => alert('Gagal proses.'));
     });
 </script>
 @endsection

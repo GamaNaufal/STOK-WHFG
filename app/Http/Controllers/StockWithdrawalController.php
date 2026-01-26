@@ -28,22 +28,35 @@ class StockWithdrawalController extends Controller
     {
         $query = $request->input('q', '');
 
-        // Get distinct part numbers with available quantities using FIFO
-        $parts = PalletItem::select('part_number')
+        $boxParts = DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.is_withdrawn', false)
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->where('boxes.part_number', 'like', '%' . $query . '%')
+            ->distinct()
+            ->limit(20)
+            ->pluck('boxes.part_number');
+
+        $legacyParts = PalletItem::select('part_number')
             ->distinct()
             ->where('part_number', 'like', '%' . $query . '%')
-            ->with(['pallet' => function ($q) {
-                $q->with('stockLocation');
-            }])
+            ->whereHas('pallet', function ($q) {
+                $q->whereHas('stockLocation')
+                  ->doesntHave('boxes');
+            })
             ->limit(20)
-            ->get();
+            ->pluck('part_number');
+
+        $parts = $boxParts->merge($legacyParts)->unique();
 
         $results = [];
-        foreach ($parts as $part) {
-            $totalQty = $this->getTotalStockForPart($part->part_number);
+        foreach ($parts as $partNumber) {
+            $totalQty = $this->getTotalStockForPart($partNumber);
             if ($totalQty > 0) {
                 $results[] = [
-                    'part_number' => $part->part_number,
+                    'part_number' => $partNumber,
                     'total_stock' => $totalQty,
                 ];
             }
@@ -445,12 +458,24 @@ class StockWithdrawalController extends Controller
      */
     private function getTotalStockForPart($partNumber)
     {
-        return PalletItem::where('part_number', $partNumber)
+        $boxTotal = DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.part_number', $partNumber)
+            ->where('boxes.is_withdrawn', false)
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->sum('boxes.pcs_quantity');
+
+        $legacyTotal = PalletItem::where('part_number', $partNumber)
             ->where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
-                $q->whereHas('stockLocation');
+                $q->whereHas('stockLocation')
+                  ->doesntHave('boxes');
             })
             ->sum('pcs_quantity');
+
+        return (int) $boxTotal + (int) $legacyTotal;
     }
 
     /**
@@ -473,48 +498,92 @@ class StockWithdrawalController extends Controller
         $locations = [];
         $remainingQty = $requestedQty;
 
-        // Get pallet items sorted by FIFO (oldest first), exclude items with 0 quantity
-        $palletItems = PalletItem::where('part_number', $partNumber)
-            ->where('pcs_quantity', '>', 0)
-            ->whereHas('pallet', function ($q) {
-                $q->whereHas('stockLocation');
-            })
-            ->with(['pallet' => function ($q) {
-                $q->with('stockLocation');
-            }])
-            ->orderBy('created_at', 'asc')
+        $boxRows = DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.part_number', $partNumber)
+            ->where('boxes.is_withdrawn', false)
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderBy('boxes.created_at', 'asc')
+            ->select([
+                'boxes.id as box_id',
+                'boxes.box_number',
+                'boxes.pcs_quantity',
+                'pallets.id as pallet_id',
+                'pallets.pallet_number',
+                'stock_locations.warehouse_location',
+                'stock_locations.stored_at',
+            ])
             ->get();
 
-        foreach ($palletItems as $item) {
+        foreach ($boxRows as $box) {
             if ($remainingQty <= 0) {
                 break;
             }
 
-            if ($item->pcs_quantity <= 0) {
-                continue;
-            }
-
-            $takeQty = min($remainingQty, $item->pcs_quantity);
-            $stockLocation = $item->pallet->stockLocation;
-            
-            // Calculate PCS per box for this specific pallet
-            $pcsPerBox = $item->box_quantity > 0 ? $item->pcs_quantity / $item->box_quantity : 0;
-            $boxesToTake = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
+            $takeQty = min($remainingQty, (int) $box->pcs_quantity);
 
             $locations[] = [
-                'pallet_id' => $item->pallet->id,
-                'pallet_number' => $item->pallet->pallet_number,
-                'warehouse_location' => $stockLocation ? $stockLocation->warehouse_location : 'Unknown',
-                'stored_date' => $stockLocation ? $stockLocation->stored_at->format('d/m/Y H:i') : '-',
-                'available_pcs' => $item->pcs_quantity,
-                'available_box' => $item->box_quantity,
-                'pcs_per_box' => $pcsPerBox,
+                'pallet_id' => $box->pallet_id,
+                'pallet_number' => $box->pallet_number,
+                'warehouse_location' => $box->warehouse_location,
+                'stored_date' => $box->stored_at ? \Carbon\Carbon::parse($box->stored_at)->format('d/m/Y H:i') : '-',
+                'available_pcs' => (int) $box->pcs_quantity,
+                'available_box' => 1,
+                'pcs_per_box' => (int) $box->pcs_quantity,
                 'will_take_pcs' => $takeQty,
-                'will_take_box' => $boxesToTake,
+                'will_take_box' => 1,
+                'box_number' => $box->box_number,
                 'order' => count($locations) + 1,
             ];
 
-            $remainingQty -= $takeQty;
+            $remainingQty -= (int) $box->pcs_quantity;
+        }
+
+        if (count($locations) === 0) {
+            $palletItems = PalletItem::where('part_number', $partNumber)
+                ->where('pcs_quantity', '>', 0)
+                ->whereHas('pallet', function ($q) {
+                    $q->whereHas('stockLocation')
+                      ->doesntHave('boxes');
+                })
+                ->with(['pallet' => function ($q) {
+                    $q->with('stockLocation');
+                }])
+                ->orderBy('created_at', 'asc')
+                ->get();
+
+            foreach ($palletItems as $item) {
+                if ($remainingQty <= 0) {
+                    break;
+                }
+
+                if ($item->pcs_quantity <= 0) {
+                    continue;
+                }
+
+                $takeQty = min($remainingQty, $item->pcs_quantity);
+                $stockLocation = $item->pallet->stockLocation;
+                $pcsPerBox = $item->box_quantity > 0 ? $item->pcs_quantity / $item->box_quantity : 0;
+                $boxesToTake = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
+
+                $locations[] = [
+                    'pallet_id' => $item->pallet->id,
+                    'pallet_number' => $item->pallet->pallet_number,
+                    'box_number' => '-',
+                    'warehouse_location' => $stockLocation ? $stockLocation->warehouse_location : 'Unknown',
+                    'stored_date' => $stockLocation ? $stockLocation->stored_at->format('d/m/Y H:i') : '-',
+                    'available_pcs' => $item->pcs_quantity,
+                    'available_box' => $item->box_quantity,
+                    'pcs_per_box' => $pcsPerBox,
+                    'will_take_pcs' => $takeQty,
+                    'will_take_box' => $boxesToTake,
+                    'order' => count($locations) + 1,
+                ];
+
+                $remainingQty -= $takeQty;
+            }
         }
 
         return $locations;

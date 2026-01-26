@@ -1,5 +1,9 @@
 @extends('shared.layouts.app')
 
+@section('styles')
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@endsection
+
 @section('content')
 <div class="row mb-4">
     <div class="col-12">
@@ -39,7 +43,12 @@
                             <div id="items-container">
                                 <div class="row g-2 mb-2 item-row">
                                     <div class="col-7">
-                                        <input type="text" name="items[0][part_number]" class="form-control form-control-sm" placeholder="Part Number" required>
+                                        <select name="items[0][part_number]" class="form-control form-control-sm part-select" required>
+                                            <option value="">Pilih Part Number</option>
+                                            @foreach($partNumbers as $partNumber)
+                                                <option value="{{ $partNumber }}">{{ $partNumber }}</option>
+                                            @endforeach
+                                        </select>
                                     </div>
                                     <div class="col-3">
                                         <input type="number" name="items[0][quantity]" class="form-control form-control-sm" placeholder="Qty" min="1" required>
@@ -125,58 +134,83 @@
     </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        let itemIndex = 1;
-        const container = document.getElementById('items-container');
-        const addBtn = document.getElementById('add-item-btn');
+@endsection
 
-        // Function to update remove buttons state
-        function updateRemoveButtons() {
-            const rows = container.getElementsByClassName('item-row');
-            if (rows.length === 1) {
-                rows[0].querySelector('.remove-item').disabled = true;
-            } else {
-                Array.from(rows).forEach(row => {
-                    row.querySelector('.remove-item').disabled = false;
+@section('scripts')
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let itemIndex = 1;
+            const container = document.getElementById('items-container');
+            const addBtn = document.getElementById('add-item-btn');
+
+            function initPartSelects(context) {
+                const selects = (context || document).querySelectorAll('.part-select');
+                selects.forEach(select => {
+                    if (!select.dataset.enhanced) {
+                        window.jQuery(select).select2({
+                            width: '100%',
+                            placeholder: 'Pilih Part Number',
+                            allowClear: true
+                        });
+                        select.dataset.enhanced = 'true';
+                    }
                 });
             }
-        }
 
-        // Add item
-        addBtn.addEventListener('click', function() {
-            const row = document.createElement('div');
-            row.className = 'row g-2 mb-2 item-row';
-            row.innerHTML = `
-                <div class="col-7">
-                    <input type="text" name="items[${itemIndex}][part_number]" class="form-control form-control-sm" placeholder="Part Number" required>
-                </div>
-                <div class="col-3">
-                    <input type="number" name="items[${itemIndex}][quantity]" class="form-control form-control-sm" placeholder="Qty" min="1" required>
-                </div>
-                <div class="col-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-item w-100"><i class="bi bi-trash"></i></button>
-                </div>
-            `;
-            container.appendChild(row);
-            itemIndex++;
-            updateRemoveButtons();
-        });
-
-        // Remove item
-        container.addEventListener('click', function(e) {
-            if(e.target.closest('.remove-item')) {
-                const row = e.target.closest('.item-row');
-                // Only remove if it's not the last one, or ensure at least one remains
-                if (container.getElementsByClassName('item-row').length > 1) {
-                    row.remove();
-                    updateRemoveButtons();
+            // Function to update remove buttons state
+            function updateRemoveButtons() {
+                const rows = container.getElementsByClassName('item-row');
+                if (rows.length === 1) {
+                    rows[0].querySelector('.remove-item').disabled = true;
+                } else {
+                    Array.from(rows).forEach(row => {
+                        row.querySelector('.remove-item').disabled = false;
+                    });
                 }
             }
-        });
 
-        // Initial check
-        updateRemoveButtons();
-    });
-</script>
+            // Add item
+            addBtn.addEventListener('click', function() {
+                const row = document.createElement('div');
+                row.className = 'row g-2 mb-2 item-row';
+                row.innerHTML = `
+                    <div class="col-7">
+                        <select name="items[${itemIndex}][part_number]" class="form-control form-control-sm part-select" required>
+                            <option value="">Pilih Part Number</option>
+                            @foreach($partNumbers as $partNumber)
+                                <option value="{{ $partNumber }}">{{ $partNumber }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-3">
+                        <input type="number" name="items[${itemIndex}][quantity]" class="form-control form-control-sm" placeholder="Qty" min="1" required>
+                    </div>
+                    <div class="col-2">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-item w-100"><i class="bi bi-trash"></i></button>
+                    </div>
+                `;
+                container.appendChild(row);
+                itemIndex++;
+                updateRemoveButtons();
+                initPartSelects(row);
+            });
+
+            // Remove item
+            container.addEventListener('click', function(e) {
+                if (e.target.closest('.remove-item')) {
+                    const row = e.target.closest('.item-row');
+                    if (container.getElementsByClassName('item-row').length > 1) {
+                        row.remove();
+                        updateRemoveButtons();
+                    }
+                }
+            });
+
+            // Initial check
+            updateRemoveButtons();
+            initPartSelects(document);
+        });
+    </script>
 @endsection

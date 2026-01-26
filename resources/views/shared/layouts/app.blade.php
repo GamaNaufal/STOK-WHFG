@@ -169,6 +169,18 @@
                                 </li>
                             @endif
 
+                            @if(auth()->user()->role === 'admin_warehouse' || auth()->user()->role === 'admin')
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.pick.issues') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.pick.issues') }}">
+                                        <i class="bi bi-bell"></i> Scan Issues
+                                        @if(isset($pendingScanIssueCount) && $pendingScanIssueCount > 0)
+                                            <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingScanIssueCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                            @endif
+
                             <!-- Master No Part & Qty: Admin Warehouse + Admin IT -->
                             @if(auth()->user()->role === 'admin_warehouse' || auth()->user()->role === 'admin')
                                 <li class="nav-item">

@@ -13,6 +13,13 @@ class Box extends Model
         'qr_code',
         'user_id',
         'qty_box',
+        'is_withdrawn',
+        'withdrawn_at',
+    ];
+
+    protected $casts = [
+        'is_withdrawn' => 'boolean',
+        'withdrawn_at' => 'datetime',
     ];
 
     public function user()

@@ -10,6 +10,7 @@ class StockWithdrawal extends Model
         'withdrawal_batch_id',
         'user_id',
         'pallet_item_id',
+        'box_id',
         'part_number',
         'pcs_quantity',
         'box_quantity',
@@ -33,5 +34,10 @@ class StockWithdrawal extends Model
     public function palletItem()
     {
         return $this->belongsTo(PalletItem::class);
+    }
+
+    public function box()
+    {
+        return $this->belongsTo(Box::class);
     }
 }
