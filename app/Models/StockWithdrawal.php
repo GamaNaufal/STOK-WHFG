@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StockWithdrawal extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'withdrawal_batch_id',
         'user_id',
@@ -24,6 +27,8 @@ class StockWithdrawal extends Model
         'withdrawn_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
+        'status' => 'string', // completed, reversed, cancelled
     ];
 
     public function user()
@@ -39,5 +44,16 @@ class StockWithdrawal extends Model
     public function box()
     {
         return $this->belongsTo(Box::class);
+    }
+
+    // Scope untuk query yang sering digunakan
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', 'completed');
+    }
+
+    public function scopeReversed($query)
+    {
+        return $query->where('status', 'reversed');
     }
 }

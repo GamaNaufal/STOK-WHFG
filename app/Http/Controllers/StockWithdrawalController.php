@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\StockLocation;
@@ -190,6 +191,12 @@ class StockWithdrawalController extends Controller
                 $item->box_quantity -= $boxesToReduce;
                 $item->save();
 
+                // Auto-update master location jika pallet kosong
+                $masterLocation = MasterLocation::where('current_pallet_id', $item->pallet_id)->first();
+                if ($masterLocation) {
+                    $masterLocation->autoVacateIfEmpty();
+                }
+
                 // Don't delete pallet immediately - keep it for undo operations
                 // Just mark items with 0 quantity (logical deletion)
 
@@ -327,6 +334,12 @@ class StockWithdrawalController extends Controller
                     $item->pcs_quantity -= $takeQty;
                     $item->box_quantity -= $boxesToReduce;
                     $item->save();
+
+                    // Auto-update master location jika pallet kosong
+                    $masterLocation = MasterLocation::where('current_pallet_id', $item->pallet_id)->first();
+                    if ($masterLocation) {
+                        $masterLocation->autoVacateIfEmpty();
+                    }
 
                     $remainingQty -= $takeQty;
                 }

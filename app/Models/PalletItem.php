@@ -13,8 +13,33 @@ class PalletItem extends Model
         'pcs_quantity',
     ];
 
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
     public function pallet()
     {
         return $this->belongsTo(Pallet::class);
+    }
+
+    // Relationship ke stock withdrawals
+    public function stockWithdrawals()
+    {
+        return $this->hasMany(StockWithdrawal::class);
+    }
+
+    // Relationship ke stock inputs
+    public function stockInputs()
+    {
+        return $this->hasMany(StockInput::class);
+    }
+
+    /**
+     * Get part settings untuk standardisasi qty_box
+     */
+    public function partSetting()
+    {
+        return $this->hasOne(PartSetting::class, 'part_number', 'part_number');
     }
 }

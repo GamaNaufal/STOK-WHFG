@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class StockInput extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'pallet_id',
         'pallet_item_id',
@@ -18,6 +21,9 @@ class StockInput extends Model
 
     protected $casts = [
         'stored_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public function pallet()
@@ -34,5 +40,12 @@ class StockInput extends Model
     {
         return $this->belongsTo(User::class);
     }
-}
 
+    /**
+     * Scope untuk query by date range
+     */
+    public function scopeRecent($query, $days = 7)
+    {
+        return $query->where('created_at', '>=', now()->subDays($days));
+    }
+}

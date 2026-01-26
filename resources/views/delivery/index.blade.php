@@ -31,13 +31,13 @@
                         <tr>
                             <td>#{{ $completion->order->id }}</td>
                             <td>{{ $completion->order->customer_name }}</td>
-                            <td>{{ $completion->completed_at->format('d M Y H:i') }}</td>
-                            <td>{{ $completion->redo_until->format('d M Y H:i') }}</td>
+                            <td>{{ is_object($completion->completed_at) ? $completion->completed_at->format('d M Y H:i') : \Carbon\Carbon::parse($completion->completed_at)->format('d M Y H:i') }}</td>
+                            <td>{{ is_object($completion->redo_until) ? $completion->redo_until->format('d M Y H:i') : \Carbon\Carbon::parse($completion->redo_until)->format('d M Y H:i') }}</td>
                             <td class="text-end">
                                 @if(Auth::user()->role === 'admin_warehouse' || Auth::user()->role === 'admin')
                                     <form method="POST" action="{{ route('delivery.pick.redo', $completion->id) }}" class="d-inline">
                                         @csrf
-                                        <button class="btn btn-sm btn-warning" {{ $completion->status !== 'completed' || now()->greaterThan($completion->redo_until) ? 'disabled' : '' }}>
+                                        <button class="btn btn-sm btn-warning" {{ $completion->completion_status !== 'completed' || now()->greaterThan($completion->redo_until) ? 'disabled' : '' }}>
                                             <i class="bi bi-arrow-counterclockwise"></i> Redo
                                         </button>
                                     </form>
@@ -75,9 +75,9 @@
                         <tr>
                             <td>#{{ $history->order->id }}</td>
                             <td>{{ $history->order->customer_name }}</td>
-                            <td>{{ $history->completed_at->format('d M Y H:i') }}</td>
+                            <td>{{ is_object($history->completed_at) ? $history->completed_at->format('d M Y H:i') : \Carbon\Carbon::parse($history->completed_at)->format('d M Y H:i') }}</td>
                             <td>
-                                @if($history->status === 'redone')
+                                @if($history->completion_status === 'redone')
                                     <span class="badge bg-warning text-dark">Redone</span>
                                 @else
                                     <span class="badge bg-secondary">Expired</span>
@@ -372,8 +372,21 @@
         .then(res => res.json())
         .then(data => {
             if (data.session_id) {
+                // Set download button
                 document.getElementById('btnDownloadPdf').href = data.pdf_url;
-                document.getElementById('btnPrintPdf').href = data.pdf_url;
+                document.getElementById('btnDownloadPdf').download = 'picklist-order-' + currentOrderId + '.pdf';
+                
+                // Set print button - open PDF and trigger print immediately
+                const printBtn = document.getElementById('btnPrintPdf');
+                printBtn.onclick = function(e) {
+                    e.preventDefault();
+                    const printWindow = window.open(data.pdf_url, '_blank');
+                    // Trigger print dialog saat PDF selesai load
+                    printWindow.onload = function() {
+                        printWindow.print();
+                    };
+                };
+                
                 document.getElementById('btnStartScan').href = data.scan_url;
                 fulfillModal.hide();
                 picklistModal.show();

@@ -3,11 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\Box;
-use App\Models\DeliveryCompletion;
+use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
-use App\Models\DeliveryScanIssue;
+use App\Models\MasterLocation;
 use App\Models\PalletItem;
 use App\Models\StockWithdrawal;
 use Illuminate\Http\Request;
@@ -116,11 +116,11 @@ class DeliveryPickController extends Controller
         $box = Box::where('box_number', $request->box_number)->first();
 
         if ($box && $box->is_withdrawn) {
-            DeliveryScanIssue::create([
+            DeliveryIssue::create([
                 'pick_session_id' => $session->id,
                 'box_id' => $box->id,
                 'scanned_code' => $request->box_number,
-                'reason' => 'Box sudah withdrawn',
+                'issue_type' => 'box_withdrawn',
                 'status' => 'pending',
             ]);
 
@@ -133,11 +133,11 @@ class DeliveryPickController extends Controller
         $pickItem = $box ? $session->items()->where('box_id', $box->id)->first() : null;
 
         if (!$pickItem) {
-            DeliveryScanIssue::create([
+            DeliveryIssue::create([
                 'pick_session_id' => $session->id,
                 'box_id' => $box?->id,
                 'scanned_code' => $request->box_number,
-                'reason' => 'Box tidak sesuai dengan daftar pengambilan',
+                'issue_type' => 'scan_mismatch',
                 'status' => 'pending',
             ]);
 
@@ -248,6 +248,14 @@ class DeliveryPickController extends Controller
                     $palletItem->box_quantity = max(0, $palletItem->box_quantity - 1);
                     $palletItem->save();
                 }
+
+                // Auto-update master location jika pallet kosong
+                if ($pallet) {
+                    $masterLocation = MasterLocation::where('current_pallet_id', $pallet->id)->first();
+                    if ($masterLocation) {
+                        $masterLocation->autoVacateIfEmpty();
+                    }
+                }
             }
 
             foreach ($order->items as $orderItem) {
@@ -264,16 +272,9 @@ class DeliveryPickController extends Controller
 
             $session->status = 'completed';
             $session->completed_at = now();
+            $session->completion_status = 'completed';
+            $session->redo_until = now()->addDays(5);
             $session->save();
-
-            DeliveryCompletion::create([
-                'delivery_order_id' => $order->id,
-                'pick_session_id' => $session->id,
-                'withdrawal_batch_id' => $batchId,
-                'status' => 'completed',
-                'completed_at' => now(),
-                'redo_until' => now()->addDays(5),
-            ]);
 
             DB::commit();
 
@@ -284,59 +285,65 @@ class DeliveryPickController extends Controller
         }
     }
 
-    public function redo($completionId)
+    public function redo($sessionId)
     {
         $user = auth()->user();
         if (!in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
-        $completion = DeliveryCompletion::with('order')->findOrFail($completionId);
+        $session = DeliveryPickSession::with('order', 'items')->findOrFail($sessionId);
 
-        if (now()->greaterThan($completion->redo_until)) {
+        if (now()->greaterThan($session->redo_until)) {
             return redirect()->back()->with('error', 'Redo sudah kadaluarsa.');
         }
 
         DB::beginTransaction();
         try {
-            $withdrawals = StockWithdrawal::where('withdrawal_batch_id', $completion->withdrawal_batch_id)
-                ->where('status', 'completed')
-                ->get();
+            // Find all boxes from pick session items and get their withdrawals
+            $boxIds = $session->items()->pluck('box_id')->toArray();
+            
+            if (!empty($boxIds)) {
+                $withdrawals = StockWithdrawal::whereIn('box_id', $boxIds)
+                    ->where('status', 'completed')
+                    ->get();
 
-            foreach ($withdrawals as $withdrawal) {
-                $box = $withdrawal->box_id ? Box::find($withdrawal->box_id) : null;
-                if ($box) {
-                    $box->is_withdrawn = false;
-                    $box->withdrawn_at = null;
-                    $box->save();
-                }
-
-                if ($withdrawal->pallet_item_id) {
-                    $palletItem = PalletItem::find($withdrawal->pallet_item_id);
-                    if ($palletItem) {
-                        $palletItem->pcs_quantity += $withdrawal->pcs_quantity;
-                        $palletItem->box_quantity += $withdrawal->box_quantity;
-                        $palletItem->save();
+                foreach ($withdrawals as $withdrawal) {
+                    $box = $withdrawal->box;
+                    if ($box) {
+                        $box->is_withdrawn = false;
+                        $box->withdrawn_at = null;
+                        $box->save();
                     }
+
+                    if ($withdrawal->pallet_item_id) {
+                        $palletItem = PalletItem::find($withdrawal->pallet_item_id);
+                        if ($palletItem) {
+                            $palletItem->pcs_quantity += $withdrawal->pcs_quantity;
+                            $palletItem->box_quantity += $withdrawal->box_quantity;
+                            $palletItem->save();
+                        }
+                    }
+
+                    $withdrawal->status = 'reversed';
+                    $withdrawal->save();
                 }
 
-                $withdrawal->status = 'reversed';
-                $withdrawal->save();
+                $order = $session->order;
+                foreach ($order->items as $orderItem) {
+                    $totalReversed = $withdrawals
+                        ->where('part_number', $orderItem->part_number)
+                        ->sum('pcs_quantity');
+
+                    $orderItem->fulfilled_quantity = max(0, (int) $orderItem->fulfilled_quantity - (int) $totalReversed);
+                    $orderItem->save();
+                }
             }
 
-            $order = $completion->order;
-            foreach ($order->items as $orderItem) {
-                $totalReversed = $withdrawals
-                    ->where('part_number', $orderItem->part_number)
-                    ->sum('pcs_quantity');
+            $session->completion_status = 'redone';
+            $session->save();
 
-                $orderItem->fulfilled_quantity = max(0, (int) $orderItem->fulfilled_quantity - (int) $totalReversed);
-                $orderItem->save();
-            }
-
-            $completion->status = 'redone';
-            $completion->save();
-
+            $order = $session->order;
             $order->status = 'processing';
             $order->save();
 
@@ -350,11 +357,30 @@ class DeliveryPickController extends Controller
 
     public function pdf($orderId, $sessionId)
     {
-        $session = DeliveryPickSession::with(['items.box'])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
+        // Eager load with proper joins to get location
+        $session = DeliveryPickSession::with([
+            'items' => function($q) {
+                $q->with([
+                    'box' => function($q) {
+                        $q->with([
+                            'pallets' => function($q) {
+                                $q->with([
+                                    'stockLocation' => function($q) {
+                                        $q->with('masterLocation');
+                                    },
+                                    'currentLocation'
+                                ]);
+                            }
+                        ]);
+                    }
+                ]);
+            }
+        ])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
+        
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('delivery.picklist_pdf', compact('order', 'session'));
-        return $pdf->download('picklist-order-' . $order->id . '.pdf');
+        return $pdf->stream('picklist-order-' . $order->id . '.pdf');
     }
 
     public function issues()

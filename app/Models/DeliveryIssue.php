@@ -4,13 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class DeliveryScanIssue extends Model
+class DeliveryIssue extends Model
 {
+    protected $table = 'delivery_issues';
+
     protected $fillable = [
         'pick_session_id',
         'box_id',
         'scanned_code',
-        'reason',
+        'issue_type',
         'status',
         'resolved_by',
         'resolved_at',

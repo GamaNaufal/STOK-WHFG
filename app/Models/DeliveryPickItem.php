@@ -13,10 +13,13 @@ class DeliveryPickItem extends Model
         'pcs_quantity',
         'status',
         'scanned_at',
+        'scanned_by',
     ];
 
     protected $casts = [
         'scanned_at' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function session()
@@ -27,5 +30,36 @@ class DeliveryPickItem extends Model
     public function box()
     {
         return $this->belongsTo(Box::class);
+    }
+
+    // User yang scan
+    public function scanner()
+    {
+        return $this->belongsTo(User::class, 'scanned_by');
+    }
+
+    /**
+     * Scope helpers
+     */
+    public function scopeScanned($query)
+    {
+        return $query->where('status', 'scanned');
+    }
+
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
+    /**
+     * Mark sebagai scanned
+     */
+    public function markAsScanned($userId = null)
+    {
+        $this->update([
+            'status' => 'scanned',
+            'scanned_at' => now(),
+            'scanned_by' => $userId,
+        ]);
     }
 }

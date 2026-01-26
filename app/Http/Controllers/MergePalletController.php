@@ -13,12 +13,40 @@ class MergePalletController extends Controller
 {
     public function index()
     {
-        $pallets = Pallet::has('boxes')
+        // Get all pallets with boxes
+        $allPallets = Pallet::has('boxes')
             ->with(['stockLocation', 'boxes'])
             ->withCount('boxes')
             ->orderBy('id', 'desc')
             ->limit(50)
             ->get();
+
+        // Filter: exclude pallets yang kosong atau sudah dideliver semua
+        $pallets = $allPallets->filter(function($pallet) {
+            // Check if pallet still has active boxes (not all withdrawn)
+            $activeBoxes = $pallet->boxes->filter(function($box) {
+                return !$box->is_withdrawn; // Only count non-withdrawn boxes
+            });
+            
+            // Exclude jika semua boxes sudah withdrawn (pallet kosong)
+            if ($activeBoxes->isEmpty()) {
+                return false;
+            }
+            
+            // Jika pallet tidak punya stockLocation, include
+            if (!$pallet->stockLocation) {
+                return true;
+            }
+            
+            // Jika punya stockLocation, check master_location
+            $masterLocation = $pallet->stockLocation->masterLocation;
+            if (!$masterLocation) {
+                return true;
+            }
+            
+            // Exclude jika master_location is_occupied = false (lokasi sudah kosong)
+            return $masterLocation->is_occupied === true;
+        });
 
         return view('warehouse.merge.index', compact('pallets'));
     }
@@ -28,9 +56,23 @@ class MergePalletController extends Controller
         $code = $request->query('code'); // Detect pallet number only
         
         // Find by Pallet Number
-        $pallet = Pallet::where('pallet_number', $code)->with(['boxes', 'stockLocation'])->first();
+        $pallet = Pallet::where('pallet_number', $code)
+            ->with(['boxes', 'stockLocation'])
+            ->first();
 
         if ($pallet) {
+            // Check if location is occupied (jika ada stockLocation)
+            if ($pallet->stockLocation) {
+                $masterLocation = $pallet->stockLocation->masterLocation;
+                if ($masterLocation && $masterLocation->is_occupied === false) {
+                    // Lokasi sudah kosong, jangan boleh merge
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Pallet tidak dapat dimerge - lokasi sudah kosong'
+                    ], 404);
+                }
+            }
+
             // Calculate stats
             $totalBox = $pallet->boxes->count();
             $totalPcs = $pallet->boxes->sum('pcs_quantity');
@@ -93,38 +135,65 @@ class MergePalletController extends Controller
 
             $palletIds = $request->pallet_ids;
 
-            // 2. Iterate Selected Pallets
+            // 2. Collect all boxes and items from ALL source pallets first
+            $allBoxes = [];
+            $sourcePallets = [];
+            
             foreach ($palletIds as $id) {
                 $sourcePallet = Pallet::with('boxes', 'stockLocation', 'items')->find($id);
-                
                 if (!$sourcePallet) continue;
-
-                $boxIds = $sourcePallet->boxes->pluck('id')->toArray();
                 
-                if (!empty($boxIds)) {
-                     // Attach boxes to NEW pallet
-                     $newPallet->boxes()->attach($boxIds);
+                $sourcePallets[] = $sourcePallet;
+                $allBoxes = array_merge($allBoxes, $sourcePallet->boxes->toArray());
+            }
 
-                     // Handle PalletItems (History + Timestamps)
-                     // Instead of creating new fresh items, let's replicate them with original timestamps FROM THE BOX
-                     foreach ($sourcePallet->boxes as $box) {
-                        // We use the BOX created_at as the source of truth for FIFO
-                        $timestamp = $box->created_at ?? now();
-                        
-                        PalletItem::create([
-                            'pallet_id' => $newPallet->id,
-                            'part_number' => $box->part_number,
-                            'box_quantity' => 1,
-                            'pcs_quantity' => $box->pcs_quantity,
-                            'created_at' => $timestamp, 
-                            'updated_at' => now(), 
-                        ]);
+            // 3. Attach all boxes to new pallet and group items by part_number
+            $allBoxIds = array_column($allBoxes, 'id');
+            if (!empty($allBoxIds)) {
+                $newPallet->boxes()->attach($allBoxIds);
+
+                // Group items by part_number across ALL source pallets
+                $itemsByPart = [];
+                foreach ($allBoxes as $box) {
+                    $partNumber = $box['part_number'];
+                    $timestamp = isset($box['created_at']) ? strtotime($box['created_at']) : time();
+                    
+                    if (!isset($itemsByPart[$partNumber])) {
+                        $itemsByPart[$partNumber] = [
+                            'part_number' => $partNumber,
+                            'box_quantity' => 0,
+                            'pcs_quantity' => 0,
+                            'created_at' => $timestamp,
+                        ];
                     }
-
-                    // Detach from OLD pallet
-                    $sourcePallet->boxes()->detach();
+                    
+                    $itemsByPart[$partNumber]['box_quantity']++;
+                    $itemsByPart[$partNumber]['pcs_quantity'] += $box['pcs_quantity'];
+                    
+                    // Use earliest timestamp for FIFO
+                    if ($timestamp < $itemsByPart[$partNumber]['created_at']) {
+                        $itemsByPart[$partNumber]['created_at'] = $timestamp;
+                    }
                 }
+                
+                // Create pallet items with summed quantities (once, per unique part_number)
+                foreach ($itemsByPart as $item) {
+                    PalletItem::create([
+                        'pallet_id' => $newPallet->id,
+                        'part_number' => $item['part_number'],
+                        'box_quantity' => $item['box_quantity'],
+                        'pcs_quantity' => $item['pcs_quantity'],
+                        'created_at' => date('Y-m-d H:i:s', $item['created_at']),
+                        'updated_at' => now(),
+                    ]);
+                }
+            }
 
+            // 4. Clean up source pallets
+            foreach ($sourcePallets as $sourcePallet) {
+                // Detach boxes from source pallet
+                $sourcePallet->boxes()->detach();
+                
                 // Delete source items history
                 $sourcePallet->items()->delete();
 

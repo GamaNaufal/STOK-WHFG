@@ -18,6 +18,8 @@ class DeliveryCompletion extends Model
     protected $casts = [
         'completed_at' => 'datetime',
         'redo_until' => 'datetime',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function order()
@@ -28,5 +30,24 @@ class DeliveryCompletion extends Model
     public function session()
     {
         return $this->belongsTo(DeliveryPickSession::class, 'pick_session_id');
+    }
+
+    // Scope helpers
+    public function scopeCompleted($query)
+    {
+        return $query->where('status', 'completed');
+    }
+
+    public function scopePending($query)
+    {
+        return $query->where('status', 'pending');
+    }
+
+    /**
+     * Check if completion is overdue
+     */
+    public function isOverdue()
+    {
+        return $this->redo_until && now()->isAfter($this->redo_until);
     }
 }

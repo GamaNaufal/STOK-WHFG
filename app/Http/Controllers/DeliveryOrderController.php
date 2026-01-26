@@ -81,18 +81,18 @@ class DeliveryOrderController extends Controller
             $order->has_sufficient_stock = $allAvailable;
         });
 
-        $completedOrders = \App\Models\DeliveryCompletion::with('order')
-            ->where('status', 'completed')
+        $completedOrders = \App\Models\DeliveryPickSession::with('order')
+            ->where('completion_status', 'completed')
             ->where('redo_until', '>=', now())
             ->orderBy('completed_at', 'desc')
             ->limit(20)
             ->get();
 
-        $historyOrders = \App\Models\DeliveryCompletion::with('order')
+        $historyOrders = \App\Models\DeliveryPickSession::with('order')
             ->where(function ($q) {
-                $q->where('status', 'redone')
+                $q->where('completion_status', 'redone')
                   ->orWhere(function ($q2) {
-                      $q2->where('status', 'completed')
+                      $q2->where('completion_status', 'completed')
                          ->where('redo_until', '<', now());
                   });
             })

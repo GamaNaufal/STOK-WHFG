@@ -102,6 +102,14 @@
         scanMessage.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
     }
 
+    // Handle Enter key in input
+    scanInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            btnScan.click();
+        }
+    });
+
     btnScan.addEventListener('click', function () {
         const boxNumber = scanInput.value.trim();
         if (!boxNumber) {
