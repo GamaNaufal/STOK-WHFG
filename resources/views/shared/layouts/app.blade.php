@@ -155,77 +155,10 @@
                                 </a>
                             </li>
 
-                            @if(auth()->user()->role === 'admin')
-                                <div class="mt-2 mb-1 text-muted px-2" style="font-size: 0.75rem;">ADMIN IT</div>
-                            @endif
-
-                            <!-- Kelola Lokasi: Admin Warehouse + Admin IT -->
-                            @if(auth()->user()->role === 'admin_warehouse' || auth()->user()->role === 'admin')
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('locations*') ? 'active' : '' }}" 
-                                       href="{{ route('locations.index') }}">
-                                        <i class="bi bi-geo-alt"></i> Kelola Lokasi
-                                    </a>
-                                </li>
-                            @endif
-
-                            @if(auth()->user()->role === 'admin_warehouse' || auth()->user()->role === 'admin')
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('delivery.pick.issues') ? 'active' : '' }}" 
-                                       href="{{ route('delivery.pick.issues') }}">
-                                        <i class="bi bi-bell"></i> Scan Issues
-                                        @if(isset($pendingScanIssueCount) && $pendingScanIssueCount > 0)
-                                            <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingScanIssueCount }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                            @endif
-
-                            <!-- Master No Part & Qty: Admin Warehouse + Admin IT -->
-                            @if(auth()->user()->role === 'admin_warehouse' || auth()->user()->role === 'admin')
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('part-settings*') ? 'active' : '' }}" 
-                                       href="{{ route('part-settings.index') }}">
-                                        <i class="bi bi-list-check"></i> Master No Part
-                                    </a>
-                                </li>
-                            @endif
-
-                            <!-- Kelola User: Admin IT only -->
-                            @if(auth()->user()->role === 'admin')
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('users*') ? 'active' : '' }}" 
-                                       href="{{ route('users.index') }}">
-                                        <i class="bi bi-people"></i> Kelola User
-                                    </a>
-                                </li>
-                            @endif
-
-                            <!-- Sales Input: Sales + Admin IT -->
-                            @if(auth()->user()->role === 'sales' || auth()->user()->role === 'admin')
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('delivery.create') ? 'active' : '' }}" 
-                                       href="{{ route('delivery.create') }}">
-                                        <i class="bi bi-cart-plus"></i> Sales Input
-                                    </a>
-                                </li>
-                            @endif
-
-                            <!-- Pending Approval: PPC + Admin IT -->
-                            @if(auth()->user()->role === 'ppc' || auth()->user()->role === 'admin')
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('delivery.approvals') ? 'active' : '' }}" 
-                                       href="{{ route('delivery.approvals') }}">
-                                        <i class="bi bi-clipboard-check"></i> Pending Approval
-                                        @if(isset($pendingDeliveryCount) && $pendingDeliveryCount > 0)
-                                            <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingDeliveryCount }}</span>
-                                        @endif
-                                    </a>
-                                </li>
-                            @endif
-
-                            <!-- Input Stok & Delivery Stock: Warehouse Operator + Admin IT -->
-                            @if(auth()->user()->role === 'warehouse_operator' || auth()->user()->role === 'admin')
+                            <!-- ==================== WAREHOUSE OPERATOR ==================== -->
+                            @if(auth()->user()->role === 'warehouse_operator')
+                                <div class="mt-3 mb-2 text-muted px-2" style="font-size: 0.75rem; font-weight: 600;">WAREHOUSE</div>
+                                
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('stock-input*') ? 'active' : '' }}" 
                                        href="{{ route('stock-input.index') }}">
@@ -235,23 +168,18 @@
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('delivery.index') ? 'active' : '' }}" 
                                        href="{{ route('delivery.index') }}">
-                                        <i class="bi bi-truck"></i> Delivery Stock
+                                        <i class="bi bi-truck"></i> Delivery
+                                        @if(isset($pendingDeliveryCount) && $pendingDeliveryCount > 0)
+                                            <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingDeliveryCount }}</span>
+                                        @endif
                                     </a>
                                 </li>
-                            @endif
-
-                            <!-- Merge Pallet: Admin IT only -->
-                            @if(auth()->user()->role === 'admin')
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('merge-pallet*') ? 'active' : '' }}" 
                                        href="{{ route('merge-pallet.index') }}">
-                                        <i class="bi bi-box-seam"></i> Merge Pallet
+                                        <i class="bi bi-box-seam"></i> Merge Palet
                                     </a>
                                 </li>
-                            @endif
-
-                            <!-- Lihat Stok: PPC + Admin Warehouse + Supervisi + Admin IT -->
-                            @if(in_array(auth()->user()->role, ['ppc', 'admin_warehouse', 'supervisi', 'admin'], true))
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" 
                                        href="{{ route('stock-view.index') }}">
@@ -260,11 +188,52 @@
                                 </li>
                             @endif
 
-                            <!-- Laporan: Supervisi + Admin IT -->
-                            @if(auth()->user()->role === 'supervisi' || auth()->user()->role === 'admin')
+                            <!-- ==================== SALES ==================== -->
+                            @if(auth()->user()->role === 'sales')
+                                <div class="mt-3 mb-2 text-muted px-2" style="font-size: 0.75rem; font-weight: 600;">SALES</div>
+                                
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.create') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.create') }}">
+                                        <i class="bi bi-cart-plus"></i> Sales Input
+                                    </a>
+                                </li>
+                            @endif
+
+                            <!-- ==================== PPC ==================== -->
+                            @if(auth()->user()->role === 'ppc')
+                                <div class="mt-3 mb-2 text-muted px-2" style="font-size: 0.75rem; font-weight: 600;">PPC</div>
+                                
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.approvals') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.approvals') }}">
+                                        <i class="bi bi-clipboard-check"></i> Pending Approval
+                                        @if(isset($pendingDeliveryCount) && $pendingDeliveryCount > 0)
+                                            <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingDeliveryCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" 
+                                       href="{{ route('stock-view.index') }}">
+                                        <i class="bi bi-eye"></i> Lihat Stok
+                                    </a>
+                                </li>
+                            @endif
+
+                            <!-- ==================== SUPERVISI ==================== -->
+                            @if(auth()->user()->role === 'supervisi')
+                                <div class="mt-3 mb-2 text-muted px-2" style="font-size: 0.75rem; font-weight: 600;">SUPERVISI</div>
+                                
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" 
+                                       href="{{ route('stock-view.index') }}">
+                                        <i class="bi bi-eye"></i> Lihat Stok
+                                    </a>
+                                </li>
                                 <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('reports*') ? 'active' : '' }}" 
-                                    data-bs-toggle="collapse" href="#laporanMenu" role="button" aria-expanded="{{ request()->routeIs('reports*') ? 'true' : 'false' }}" aria-controls="laporanMenu">
+                                       data-bs-toggle="collapse" href="#laporanMenu" role="button" aria-expanded="{{ request()->routeIs('reports*') ? 'true' : 'false' }}" aria-controls="laporanMenu">
                                         <i class="bi bi-file-earmark-pdf"></i> Laporan
                                         <i class="bi bi-chevron-down" style="float: right; margin-top: 3px;"></i>
                                     </a>
@@ -273,13 +242,154 @@
                                             <li class="nav-item">
                                                 <a class="nav-link {{ request()->routeIs('reports.stock-input') ? 'active' : '' }}" 
                                                     href="{{ route('reports.stock-input') }}">
-                                                    <i class="bi bi-arrow-right-short"></i> Laporan Input Stok
+                                                    <i class="bi bi-arrow-right-short"></i> Input Stok
                                                 </a>
                                             </li>
                                             <li class="nav-item">
                                                 <a class="nav-link {{ request()->routeIs('reports.withdrawal') ? 'active' : '' }}" 
                                                     href="{{ route('reports.withdrawal') }}">
-                                                    <i class="bi bi-arrow-right-short"></i> Laporan Pengambilan
+                                                    <i class="bi bi-arrow-right-short"></i> Pengambilan Stok
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link {{ request()->routeIs('audit.index') ? 'active' : '' }}" 
+                                                    href="{{ route('audit.index') }}">
+                                                    <i class="bi bi-arrow-right-short"></i> Audit Trail
+                                                </a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </li>
+                            @endif
+
+                            <!-- ==================== ADMIN WAREHOUSE ==================== -->
+                            @if(auth()->user()->role === 'admin_warehouse')
+                                <div class="mt-3 mb-2 text-muted px-2" style="font-size: 0.75rem; font-weight: 600;">ADMIN WAREHOUSE</div>
+                                
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('locations*') ? 'active' : '' }}" 
+                                       href="{{ route('locations.index') }}">
+                                        <i class="bi bi-geo-alt"></i> Kelola Lokasi
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.pick.issues') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.pick.issues') }}">
+                                        <i class="bi bi-bell"></i> Scan Issues
+                                        @if(isset($pendingScanIssueCount) && $pendingScanIssueCount > 0)
+                                            <span class="badge bg-danger rounded-pill ms-auto">{{ $pendingScanIssueCount }}</span>
+                                        @endif
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('part-settings*') ? 'active' : '' }}" 
+                                       href="{{ route('part-settings.index') }}">
+                                        <i class="bi bi-list-check"></i> Master No Part
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" 
+                                       href="{{ route('stock-view.index') }}">
+                                        <i class="bi bi-eye"></i> Lihat Stok
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('merge-pallet*') ? 'active' : '' }}" 
+                                       href="{{ route('merge-pallet.index') }}">
+                                        <i class="bi bi-box-seam"></i> Merge Palet
+                                    </a>
+                                </li>
+                            @endif
+
+                            <!-- ==================== ADMIN IT ==================== -->
+                            @if(auth()->user()->role === 'admin')
+                                <div class="mt-3 mb-2 text-muted px-2" style="font-size: 0.75rem; font-weight: 600;">ADMIN IT</div>
+                                
+                                <!-- All Features for Admin -->
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('stock-input*') ? 'active' : '' }}" 
+                                       href="{{ route('stock-input.index') }}">
+                                        <i class="bi bi-plus-circle"></i> Input Stok
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.index') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.index') }}">
+                                        <i class="bi bi-truck"></i> Delivery
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.create') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.create') }}">
+                                        <i class="bi bi-cart-plus"></i> Sales Input
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.approvals') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.approvals') }}">
+                                        <i class="bi bi-clipboard-check"></i> Approval
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('merge-pallet*') ? 'active' : '' }}" 
+                                       href="{{ route('merge-pallet.index') }}">
+                                        <i class="bi bi-box-seam"></i> Merge Palet
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('locations*') ? 'active' : '' }}" 
+                                       href="{{ route('locations.index') }}">
+                                        <i class="bi bi-geo-alt"></i> Lokasi
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('delivery.pick.issues') ? 'active' : '' }}" 
+                                       href="{{ route('delivery.pick.issues') }}">
+                                        <i class="bi bi-bell"></i> Scan Issues
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('part-settings*') ? 'active' : '' }}" 
+                                       href="{{ route('part-settings.index') }}">
+                                        <i class="bi bi-list-check"></i> Master No Part
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('users*') ? 'active' : '' }}" 
+                                       href="{{ route('users.index') }}">
+                                        <i class="bi bi-people"></i> Kelola User
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" 
+                                       href="{{ route('stock-view.index') }}">
+                                        <i class="bi bi-eye"></i> Lihat Stok
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('reports*') ? 'active' : '' }}" 
+                                       data-bs-toggle="collapse" href="#laporanMenu" role="button" aria-expanded="{{ request()->routeIs('reports*') ? 'true' : 'false' }}" aria-controls="laporanMenu">
+                                        <i class="bi bi-file-earmark-pdf"></i> Laporan
+                                        <i class="bi bi-chevron-down" style="float: right; margin-top: 3px;"></i>
+                                    </a>
+                                    <div class="collapse {{ request()->routeIs('reports*') ? 'show' : '' }}" id="laporanMenu">
+                                        <ul class="nav flex-column ms-3 mt-2">
+                                            <li class="nav-item">
+                                                <a class="nav-link {{ request()->routeIs('reports.stock-input') ? 'active' : '' }}" 
+                                                    href="{{ route('reports.stock-input') }}">
+                                                    <i class="bi bi-arrow-right-short"></i> Input Stok
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link {{ request()->routeIs('reports.withdrawal') ? 'active' : '' }}" 
+                                                    href="{{ route('reports.withdrawal') }}">
+                                                    <i class="bi bi-arrow-right-short"></i> Pengambilan Stok
+                                                </a>
+                                            </li>
+                                            <li class="nav-item">
+                                                <a class="nav-link {{ request()->routeIs('audit.index') ? 'active' : '' }}" 
+                                                    href="{{ route('audit.index') }}">
+                                                    <i class="bi bi-arrow-right-short"></i> Audit Trail
                                                 </a>
                                             </li>
                                         </ul>

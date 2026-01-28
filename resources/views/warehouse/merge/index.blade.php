@@ -153,6 +153,81 @@
     </div>
 </div>
 
+<!-- MERGE HISTORY SECTION -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light fw-bold text-dark border-bottom">
+                <i class="bi bi-clock-history"></i> History Merge Pallet
+            </div>
+            <div class="card-body">
+                @if($mergeHistory->count() > 0)
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover align-middle">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Pallet Hasil Merge</th>
+                                    <th>Sumber Pallet</th>
+                                    <th>Operator</th>
+                                    <th>Keterangan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($mergeHistory as $history)
+                                    <tr>
+                                        <td>
+                                            <span class="badge bg-light text-dark border">
+                                                {{ $history->created_at->format('d M Y H:i') }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @php
+                                                $resultPallet = \App\Models\Pallet::find($history->model_id);
+                                            @endphp
+                                            <strong>{{ $resultPallet?->pallet_number ?? 'PLT-' . $history->model_id }}</strong>
+                                        </td>
+                                        <td>
+                                            @php
+                                                $description = $history->description;
+                                                // Extract pallet numbers from description (format: "Merge dari 2 pallet: PLT-009, PLT-010")
+                                                preg_match('/pallet:\s*(.+)$/', $description, $matches);
+                                                $palletNumbers = $matches[1] ?? '';
+                                            @endphp
+                                            @if($palletNumbers)
+                                                @foreach(explode(',', $palletNumbers) as $num)
+                                                    <span class="badge bg-warning text-dark">{{ trim($num) }}</span>
+                                                @endforeach
+                                            @else
+                                                <span class="text-muted">-</span>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if($history->user)
+                                                <small>{{ $history->user->name }}</small>
+                                            @else
+                                                <small class="text-muted">System</small>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            <small class="text-muted">{{ $history->description }}</small>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @else
+                    <div class="text-center py-5">
+                        <i class="bi bi-inbox display-5 text-muted d-block mb-2"></i>
+                        <p class="text-muted">Belum ada history merge pallet</p>
+                    </div>
+                @endif
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     let currentPreview = null;
     let selectedPallets = []; // Array of objects

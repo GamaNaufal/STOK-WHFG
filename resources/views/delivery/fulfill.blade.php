@@ -34,29 +34,16 @@
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($order->items as $item)
-                            @php
-                                $remaining = $item->quantity - $item->fulfilled_quantity;
-                                $statusClass = $remaining <= 0 ? 'bg-light text-muted' : '';
-                            @endphp
-                            <tr class="{{ $statusClass }}">
-                                <td class="ps-3 fw-bold">{{ $item->part_number }}</td>
-                                <td class="text-center">{{ $item->quantity }}</td>
-                                <td class="text-center text-success">{{ $item->fulfilled_quantity }}</td>
-                                <td class="text-center">{{ max(0, $remaining) }}</td>
-                                <td class="text-end pe-3">
-                                    @if($remaining > 0)
-                                    <button class="btn btn-sm btn-primary" onclick="openWithdrawModal('{{ $item->part_number }}', {{ $remaining }}, {{ $item->id }})">
-                                        <i class="bi bi-box-arrow-up"></i> Withdraw
+                            <tr>
+                                <td colspan="4" class="ps-3 text-muted">
+                                    <small>Items are tracked through the picking session. Use the picking system to fulfill this order.</small>
+                                </td>
+                            </tr>
                                     </button>
                                     @else
                                     <span class="badge bg-success"><i class="bi bi-check"></i> Done</span>
-                                    @endif
-                                </td>
-                            </tr>
-                            @endforeach
                         </tbody>
-                    </table>
+                    </table>>
                 </div>
             </div>
         </div>

@@ -74,7 +74,7 @@ class ReportController extends Controller
     public function stockInputReport(Request $request)
     {
         // Get stock inputs from stock_inputs table
-        $query = StockInput::with(['pallet', 'palletItem', 'user']);
+        $query = StockInput::with(['pallet.items', 'palletItem', 'user']);
 
         // Date range filter
         if ($request->filled('start_date')) {

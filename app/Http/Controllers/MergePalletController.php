@@ -6,6 +6,7 @@ use App\Models\Pallet;
 use App\Models\Box;
 use App\Models\PalletItem;
 use App\Models\StockLocation;
+use App\Models\AuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -48,7 +49,14 @@ class MergePalletController extends Controller
             return $masterLocation->is_occupied === true;
         });
 
-        return view('warehouse.merge.index', compact('pallets'));
+        // Get merge history from audit logs
+        $mergeHistory = AuditLog::where('type', 'pallet_merged')
+            ->with('user')
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get();
+
+        return view('warehouse.merge.index', compact('pallets', 'mergeHistory'));
     }
 
     public function searchPallet(Request $request)
@@ -134,6 +142,7 @@ class MergePalletController extends Controller
             ]);
 
             $palletIds = $request->pallet_ids;
+            $palletNumbers = []; // Store actual pallet numbers for audit log
 
             // 2. Collect all boxes and items from ALL source pallets first
             $allBoxes = [];
@@ -144,6 +153,7 @@ class MergePalletController extends Controller
                 if (!$sourcePallet) continue;
                 
                 $sourcePallets[] = $sourcePallet;
+                $palletNumbers[] = $sourcePallet->pallet_number; // Store pallet_number
                 $allBoxes = array_merge($allBoxes, $sourcePallet->boxes->toArray());
             }
 
@@ -191,6 +201,10 @@ class MergePalletController extends Controller
 
             // 4. Clean up source pallets
             foreach ($sourcePallets as $sourcePallet) {
+                // Update StockInput records to reference new pallet
+                \App\Models\StockInput::where('pallet_id', $sourcePallet->id)
+                    ->update(['pallet_id' => $newPallet->id]);
+
                 // Detach boxes from source pallet
                 $sourcePallet->boxes()->detach();
                 
@@ -233,6 +247,17 @@ class MergePalletController extends Controller
                 'pallet_id' => $newPallet->id,
                 'warehouse_location' => $locationCode ?? 'Unknown',
                 'stored_at' => now(),
+            ]);
+
+            // Mark new pallet as merged by adding a special note (store merge info in first stock input)
+            \App\Models\AuditLog::create([
+                'type' => 'pallet_merged',
+                'action' => 'merged',
+                'model' => 'Pallet',
+                'model_id' => $newPallet->id,
+                'description' => 'Merge dari ' . count($palletNumbers) . ' pallet: ' . implode(', ', $palletNumbers),
+                'user_id' => auth()->id(),
+                'ip_address' => request()->ip(),
             ]);
 
             DB::commit();

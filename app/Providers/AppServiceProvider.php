@@ -21,16 +21,28 @@ class AppServiceProvider extends ServiceProvider
     {
         \App\Models\StockLocation::observe(\App\Observers\StockLocationObserver::class);
 
-        // Share pending count for PPC sidebar badge
+        // Share notification counts for sidebar badges
         \Illuminate\Support\Facades\View::composer('shared.layouts.app', function ($view) {
-            if (auth()->check() && (auth()->user()->role === 'ppc' || auth()->user()->role === 'admin')) {
-                $count = \App\Models\DeliveryOrder::where('status', 'pending')->count();
-                $view->with('pendingDeliveryCount', $count);
-            }
-
-            if (auth()->check() && in_array(auth()->user()->role, ['admin_warehouse', 'admin'], true)) {
-                $issueCount = \App\Models\DeliveryScanIssue::where('status', 'pending')->count();
-                $view->with('pendingScanIssueCount', $issueCount);
+            if (auth()->check()) {
+                $userRole = auth()->user()->role;
+                
+                // Delivery count for Warehouse Operator
+                if ($userRole === 'warehouse_operator') {
+                    $deliveryCount = \App\Models\DeliveryOrder::where('status', 'approved')->count();
+                    $view->with('pendingDeliveryCount', $deliveryCount);
+                }
+                
+                // Pending Approval count for PPC
+                if ($userRole === 'ppc') {
+                    $approvalCount = \App\Models\DeliveryOrder::where('status', 'pending')->count();
+                    $view->with('pendingDeliveryCount', $approvalCount);
+                }
+                
+                // Scan Issues count for Admin Warehouse
+                if ($userRole === 'admin_warehouse' || $userRole === 'admin') {
+                    $scanIssueCount = \App\Models\DeliveryIssue::where('status', 'pending')->count();
+                    $view->with('pendingScanIssueCount', $scanIssueCount);
+                }
             }
         });
     }

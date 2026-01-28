@@ -8,6 +8,7 @@ use App\Models\PalletItem;
 use App\Models\PartSetting;
 use App\Models\StockLocation;
 use App\Models\StockInput;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -490,6 +491,24 @@ class StockInputController extends Controller
                 'warehouse_location' => $locationCode ?? 'Unknown',
                 'stored_at' => now(),
             ]);
+
+            // Create StockInput record for audit
+            $totalPcs = 0;
+            foreach ($scannedBoxes as $box) {
+                $totalPcs += (int) ($box['pcs_quantity'] ?? $box['qty_box'] ?? 0);
+            }
+
+            $stockInput = StockInput::create([
+                'pallet_id' => $pallet->id,
+                'user_id' => auth()->id(),
+                'warehouse_location' => $locationCode ?? 'Unknown',
+                'pcs_quantity' => $totalPcs,
+                'box_quantity' => count($scannedBoxes),
+                'stored_at' => now(),
+            ]);
+
+            // Log audit trail
+            AuditService::logStockInput($stockInput, 'created');
 
             // Clear session data
             session()->forget('scanned_boxes');

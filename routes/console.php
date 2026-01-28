@@ -44,7 +44,6 @@ Artisan::command('delivery:purge-completions', function () {
     foreach ($expired as $completion) {
         $sessionId = $completion->pick_session_id;
         \App\Models\DeliveryPickItem::where('pick_session_id', $sessionId)->delete();
-        \App\Models\DeliveryScanIssue::where('pick_session_id', $sessionId)->delete();
         \App\Models\DeliveryPickSession::where('id', $sessionId)->delete();
         $completion->delete();
     }

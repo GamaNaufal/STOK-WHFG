@@ -12,7 +12,7 @@ class StockViewController extends Controller
 {
     private function buildStockItems(?string $search = null)
     {
-        $palletQuery = Pallet::with(['stockLocation', 'boxes', 'items'])
+        $palletQuery = Pallet::with(['stockLocation', 'items'])
             ->whereHas('stockLocation', function ($q) {
                 $q->where('warehouse_location', '!=', 'Unknown');
             });
@@ -23,50 +23,28 @@ class StockViewController extends Controller
         foreach ($pallets as $pallet) {
             $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
 
-            if ($pallet->boxes->count() > 0) {
-                $boxes = $pallet->boxes->where('is_withdrawn', false);
+            // Use pallet items (legacy system, no more boxes relationship)
+            $legacyItems = $pallet->items->filter(function ($item) {
+                return $item->pcs_quantity > 0 || $item->box_quantity > 0;
+            });
 
-                if ($search) {
-                    $boxes = $boxes->filter(function ($box) use ($search, $pallet) {
-                        return stripos($box->part_number, $search) !== false
-                            || stripos($pallet->pallet_number, $search) !== false;
-                    });
-                }
-
-                foreach ($boxes as $box) {
-                    $items->push([
-                        'pallet_id' => $pallet->id,
-                        'pallet_number' => $pallet->pallet_number,
-                        'location' => $location,
-                        'part_number' => $box->part_number,
-                        'box_quantity' => 1,
-                        'pcs_quantity' => (int) $box->pcs_quantity,
-                        'created_at' => $box->created_at,
-                    ]);
-                }
-            } else {
-                $legacyItems = $pallet->items->filter(function ($item) {
-                    return $item->pcs_quantity > 0 || $item->box_quantity > 0;
+            if ($search) {
+                $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
+                    return stripos($item->part_number, $search) !== false
+                        || stripos($pallet->pallet_number, $search) !== false;
                 });
+            }
 
-                if ($search) {
-                    $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
-                        return stripos($item->part_number, $search) !== false
-                            || stripos($pallet->pallet_number, $search) !== false;
-                    });
-                }
-
-                foreach ($legacyItems as $item) {
-                    $items->push([
-                        'pallet_id' => $pallet->id,
-                        'pallet_number' => $pallet->pallet_number,
-                        'location' => $location,
-                        'part_number' => $item->part_number,
-                        'box_quantity' => (int) $item->box_quantity,
-                        'pcs_quantity' => (int) $item->pcs_quantity,
-                        'created_at' => $item->created_at,
-                    ]);
-                }
+            foreach ($legacyItems as $item) {
+                $items->push([
+                    'pallet_id' => $pallet->id,
+                    'pallet_number' => $pallet->pallet_number,
+                    'location' => $location,
+                    'part_number' => $item->part_number,
+                    'box_quantity' => (int) $item->box_quantity,
+                    'pcs_quantity' => (int) $item->pcs_quantity,
+                    'created_at' => $item->created_at,
+                ]);
             }
         }
 
@@ -105,6 +83,13 @@ class StockViewController extends Controller
                 $firstItem = $itemGroup->first();
                 $totalPcs = $itemGroup->sum('pcs_quantity');
                 $totalBox = $itemGroup->sum('box_quantity');
+                
+                // Check if pallet is merged by looking for pallet_merged audit log
+                $pallet = Pallet::find($firstItem['pallet_id']);
+                $isMerged = \App\Models\AuditLog::where('model', 'Pallet')
+                    ->where('model_id', $firstItem['pallet_id'])
+                    ->where('type', 'pallet_merged')
+                    ->exists();
 
                 return [
                     'pallet_id' => $firstItem['pallet_id'],
@@ -113,6 +98,7 @@ class StockViewController extends Controller
                     'total_box' => (int) $totalBox,
                     'total_pcs' => $totalPcs,
                     'items' => $itemGroup,
+                    'is_merged' => $isMerged,
                 ];
             });
         }

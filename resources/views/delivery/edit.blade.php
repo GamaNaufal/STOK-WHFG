@@ -29,28 +29,8 @@
                             <input type="date" name="delivery_date" class="form-control" value="{{ old('delivery_date', $order->delivery_date->format('Y-m-d')) }}" required>
                         </div>
     
-                        <div class="mb-3">
-                            <label class="form-label fw-bold d-flex justify-content-between">
-                                Items
-                                <button type="button" class="btn btn-sm btn-outline-secondary" id="add-item-btn">
-                                    <i class="bi bi-plus"></i> Add
-                                </button>
-                            </label>
-                            <div id="items-container">
-                                @foreach($order->items as $index => $item)
-                                    <div class="row g-2 mb-2 item-row">
-                                        <div class="col-7">
-                                            <input type="text" name="items[{{ $index }}][part_number]" class="form-control form-control-sm" placeholder="Part Number" value="{{ $item->part_number }}" required>
-                                        </div>
-                                        <div class="col-3">
-                                            <input type="number" name="items[{{ $index }}][quantity]" class="form-control form-control-sm" placeholder="Qty" min="1" value="{{ $item->quantity }}" required>
-                                        </div>
-                                        <div class="col-2">
-                                            <button type="button" class="btn btn-sm btn-outline-danger remove-item w-100"><i class="bi bi-trash"></i></button>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
+                        <div class="alert alert-info">
+                            <small><i class="bi bi-info-circle"></i> Items from this delivery order are now managed through the picking session system.</small>
                         </div>
     
                         <div class="mb-3">
@@ -68,51 +48,7 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        let itemIndex = {{ $order->items->count() }};
-        const container = document.getElementById('items-container');
-        const addBtn = document.getElementById('add-item-btn');
-
-        function updateRemoveButtons() {
-            const rows = container.getElementsByClassName('item-row');
-            if (rows.length === 1) {
-                rows[0].querySelector('.remove-item').disabled = true;
-            } else {
-                Array.from(rows).forEach(row => {
-                    row.querySelector('.remove-item').disabled = false;
-                });
-            }
-        }
-
-        addBtn.addEventListener('click', function() {
-            const row = document.createElement('div');
-            row.className = 'row g-2 mb-2 item-row';
-            row.innerHTML = `
-                <div class="col-7">
-                    <input type="text" name="items[${itemIndex}][part_number]" class="form-control form-control-sm" placeholder="Part Number" required>
-                </div>
-                <div class="col-3">
-                    <input type="number" name="items[${itemIndex}][quantity]" class="form-control form-control-sm" placeholder="Qty" min="1" required>
-                </div>
-                <div class="col-2">
-                    <button type="button" class="btn btn-sm btn-outline-danger remove-item w-100"><i class="bi bi-trash"></i></button>
-                </div>
-            `;
-            container.appendChild(row);
-            itemIndex++;
-            updateRemoveButtons();
-        });
-
-        container.addEventListener('click', function(e) {
-            if(e.target.closest('.remove-item')) {
-                const row = e.target.closest('.item-row');
-                if (container.getElementsByClassName('item-row').length > 1) {
-                    row.remove();
-                    updateRemoveButtons();
-                }
-            }
-        });
-
-        updateRemoveButtons();
+        // Items management has been moved to the picking session system
     });
 </script>
 @endsection

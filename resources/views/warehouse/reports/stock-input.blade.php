@@ -149,11 +149,11 @@
                                     </small>
                                 </td>
                                 <td style="padding: 16px 20px;">
-                                    <strong style="color: #1f2937;">{{ $input->pallet->pallet_number }}</strong>
+                                    <strong style="color: #1f2937;">{{ $input->pallet?->pallet_number ?? '-' }}</strong>
                                 </td>
                                 <td style="padding: 16px 20px;">
                                     <span class="badge" style="background-color: #f0f4f8; color: #0C7779;">
-                                        {{ $input->palletItem->part_number }}
+                                        {{ $input->palletItem?->part_number ?? $input->pallet?->items?->first()?->part_number ?? '-' }}
                                     </span>
                                 </td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">{{ (int) $input->box_quantity }}</td>

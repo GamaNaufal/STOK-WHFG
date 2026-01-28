@@ -10,6 +10,7 @@ use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
 use App\Models\PalletItem;
 use App\Models\StockWithdrawal;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -171,7 +172,7 @@ class DeliveryPickController extends Controller
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
-        $issue = DeliveryScanIssue::with('session')->findOrFail($issueId);
+        $issue = DeliveryIssue::with('session')->findOrFail($issueId);
         $issue->status = 'approved';
         $issue->resolved_by = $user->id;
         $issue->resolved_at = now();
@@ -225,7 +226,7 @@ class DeliveryPickController extends Controller
                         ->first();
                 }
 
-                StockWithdrawal::create([
+                $withdrawal = StockWithdrawal::create([
                     'withdrawal_batch_id' => $batchId,
                     'user_id' => auth()->id(),
                     'pallet_item_id' => $palletItem?->id,
@@ -238,6 +239,9 @@ class DeliveryPickController extends Controller
                     'notes' => 'Delivery fulfillment (scan)',
                     'withdrawn_at' => now(),
                 ]);
+
+                // Log audit trail
+                AuditService::logStockWithdrawal($withdrawal, 'completed');
 
                 $box->is_withdrawn = true;
                 $box->withdrawn_at = now();
@@ -327,6 +331,9 @@ class DeliveryPickController extends Controller
 
                     $withdrawal->status = 'reversed';
                     $withdrawal->save();
+
+                    // Log audit trail
+                    AuditService::logStockWithdrawal($withdrawal, 'reversed');
                 }
 
                 $order = $session->order;
@@ -342,6 +349,9 @@ class DeliveryPickController extends Controller
 
             $session->completion_status = 'redone';
             $session->save();
+
+            // Log delivery redo
+            AuditService::logDeliveryRedo($session->id, "Pengambilan delivery di-redo oleh " . auth()->user()->name);
 
             $order = $session->order;
             $order->status = 'processing';
@@ -390,7 +400,7 @@ class DeliveryPickController extends Controller
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
-        $issues = DeliveryScanIssue::with(['session.order'])->where('status', 'pending')->orderBy('created_at', 'desc')->get();
+        $issues = DeliveryIssue::with(['session.order'])->where('status', 'pending')->orderBy('created_at', 'desc')->get();
         return view('delivery.scan-issues', compact('issues'));
     }
 

@@ -113,11 +113,7 @@
                                         @endif
                                     </td>
                                     <td class="small">
-                                        <ul class="mb-0 ps-3">
-                                        @foreach($order->items as $item)
-                                            <li>{{ $item->part_number }} ({{ $item->quantity }})</li>
-                                        @endforeach
-                                        </ul>
+                                        <span class="text-muted">Items managed in picking</span>
                                     </td>
                                 </tr>
                                 @empty

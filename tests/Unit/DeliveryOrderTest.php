@@ -5,7 +5,6 @@ namespace Tests\Unit;
 use Tests\TestCase;
 use App\Models\User;
 use App\Models\DeliveryOrder;
-use App\Models\DeliveryOrderItem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 class DeliveryOrderTest extends TestCase
@@ -14,9 +13,6 @@ class DeliveryOrderTest extends TestCase
 
     public function test_can_create_and_retrieve_order()
     {
-        // One issue: Unit tests in Laravel default to PHPUnit\Framework\TestCase which doesn't boot Laravel app.
-        // We need Tests\TestCase for DB access.
-        
         // Create a user
         $user = User::factory()->create([
             'role' => 'sales',
@@ -29,12 +25,6 @@ class DeliveryOrderTest extends TestCase
             'customer_name' => 'Test Customer',
             'delivery_date' => now()->addDays(3),
             'status' => 'pending'
-        ]);
-
-        DeliveryOrderItem::create([
-            'delivery_order_id' => $order->id,
-            'part_number' => 'PART-123',
-            'quantity' => 100
         ]);
 
         // Retrieve

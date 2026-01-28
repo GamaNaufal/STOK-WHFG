@@ -234,9 +234,16 @@
                                 @foreach($groupedByPallet as $palletData)
                                     <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
-                                            <span style="background: #fff8e1; color: #b45309; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
-                                                {{ $palletData['pallet_number'] }}
-                                            </span>
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <span style="background: #fff8e1; color: #b45309; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
+                                                    {{ $palletData['pallet_number'] }}
+                                                </span>
+                                                @if($palletData['is_merged'])
+                                                    <span style="background: #fce7f3; color: #be185d; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;" title="Pallet hasil merge">
+                                                        <i class="bi bi-arrow-repeat"></i> M
+                                                    </span>
+                                                @endif
+                                            </div>
                                         </td>
                                         <td style="padding: 16px 20px; color: #4b5563; font-size: 14px;">
                                             <i class="bi bi-geo-alt me-1"></i> {{ $palletData['location'] }}

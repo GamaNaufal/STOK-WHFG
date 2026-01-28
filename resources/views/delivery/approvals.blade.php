@@ -36,14 +36,6 @@
                                 <span class="fw-bold small">{{ $order->delivery_date->format('d M Y') }}</span>
                             </div>
                         </div>
-                        
-                        <div class="bg-light p-2 border rounded mb-3" style="max-height: 150px; overflow-y: auto;">
-                            <ul class="mb-0 small ps-3">
-                                @foreach($order->items as $item)
-                                    <li>{{ $item->part_number }} - <strong>Qty: {{ $item->quantity }}</strong></li>
-                                @endforeach
-                            </ul>
-                        </div>
     
                         @if($order->notes)
                         <div class="alert alert-secondary py-2 px-2 mb-3">
