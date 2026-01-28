@@ -293,12 +293,6 @@
                                         <i class="bi bi-eye"></i> Lihat Stok
                                     </a>
                                 </li>
-                                <li class="nav-item">
-                                    <a class="nav-link {{ request()->routeIs('merge-pallet*') ? 'active' : '' }}" 
-                                       href="{{ route('merge-pallet.index') }}">
-                                        <i class="bi bi-box-seam"></i> Merge Palet
-                                    </a>
-                                </li>
                             @endif
 
                             <!-- ==================== ADMIN IT ==================== -->

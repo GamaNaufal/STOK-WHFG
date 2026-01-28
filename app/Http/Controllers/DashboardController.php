@@ -151,8 +151,6 @@ class DashboardController extends Controller
                     $q->where('pcs_quantity', '>', 0)
                       ->orWhere('box_quantity', '>', 0);
                 })->sum('pcs_quantity') ?? 0,
-                'total_qr_boxes' => Box::count(),
-                'today_qr_boxes' => Box::whereDate('created_at', today())->count(),
                 'total_orders' => DeliveryOrder::count(),
                 'pending_orders' => DeliveryOrder::where('status', 'pending')->count(),
             ];

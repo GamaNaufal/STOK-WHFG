@@ -42,6 +42,47 @@
                             <i class="bi bi-chat-quote me-1"></i> <small class="fst-italic">{{ $order->notes }}</small>
                         </div>
                         @endif
+
+                        <!-- ITEMS & STOCK INFO -->
+                        @if($order->items->count() > 0)
+                        <div class="mb-3">
+                            <label class="form-label fw-bold small mb-2">
+                                <i class="bi bi-box-seam"></i> Items & Stock Availability
+                            </label>
+                            <div class="table-responsive" style="font-size: 0.85rem;">
+                                <table class="table table-sm table-bordered mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-center">Part</th>
+                                            <th class="text-center">Required</th>
+                                            <th class="text-center">Available</th>
+                                            <th class="text-center">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach($order->items as $item)
+                                        <tr>
+                                            <td class="fw-bold">{{ $item->part_number }}</td>
+                                            <td class="text-center">{{ $item->quantity }}</td>
+                                            <td class="text-center fw-bold">
+                                                <span class="@if($item->stock_warning) text-danger @else text-success @endif">
+                                                    {{ $item->available_stock ?? 0 }}
+                                                </span>
+                                            </td>
+                                            <td class="text-center">
+                                                @if($item->stock_warning)
+                                                    <span class="badge bg-danger">⚠ Low</span>
+                                                @else
+                                                    <span class="badge bg-success">✓ OK</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        @endif
     
                         <div class="d-grid gap-2 mt-auto">
                             <button class="btn btn-success" onclick="openStatusModal({{ $order->id }}, 'approved')">

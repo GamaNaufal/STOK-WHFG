@@ -651,20 +651,6 @@
         </div>
     </div>
     <div class="col-md-3 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <p class="card-text mb-2" style="color: #9ca3af;">QR Box</p>
-                        <h3 class="mb-0" style="color: #1f2937;">{{ $stats['total_qr_boxes'] ?? 0 }}</h3>
-                        <small style="color: #9ca3af;">{{ $stats['today_qr_boxes'] ?? 0 }} Hari Ini</small>
-                    </div>
-                    <i class="bi bi-qr-code" style="font-size: 2.5rem; color: #17a2b8; opacity: 0.7;"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-3">
         <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ff6b6b;">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
@@ -693,22 +679,6 @@
                 </p>
                 <a href="{{ route('locations.index') }}" class="btn btn-sm" style="background: #0C7779; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Manage
-                </a>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3 mb-4">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-top: 4px solid #249E94;">
-            <div class="card-body text-center">
-                <div class="mb-3">
-                    <i class="bi bi-plus-circle" style="font-size: 3rem; color: #249E94;"></i>
-                </div>
-                <h5 class="card-title" style="color: #1f2937;">Generate QR Box</h5>
-                <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem; font-size: 0.9rem;">
-                    Buat QR code baru
-                </p>
-                <a href="{{ route('boxes.create') }}" class="btn btn-sm" style="background: #249E94; color: white; border: none;">
-                    <i class="bi bi-arrow-right"></i> Buat
                 </a>
             </div>
         </div>

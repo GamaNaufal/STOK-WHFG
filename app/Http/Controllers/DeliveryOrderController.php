@@ -136,6 +136,19 @@ class DeliveryOrderController extends Controller
             ->orderBy('delivery_date', 'asc')
             ->get();
 
+        // Enrich each order with stock availability info
+        foreach ($pendingOrders as $order) {
+            foreach ($order->items as $item) {
+                // Get available stock for this part_number
+                $availableStock = \App\Models\PalletItem::where('part_number', $item->part_number)
+                    ->whereHas('pallet.stockLocation')
+                    ->sum('pcs_quantity');
+                
+                $item->available_stock = $availableStock;
+                $item->stock_warning = $availableStock < $item->quantity;
+            }
+        }
+
         $historyOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
             ->whereIn('status', ['approved', 'rejected', 'correction', 'processing', 'completed'])
             ->orderBy('updated_at', 'desc')

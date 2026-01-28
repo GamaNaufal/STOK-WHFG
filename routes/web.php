@@ -91,15 +91,15 @@ Route::middleware('auth')->group(function () {
         Route::post('/stock-withdrawal/preview', [StockWithdrawalController::class, 'preview'])->name('stock-withdrawal.preview');
     });
 
-    // Merge Pallet Routes (Admin Only)
-    Route::middleware('role:admin')->group(function () {
+    // Merge Pallet Routes (Warehouse Operator + Admin)
+    Route::middleware('role:warehouse_operator,admin')->group(function () {
         Route::get('/merge-pallet', [\App\Http\Controllers\MergePalletController::class, 'index'])->name('merge-pallet.index');
         Route::get('/merge-pallet/search', [\App\Http\Controllers\MergePalletController::class, 'searchPallet'])->name('merge-pallet.search');
         Route::post('/merge-pallet/store', [\App\Http\Controllers\MergePalletController::class, 'store'])->name('merge-pallet.store');
     });
 
-    // Stock View Routes (PPC, Admin Warehouse, Supervisi, Admin IT)
-    Route::middleware('role:ppc,admin_warehouse,supervisi,admin')->group(function () {
+    // Stock View Routes (Warehouse Operator, PPC, Admin Warehouse, Supervisi, Admin)
+    Route::middleware('role:warehouse_operator,ppc,admin_warehouse,supervisi,admin')->group(function () {
         Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
     });
 
