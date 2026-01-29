@@ -38,6 +38,7 @@ Route::middleware('auth')->group(function () {
 
     // Admin Warehouse Routes - Master Part & Qty
     Route::middleware('role:admin_warehouse,admin')->group(function () {
+        Route::get('part-settings/search', [\App\Http\Controllers\PartSettingController::class, 'search'])->name('part-settings.search');
         Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
     });
 
@@ -72,7 +73,9 @@ Route::middleware('auth')->group(function () {
         
         // PPC Side (Approvals)
         Route::get('/delivery-stock/approvals', [\App\Http\Controllers\DeliveryOrderController::class, 'pendingApprovals'])->name('delivery.approvals');
+        Route::get('/delivery-stock/{id}/approval-impact', [\App\Http\Controllers\DeliveryOrderController::class, 'approvalImpact'])->name('delivery.approval-impact');
         Route::post('/delivery-stock/{id}/status', [\App\Http\Controllers\DeliveryOrderController::class, 'updateStatus'])->name('delivery.status');
+        Route::delete('/delivery-stock/{id}', [\App\Http\Controllers\DeliveryOrderController::class, 'destroy'])->name('delivery.destroy');
         
         // Warehouse Execution (Fulfillment) - Uses StockWithdrawalController logic
         Route::get('/delivery-stock/{id}/fulfill', [StockWithdrawalController::class, 'fulfillOrder'])->name('delivery.fulfill');
@@ -107,6 +110,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:supervisi,admin')->group(function () {
         Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');
         Route::get('/reports/stock-input', [ReportController::class, 'stockInputReport'])->name('reports.stock-input');
+        Route::get('/reports/operational/export', [ReportController::class, 'exportOperationalExcel'])->name('reports.operational.export');
 
         // Audit Trail Report
         Route::get('/audit-trail', [\App\Http\Controllers\AuditController::class, 'index'])->name('audit.index');

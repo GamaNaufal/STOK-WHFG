@@ -13,6 +13,23 @@ class PartSettingController extends Controller
         return view('warehouse.part-settings.index', compact('parts'));
     }
 
+    public function search(Request $request)
+    {
+        $query = trim((string) $request->get('q', ''));
+
+        $parts = PartSetting::query()
+            ->when($query !== '', function ($builder) use ($query) {
+                $builder->where('part_number', 'like', '%' . $query . '%');
+            })
+            ->orderBy('part_number')
+            ->limit(50)
+            ->get(['id', 'part_number', 'qty_box']);
+
+        return response()->json([
+            'data' => $parts,
+        ]);
+    }
+
     public function create()
     {
         return view('warehouse.part-settings.create');

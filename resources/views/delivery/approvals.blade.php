@@ -55,6 +55,7 @@
                                         <tr>
                                             <th class="text-center">Part</th>
                                             <th class="text-center">Required</th>
+                                            <th class="text-center">Can Fulfill</th>
                                             <th class="text-center">Available</th>
                                             <th class="text-center">Status</th>
                                         </tr>
@@ -66,8 +67,11 @@
                                             <td class="text-center">{{ $item->quantity }}</td>
                                             <td class="text-center fw-bold">
                                                 <span class="@if($item->stock_warning) text-danger @else text-success @endif">
-                                                    {{ $item->available_stock ?? 0 }}
+                                                    {{ $item->display_fulfilled ?? 0 }}
                                                 </span>
+                                            </td>
+                                            <td class="text-center">
+                                                {{ $item->available_total ?? 0 }}
                                             </td>
                                             <td class="text-center">
                                                 @if($item->stock_warning)
@@ -170,6 +174,7 @@
                 </div>
                 <div class="modal-body">
                     <p id="statusConfirmationText"></p>
+                    <div id="impactWarning" class="alert alert-warning d-none"></div>
                     
                     <div class="mb-3" id="noteSection">
                         <label class="form-label">Notes / Reason</label>
@@ -192,6 +197,7 @@
         const statusInput = document.getElementById('modalStatusInput');
         const noteSection = document.getElementById('noteSection');
         const confirmationText = document.getElementById('statusConfirmationText');
+        const impactWarning = document.getElementById('impactWarning');
         const title = document.getElementById('statusModalLabel');
 
         // Set Form Action
@@ -202,20 +208,54 @@
         if (status === 'approved') {
             title.innerText = 'Approve Delivery';
             title.className = 'modal-title text-success';
-            confirmationText.innerText = 'Are you sure you want to approve this delivery schedule?';
+            confirmationText.innerText = 'Checking schedule impact...';
             noteSection.style.display = 'none';
+            impactWarning.classList.add('d-none');
+            impactWarning.innerHTML = '';
+
+            fetch(`/delivery-stock/${orderId}/approval-impact`)
+                .then((response) => response.json())
+                .then((data) => {
+                    const impacted = data.impacted || [];
+                    if (impacted.length === 0) {
+                        confirmationText.innerText = 'Are you sure you want to approve this delivery schedule?';
+                        impactWarning.classList.add('d-none');
+                        impactWarning.innerHTML = '';
+                        return;
+                    }
+
+                    const itemsHtml = impacted.map((item) => {
+                        const parts = (item.short_parts || []).map((part) => {
+                            return `${part.part_number} (${part.can_fulfill}/${part.required})`;
+                        }).join(', ');
+                        return `<li>#${item.id} - ${item.customer_name} (${item.delivery_date ?? '-'})<br><small>Parts: ${parts}</small></li>`;
+                    }).join('');
+
+                    confirmationText.innerText = 'Approval ini akan menggeser jadwal dan membuat order berikut tidak terpenuhi:';
+                    impactWarning.innerHTML = `<ul class="mb-0">${itemsHtml}</ul>`;
+                    impactWarning.classList.remove('d-none');
+                })
+                .catch(() => {
+                    confirmationText.innerText = 'Are you sure you want to approve this delivery schedule?';
+                    impactWarning.classList.add('d-none');
+                    impactWarning.innerHTML = '';
+                });
         } else if (status === 'correction') {
             title.innerText = 'Request Correction';
             title.className = 'modal-title text-warning';
             confirmationText.innerText = 'Please specify what needs to be corrected:';
             noteSection.style.display = 'block';
             noteSection.querySelector('textarea').required = true;
+            impactWarning.classList.add('d-none');
+            impactWarning.innerHTML = '';
         } else if (status === 'rejected') {
             title.innerText = 'Reject Order';
             title.className = 'modal-title text-danger';
             confirmationText.innerText = 'Are you sure you want to reject this order? Please provide a reason.';
             noteSection.style.display = 'block';
             noteSection.querySelector('textarea').required = true;
+            impactWarning.classList.add('d-none');
+            impactWarning.innerHTML = '';
         }
 
         modal.show();

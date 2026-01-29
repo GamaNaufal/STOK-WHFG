@@ -186,13 +186,28 @@ class StockViewController extends Controller
 
         // Priority 1: Use Boxes (Source of Truth for FIFO created_at)
         if ($pallet->boxes->count() > 0) {
-            $items = $pallet->boxes->where('is_withdrawn', false)->map(function ($box) {
+            $boxIds = $pallet->boxes->where('is_withdrawn', false)->pluck('id');
+            $originLogs = \App\Models\AuditLog::where('type', 'box_pallet_moved')
+                ->where('model', 'Box')
+                ->whereIn('model_id', $boxIds)
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->groupBy('model_id')
+                ->map(function ($logs) {
+                    return $logs->first();
+                });
+
+            $items = $pallet->boxes->where('is_withdrawn', false)->map(function ($box) use ($originLogs) {
+                $log = $originLogs->get($box->id);
+                $origin = $log?->getOldValuesArray()['from_pallet'] ?? null;
+
                 return [
                     'part_number' => $box->part_number,
                     'box_number' => $box->box_number,
                     'box_quantity' => 1,
                     'pcs_quantity' => (int)$box->pcs_quantity,
                     'created_at' => $box->created_at->format('d M Y H:i'),
+                    'origin_pallet' => $origin,
                 ];
             });
         } else {
@@ -206,6 +221,7 @@ class StockViewController extends Controller
                     'box_quantity' => (int)$item->box_quantity,
                     'pcs_quantity' => (int)$item->pcs_quantity,
                     'created_at' => $item->created_at->format('d M Y H:i'),
+                    'origin_pallet' => null,
                 ];
             });
         }

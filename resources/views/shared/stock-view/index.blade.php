@@ -431,12 +431,13 @@
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">No Part</th>
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Box</th>
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">PCS</th>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Asal Pallet</th>
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Tanggal Masuk</th>
                                         </tr>
                                     </thead>
                                     <tbody id="palletItemsTable">
                                         <tr>
-                                            <td colspan="5" class="text-center text-muted py-4">Loading...</td>
+                                            <td colspan="6" class="text-center text-muted py-4">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -667,7 +668,7 @@
                 // Populate items table
                 const tableBody = document.getElementById('palletItemsTable');
                 if (data.items.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">Tidak ada item di pallet ini</td></tr>';
+                    tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Tidak ada item di pallet ini</td></tr>';
                 } else {
                     tableBody.innerHTML = data.items.map(item => `
                         <tr>
@@ -675,6 +676,7 @@
                             <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.part_number}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.box_quantity}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.pcs_quantity}</td>
+                            <td style="color: #6b7280; padding: 12px 8px;">${item.origin_pallet || '-'}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.created_at}</td>
                         </tr>
                     `).join('');

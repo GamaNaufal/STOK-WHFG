@@ -54,70 +54,6 @@
 </div>
 @endif
 
-@if(isset($historyOrders) && $historyOrders->count() > 0)
-<div class="card shadow mb-4">
-    <div class="card-header py-3 bg-white">
-        <h6 class="m-0 font-weight-bold text-primary">History Orders</h6>
-    </div>
-    <div class="card-body">
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped align-middle">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Order</th>
-                        <th>Customer</th>
-                        <th>Completed At</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($historyOrders as $history)
-                        <tr>
-                            <td>#{{ $history->order->id }}</td>
-                            <td>{{ $history->order->customer_name }}</td>
-                            <td>{{ is_object($history->completed_at) ? $history->completed_at->format('d M Y H:i') : \Carbon\Carbon::parse($history->completed_at)->format('d M Y H:i') }}</td>
-                            <td>
-                                @if($history->completion_status === 'redone')
-                                    <span class="badge bg-warning text-dark">Redone</span>
-                                @else
-                                    <span class="badge bg-secondary">Expired</span>
-                                @endif
-                            </td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        </div>
-    </div>
-</div>
-@endif
-
-<!-- Picklist Modal -->
-<div class="modal fade" id="picklistModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
-                <h5 class="modal-title"><i class="bi bi-file-earmark-pdf"></i> Dokumen Pengambilan</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Silakan download atau print pick list sebelum scan.</p>
-            </div>
-            <div class="modal-footer">
-                <a href="#" class="btn btn-outline-primary" id="btnDownloadPdf" target="_blank">
-                    <i class="bi bi-download"></i> Download PDF
-                </a>
-                <a href="#" class="btn btn-outline-secondary" id="btnPrintPdf" target="_blank">
-                    <i class="bi bi-printer"></i> Print
-                </a>
-                <a href="#" class="btn btn-success" id="btnStartScan">
-                    <i class="bi bi-upc-scan"></i> Mulai Scan
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
 <div class="container-fluid py-4">
     <!-- Buttons Moved to Sidebar -->
 
@@ -168,17 +104,28 @@
                             </td>
                             @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
                             <td class="text-end">
-                                @if($order->status === 'completed')
-                                    <span class="badge bg-success"><i class="bi bi-check"></i> Selesai</span>
-                                @elseif($order->has_sufficient_stock)
-                                    <button class="btn btn-sm btn-dark" onclick="openFulfillModal({{ $order->id }})">
-                                        <i class="bi bi-box-seam"></i> Process
-                                    </button>
-                                @else
-                                    <button class="btn btn-sm btn-secondary" disabled>
-                                        <i class="bi bi-x-circle"></i> Stock Kurang
-                                    </button>
-                                @endif
+                                <div class="d-flex gap-2 justify-content-end">
+                                    @if($order->status === 'completed')
+                                        <span class="badge bg-success"><i class="bi bi-check"></i> Selesai</span>
+                                    @elseif($order->has_sufficient_stock)
+                                        <button class="btn btn-sm btn-dark" onclick="openFulfillModal({{ $order->id }})">
+                                            <i class="bi bi-box-seam"></i> Process
+                                        </button>
+                                    @else
+                                        <button class="btn btn-sm btn-secondary" disabled>
+                                            <i class="bi bi-x-circle"></i> Stock Kurang
+                                        </button>
+                                    @endif
+                                    @if(Auth::user()->role === 'admin')
+                                        <form method="POST" action="{{ route('delivery.destroy', $order->id) }}" onsubmit="return confirm('Hapus jadwal ini?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger">
+                                                <i class="bi bi-trash"></i> Hapus
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
                             </td>
                             @endif
                         </tr>
@@ -196,6 +143,91 @@
         </div>
     </div>
 </div>
+
+@if(isset($historyRows) && $historyRows->count() > 0)
+<div class="card shadow mb-4">
+    <div class="card-header py-3 bg-white">
+        <h6 class="m-0 font-weight-bold text-primary">History Orders</h6>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped align-middle">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Order Details (Part No. & Qty)</th>
+                        <th>Completed At</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($historyRows as $history)
+                        @php
+                            $order = $history->order;
+                        @endphp
+                        <tr>
+                            <td>{{ $order ? '#' . $order->id : '-' }}</td>
+                            <td>{{ $order?->customer_name ?? '-' }}</td>
+                            <td>
+                                @if($order)
+                                    <ul class="mb-0 list-unstyled">
+                                        @foreach($order->items as $item)
+                                            <li class="d-flex justify-content-between border-bottom py-1">
+                                                <span>Part: <strong>{{ $item->part_number }}</strong></span>
+                                                <span>Qty: {{ $item->quantity }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td>{{ is_object($history->completed_at) ? $history->completed_at->format('d M Y H:i') : \Carbon\Carbon::parse($history->completed_at)->format('d M Y H:i') }}</td>
+                            <td>
+                                @if($history->status_label === 'Deleted')
+                                    <span class="badge bg-danger">Deleted</span>
+                                @elseif($history->status_label === 'Redone')
+                                    <span class="badge bg-warning text-dark">Redone</span>
+                                @else
+                                    <span class="badge bg-secondary">Expired</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+@endif
+
+<!-- Picklist Modal -->
+<div class="modal fade" id="picklistModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="bi bi-file-earmark-pdf"></i> Dokumen Pengambilan</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Silakan download atau print pick list sebelum scan.</p>
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-outline-primary" id="btnDownloadPdf" target="_blank">
+                    <i class="bi bi-download"></i> Download PDF
+                </a>
+                <a href="#" class="btn btn-outline-secondary" id="btnPrintPdf" target="_blank">
+                    <i class="bi bi-printer"></i> Print
+                </a>
+                <a href="#" class="btn btn-success" id="btnStartScan">
+                    <i class="bi bi-upc-scan"></i> Mulai Scan
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
 
 
 

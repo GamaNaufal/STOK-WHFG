@@ -88,7 +88,7 @@ class DeliveryOrderController extends Controller
             ->limit(20)
             ->get();
 
-        $historyOrders = \App\Models\DeliveryPickSession::with('order')
+        $historyOrders = \App\Models\DeliveryPickSession::with('order.items')
             ->where(function ($q) {
                 $q->where('completion_status', 'redone')
                   ->orWhere(function ($q2) {
@@ -100,7 +100,34 @@ class DeliveryOrderController extends Controller
             ->limit(50)
             ->get();
 
-        return view('delivery.index', compact('approvedOrders', 'completedOrders', 'historyOrders'));
+        $deletedOrders = \App\Models\DeliveryOrder::withTrashed()
+            ->with('items')
+            ->where('status', 'deleted')
+            ->orderBy('deleted_at', 'desc')
+            ->limit(50)
+            ->get();
+
+        $historyRows = collect();
+
+        foreach ($historyOrders as $history) {
+            $historyRows->push((object) [
+                'order' => $history->order,
+                'completed_at' => $history->completed_at,
+                'status_label' => $history->completion_status === 'redone' ? 'Redone' : 'Expired',
+            ]);
+        }
+
+        foreach ($deletedOrders as $order) {
+            $historyRows->push((object) [
+                'order' => $order,
+                'completed_at' => $order->deleted_at,
+                'status_label' => 'Deleted',
+            ]);
+        }
+
+        $historyRows = $historyRows->sortByDesc('completed_at')->values();
+
+        return view('delivery.index', compact('approvedOrders', 'completedOrders', 'historyRows'));
     }
 
     // Sales Page: Input Form & History
@@ -134,20 +161,69 @@ class DeliveryOrderController extends Controller
         $pendingOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
             ->where('status', 'pending')
             ->orderBy('delivery_date', 'asc')
+            ->orderBy('created_at', 'desc')
             ->get();
 
-        // Enrich each order with stock availability info
-        foreach ($pendingOrders as $order) {
-            foreach ($order->items as $item) {
-                // Get available stock for this part_number
-                $availableStock = \App\Models\PalletItem::where('part_number', $item->part_number)
-                    ->whereHas('pallet.stockLocation')
-                    ->sum('pcs_quantity');
-                
-                $item->available_stock = $availableStock;
-                $item->stock_warning = $availableStock < $item->quantity;
-            }
+        $approvedOrders = \App\Models\DeliveryOrder::with('items')
+            ->whereIn('status', ['approved', 'processing'])
+            ->orderBy('delivery_date', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        // Precompute available stock per part (PCS) - same logic as delivery schedule
+        $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->where('boxes.is_withdrawn', false)
+            ->groupBy('boxes.part_number')
+            ->pluck('total', 'boxes.part_number');
+
+        $legacyTotals = PalletItem::select('part_number', DB::raw('SUM(pcs_quantity) as total'))
+            ->where('pcs_quantity', '>', 0)
+            ->whereHas('pallet', function ($q) {
+                $q->whereHas('stockLocation')
+                  ->doesntHave('boxes');
+            })
+            ->groupBy('part_number')
+            ->pluck('total', 'part_number');
+
+        $availableByPart = $boxTotals->toArray();
+        foreach ($legacyTotals as $partNumber => $total) {
+            $availableByPart[$partNumber] = ($availableByPart[$partNumber] ?? 0) + (int) $total;
         }
+
+        $sequenceOrders = $approvedOrders->concat($pendingOrders)->sort(function ($a, $b) {
+            $dateA = \Carbon\Carbon::parse($a->delivery_date)->startOfDay();
+            $dateB = \Carbon\Carbon::parse($b->delivery_date)->startOfDay();
+
+            if ($dateA->equalTo($dateB)) {
+                return $a->created_at < $b->created_at ? 1 : -1;
+            }
+
+            return $dateA->lessThan($dateB) ? -1 : 1;
+        })->values();
+
+        $runningRequired = [];
+
+        $sequenceOrders->each(function ($order) use ($availableByPart, &$runningRequired) {
+            $order->items->each(function ($item) use ($availableByPart, &$runningRequired) {
+                $partNumber = $item->part_number;
+                $available = (int) ($availableByPart[$partNumber] ?? 0);
+
+                $runningRequired[$partNumber] = ($runningRequired[$partNumber] ?? 0) + (int) $item->quantity;
+
+                $previousRequired = $runningRequired[$partNumber] - (int) $item->quantity;
+                $remainingBefore = $available - $previousRequired;
+
+                $item->available_total = $available;
+                $item->remaining_before = max(0, $remainingBefore);
+                $item->display_fulfilled = max(0, min((int) $item->quantity, $remainingBefore));
+                $item->available_stock = $item->display_fulfilled;
+                $item->stock_warning = $remainingBefore < (int) $item->quantity;
+            });
+        });
 
         $historyOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
             ->whereIn('status', ['approved', 'rejected', 'correction', 'processing', 'completed'])
@@ -325,5 +401,130 @@ class DeliveryOrderController extends Controller
         if($request->status == 'correction') $msg .= '. Sent back to Sales.';
 
         return redirect()->back()->with('success', $msg);
+    }
+
+    public function destroy($id)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user->role !== 'admin') {
+            return redirect()->back()->with('error', 'Unauthorized.');
+        }
+
+        $order = \App\Models\DeliveryOrder::findOrFail($id);
+        $order->status = 'deleted';
+        $order->save();
+        $order->delete();
+
+        return redirect()->back()->with('success', 'Delivery schedule deleted.');
+    }
+
+    public function approvalImpact($id)
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if (!in_array($user->role, ['ppc', 'admin'], true)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+
+        $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->where('boxes.is_withdrawn', false)
+            ->groupBy('boxes.part_number')
+            ->pluck('total', 'boxes.part_number');
+
+        $legacyTotals = PalletItem::select('part_number', DB::raw('SUM(pcs_quantity) as total'))
+            ->where('pcs_quantity', '>', 0)
+            ->whereHas('pallet', function ($q) {
+                $q->whereHas('stockLocation')
+                  ->doesntHave('boxes');
+            })
+            ->groupBy('part_number')
+            ->pluck('total', 'part_number');
+
+        $availableByPart = $boxTotals->toArray();
+        foreach ($legacyTotals as $partNumber => $total) {
+            $availableByPart[$partNumber] = ($availableByPart[$partNumber] ?? 0) + (int) $total;
+        }
+
+        $approvedOrders = \App\Models\DeliveryOrder::with('items')
+            ->whereIn('status', ['approved', 'processing'])
+            ->orderBy('delivery_date', 'asc')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $compute = function ($orders) use ($availableByPart) {
+            $runningRequired = [];
+            $result = [];
+
+            foreach ($orders as $currentOrder) {
+                $fully = true;
+                $shortParts = [];
+
+                foreach ($currentOrder->items as $item) {
+                    $partNumber = $item->part_number;
+                    $available = (int) ($availableByPart[$partNumber] ?? 0);
+
+                    $runningRequired[$partNumber] = ($runningRequired[$partNumber] ?? 0) + (int) $item->quantity;
+
+                    $previousRequired = $runningRequired[$partNumber] - (int) $item->quantity;
+                    $remainingBefore = $available - $previousRequired;
+                    $displayFulfilled = max(0, min((int) $item->quantity, $remainingBefore));
+
+                    if ($displayFulfilled < (int) $item->quantity) {
+                        $fully = false;
+                        $shortParts[] = [
+                            'part_number' => $partNumber,
+                            'can_fulfill' => $displayFulfilled,
+                            'required' => (int) $item->quantity,
+                        ];
+                    }
+                }
+
+                $result[$currentOrder->id] = [
+                    'fully' => $fully,
+                    'short_parts' => $shortParts,
+                ];
+            }
+
+            return $result;
+        };
+
+        $baseline = $compute($approvedOrders);
+
+        $sequenceOrders = $approvedOrders->concat(collect([$order]))->sort(function ($a, $b) {
+            $dateA = \Carbon\Carbon::parse($a->delivery_date)->startOfDay();
+            $dateB = \Carbon\Carbon::parse($b->delivery_date)->startOfDay();
+
+            if ($dateA->equalTo($dateB)) {
+                return $a->created_at < $b->created_at ? 1 : -1;
+            }
+
+            return $dateA->lessThan($dateB) ? -1 : 1;
+        })->values();
+
+        $after = $compute($sequenceOrders);
+
+        $impacted = [];
+        foreach ($approvedOrders as $approvedOrder) {
+            $before = $baseline[$approvedOrder->id] ?? ['fully' => false, 'short_parts' => []];
+            $afterState = $after[$approvedOrder->id] ?? ['fully' => false, 'short_parts' => []];
+
+            if ($before['fully'] && !$afterState['fully']) {
+                $impacted[] = [
+                    'id' => $approvedOrder->id,
+                    'delivery_date' => $approvedOrder->delivery_date?->format('d M Y') ?? null,
+                    'customer_name' => $approvedOrder->customer_name,
+                    'short_parts' => $afterState['short_parts'],
+                ];
+            }
+        }
+
+        return response()->json([
+            'impacted' => $impacted,
+        ]);
     }
 }

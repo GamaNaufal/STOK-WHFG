@@ -8,11 +8,12 @@ use App\Models\PalletItem;
 use App\Models\StockLocation;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryPickSession;
+use App\Services\OperationalReportService;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = auth()->user();
         $userRole = $user->role;
@@ -88,19 +89,8 @@ class DashboardController extends Controller
         }
         // SUPERVISI
         elseif ($userRole === 'supervisi') {
-            $stats = [
-                'role_label' => 'Supervisi',
-                'total_pallets' => Pallet::count(),
-                'total_pcs' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->sum('pcs_quantity') ?? 0,
-                'total_locations' => StockLocation::distinct('warehouse_location')->count(),
-                'total_orders' => DeliveryOrder::count(),
-                'completed_orders_today' => DeliveryOrder::where('status', 'completed')
-                    ->whereDate('created_at', today())->count(),
-                'total_deliveries' => DeliveryPickSession::count(),
-            ];
+            $data = app(OperationalReportService::class)->build($request);
+            return view('warehouse.reports.operational', $data);
         }
         // ADMIN WAREHOUSE
         elseif ($userRole === 'admin_warehouse') {

@@ -143,6 +143,7 @@ class MergePalletController extends Controller
 
             $palletIds = $request->pallet_ids;
             $palletNumbers = []; // Store actual pallet numbers for audit log
+            $boxOrigins = [];
 
             // 2. Collect all boxes and items from ALL source pallets first
             $allBoxes = [];
@@ -155,12 +156,35 @@ class MergePalletController extends Controller
                 $sourcePallets[] = $sourcePallet;
                 $palletNumbers[] = $sourcePallet->pallet_number; // Store pallet_number
                 $allBoxes = array_merge($allBoxes, $sourcePallet->boxes->toArray());
+
+                foreach ($sourcePallet->boxes as $box) {
+                    $boxOrigins[$box->id] = $sourcePallet->pallet_number;
+                }
             }
 
             // 3. Attach all boxes to new pallet and group items by part_number
             $allBoxIds = array_column($allBoxes, 'id');
             if (!empty($allBoxIds)) {
                 $newPallet->boxes()->attach($allBoxIds);
+
+                foreach ($allBoxIds as $boxId) {
+                    $fromPallet = $boxOrigins[$boxId] ?? null;
+                    if (!$fromPallet) {
+                        continue;
+                    }
+
+                    \App\Models\AuditLog::create([
+                        'type' => 'box_pallet_moved',
+                        'action' => 'moved',
+                        'model' => 'Box',
+                        'model_id' => $boxId,
+                        'description' => 'Box dipindahkan dari ' . $fromPallet . ' ke ' . $newPallet->pallet_number,
+                        'old_values' => json_encode(['from_pallet' => $fromPallet]),
+                        'new_values' => json_encode(['to_pallet' => $newPallet->pallet_number]),
+                        'user_id' => auth()->id(),
+                        'ip_address' => request()->ip(),
+                    ]);
+                }
 
                 // Group items by part_number across ALL source pallets
                 $itemsByPart = [];

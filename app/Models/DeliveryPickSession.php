@@ -29,7 +29,7 @@ class DeliveryPickSession extends Model
 
     public function order()
     {
-        return $this->belongsTo(DeliveryOrder::class, 'delivery_order_id');
+        return $this->belongsTo(DeliveryOrder::class, 'delivery_order_id')->withTrashed();
     }
 
     public function items()

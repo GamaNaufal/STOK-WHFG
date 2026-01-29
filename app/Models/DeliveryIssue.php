@@ -41,6 +41,17 @@ class DeliveryIssue extends Model
         return $this->belongsTo(User::class, 'resolved_by');
     }
 
+    public function getReasonAttribute()
+    {
+        return match ($this->issue_type) {
+            'box_withdrawn' => 'Box sudah withdrawn',
+            'scan_mismatch' => 'Box tidak sesuai',
+            'box_damaged' => 'Box rusak',
+            'quantity_mismatch' => 'Quantity tidak sesuai',
+            default => 'Issue lainnya',
+        };
+    }
+
     /**
      * Scope helpers
      */

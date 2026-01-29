@@ -2,15 +2,111 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\StockWithdrawal;
+use App\Exports\OperationalReportsExport;
 use App\Models\StockLocation;
-use App\Models\PalletItem;
-use App\Models\Pallet;
 use App\Models\StockInput;
+use App\Models\StockWithdrawal;
+use App\Services\OperationalReportService;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
+    public function operationalReports(Request $request)
+    {
+        $data = app(OperationalReportService::class)->build($request);
+        return view('warehouse.reports.operational', $data);
+    }
+
+    public function exportOperationalExcel(Request $request)
+    {
+        $data = (object) app(OperationalReportService::class)->build($request, true);
+        $start = $data->start;
+        $end = $data->end;
+        $rangeLabel = $data->rangeLabel;
+
+        $summaryRows = [[
+            'range' => $rangeLabel,
+            'start_date' => optional($start)->format('d M Y'),
+            'end_date' => optional($end)->format('d M Y'),
+            'fulfillment_rate' => $data->fulfillmentRate . '%',
+        ]];
+
+        $exportData = [
+            'summary_headings' => ['Range', 'Start Date', 'End Date', 'Fulfillment Rate'],
+            'summary_rows' => $summaryRows,
+            'current_headings' => ['Box', 'Part', 'PCS', 'Pallet', 'Lokasi', 'Tanggal Masuk'],
+            'current_rows' => $data->currentHandling->map(fn ($row) => [
+                $row->box_number,
+                $row->part_number,
+                $row->pcs_quantity,
+                $row->pallet_number,
+                $row->warehouse_location ?? 'Unknown',
+                optional($row->created_at)->format('d M Y H:i'),
+            ])->toArray(),
+            'matching_headings' => ['Order', 'Customer', 'Delivery Date', 'Required', 'Fulfilled', 'Rate', 'Status'],
+            'matching_rows' => $data->matchingReport->map(fn ($row) => [
+                $row['order_id'],
+                $row['customer'],
+                $row['delivery_date'],
+                $row['required'],
+                $row['fulfilled'],
+                $row['rate'] . '%',
+                $row['status'],
+            ])->toArray(),
+            'processing_headings' => ['Session', 'Order', 'Started', 'Completed', 'Duration (min)', 'Scan Duration (min)'],
+            'processing_rows' => $data->processingReport->map(fn ($row) => [
+                $row['session_id'],
+                $row['order_id'],
+                $row['started_at'],
+                $row['completed_at'],
+                $row['duration_min'],
+                $row['scan_duration_min'],
+            ])->toArray(),
+            'throughput_headings' => ['Date', 'Inbound PCS', 'Outbound PCS'],
+            'throughput_rows' => collect($data->throughputDays)->map(fn ($row) => [
+                $row['date'],
+                $row['inbound_pcs'],
+                $row['outbound_pcs'],
+            ])->toArray(),
+            'peak_headings' => ['Hour', 'Inbound PCS', 'Outbound PCS'],
+            'peak_rows' => $data->peakHours->map(fn ($row) => [
+                $row['hour'],
+                $row['inbound_pcs'],
+                $row['outbound_pcs'],
+            ])->toArray(),
+            'mismatch_headings' => ['Order', 'Scanned', 'Issue Type', 'Status', 'Tanggal'],
+            'mismatch_rows' => $data->issueList->map(fn ($row) => [
+                $row['order_id'],
+                $row['scanned_code'],
+                $row['issue_type'],
+                $row['status'],
+                $row['created_at'],
+            ])->toArray(),
+            'fulfillment_headings' => ['Order', 'Customer', 'Delivery Date', 'Required', 'Fulfilled', 'Rate', 'Status'],
+            'fulfillment_rows' => $data->fulfillmentRows->map(fn ($row) => [
+                $row['order_id'],
+                $row['customer'],
+                $row['delivery_date'],
+                $row['required'],
+                $row['fulfilled'],
+                $row['rate'] . '%',
+                $row['status'],
+            ])->toArray(),
+            'audit_headings' => ['Type', 'Action', 'Model', 'Model ID', 'Description', 'User', 'Date'],
+            'audit_rows' => $data->auditLogs->map(fn ($log) => [
+                $log->type,
+                $log->action,
+                $log->model,
+                $log->model_id,
+                $log->description,
+                $log->user_id,
+                $log->created_at->format('d M Y H:i'),
+            ])->toArray(),
+        ];
+
+        return Excel::download(new OperationalReportsExport($exportData), 'operational_reports_' . now()->format('Ymd_His') . '.xlsx');
+    }
     /**
      * Show withdrawal history report
      */
