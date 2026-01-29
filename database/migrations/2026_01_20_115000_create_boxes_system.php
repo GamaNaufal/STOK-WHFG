@@ -25,7 +25,14 @@ return new class extends Migration
             $table->string('lot03')->nullable();
             $table->longText('qr_code'); // QR Code (encoded)
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); // Admin yang membuat
+            $table->boolean('is_withdrawn')->default(false);
+            $table->dateTime('withdrawn_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('part_number');
+            $table->index('user_id');
+            $table->index('created_at');
         });
 
         Schema::create('pallet_boxes', function (Blueprint $table) {

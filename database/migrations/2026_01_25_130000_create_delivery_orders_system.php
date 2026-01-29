@@ -16,9 +16,15 @@ return new class extends Migration
             $table->foreignId('sales_user_id')->constrained('users'); // Who created it
             $table->string('customer_name');
             $table->date('delivery_date');
-            $table->enum('status', ['pending', 'approved', 'rejected', 'completed', 'correction'])->default('pending');
+            $table->enum('status', ['pending', 'approved', 'rejected', 'processing', 'completed', 'correction', 'deleted'])->default('pending');
             $table->text('notes')->nullable();
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('status');
+            $table->index('sales_user_id');
+            $table->index('delivery_date');
+            $table->index('created_at');
         });
 
         Schema::create('delivery_order_items', function (Blueprint $table) {

@@ -14,13 +14,18 @@ return new class extends Migration
         Schema::create('stock_inputs', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pallet_id')->constrained('pallets')->onDelete('cascade');
-            $table->foreignId('pallet_item_id')->constrained('pallet_items')->onDelete('cascade');
+            $table->foreignId('pallet_item_id')->nullable()->constrained('pallet_items')->nullOnDelete();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->string('warehouse_location');
             $table->integer('pcs_quantity');
             $table->decimal('box_quantity', 8, 2);
             $table->dateTime('stored_at');
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('pallet_id');
+            $table->index('user_id');
+            $table->index('stored_at');
         });
     }
 

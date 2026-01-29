@@ -17,6 +17,9 @@ return new class extends Migration
             $table->boolean('is_occupied')->default(false); // Status terisi/kosong
             $table->foreignId('current_pallet_id')->nullable()->constrained('pallets')->nullOnDelete(); // Palet mana yang sedang menempati (opsional untuk double check)
             $table->timestamps();
+
+            $table->index('is_occupied');
+            $table->unique('current_pallet_id', 'master_locations_current_pallet_id_unique');
         });
     }
 
