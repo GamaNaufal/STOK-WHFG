@@ -2,6 +2,17 @@
 
 @section('title', 'Operational Warehouse Reports')
 
+@section('styles')
+<style>
+    .popover.popover-wide {
+        max-width: 520px;
+    }
+    .popover.popover-wide .popover-body {
+        max-width: 520px;
+    }
+</style>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -43,31 +54,164 @@
         </div>
     </div>
 
+    @php
+        $activeBoxPreview = $currentHandling->sortByDesc('created_at')->take(5);
+        $activePallets = $currentHandling->groupBy('pallet_number')->map(function ($rows) {
+            $first = $rows->first();
+            $firstIn = optional($rows->sortBy('created_at')->first()->created_at)->format('d M Y H:i');
+            $lastIn = optional($rows->sortByDesc('created_at')->first()->created_at)->format('d M Y H:i');
+            return [
+                'pallet_number' => $first->pallet_number,
+                'total_boxes' => $rows->count(),
+                'total_pcs' => $rows->sum('pcs_quantity'),
+                'location' => $first->warehouse_location ?? 'Unknown',
+                'first_in' => $firstIn,
+                'last_in' => $lastIn,
+                'last_in_sort' => $rows->max('created_at'),
+            ];
+        });
+        $activePalletPreview = $activePallets->sortByDesc('last_in_sort')->values()->take(5);
+        $fulfillmentPreview = $fulfillmentRows->sortBy('rate')->take(5);
+        $scanPreview = $issueList->take(5);
+    @endphp
+
     <div class="row g-4 mb-4">
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100" data-bs-toggle="popover" data-bs-html="true" data-bs-placement="left" data-popover-target="fulfillment-popover" data-popover-title="Fulfillment (Top 5)">
+                <div class="card-body position-relative">
                     <h6 class="text-muted">Fulfillment Rate (Order Full)</h6>
                     <div class="display-6 fw-bold">{{ $fulfillmentRate }}%</div>
+                    <a href="#fulfillment-report" class="stretched-link" aria-label="Lihat detail fulfillment"></a>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100" data-bs-toggle="popover" data-bs-html="true" data-bs-placement="left" data-popover-target="active-box-popover" data-popover-title="Active Boxes (Top 5)">
+                <div class="card-body position-relative">
                     <h6 class="text-muted">Active Boxes</h6>
                     <div class="display-6 fw-bold">{{ $currentHandling->count() }}</div>
+                    <a href="#current-handling" class="stretched-link" aria-label="Lihat detail active boxes"></a>
                 </div>
             </div>
         </div>
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0 h-100">
-                <div class="card-body">
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100" data-bs-toggle="popover" data-bs-html="true" data-bs-placement="left" data-popover-target="active-pallet-popover" data-popover-title="Active Pallets (Top 5)">
+                <div class="card-body position-relative">
+                    <h6 class="text-muted">Active Pallets</h6>
+                    <div class="display-6 fw-bold">{{ $activePallets->count() }}</div>
+                    <a href="#active-pallets" class="stretched-link" aria-label="Lihat detail active pallets"></a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100" data-bs-toggle="popover" data-bs-html="true" data-bs-placement="left" data-popover-target="scan-issues-popover" data-popover-title="Scan Issues (Top 5)">
+                <div class="card-body position-relative">
                     <h6 class="text-muted">Scan Issues</h6>
                     <div class="display-6 fw-bold">{{ $issueSummary->sum('total') }}</div>
+                    <a href="#scan-issues" class="stretched-link" aria-label="Lihat detail scan issues"></a>
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="fulfillment-popover" class="d-none">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Customer</th>
+                    <th>Rate</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($fulfillmentPreview as $row)
+                    <tr>
+                        <td>#{{ $row['order_id'] }}</td>
+                        <td>{{ $row['customer'] }}</td>
+                        <td>{{ $row['rate'] }}%</td>
+                        <td>{{ $row['status'] }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="4" class="text-muted">Tidak ada data.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div id="active-box-popover" class="d-none">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Box</th>
+                    <th>Part</th>
+                    <th>PCS</th>
+                    <th>Pallet</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($activeBoxPreview as $row)
+                    <tr>
+                        <td>{{ $row->box_number }}</td>
+                        <td>{{ $row->part_number }}</td>
+                        <td>{{ $row->pcs_quantity }}</td>
+                        <td>{{ $row->pallet_number }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="4" class="text-muted">Tidak ada data.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div id="active-pallet-popover" class="d-none">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Pallet</th>
+                    <th>Boxes</th>
+                    <th>PCS</th>
+                    <th>Lokasi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($activePalletPreview as $row)
+                    <tr>
+                        <td>{{ $row['pallet_number'] }}</td>
+                        <td>{{ $row['total_boxes'] }}</td>
+                        <td>{{ $row['total_pcs'] }}</td>
+                        <td>{{ $row['location'] }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="4" class="text-muted">Tidak ada data.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div id="scan-issues-popover" class="d-none">
+        <table class="table table-sm mb-0">
+            <thead>
+                <tr>
+                    <th>Order</th>
+                    <th>Scanned</th>
+                    <th>Status</th>
+                    <th>Tanggal</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($scanPreview as $row)
+                    <tr>
+                        <td>#{{ $row['order_id'] ?? '-' }}</td>
+                        <td>{{ $row['scanned_code'] ?? '-' }}</td>
+                        <td>{{ $row['status'] ?? '-' }}</td>
+                        <td>{{ $row['created_at'] ?? '-' }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="4" class="text-muted">Tidak ada data.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
     </div>
 
     <div class="row g-4 mb-4">
@@ -95,6 +239,64 @@
                 <div class="card-body">
                     <h6 class="fw-bold mb-3">Schedule Fulfillment Performance</h6>
                     <canvas id="fulfillmentChart" height="140"></canvas>
+                    <div class="collapse mt-3" id="fulfillment-detail">
+                        <div class="card card-body border-0 shadow-sm">
+                            <div id="fulfillment-full" class="d-none">
+                                <div class="text-muted small mb-2">Order Full (Top 5)</div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Order</th>
+                                                <th>Customer</th>
+                                                <th>Rate</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($fulfillmentRows->where('status', 'Full')->take(5) as $row)
+                                                <tr>
+                                                    <td>#{{ $row['order_id'] }}</td>
+                                                    <td>{{ $row['customer'] }}</td>
+                                                    <td>{{ $row['rate'] }}%</td>
+                                                    <td>{{ $row['status'] }}</td>
+                                                </tr>
+                                            @empty
+                                                <tr><td colspan="4" class="text-center text-muted">Tidak ada data.</td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div id="fulfillment-partial" class="d-none">
+                                <div class="text-muted small mb-2">Order Partial (Top 5)</div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Order</th>
+                                                <th>Customer</th>
+                                                <th>Rate</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($fulfillmentRows->where('status', 'Partial')->take(5) as $row)
+                                                <tr>
+                                                    <td>#{{ $row['order_id'] }}</td>
+                                                    <td>{{ $row['customer'] }}</td>
+                                                    <td>{{ $row['rate'] }}%</td>
+                                                    <td>{{ $row['status'] }}</td>
+                                                </tr>
+                                            @empty
+                                                <tr><td colspan="4" class="text-center text-muted">Tidak ada data.</td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -102,6 +304,17 @@
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
                     <h6 class="fw-bold mb-3">Scan Mismatch Summary</h6>
+                    @php
+                        $scanTotal = $issueSummary->sum('total');
+                        $scanTypes = $issueSummary->count();
+                        $scanAvg = $scanTypes ? round($scanTotal / $scanTypes, 1) : 0;
+                        $topIssue = $scanTypes ? $issueSummary->sortByDesc('total')->first() : null;
+                        $daysInRange = ($start && $end) ? max(1, $start->diffInDays($end) + 1) : null;
+                        $scanPerDay = $daysInRange ? round($scanTotal / $daysInRange, 1) : null;
+                        $lastIssueAt = $issueList->first()['created_at'] ?? null;
+                        $recentIssues = $issueList->take(5);
+                    @endphp
+                    <div class="text-muted small mb-2">Ringkasan mismatch dari periode terpilih.</div>
                     <ul class="list-group list-group-flush">
                         @forelse($issueSummary as $row)
                             <li class="list-group-item d-flex justify-content-between">
@@ -112,14 +325,27 @@
                             <li class="list-group-item text-muted">Tidak ada data.</li>
                         @endforelse
                     </ul>
+                    <div class="mt-3">
+                        <div class="text-muted small mb-2">5 mismatch terbaru</div>
+                        <ul class="list-unstyled small mb-0">
+                            @forelse($recentIssues as $row)
+                                <li class="d-flex justify-content-between border-bottom py-1">
+                                    <span>#{{ $row['order_id'] ?? '-' }} · {{ $row['scanned_code'] ?? '-' }}</span>
+                                    <span class="text-muted">{{ $row['created_at'] ?? '-' }}</span>
+                                </li>
+                            @empty
+                                <li class="text-muted">Belum ada mismatch.</li>
+                            @endforelse
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="card shadow-sm border-0 mb-4" id="current-handling">
         <div class="card-header bg-white">
-            <strong>A. Current Handling Report (Barang Aktif)</strong>
+            <strong>Current Handling Report (Barang Aktif)</strong>
         </div>
         <div class="card-body table-responsive">
             <table class="table table-sm table-striped align-middle">
@@ -151,9 +377,41 @@
         </div>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="card shadow-sm border-0 mb-4" id="active-pallets">
         <div class="card-header bg-white">
-            <strong>B. Inbound vs Outbound Matching Report</strong>
+            <strong>Active Pallet Report (Pallet Aktif)</strong>
+        </div>
+        <div class="card-body table-responsive">
+            <table class="table table-sm table-striped align-middle">
+                <thead>
+                    <tr>
+                        <th>Pallet</th>
+                        <th>Total Box</th>
+                        <th>Total PCS</th>
+                        <th>Lokasi</th>
+                        <th>First In</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($activePallets as $row)
+                        <tr>
+                            <td>{{ $row['pallet_number'] }}</td>
+                            <td>{{ $row['total_boxes'] }}</td>
+                            <td>{{ $row['total_pcs'] }}</td>
+                            <td>{{ $row['location'] }}</td>
+                            <td>{{ $row['first_in'] ?? '-' }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="5" class="text-center text-muted">Tidak ada data.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4" id="fulfillment-report">
+        <div class="card-header bg-white">
+            <strong>Inbound vs Outbound Matching Report</strong>
         </div>
         <div class="card-body table-responsive">
             <table class="table table-sm table-striped align-middle">
@@ -187,9 +445,9 @@
         </div>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="card shadow-sm border-0 mb-4" id="scan-issues">
         <div class="card-header bg-white">
-            <strong>C. Processing Time (Lead Time)</strong>
+            <strong>Processing Time (Lead Time)</strong>
         </div>
         <div class="card-body">
             <div class="text-muted small mb-2">
@@ -229,7 +487,7 @@
 
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
-            <strong>D. Warehouse Throughput</strong>
+            <strong>Warehouse Throughput</strong>
         </div>
         <div class="card-body table-responsive">
             <table class="table table-sm table-striped align-middle">
@@ -257,7 +515,7 @@
 
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
-            <strong>E. Scan Mismatch Report</strong>
+            <strong>Scan Mismatch Report</strong>
         </div>
         <div class="card-body table-responsive">
             <table class="table table-sm table-striped align-middle">
@@ -291,7 +549,7 @@
 
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
-            <strong>G. Schedule Fulfillment Performance</strong>
+            <strong>Schedule Fulfillment Performance</strong>
         </div>
         <div class="card-body table-responsive">
             <table class="table table-sm table-striped align-middle">
@@ -327,10 +585,10 @@
 
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
-            <strong>I. Audit Report</strong>
+            <strong>Audit Report</strong>
         </div>
         <div class="card-body">
-            <form method="GET" action="{{ url()->current() }}" class="row g-2 align-items-end mb-3">
+            <form id="audit-filter-form" method="GET" action="{{ url()->current() }}" class="row g-2 align-items-end mb-3">
                 <div class="col-md-3">
                     <label class="form-label">Type</label>
                     <select name="audit_type" class="form-select">
@@ -359,77 +617,79 @@
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <button class="btn btn-primary w-100">Filter</button>
+                    <button class="btn btn-primary w-100" type="submit">Filter</button>
                 </div>
                 <div class="col-md-2">
-                    <a href="{{ url()->current() }}?period={{ request('period', 'week') }}" class="btn btn-outline-secondary w-100">Reset</a>
+                    <a href="{{ url()->current() }}?period={{ request('period', 'week') }}" class="btn btn-outline-secondary w-100" id="audit-filter-reset">Reset</a>
                 </div>
             </form>
-            <div class="row mb-3">
-                <div class="col-md-6">
-                    <h6 class="fw-bold">Summary</h6>
-                    @php
-                        $typeLabels = [
-                            'stock_input' => 'Input Stok',
-                            'stock_withdrawal' => 'Pengambilan Stok',
-                            'delivery_pickup' => 'Delivery Pickup',
-                            'delivery_redo' => 'Delivery Redo',
-                            'pallet_merged' => 'Pallet Merge',
-                            'box_pallet_moved' => 'Box Dipindahkan',
-                            'other' => 'Lainnya',
-                        ];
-                    @endphp
-                    <ul class="list-group list-group-flush">
-                        @forelse($auditSummary as $row)
-                            <li class="list-group-item d-flex justify-content-between">
-                                <span>{{ $typeLabels[$row->type] ?? $row->type }}</span>
-                                <span class="fw-bold">{{ $row->total }}</span>
-                            </li>
-                        @empty
-                            <li class="list-group-item text-muted">Tidak ada data.</li>
-                        @endforelse
-                    </ul>
-                </div>
-            </div>
-            <div class="text-muted small mb-2">
-                User = nama operator/admin yang melakukan aksi.
-            </div>
-            <div class="table-responsive">
-                <table class="table table-sm table-striped align-middle">
-                    <thead>
-                        <tr>
-                            <th>Type</th>
-                            <th>Action</th>
-                            <th>Model</th>
-                            <th>Description</th>
-                            <th>User</th>
-                            <th>Tanggal</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($auditLogs as $log)
-                            <tr>
-                                <td>{{ $typeLabels[$log->type] ?? $log->type }}</td>
-                                <td>{{ $log->action }}</td>
-                                <td>{{ $log->model }}</td>
-                                <td>{{ $log->description }}</td>
-                                <td>{{ $log->user?->name ?? 'User #' . $log->user_id }}</td>
-                                <td>{{ $log->created_at->format('d M Y H:i') }}</td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="6" class="text-center text-muted">Tidak ada data.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            @if(method_exists($auditLogs, 'links'))
-                <div class="d-flex flex-wrap justify-content-between align-items-center mt-3">
-                    <div class="text-muted small">
-                        Menampilkan {{ $auditLogs->firstItem() ?? 0 }}–{{ $auditLogs->lastItem() ?? 0 }} dari {{ $auditLogs->total() }} data
+            <div id="audit-report-content">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6 class="fw-bold">Summary</h6>
+                        @php
+                            $typeLabels = [
+                                'stock_input' => 'Input Stok',
+                                'stock_withdrawal' => 'Pengambilan Stok',
+                                'delivery_pickup' => 'Delivery Pickup',
+                                'delivery_redo' => 'Delivery Redo',
+                                'pallet_merged' => 'Pallet Merge',
+                                'box_pallet_moved' => 'Box Dipindahkan',
+                                'other' => 'Lainnya',
+                            ];
+                        @endphp
+                        <ul class="list-group list-group-flush">
+                            @forelse($auditSummary as $row)
+                                <li class="list-group-item d-flex justify-content-between">
+                                    <span>{{ $typeLabels[$row->type] ?? $row->type }}</span>
+                                    <span class="fw-bold">{{ $row->total }}</span>
+                                </li>
+                            @empty
+                                <li class="list-group-item text-muted">Tidak ada data.</li>
+                            @endforelse
+                        </ul>
                     </div>
-                    {{ $auditLogs->onEachSide(1)->fragment('audit-report')->links('pagination::bootstrap-5') }}
                 </div>
-            @endif
+                <div class="text-muted small mb-2">
+                    User = nama operator/admin yang melakukan aksi.
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Action</th>
+                                <th>Model</th>
+                                <th>Description</th>
+                                <th>User</th>
+                                <th>Tanggal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($auditLogs as $log)
+                                <tr>
+                                    <td>{{ $typeLabels[$log->type] ?? $log->type }}</td>
+                                    <td>{{ $log->action }}</td>
+                                    <td>{{ $log->model }}</td>
+                                    <td>{{ $log->description }}</td>
+                                    <td>{{ $log->user?->name ?? 'User #' . $log->user_id }}</td>
+                                    <td>{{ $log->created_at->format('d M Y H:i') }}</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="6" class="text-center text-muted">Tidak ada data.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                @if(method_exists($auditLogs, 'links'))
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mt-3">
+                        <div class="text-muted small">
+                            Menampilkan {{ $auditLogs->firstItem() ?? 0 }}–{{ $auditLogs->lastItem() ?? 0 }} dari {{ $auditLogs->total() }} data
+                        </div>
+                        {{ $auditLogs->onEachSide(1)->fragment('audit-report')->links('pagination::bootstrap-5') }}
+                    </div>
+                @endif
+            </div>
         </div>
     </div>
 </div>
@@ -482,7 +742,7 @@
         options: { responsive: true, scales: { y: { beginAtZero: true } } }
     });
 
-    new Chart(document.getElementById('fulfillmentChart'), {
+    const fulfillmentChart = new Chart(document.getElementById('fulfillmentChart'), {
         type: 'doughnut',
         data: {
             labels: ['Full', 'Partial'],
@@ -493,5 +753,99 @@
         },
         options: { responsive: true }
     });
+
+    const fulfillmentDetail = document.getElementById('fulfillment-detail');
+    const fulfillmentFull = document.getElementById('fulfillment-full');
+    const fulfillmentPartial = document.getElementById('fulfillment-partial');
+    const fulfillmentCollapse = new bootstrap.Collapse(fulfillmentDetail, { toggle: false });
+
+    document.getElementById('fulfillmentChart').onclick = (evt) => {
+        const points = fulfillmentChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (!points.length) return;
+        const index = points[0].index;
+        if (index === 0) {
+            fulfillmentFull.classList.remove('d-none');
+            fulfillmentPartial.classList.add('d-none');
+        } else {
+            fulfillmentPartial.classList.remove('d-none');
+            fulfillmentFull.classList.add('d-none');
+        }
+        fulfillmentCollapse.show();
+        fulfillmentDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    };
+
+    const popoverTriggers = document.querySelectorAll('[data-bs-toggle="popover"]');
+    popoverTriggers.forEach((el) => {
+        const targetId = el.getAttribute('data-popover-target');
+        const title = el.getAttribute('data-popover-title') || '';
+        let content = '';
+        if (targetId) {
+            const template = document.getElementById(targetId);
+            if (template) {
+                content = template.innerHTML;
+            }
+        }
+        new bootstrap.Popover(el, {
+            html: true,
+            sanitize: false,
+            trigger: 'hover focus',
+            placement: 'left',
+            customClass: 'popover-wide',
+            title,
+            content,
+            container: 'body'
+        });
+    });
+
+    const auditForm = document.getElementById('audit-filter-form');
+    const auditContent = document.getElementById('audit-report-content');
+    const auditReset = document.getElementById('audit-filter-reset');
+
+    const loadAuditReport = async (url) => {
+        const response = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!response.ok) return;
+        const html = await response.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const nextContent = doc.getElementById('audit-report-content');
+        const nextForm = doc.getElementById('audit-filter-form');
+        if (nextContent && nextForm) {
+            auditContent.innerHTML = nextContent.innerHTML;
+            auditForm.innerHTML = nextForm.innerHTML;
+            window.history.replaceState({}, '', url);
+        }
+    };
+
+    if (auditForm) {
+        auditForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const url = new URL(auditForm.action);
+            const formData = new FormData(auditForm);
+            formData.forEach((value, key) => {
+                if (value !== '') {
+                    url.searchParams.set(key, value);
+                } else {
+                    url.searchParams.delete(key);
+                }
+            });
+            loadAuditReport(url.toString());
+        });
+    }
+
+    if (auditReset) {
+        auditReset.addEventListener('click', (event) => {
+            event.preventDefault();
+            loadAuditReport(auditReset.href);
+        });
+    }
+
+    if (auditContent) {
+        auditContent.addEventListener('click', (event) => {
+            const link = event.target.closest('a');
+            if (!link || !link.href) return;
+            if (!link.href.includes('page=')) return;
+            event.preventDefault();
+            loadAuditReport(link.href);
+        });
+    }
 </script>
 @endsection

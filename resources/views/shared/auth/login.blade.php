@@ -195,13 +195,18 @@
                 </div>
                 
                 <div class="cred-item">
-                    <strong>Packing Dept:</strong><br>
-                    Email: budi@packing.local | Password: password
+                    <strong>Admin Warehouse:</strong><br>
+                    Email: admin.wh@warehouse.local	 | Password: password
                 </div>
                 
                 <div class="cred-item">
                     <strong>Warehouse Op:</strong><br>
                     Email: andi@warehouse.local | Password: password
+                </div>
+                
+                                <div class="cred-item">
+                    <strong>Supervisi Warehouse:</strong><br>
+                    Email: spv@supervisi.local | Password: password
                 </div>
 
                 <div class="cred-item">
