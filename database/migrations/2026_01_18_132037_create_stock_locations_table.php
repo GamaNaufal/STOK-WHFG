@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('stock_locations', function (Blueprint $table) {
             $table->id();
             $table->foreignId('pallet_id')->constrained('pallets')->onDelete('cascade');
-            $table->foreignId('master_location_id')->nullable()->constrained('master_locations')->nullOnDelete();
+            $table->foreignId('master_location_id')->nullable();
             $table->string('warehouse_location');
             $table->timestamp('stored_at');
             $table->timestamps();

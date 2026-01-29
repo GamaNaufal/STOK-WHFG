@@ -44,6 +44,13 @@ return new class extends Migration
             // Composite unique key - satu pallet tidak boleh punya box yang sama 2x
             $table->unique(['pallet_id', 'box_id']);
         });
+
+        Schema::table('stock_withdrawals', function (Blueprint $table) {
+            $table->foreign('box_id')
+                ->references('id')
+                ->on('boxes')
+                ->nullOnDelete();
+        });
     }
 
     /**
@@ -51,6 +58,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('stock_withdrawals', function (Blueprint $table) {
+            $table->dropForeign(['box_id']);
+        });
+
         Schema::dropIfExists('pallet_boxes');
         Schema::dropIfExists('boxes');
     }

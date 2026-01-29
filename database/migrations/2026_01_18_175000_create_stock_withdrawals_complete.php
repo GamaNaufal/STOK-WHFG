@@ -16,7 +16,7 @@ return new class extends Migration
             $table->uuid('withdrawal_batch_id')->nullable()->index();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('pallet_item_id')->nullable()->constrained('pallet_items')->onDelete('set null');
-            $table->foreignId('box_id')->nullable()->constrained('boxes')->nullOnDelete();
+            $table->foreignId('box_id')->nullable();
             $table->string('part_number');
             $table->integer('pcs_quantity');
             $table->decimal('box_quantity', 8, 2)->default(0); // Store box quantity with decimal for partial boxes
