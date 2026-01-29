@@ -4,9 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Pallet;
 use App\Models\PalletItem;
-use App\Models\StockLocation;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class StockViewController extends Controller
 {
@@ -17,36 +15,37 @@ class StockViewController extends Controller
                 $q->where('warehouse_location', '!=', 'Unknown');
             });
 
-        $pallets = $palletQuery->get();
         $items = collect();
 
-        foreach ($pallets as $pallet) {
-            $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
+        $palletQuery->chunkById(200, function ($pallets) use (&$items, $search) {
+            foreach ($pallets as $pallet) {
+                $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
 
-            // Use pallet items (legacy system, no more boxes relationship)
-            $legacyItems = $pallet->items->filter(function ($item) {
-                return $item->pcs_quantity > 0 || $item->box_quantity > 0;
-            });
-
-            if ($search) {
-                $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
-                    return stripos($item->part_number, $search) !== false
-                        || stripos($pallet->pallet_number, $search) !== false;
+                // Use pallet items (legacy system, no more boxes relationship)
+                $legacyItems = $pallet->items->filter(function ($item) {
+                    return $item->pcs_quantity > 0 || $item->box_quantity > 0;
                 });
-            }
 
-            foreach ($legacyItems as $item) {
-                $items->push([
-                    'pallet_id' => $pallet->id,
-                    'pallet_number' => $pallet->pallet_number,
-                    'location' => $location,
-                    'part_number' => $item->part_number,
-                    'box_quantity' => (int) $item->box_quantity,
-                    'pcs_quantity' => (int) $item->pcs_quantity,
-                    'created_at' => $item->created_at,
-                ]);
+                if ($search) {
+                    $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
+                        return stripos($item->part_number, $search) !== false
+                            || stripos($pallet->pallet_number, $search) !== false;
+                    });
+                }
+
+                foreach ($legacyItems as $item) {
+                    $items->push([
+                        'pallet_id' => $pallet->id,
+                        'pallet_number' => $pallet->pallet_number,
+                        'location' => $location,
+                        'part_number' => $item->part_number,
+                        'box_quantity' => (int) $item->box_quantity,
+                        'pcs_quantity' => (int) $item->pcs_quantity,
+                        'created_at' => $item->created_at,
+                    ]);
+                }
             }
-        }
+        });
 
         return $items->sortBy('created_at');
     }
@@ -79,17 +78,19 @@ class StockViewController extends Controller
         // Data for "By Pallet" view
         $groupedByPallet = collect();
         if ($viewMode === 'pallet') {
-            $groupedByPallet = $items->groupBy('pallet_id')->map(function ($itemGroup) {
+            $palletIds = $items->pluck('pallet_id')->unique()->values();
+            $mergedPalletIds = \App\Models\AuditLog::where('model', 'Pallet')
+                ->where('type', 'pallet_merged')
+                ->whereIn('model_id', $palletIds)
+                ->pluck('model_id')
+                ->unique()
+                ->toArray();
+
+            $groupedByPallet = $items->groupBy('pallet_id')->map(function ($itemGroup) use ($mergedPalletIds) {
                 $firstItem = $itemGroup->first();
                 $totalPcs = $itemGroup->sum('pcs_quantity');
                 $totalBox = $itemGroup->sum('box_quantity');
-                
-                // Check if pallet is merged by looking for pallet_merged audit log
-                $pallet = Pallet::find($firstItem['pallet_id']);
-                $isMerged = \App\Models\AuditLog::where('model', 'Pallet')
-                    ->where('model_id', $firstItem['pallet_id'])
-                    ->where('type', 'pallet_merged')
-                    ->exists();
+                $isMerged = in_array($firstItem['pallet_id'], $mergedPalletIds, true);
 
                 return [
                     'pallet_id' => $firstItem['pallet_id'],

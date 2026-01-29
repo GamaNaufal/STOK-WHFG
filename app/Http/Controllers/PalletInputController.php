@@ -7,6 +7,9 @@ use App\Models\PalletItem;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 
+/**
+ * @deprecated Unused controller (no active routes).
+ */
 class PalletInputController extends Controller
 {
     // List part numbers yang tersedia

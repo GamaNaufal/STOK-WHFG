@@ -6,6 +6,9 @@ use App\Models\MasterLocation;
 use App\Models\Pallet;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * @deprecated Unused component. Kept for backward compatibility.
+ */
 class LocationManagementService
 {
     /**

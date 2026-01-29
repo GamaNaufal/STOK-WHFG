@@ -154,6 +154,7 @@ class DeliveryPickController extends Controller
 
         $pickItem->status = 'scanned';
         $pickItem->scanned_at = now();
+        $pickItem->scanned_by = auth()->id();
         $pickItem->save();
 
         $remaining = $session->items()->where('status', 'pending')->count();
@@ -195,7 +196,7 @@ class DeliveryPickController extends Controller
 
     public function complete(Request $request, $sessionId)
     {
-        $session = DeliveryPickSession::with(['items.box'])->findOrFail($sessionId);
+        $session = DeliveryPickSession::with(['items.box.pallets.stockLocation'])->findOrFail($sessionId);
         $order = DeliveryOrder::with('items')->findOrFail($session->delivery_order_id);
 
         if ($session->status === 'blocked') {
@@ -420,15 +421,18 @@ class DeliveryPickController extends Controller
 
     private function getBoxesByFIFO(string $partNumber, int $requestedPcs)
     {
-        $busyBoxIds = DeliveryPickItem::whereHas('session', function ($q) {
-                $q->whereIn('status', ['scanning', 'blocked', 'approved']);
-            })
-            ->pluck('box_id');
-
         $boxes = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
-            ->whereNotIn('boxes.id', $busyBoxIds)
+            ->whereNotIn('boxes.id', function ($q) {
+                $q->select('box_id')
+                  ->from('delivery_pick_items')
+                  ->whereIn('pick_session_id', function ($q2) {
+                      $q2->select('id')
+                        ->from('delivery_pick_sessions')
+                        ->whereIn('status', ['scanning', 'blocked', 'approved']);
+                  });
+            })
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')

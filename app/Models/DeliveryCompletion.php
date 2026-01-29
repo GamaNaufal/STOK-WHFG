@@ -4,6 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @deprecated Unused model (legacy table).
+ */
 class DeliveryCompletion extends Model
 {
     protected $fillable = [

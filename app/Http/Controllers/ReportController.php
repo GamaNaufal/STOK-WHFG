@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Exports\OperationalReportsExport;
-use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Models\StockWithdrawal;
 use App\Services\OperationalReportService;
@@ -183,7 +182,7 @@ class ReportController extends Controller
 
         // Part number filter
         if ($request->filled('part_number')) {
-            $query->where('pallet_item_id', function ($q) {
+            $query->whereIn('pallet_item_id', function ($q) {
                 $q->select('id')
                   ->from('pallet_items')
                   ->where('part_number', 'like', '%' . request()->input('part_number') . '%');

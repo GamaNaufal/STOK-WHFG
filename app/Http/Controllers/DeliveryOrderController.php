@@ -9,24 +9,8 @@ use Illuminate\Support\Facades\DB;
 
 class DeliveryOrderController extends Controller
 {
-    // Dashboard: Only Approved Schedule (Visible to Admin & Warehouse)
-    public function index()
+    private function getAvailableStockByPart(): array
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
-        
-           // Strict Role Check: Admin & Warehouse Operator only
-                     if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
-             if ($user->role === 'sales') return redirect()->route('delivery.create');
-             if ($user->role === 'ppc') return redirect()->route('delivery.approvals');
-             return redirect('/')->with('error', 'Unauthorized access to Schedule.');
-        }
-
-        $approvedOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
-            ->whereIn('status', ['approved', 'processing']) 
-            ->orderBy('delivery_date', 'asc')
-            ->get();
-
-        // Precompute available stock per part (PCS)
         $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
@@ -49,6 +33,29 @@ class DeliveryOrderController extends Controller
         foreach ($legacyTotals as $partNumber => $total) {
             $availableByPart[$partNumber] = ($availableByPart[$partNumber] ?? 0) + (int) $total;
         }
+
+        return $availableByPart;
+    }
+
+    // Dashboard: Only Approved Schedule (Visible to Admin & Warehouse)
+    public function index()
+    {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        
+           // Strict Role Check: Admin & Warehouse Operator only
+                     if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+             if ($user->role === 'sales') return redirect()->route('delivery.create');
+             if ($user->role === 'ppc') return redirect()->route('delivery.approvals');
+             return redirect('/')->with('error', 'Unauthorized access to Schedule.');
+        }
+
+        $approvedOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
+            ->whereIn('status', ['approved', 'processing']) 
+            ->orderBy('delivery_date', 'asc')
+            ->get();
+
+        // Precompute available stock per part (PCS)
+        $availableByPart = $this->getAvailableStockByPart();
 
         $runningRequired = [];
 
@@ -171,28 +178,7 @@ class DeliveryOrderController extends Controller
             ->get();
 
         // Precompute available stock per part (PCS) - same logic as delivery schedule
-        $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
-            ->where('boxes.is_withdrawn', false)
-            ->groupBy('boxes.part_number')
-            ->pluck('total', 'boxes.part_number');
-
-        $legacyTotals = PalletItem::select('part_number', DB::raw('SUM(pcs_quantity) as total'))
-            ->where('pcs_quantity', '>', 0)
-            ->whereHas('pallet', function ($q) {
-                $q->whereHas('stockLocation')
-                  ->doesntHave('boxes');
-            })
-            ->groupBy('part_number')
-            ->pluck('total', 'part_number');
-
-        $availableByPart = $boxTotals->toArray();
-        foreach ($legacyTotals as $partNumber => $total) {
-            $availableByPart[$partNumber] = ($availableByPart[$partNumber] ?? 0) + (int) $total;
-        }
+        $availableByPart = $this->getAvailableStockByPart();
 
         $sequenceOrders = $approvedOrders->concat($pendingOrders)->sort(function ($a, $b) {
             $dateA = \Carbon\Carbon::parse($a->delivery_date)->startOfDay();
@@ -341,6 +327,11 @@ class DeliveryOrderController extends Controller
     // Sales: Store new Delivery Order
     public function store(Request $request)
     {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user->role !== 'sales' && $user->role !== 'admin') {
+            return redirect()->back()->with('error', 'Unauthorized access.');
+        }
+
         $request->validate([
             'customer_name' => 'required|string',
             'delivery_date' => 'required|date',
@@ -382,6 +373,11 @@ class DeliveryOrderController extends Controller
     // PPC: Approve, Reject, or Correction
     public function updateStatus(Request $request, $id)
     {
+        $user = \Illuminate\Support\Facades\Auth::user();
+        if ($user->role !== 'ppc' && $user->role !== 'admin') {
+            return redirect()->back()->with('error', 'Unauthorized access.');
+        }
+
         $request->validate([
             'status' => 'required|in:approved,rejected,correction',
             'notes' => 'nullable|string'
@@ -427,28 +423,7 @@ class DeliveryOrderController extends Controller
 
         $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
 
-        $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
-            ->where('boxes.is_withdrawn', false)
-            ->groupBy('boxes.part_number')
-            ->pluck('total', 'boxes.part_number');
-
-        $legacyTotals = PalletItem::select('part_number', DB::raw('SUM(pcs_quantity) as total'))
-            ->where('pcs_quantity', '>', 0)
-            ->whereHas('pallet', function ($q) {
-                $q->whereHas('stockLocation')
-                  ->doesntHave('boxes');
-            })
-            ->groupBy('part_number')
-            ->pluck('total', 'part_number');
-
-        $availableByPart = $boxTotals->toArray();
-        foreach ($legacyTotals as $partNumber => $total) {
-            $availableByPart[$partNumber] = ($availableByPart[$partNumber] ?? 0) + (int) $total;
-        }
+        $availableByPart = $this->getAvailableStockByPart();
 
         $approvedOrders = \App\Models\DeliveryOrder::with('items')
             ->whereIn('status', ['approved', 'processing'])
