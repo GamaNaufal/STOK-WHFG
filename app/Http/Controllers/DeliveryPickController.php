@@ -241,9 +241,6 @@ class DeliveryPickController extends Controller
                     'withdrawn_at' => now(),
                 ]);
 
-                // Log audit trail
-                AuditService::logStockWithdrawal($withdrawal, 'completed');
-
                 $box->is_withdrawn = true;
                 $box->withdrawn_at = now();
                 $box->save();
@@ -262,6 +259,9 @@ class DeliveryPickController extends Controller
                     }
                 }
             }
+
+            // Log batch withdrawal satu kali dengan detail semua boxes
+            AuditService::logBatchStockWithdrawal($session, 'completed');
 
             foreach ($order->items as $orderItem) {
                 $pickedPcs = $session->items->where('part_number', $orderItem->part_number)->sum('pcs_quantity');
@@ -332,10 +332,10 @@ class DeliveryPickController extends Controller
 
                     $withdrawal->status = 'reversed';
                     $withdrawal->save();
-
-                    // Log audit trail
-                    AuditService::logStockWithdrawal($withdrawal, 'reversed');
                 }
+
+                // Log batch reversal satu kali dengan detail semua boxes
+                AuditService::logBatchStockWithdrawal($session, 'reversed');
 
                 $order = $session->order;
                 foreach ($order->items as $orderItem) {

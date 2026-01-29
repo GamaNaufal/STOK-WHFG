@@ -52,9 +52,20 @@ class AuditService
      */
     public static function logStockInput($stockInput, $action = 'created', $oldValues = [])
     {
+        // Load relations
+        $stockInput->loadMissing('palletItem');
+        
+        // Get part numbers (dari array atau fallback ke single palletItem)
+        $partNumbers = $stockInput->part_numbers ?? [];
+        if (empty($partNumbers) && $stockInput->palletItem?->part_number) {
+            $partNumbers = [$stockInput->palletItem->part_number];
+        }
+        $partNumberString = !empty($partNumbers) ? implode(', ', $partNumbers) : '-';
+        
         $newValues = [
             'pallet_id' => $stockInput->pallet_id,
-            'part_number' => $stockInput->pallet?->part_number,
+            'part_numbers' => $partNumbers,
+            'part_number' => $partNumberString,
             'pcs_quantity' => $stockInput->pcs_quantity,
             'box_quantity' => $stockInput->box_quantity,
             'warehouse_location' => $stockInput->warehouse_location,
@@ -103,6 +114,75 @@ class AuditService
             $oldValues,
             $newValues,
             $actionDescription
+        );
+    }
+
+    /**
+     * Log batch stock withdrawal (multiple boxes dalam satu session)
+     */
+    public static function logBatchStockWithdrawal($session, $action = 'completed', $description = null)
+    {
+        // Load box dengan palletnya, dan stock location
+        $items = $session->items()->with(['box' => function($q) {
+            $q->with('pallets.stockLocation');
+        }])->get();
+        
+        $totalPcs = 0;
+        $totalBox = $items->count();
+        $boxDetails = [];
+        $partNumbers = [];
+
+        foreach ($items as $item) {
+            $box = $item->box;
+            if ($box) {
+                $totalPcs += $box->pcs_quantity;
+                
+                // Get warehouse location dari pallet's stockLocation
+                $warehouseLocation = 'Unknown';
+                if ($box->pallets && $box->pallets->isNotEmpty()) {
+                    $pallet = $box->pallets->first();
+                    $warehouseLocation = $pallet->stockLocation?->warehouse_location ?? 'Unknown';
+                }
+                
+                $boxDetails[] = [
+                    'box_id' => $box->id,
+                    'part_number' => $box->part_number,
+                    'pcs_quantity' => (int)$box->pcs_quantity,
+                    'warehouse_location' => $warehouseLocation,
+                ];
+                // Collect unique part numbers
+                if ($box->part_number && !in_array($box->part_number, $partNumbers)) {
+                    $partNumbers[] = $box->part_number;
+                }
+            }
+        }
+
+        $partNumberString = !empty($partNumbers) ? implode(', ', $partNumbers) : '-';
+
+        $newValues = [
+            'session_id' => $session->id,
+            'delivery_order_id' => $session->delivery_order_id,
+            'total_pcs_quantity' => $totalPcs,
+            'total_box_quantity' => $totalBox,
+            'part_numbers' => $partNumbers,
+            'part_number' => $partNumberString,
+            'boxes' => $boxDetails,
+        ];
+
+        $actionDescription = match($action) {
+            'completed' => "Pengambilan stok selesai: {$totalPcs} PCS ({$totalBox} box) untuk DO #{$session->delivery_order_id}",
+            'reversed' => "Pengambilan stok di-undo: {$totalPcs} PCS ({$totalBox} box) dari DO #{$session->delivery_order_id}",
+            default => $description ?? "Aksi pengambilan stok batch: {$action}",
+        };
+
+        self::log(
+            'stock_withdrawal',
+            $action,
+            'DeliveryPickSession',
+            $session->id,
+            [],
+            $newValues,
+            $description ?? $actionDescription
         );
     }
 

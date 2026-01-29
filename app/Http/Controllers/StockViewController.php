@@ -233,4 +233,51 @@ class StockViewController extends Controller
             'items' => $items->values() 
         ]);
     }
+
+    /**
+     * Export stock view by part to Excel
+     */
+    public function exportByPart(Request $request)
+    {
+        $search = $request->query('search');
+        $stocks = $this->buildStockItems($search);
+        
+        // Group by part number and sum quantities
+        $groupedByPart = $stocks->groupBy('part_number')->map(function ($items) {
+            return [
+                'part_number' => $items->first()['part_number'],
+                'box_quantity' => $items->sum('box_quantity'),
+                'pcs_quantity' => $items->sum('pcs_quantity'),
+            ];
+        })->values();
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\StockViewByPartExport($groupedByPart),
+            'stock_by_part_' . now()->format('Ymd_His') . '.xlsx'
+        );
+    }
+
+    /**
+     * Export stock view by pallet to Excel
+     */
+    public function exportByPallet(Request $request)
+    {
+        $search = $request->query('search');
+        $stocks = $this->buildStockItems($search);
+        
+        // Group by pallet and sum quantities
+        $groupedByPallet = $stocks->groupBy('pallet_number')->map(function ($items) {
+            return [
+                'pallet_number' => $items->first()['pallet_number'],
+                'location' => $items->first()['location'],
+                'box_quantity' => $items->sum('box_quantity'),
+                'pcs_quantity' => $items->sum('pcs_quantity'),
+            ];
+        })->values();
+
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\StockViewByPalletExport($groupedByPallet),
+            'stock_by_pallet_' . now()->format('Ymd_His') . '.xlsx'
+        );
+    }
 }

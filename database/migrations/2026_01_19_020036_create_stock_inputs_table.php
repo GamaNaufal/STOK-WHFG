@@ -19,6 +19,7 @@ return new class extends Migration
             $table->string('warehouse_location');
             $table->integer('pcs_quantity');
             $table->decimal('box_quantity', 8, 2);
+            $table->json('part_numbers')->nullable()->comment('JSON array of all part numbers in this input');
             $table->dateTime('stored_at');
             $table->timestamps();
             $table->softDeletes();

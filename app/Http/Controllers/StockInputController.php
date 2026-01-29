@@ -466,13 +466,25 @@ class StockInputController extends Controller
                 $totalPcs += (int) ($box['pcs_quantity'] ?? $box['qty_box'] ?? 0);
             }
 
+            // Get first pallet item for part_number
+            $palletItem = $pallet->items()->first();
+            
+            // Collect all unique part numbers from pallet items
+            $partNumbers = $pallet->items()
+                ->pluck('part_number')
+                ->unique()
+                ->values()
+                ->toArray();
+            
             $stockInput = StockInput::create([
                 'pallet_id' => $pallet->id,
+                'pallet_item_id' => $palletItem?->id,
                 'user_id' => auth()->id(),
                 'warehouse_location' => $locationCode ?? 'Unknown',
                 'pcs_quantity' => $totalPcs,
                 'box_quantity' => count($scannedBoxes),
                 'stored_at' => now(),
+                'part_numbers' => $partNumbers,
             ]);
 
             // Log audit trail
