@@ -1,83 +1,455 @@
 @extends('shared.layouts.app')
 
+@section('styles')
+    <style>
+        .approvals-page {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e8eef5 100%);
+            min-height: 100vh;
+        }
+
+        .page-header {
+            margin-bottom: 2.5rem;
+            padding-top: 1rem;
+        }
+
+        .page-header h1 {
+            color: #1f2937;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .page-header p {
+            color: #6b7280;
+            font-size: 0.95rem;
+        }
+
+        /* Approval Card Styling */
+        .approval-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            border: none;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .approval-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        }
+
+        .approval-card .card-header {
+            background: linear-gradient(135deg, #0C7779 0%, #005461 100%);
+            color: white;
+            padding: 1.25rem;
+            border: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .approval-card .card-header .customer-name {
+            font-weight: 600;
+            font-size: 1.05rem;
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .approval-card .card-header .badge {
+            background: #fbbf24 !important;
+            color: #92400e !important;
+            padding: 0.5rem 0.875rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-left: 1rem;
+            flex-shrink: 0;
+        }
+
+        .approval-card .card-body {
+            padding: 1.5rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .order-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid #e5e9f0;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-label {
+            color: #9ca3af;
+            font-size: 0.85rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        }
+
+        .info-value {
+            color: #1f2937;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .notes-box {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 0.875rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .notes-box small {
+            color: #92400e;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        /* Items & Stock Table */
+        .items-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .items-section h6 {
+            color: #0C7779;
+            font-weight: 600;
+            font-size: 0.9rem;
+            margin-bottom: 0.875rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .items-table {
+            font-size: 0.85rem;
+            border-collapse: collapse;
+        }
+
+        .items-table thead {
+            background: #f0f8f7;
+            border-bottom: 2px solid #b3e5db;
+        }
+
+        .items-table thead th {
+            color: #0C7779;
+            font-weight: 600;
+            padding: 0.75rem 0.5rem;
+            text-align: center;
+            border: none;
+        }
+
+        .items-table tbody td {
+            padding: 0.75rem 0.5rem;
+            text-align: center;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .items-table tbody td:first-child {
+            text-align: left;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .items-table .status-ok {
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .items-table .status-warning {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .items-table .badge-ok {
+            background: #dcfce7;
+            color: #166534;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .items-table .badge-warning {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: auto;
+        }
+
+        .btn-approve {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-approve:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+            color: white;
+        }
+
+        .btn-correction {
+            background: #fbbf24;
+            color: #92400e;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex: 1;
+        }
+
+        .btn-correction:hover {
+            background: #f59e0b;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .btn-reject {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            padding: 0.75rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex: 1;
+        }
+
+        .btn-reject:hover {
+            background: #dc2626;
+            color: white;
+            border-color: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .btn-group-horizontal {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        /* Empty State */
+        .empty-state {
+            background: white;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            text-align: center;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: #10b981;
+            margin-bottom: 1rem;
+        }
+
+        .empty-state h3 {
+            color: #1f2937;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .empty-state p {
+            color: #9ca3af;
+        }
+
+        /* History Section */
+        .history-section {
+            margin-top: 3rem;
+        }
+
+        .history-header {
+            color: #1f2937;
+            font-weight: 700;
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .history-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            border: none;
+            overflow: hidden;
+        }
+
+        .history-table {
+            margin-bottom: 0;
+        }
+
+        .history-table thead {
+            background: #f0f8f7;
+            border-bottom: 2px solid #b3e5db;
+        }
+
+        .history-table thead th {
+            color: #0C7779;
+            font-weight: 600;
+            padding: 1rem 0.75rem;
+            border: none;
+        }
+
+        .history-table tbody tr {
+            border-bottom: 1px solid #e9ecef;
+            transition: background 0.2s ease;
+        }
+
+        .history-table tbody tr:hover {
+            background: #f8fffe;
+        }
+
+        .history-table tbody td {
+            padding: 1rem 0.75rem;
+            vertical-align: middle;
+        }
+
+        .empty-history {
+            padding: 2rem;
+            text-align: center;
+            color: #9ca3af;
+        }
+
+        /* Modal Styling */
+        .modal-content {
+            border-radius: 12px;
+            border: none;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        .modal-header {
+            border-bottom: 1px solid #e9ecef;
+            padding: 1.5rem;
+        }
+
+        .modal-title {
+            font-weight: 700;
+            font-size: 1.25rem;
+        }
+
+        .modal-body {
+            padding: 1.5rem;
+        }
+
+        .modal-footer {
+            border-top: 1px solid #e9ecef;
+            padding: 1.5rem;
+        }
+    </style>
+@endsection
+
 @section('content')
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="h3 text-gray-800">
-            <i class="bi bi-clipboard-check"></i> Pending Approvals
-        </h1>
-    </div>
+<div class="page-header">
+    <h1>
+        <i class="bi bi-clipboard-check" style="color: #0C7779;"></i> Pending Approvals
+    </h1>
+    <p class="mb-0">Review dan setujui pesanan delivery yang menunggu persetujuan</p>
 </div>
 
-<div class="container-fluid py-2">
+<div class="container-fluid">
     @if($pendingOrders->isEmpty())
-        <div class="text-center py-5 bg-white shadow rounded">
-            <i class="bi bi-check-circle display-1 text-success"></i>
-            <p class="mt-3 lead">All Caught Up!</p>
-            <p class="text-muted">No pending orders to review.</p>
+        <div class="empty-state">
+            <i class="bi bi-check-circle"></i>
+            <h3>Tidak Ada Pesanan Menunggu</h3>
+            <p>Semua pesanan telah diproses. Kerja bagus!</p>
         </div>
     @else
-        <div class="row">
+        <div class="row g-4">
             @foreach($pendingOrders as $order)
-            <div class="col-md-6 col-lg-4 mb-4">
-                <div class="card shadow-sm border-warning h-100">
-                    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-                        <strong class="text-truncate" style="max-width: 70%;">{{ $order->customer_name }}</strong>
-                        <span class="badge bg-warning text-dark">Pending</span>
+            <div class="col-md-6 col-xl-4">
+                <div class="approval-card">
+                    <div class="card-header">
+                        <span class="customer-name">{{ $order->customer_name }}</span>
+                        <span class="badge">
+                            <i class="bi bi-hourglass-split"></i> Pending
+                        </span>
                     </div>
                     <div class="card-body">
-                        <div class="mb-3">
-                            <div class="d-flex justify-content-between">
-                                <span class="text-muted small">Sales:</span>
-                                <span class="fw-bold small">{{ $order->salesUser->name ?? 'Unknown' }}</span>
+                        <!-- Order Info -->
+                        <div class="order-info">
+                            <div class="info-item">
+                                <span class="info-label">Sales</span>
+                                <span class="info-value">{{ $order->salesUser->name ?? 'Unknown' }}</span>
                             </div>
-                            <div class="d-flex justify-content-between">
-                                <span class="text-muted small">Delivery Date:</span>
-                                <span class="fw-bold small">{{ $order->delivery_date->format('d M Y') }}</span>
+                            <div class="info-item">
+                                <span class="info-label">Delivery Date</span>
+                                <span class="info-value">{{ $order->delivery_date->format('d M Y') }}</span>
                             </div>
                         </div>
-    
+
+                        <!-- Notes -->
                         @if($order->notes)
-                        <div class="alert alert-secondary py-2 px-2 mb-3">
-                            <i class="bi bi-chat-quote me-1"></i> <small class="fst-italic">{{ $order->notes }}</small>
+                        <div class="notes-box">
+                            <i class="bi bi-chat-quote"></i>
+                            <small>{{ $order->notes }}</small>
                         </div>
                         @endif
 
-                        <!-- ITEMS & STOCK INFO -->
+                        <!-- Items & Stock Table -->
                         @if($order->items->count() > 0)
-                        <div class="mb-3">
-                            <label class="form-label fw-bold small mb-2">
-                                <i class="bi bi-box-seam"></i> Items & Stock Availability
-                            </label>
-                            <div class="table-responsive" style="font-size: 0.85rem;">
-                                <table class="table table-sm table-bordered mb-0">
-                                    <thead class="table-light">
+                        <div class="items-section">
+                            <h6>
+                                <i class="bi bi-box-seam"></i> Items & Stock
+                            </h6>
+                            <div style="overflow-x: auto;">
+                                <table class="items-table" style="width: 100%;">
+                                    <thead>
                                         <tr>
-                                            <th class="text-center">Part</th>
-                                            <th class="text-center">Required</th>
-                                            <th class="text-center">Can Fulfill</th>
-                                            <th class="text-center">Available</th>
-                                            <th class="text-center">Status</th>
+                                            <th style="text-align: left;">Part</th>
+                                            <th>Required</th>
+                                            <th>Available</th>
+                                            <th>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($order->items as $item)
                                         <tr>
-                                            <td class="fw-bold">{{ $item->part_number }}</td>
-                                            <td class="text-center">{{ $item->quantity }}</td>
-                                            <td class="text-center fw-bold">
-                                                <span class="@if($item->stock_warning) text-danger @else text-success @endif">
-                                                    {{ $item->display_fulfilled ?? 0 }}
-                                                </span>
+                                            <td style="text-align: left;">{{ $item->part_number }}</td>
+                                            <td>{{ $item->quantity }}</td>
+                                            <td class="@if($item->stock_warning) status-warning @else status-ok @endif">
+                                                {{ $item->available_stock ?? 0 }}
                                             </td>
-                                            <td class="text-center">
-                                                {{ $item->available_total ?? 0 }}
-                                            </td>
-                                            <td class="text-center">
+                                            <td>
                                                 @if($item->stock_warning)
-                                                    <span class="badge bg-danger">⚠ Low</span>
+                                                    <span class="badge-warning">⚠ Low</span>
                                                 @else
-                                                    <span class="badge bg-success">✓ OK</span>
+                                                    <span class="badge-ok">✓ OK</span>
                                                 @endif
                                             </td>
                                         </tr>
@@ -87,17 +459,18 @@
                             </div>
                         </div>
                         @endif
-    
-                        <div class="d-grid gap-2 mt-auto">
-                            <button class="btn btn-success" onclick="openStatusModal({{ $order->id }}, 'approved')">
-                                <i class="bi bi-check-lg"></i> Approve
+
+                        <!-- Action Buttons -->
+                        <div class="action-buttons">
+                            <button class="btn-approve" onclick="openStatusModal({{ $order->id }}, 'approved')">
+                                <i class="bi bi-check-circle"></i> Setujui
                             </button>
-                            <div class="btn-group w-100">
-                                <button class="btn btn-outline-warning w-50" onclick="openStatusModal({{ $order->id }}, 'correction')">
-                                    <i class="bi bi-pencil"></i> Correction
+                            <div class="btn-group-horizontal">
+                                <button class="btn-correction" onclick="openStatusModal({{ $order->id }}, 'correction')">
+                                    <i class="bi bi-pencil"></i> Koreksi
                                 </button>
-                                <button class="btn btn-outline-danger w-50" onclick="openStatusModal({{ $order->id }}, 'rejected')">
-                                    <i class="bi bi-x-lg"></i> Reject
+                                <button class="btn-reject" onclick="openStatusModal({{ $order->id }}, 'rejected')">
+                                    <i class="bi bi-x-circle"></i> Tolak
                                 </button>
                             </div>
                         </div>
@@ -108,55 +481,69 @@
         </div>
     @endif
 
-    <div class="mt-5">
-        <h5 class="mb-3"><i class="bi bi-clock-history"></i> Approval History</h5>
-        <div class="card shadow-sm">
-            <div class="card-body">
-                @if($historyOrders->isEmpty())
-                    <div class="text-muted">Belum ada riwayat approval.</div>
-                @else
-                    <div class="table-responsive">
-                        <table class="table table-striped align-middle">
-                            <thead>
+    <!-- History Section -->
+    <div class="history-section">
+        <h4 class="history-header">
+            <i class="bi bi-clock-history"></i> Riwayat Persetujuan
+        </h4>
+        <div class="history-card">
+            @if($historyOrders->isEmpty())
+                <div class="empty-history">
+                    <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
+                    Belum ada riwayat persetujuan
+                </div>
+            @else
+                <div class="table-responsive">
+                    <table class="table history-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 15%;">Tanggal</th>
+                                <th style="width: 20%;">Pelanggan</th>
+                                <th style="width: 15%;">Sales</th>
+                                <th style="width: 15%;">Status</th>
+                                <th style="width: 35%;">Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($historyOrders as $order)
                                 <tr>
-                                    <th>Updated At</th>
-                                    <th>Customer</th>
-                                    <th>Sales</th>
-                                    <th>Status</th>
-                                    <th>Notes</th>
+                                    <td>{{ $order->updated_at->format('d M Y H:i') }}</td>
+                                    <td><strong>{{ $order->customer_name }}</strong></td>
+                                    <td>{{ $order->salesUser->name ?? 'Unknown' }}</td>
+                                    <td>
+                                        @if($order->status == 'approved')
+                                            <span class="badge" style="background: #dcfce7; color: #166534;">
+                                                <i class="bi bi-check2-circle"></i> Disetujui
+                                            </span>
+                                        @elseif($order->status == 'rejected')
+                                            <span class="badge" style="background: #fee2e2; color: #991b1b;">
+                                                <i class="bi bi-x-circle"></i> Ditolak
+                                            </span>
+                                        @elseif($order->status == 'correction')
+                                            <span class="badge" style="background: #fef3c7; color: #92400e;">
+                                                <i class="bi bi-pencil-square"></i> Koreksi
+                                            </span>
+                                        @elseif($order->status == 'completed')
+                                            <span class="badge" style="background: #e0f2fe; color: #0369a1;">
+                                                <i class="bi bi-check-all"></i> Selesai
+                                            </span>
+                                        @elseif($order->status == 'processing')
+                                            <span class="badge" style="background: #dbeafe; color: #1e40af;">
+                                                <i class="bi bi-arrow-repeat"></i> Proses
+                                            </span>
+                                        @else
+                                            <span class="badge" style="background: #f3f4f6; color: #6b7280;">{{ ucfirst($order->status) }}</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ $order->notes ? Str::limit($order->notes, 50) : '-' }}</small>
+                                    </td>
                                 </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($historyOrders as $order)
-                                    <tr>
-                                        <td>{{ $order->updated_at->format('d M Y H:i') }}</td>
-                                        <td>{{ $order->customer_name }}</td>
-                                        <td>{{ $order->salesUser->name ?? 'Unknown' }}</td>
-                                        <td>
-                                            @if($order->status == 'approved')
-                                                <span class="badge bg-primary">Approved</span>
-                                            @elseif($order->status == 'rejected')
-                                                <span class="badge bg-danger">Rejected</span>
-                                            @elseif($order->status == 'correction')
-                                                <span class="badge bg-warning text-dark">Correction</span>
-                                            @elseif($order->status == 'completed')
-                                                <span class="badge bg-success">Completed</span>
-                                            @elseif($order->status == 'processing')
-                                                <span class="badge bg-info">Processing</span>
-                                            @else
-                                                <span class="badge bg-secondary">{{ $order->status }}</span>
-                                            @endif
-                                        </td>
-                                        <td class="small text-muted" style="max-width: 320px;">
-                                            {{ $order->notes ?? '-' }}
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </div>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
     </div>
 </div>
@@ -177,13 +564,13 @@
                     <div id="impactWarning" class="alert alert-warning d-none"></div>
                     
                     <div class="mb-3" id="noteSection">
-                        <label class="form-label">Notes / Reason</label>
-                        <textarea name="notes" class="form-control" rows="3" placeholder="Enter reason for correction/rejection..."></textarea>
+                        <label class="form-label">Catatan / Alasan</label>
+                        <textarea name="notes" class="form-control" rows="3" placeholder="Masukkan alasan atau catatan..."></textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Confirm Action</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary">Konfirmasi</button>
                 </div>
             </div>
         </form>
@@ -200,15 +587,13 @@
         const impactWarning = document.getElementById('impactWarning');
         const title = document.getElementById('statusModalLabel');
 
-        // Set Form Action
         form.action = `/delivery-stock/${orderId}/status`;
         statusInput.value = status;
 
-        // UI Updates based on status
         if (status === 'approved') {
-            title.innerText = 'Approve Delivery';
+            title.innerText = 'Setujui Pesanan Delivery';
             title.className = 'modal-title text-success';
-            confirmationText.innerText = 'Checking schedule impact...';
+            confirmationText.innerText = 'Mengecek dampak jadwal...';
             noteSection.style.display = 'none';
             impactWarning.classList.add('d-none');
             impactWarning.innerHTML = '';
@@ -218,7 +603,7 @@
                 .then((data) => {
                     const impacted = data.impacted || [];
                     if (impacted.length === 0) {
-                        confirmationText.innerText = 'Are you sure you want to approve this delivery schedule?';
+                        confirmationText.innerText = 'Yakin ingin menyetujui pesanan delivery ini?';
                         impactWarning.classList.add('d-none');
                         impactWarning.innerHTML = '';
                         return;
@@ -231,27 +616,27 @@
                         return `<li>#${item.id} - ${item.customer_name} (${item.delivery_date ?? '-'})<br><small>Parts: ${parts}</small></li>`;
                     }).join('');
 
-                    confirmationText.innerText = 'Approval ini akan menggeser jadwal dan membuat order berikut tidak terpenuhi:';
+                    confirmationText.innerText = 'Persetujuan ini akan menggeser jadwal dan membuat pesanan berikut tidak terpenuhi:';
                     impactWarning.innerHTML = `<ul class="mb-0">${itemsHtml}</ul>`;
                     impactWarning.classList.remove('d-none');
                 })
                 .catch(() => {
-                    confirmationText.innerText = 'Are you sure you want to approve this delivery schedule?';
+                    confirmationText.innerText = 'Yakin ingin menyetujui pesanan delivery ini?';
                     impactWarning.classList.add('d-none');
                     impactWarning.innerHTML = '';
                 });
         } else if (status === 'correction') {
-            title.innerText = 'Request Correction';
+            title.innerText = 'Minta Koreksi';
             title.className = 'modal-title text-warning';
-            confirmationText.innerText = 'Please specify what needs to be corrected:';
+            confirmationText.innerText = 'Sebutkan apa yang perlu dikoreksi:';
             noteSection.style.display = 'block';
             noteSection.querySelector('textarea').required = true;
             impactWarning.classList.add('d-none');
             impactWarning.innerHTML = '';
         } else if (status === 'rejected') {
-            title.innerText = 'Reject Order';
+            title.innerText = 'Tolak Pesanan';
             title.className = 'modal-title text-danger';
-            confirmationText.innerText = 'Are you sure you want to reject this order? Please provide a reason.';
+            confirmationText.innerText = 'Yakin ingin menolak pesanan ini? Berikan alasan penolakan.';
             noteSection.style.display = 'block';
             noteSection.querySelector('textarea').required = true;
             impactWarning.classList.add('d-none');

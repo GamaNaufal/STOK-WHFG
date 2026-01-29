@@ -173,10 +173,6 @@ class DeliveryPickController extends Controller
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
-        $request->validate([
-            'notes' => 'required|string|max:500',
-        ]);
-
         $issue = DeliveryIssue::with('session')->findOrFail($issueId);
         $issue->status = 'approved';
         $issue->resolved_by = $user->id;
@@ -405,19 +401,9 @@ class DeliveryPickController extends Controller
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
-        $issues = DeliveryIssue::with(['session.order'])
-            ->where('status', 'pending')
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        $historyIssues = DeliveryIssue::with(['session.order', 'resolver'])
-            ->where('status', 'approved')
-            ->orderBy('resolved_at', 'desc')
-            ->get();
-
-        return view('delivery.scan-issues', compact('issues', 'historyIssues'));
+        $issues = DeliveryIssue::with(['session.order'])->where('status', 'pending')->orderBy('created_at', 'desc')->get();
+        return view('delivery.scan-issues', compact('issues'));
     }
-
 
     private function getBoxesByFIFO(string $partNumber, int $requestedPcs)
     {

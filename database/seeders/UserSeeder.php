@@ -14,6 +14,10 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        // Test credentials have been disabled for production
+        // If needed, uncomment below to create test users
+        
+        /*
         // Admin User
         User::firstOrCreate(
             ['email' => 'admin@yamato.local'],
@@ -73,5 +77,6 @@ class UserSeeder extends Seeder
                 'role' => 'supervisi',
             ]
         );
+        */
     }
 }
