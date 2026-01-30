@@ -20,7 +20,7 @@
                 </div>
                 <div class="mb-3">
                     <label class="form-label">Qty Box (Tetap)</label>
-                    <input type="number" name="qty_box" class="form-control" value="{{ old('qty_box', $partSetting->qty_box) }}" min="1" required>
+                    <input type="number" name="qty_box" class="form-control" value="{{ old('qty_box', $partSetting->qty_box) }}" min="1" max="4294967295" required>
                     @error('qty_box')
                         <div class="text-danger small">{{ $message }}</div>
                     @enderror

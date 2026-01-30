@@ -10,7 +10,7 @@ class StockViewController extends Controller
 {
     private function buildStockItems(?string $search = null)
     {
-        $palletQuery = Pallet::with(['stockLocation', 'items'])
+        $palletQuery = Pallet::with(['stockLocation', 'items', 'boxes'])
             ->whereHas('stockLocation', function ($q) {
                 $q->where('warehouse_location', '!=', 'Unknown');
             });
@@ -21,28 +21,52 @@ class StockViewController extends Controller
             foreach ($pallets as $pallet) {
                 $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
 
-                // Use pallet items (legacy system, no more boxes relationship)
-                $legacyItems = $pallet->items->filter(function ($item) {
-                    return $item->pcs_quantity > 0 || $item->box_quantity > 0;
-                });
+                // Prefer active boxes as source of truth
+                $activeBoxes = $pallet->boxes->where('is_withdrawn', false);
 
-                if ($search) {
-                    $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
-                        return stripos($item->part_number, $search) !== false
-                            || stripos($pallet->pallet_number, $search) !== false;
+                if ($activeBoxes->isNotEmpty()) {
+                    if ($search) {
+                        $activeBoxes = $activeBoxes->filter(function ($box) use ($search, $pallet) {
+                            return stripos($box->part_number, $search) !== false
+                                || stripos($pallet->pallet_number, $search) !== false;
+                        });
+                    }
+
+                    foreach ($activeBoxes as $box) {
+                        $items->push([
+                            'pallet_id' => $pallet->id,
+                            'pallet_number' => $pallet->pallet_number,
+                            'location' => $location,
+                            'part_number' => $box->part_number,
+                            'box_quantity' => 1,
+                            'pcs_quantity' => (int) $box->pcs_quantity,
+                            'created_at' => $box->created_at,
+                        ]);
+                    }
+                } else {
+                    // Fallback to pallet items (legacy / no box data)
+                    $legacyItems = $pallet->items->filter(function ($item) {
+                        return $item->pcs_quantity > 0 || $item->box_quantity > 0;
                     });
-                }
 
-                foreach ($legacyItems as $item) {
-                    $items->push([
-                        'pallet_id' => $pallet->id,
-                        'pallet_number' => $pallet->pallet_number,
-                        'location' => $location,
-                        'part_number' => $item->part_number,
-                        'box_quantity' => (int) $item->box_quantity,
-                        'pcs_quantity' => (int) $item->pcs_quantity,
-                        'created_at' => $item->created_at,
-                    ]);
+                    if ($search) {
+                        $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
+                            return stripos($item->part_number, $search) !== false
+                                || stripos($pallet->pallet_number, $search) !== false;
+                        });
+                    }
+
+                    foreach ($legacyItems as $item) {
+                        $items->push([
+                            'pallet_id' => $pallet->id,
+                            'pallet_number' => $pallet->pallet_number,
+                            'location' => $location,
+                            'part_number' => $item->part_number,
+                            'box_quantity' => (int) $item->box_quantity,
+                            'pcs_quantity' => (int) $item->pcs_quantity,
+                            'created_at' => $item->created_at,
+                        ]);
+                    }
                 }
             }
         });

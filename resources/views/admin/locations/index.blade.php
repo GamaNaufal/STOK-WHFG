@@ -71,13 +71,13 @@
                                     <a href="{{ route('locations.edit', $location->id) }}" class="btn btn-sm btn-outline-primary border-0">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <form action="{{ route('locations.destroy', $location->id) }}" method="POST" onsubmit="return confirm('Hapus lokasi {{ $location->code }}?');" class="d-inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger border-0">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
+                                    <button type="button"
+                                        class="btn btn-sm btn-outline-danger border-0 js-delete-location"
+                                        data-delete-url="{{ route('locations.destroy', $location->id) }}"
+                                        data-location-code="{{ $location->code }}"
+                                        data-location-status="{{ $isOccupied ? 'terisi' : 'kosong' }}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -95,4 +95,45 @@
         </div>
     </div>
 </div>
+
+@endsection
+
+@section('scripts')
+<script>
+    (function () {
+        const buttons = document.querySelectorAll('.js-delete-location');
+        buttons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const deleteUrl = btn.getAttribute('data-delete-url') || '#';
+                const code = btn.getAttribute('data-location-code') || '-';
+                const status = btn.getAttribute('data-location-status') || 'kosong';
+
+                Swal.fire({
+                    title: 'Hapus Lokasi ' + code,
+                    text: status === 'terisi'
+                        ? 'Lokasi ini masih terisi pallet. Menghapus akan melepaskan data lokasi terkait.'
+                        : 'Lokasi ini kosong dan akan dihapus.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Hapus',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#dc2626',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (!result.isConfirmed) return;
+
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = deleteUrl;
+                    form.innerHTML = `
+                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="_method" value="DELETE">
+                    `;
+                    document.body.appendChild(form);
+                    form.submit();
+                });
+            });
+        });
+    })();
+</script>
 @endsection

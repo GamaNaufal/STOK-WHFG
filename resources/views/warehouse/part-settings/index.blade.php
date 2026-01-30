@@ -41,11 +41,12 @@
                                     <a href="{{ route('part-settings.edit', $part) }}" class="btn btn-sm btn-outline-primary">
                                         Edit
                                     </a>
-                                    <form action="{{ route('part-settings.destroy', $part) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus data ini?');">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
-                                    </form>
+                                    <button type="button"
+                                        class="btn btn-sm btn-outline-danger js-delete-btn"
+                                        data-delete-url="{{ route('part-settings.destroy', $part) }}"
+                                        data-part-number="{{ $part->part_number }}">
+                                        Hapus
+                                    </button>
                                 </td>
                             </tr>
                         @empty
@@ -62,6 +63,30 @@
         </div>
     </div>
 </div>
+
+<div class="modal fade" id="deletePartModal" tabindex="-1" aria-labelledby="deletePartModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deletePartModalLabel">Hapus No Part</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2">Anda yakin ingin menghapus No Part berikut?</p>
+                <div class="fw-semibold" id="deletePartNumber">-</div>
+                <div class="text-muted small mt-2">Tindakan ini tidak dapat dibatalkan.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                <form id="deletePartForm" method="POST" class="d-inline">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn btn-danger">Hapus</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
@@ -72,7 +97,10 @@
         const pagination = document.getElementById('part-pagination');
         const baseUrl = "{{ url('part-settings') }}";
         const searchUrl = "{{ route('part-settings.search') }}";
-        const csrfToken = "{{ csrf_token() }}";
+        const deleteModalEl = document.getElementById('deletePartModal');
+        const deleteModal = deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
+        const deleteForm = document.getElementById('deletePartForm');
+        const deletePartNumber = document.getElementById('deletePartNumber');
 
         let searchTimer = null;
 
@@ -103,15 +131,30 @@
                         <td>${qtyBox}</td>
                         <td class="text-end">
                             <a href="${editUrl}" class="btn btn-sm btn-outline-primary">Edit</a>
-                            <form action="${deleteUrl}" method="POST" class="d-inline" onsubmit="return confirm('Hapus data ini?');">
-                                <input type="hidden" name="_token" value="${csrfToken}">
-                                <input type="hidden" name="_method" value="DELETE">
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
-                            </form>
+                            <button type="button"
+                                class="btn btn-sm btn-outline-danger js-delete-btn"
+                                data-delete-url="${deleteUrl}"
+                                data-part-number="${partNumber}">
+                                Hapus
+                            </button>
                         </td>
                     </tr>
                 `;
             }).join('');
+        };
+
+        const bindDeleteButtons = () => {
+            const buttons = document.querySelectorAll('.js-delete-btn');
+            buttons.forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    if (!deleteModal || !deleteForm || !deletePartNumber) return;
+                    const deleteUrl = btn.getAttribute('data-delete-url') || '#';
+                    const partNumber = btn.getAttribute('data-part-number') || '-';
+                    deleteForm.setAttribute('action', deleteUrl);
+                    deletePartNumber.textContent = partNumber;
+                    deleteModal.show();
+                });
+            });
         };
 
         const runSearch = (term) => {
@@ -126,6 +169,7 @@
                 .then((data) => {
                     pagination.classList.add('d-none');
                     renderRows(data.data || []);
+                    bindDeleteButtons();
                 })
                 .catch(() => {
                     tableBody.innerHTML = '<tr><td colspan="3" class="text-center text-muted">Gagal memuat data.</td></tr>';
@@ -136,6 +180,8 @@
             clearTimeout(searchTimer);
             searchTimer = setTimeout(() => runSearch(event.target.value), 300);
         });
+
+        bindDeleteButtons();
     })();
 </script>
 @endsection

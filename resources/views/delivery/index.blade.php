@@ -449,13 +449,12 @@
                                     </button>
                                 @endif
                                 @if(Auth::user()->role === 'admin')
-                                    <form method="POST" action="{{ route('delivery.destroy', $order->id) }}" onsubmit="return confirm('Hapus jadwal ini?');" class="d-inline">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button class="btn-delete" type="submit">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </form>
+                                    <button type="button"
+                                        class="btn-delete js-delete-delivery"
+                                        data-delete-url="{{ route('delivery.destroy', $order->id) }}"
+                                        data-order-id="{{ $order->id }}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 @endif
                             </div>
                         </td>
@@ -766,6 +765,36 @@
             }
         })
         .catch(() => showToast('Gagal proses.', 'danger'));
+    });
+
+    document.querySelectorAll('.js-delete-delivery').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const deleteUrl = btn.getAttribute('data-delete-url') || '#';
+            const orderId = btn.getAttribute('data-order-id') || '-';
+
+            Swal.fire({
+                title: 'Hapus Jadwal #' + orderId + '?',
+                text: 'Tindakan ini tidak dapat dibatalkan.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Hapus',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#dc2626',
+                reverseButtons: true
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = deleteUrl;
+                form.innerHTML = `
+                    <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                    <input type="hidden" name="_method" value="DELETE">
+                `;
+                document.body.appendChild(form);
+                form.submit();
+            });
+        });
     });
 </script>
 @endsection

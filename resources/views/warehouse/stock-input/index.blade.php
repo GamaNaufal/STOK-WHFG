@@ -210,6 +210,7 @@
                                     </div>
                                 </div>
                             </div>
+
                         </div>
 
                         <div class="mb-3">
@@ -695,44 +696,70 @@
     let lastScannedCode = null;
     let lastScanTime = 0;
 
+    const showConfirm = ({ title, message, confirmText, onConfirm }) => {
+        Swal.fire({
+            title: title,
+            text: message,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: confirmText,
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#0C7779',
+            reverseButtons: true
+        }).then((result) => {
+            if (!result.isConfirmed) return;
+            onConfirm();
+        });
+    };
+
     // Clear Pallet Button
     document.getElementById('clear-pallet-btn').addEventListener('click', function() {
-        if (confirm('Yakin ingin mulai palet baru? Palet saat ini belum disimpan.')) {
-            fetch('{{ route("stock-input.clear-session") }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                // Reset scan tracking untuk palet baru
-                lastScannedCode = null;
-                lastScanTime = 0;
-                // Reset barcode input focus
-                barcodeInput.value = '';
-                barcodeInput.focus();
-                location.reload();
-            });
-        }
+        showConfirm({
+            title: 'Mulai Palet Baru',
+            message: 'Palet saat ini belum disimpan. Jika lanjut, data palet saat ini akan dihapus.',
+            confirmText: 'Mulai Baru',
+            onConfirm: () => {
+                fetch('{{ route("stock-input.clear-session") }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(() => {
+                    // Reset scan tracking untuk palet baru
+                    lastScannedCode = null;
+                    lastScanTime = 0;
+                    // Reset barcode input focus
+                    barcodeInput.value = '';
+                    barcodeInput.focus();
+                    location.reload();
+                });
+            }
+        });
     });
 
     // Cancel Button
     document.getElementById('cancel-btn').addEventListener('click', function() {
-        if (confirm('Batal? Data palet akan hilang.')) {
-            // Reset scan tracking
-            lastScannedCode = null;
-            lastScanTime = 0;
+        showConfirm({
+            title: 'Batalkan Input',
+            message: 'Data palet saat ini akan hilang jika dibatalkan.',
+            confirmText: 'Batalkan',
+            onConfirm: () => {
+                // Reset scan tracking
+                lastScannedCode = null;
+                lastScanTime = 0;
 
-            // CLEAR SESSION
-            fetch('{{ route("stock-input.clear-session") }}', {
-                method: 'POST',
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                }
-            })
-            .then(() => location.reload());
-        }
+                // CLEAR SESSION
+                fetch('{{ route("stock-input.clear-session") }}', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                })
+                .then(() => location.reload());
+            }
+        });
     });
 
     // Save Button

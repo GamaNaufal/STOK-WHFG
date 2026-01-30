@@ -45,11 +45,12 @@
                         <td>{{ $user->created_at->format('d M Y') }}</td>
                         <td>
                             <a href="{{ route('users.edit', $user) }}" class="btn btn-sm btn-outline-primary">Edit</a>
-                            <form action="{{ route('users.destroy', $user) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus user ini?');">
-                                @csrf
-                                @method('DELETE')
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Hapus</button>
-                            </form>
+                            <button type="button"
+                                class="btn btn-sm btn-outline-danger js-delete-user"
+                                data-delete-url="{{ route('users.destroy', $user) }}"
+                                data-user-name="{{ $user->name }}">
+                                Hapus
+                            </button>
                         </td>
                     </tr>
                     @endforeach
@@ -58,4 +59,41 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    (function () {
+        const buttons = document.querySelectorAll('.js-delete-user');
+        buttons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const deleteUrl = btn.getAttribute('data-delete-url') || '#';
+                const userName = btn.getAttribute('data-user-name') || 'user';
+
+                Swal.fire({
+                    title: 'Hapus User ' + userName + '?',
+                    text: 'Tindakan ini tidak dapat dibatalkan.',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Hapus',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#dc2626',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (!result.isConfirmed) return;
+
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.action = deleteUrl;
+                    form.innerHTML = `
+                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                        <input type="hidden" name="_method" value="DELETE">
+                    `;
+                    document.body.appendChild(form);
+                    form.submit();
+                });
+            });
+        });
+    })();
+</script>
 @endsection

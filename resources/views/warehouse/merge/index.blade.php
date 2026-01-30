@@ -485,34 +485,45 @@
             return;
         }
 
-        if(!confirm(`Yakin ingin menggabungkan ${selectedPallets.length} pallet ini menjadi SATU pallet baru di lokasi ${locationVal}? Pallet lama akan dihapus.`)) return;
+        Swal.fire({
+            title: 'Konfirmasi Merge Pallet',
+            text: `Yakin ingin menggabungkan ${selectedPallets.length} pallet ini menjadi SATU pallet baru di lokasi ${locationVal}? Pallet lama akan dihapus.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Merge',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#0C7779',
+            reverseButtons: true
+        }).then((result) => {
+            if (!result.isConfirmed) return;
 
-        const ids = selectedPallets.map(p => p.id);
-        const locId = selectedLocationId.value;
-        const locCode = locationVal;
+            const ids = selectedPallets.map(p => p.id);
+            const locId = selectedLocationId.value;
+            const locCode = locationVal;
 
-        fetch('{{ route("merge-pallet.store") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify({
-                pallet_ids: ids,
-                location_id: locId,
-                warehouse_location: locCode
+            fetch('{{ route("merge-pallet.store") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    pallet_ids: ids,
+                    location_id: locId,
+                    warehouse_location: locCode
+                })
             })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.success) {
-                showToast(data.message, 'success');
-                window.location.reload();
-            } else {
-                showToast(data.message, 'danger');
-            }
-        })
-        .catch(err => showToast('Error: ' + err, 'danger'));
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    showToast(data.message, 'success');
+                    window.location.reload();
+                } else {
+                    showToast(data.message, 'danger');
+                }
+            })
+            .catch(err => showToast('Error: ' + err, 'danger'));
+        });
     }
 </script>
 @endsection

@@ -546,10 +546,20 @@
     }
 
     document.getElementById('clearCartBtn').addEventListener('click', function() {
-        if (confirm('Hapus semua item dari keranjang?')) {
+        Swal.fire({
+            title: 'Kosongkan Keranjang?',
+            text: 'Semua item di keranjang akan dihapus.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Hapus',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#dc2626',
+            reverseButtons: true
+        }).then((result) => {
+            if (!result.isConfirmed) return;
             cart = {};
             updateCartDisplay();
-        }
+        });
     });
 
     document.getElementById('submitBtn').addEventListener('click', function() {

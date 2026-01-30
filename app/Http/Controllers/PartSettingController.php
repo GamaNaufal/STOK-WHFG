@@ -39,7 +39,7 @@ class PartSettingController extends Controller
     {
         $validated = $request->validate([
             'part_number' => 'required|string|max:100|unique:part_settings,part_number',
-            'qty_box' => 'required|integer|min:1',
+            'qty_box' => 'required|integer|min:1|max:4294967295',
         ]);
 
         PartSetting::create($validated);
@@ -56,7 +56,7 @@ class PartSettingController extends Controller
     {
         $validated = $request->validate([
             'part_number' => 'required|string|max:100|unique:part_settings,part_number,' . $partSetting->id,
-            'qty_box' => 'required|integer|min:1',
+            'qty_box' => 'required|integer|min:1|max:4294967295',
         ]);
 
         $partSetting->update($validated);

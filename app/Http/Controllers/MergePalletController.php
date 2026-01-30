@@ -81,9 +81,10 @@ class MergePalletController extends Controller
                 }
             }
 
-            // Calculate stats
-            $totalBox = $pallet->boxes->count();
-            $totalPcs = $pallet->boxes->sum('pcs_quantity');
+            // Calculate stats (only active boxes)
+            $activeBoxes = $pallet->boxes->where('is_withdrawn', false);
+            $totalBox = $activeBoxes->count();
+            $totalPcs = $activeBoxes->sum('pcs_quantity');
             $location = $pallet->stockLocation->warehouse_location ?? 'Not Stored';
 
             return response()->json([
@@ -94,7 +95,7 @@ class MergePalletController extends Controller
                     'total_box' => $totalBox,
                     'total_pcs' => $totalPcs,
                     'location' => $location,
-                    'items' => $pallet->boxes->map(function($box) {
+                    'items' => $activeBoxes->map(function($box) {
                         return [
                             'box_number' => $box->box_number,
                             'part_number' => $box->part_number,
@@ -155,11 +156,20 @@ class MergePalletController extends Controller
                 
                 $sourcePallets[] = $sourcePallet;
                 $palletNumbers[] = $sourcePallet->pallet_number; // Store pallet_number
-                $allBoxes = array_merge($allBoxes, $sourcePallet->boxes->toArray());
+                $activeBoxes = $sourcePallet->boxes->where('is_withdrawn', false);
+                $allBoxes = array_merge($allBoxes, $activeBoxes->values()->toArray());
 
-                foreach ($sourcePallet->boxes as $box) {
+                foreach ($activeBoxes as $box) {
                     $boxOrigins[$box->id] = $sourcePallet->pallet_number;
                 }
+            }
+
+            if (empty($allBoxes)) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Tidak ada box aktif untuk dimerge (semua sudah withdrawn)'
+                ], 422);
             }
 
             // 3. Attach all boxes to new pallet and group items by part_number
