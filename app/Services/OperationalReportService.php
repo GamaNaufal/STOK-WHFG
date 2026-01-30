@@ -66,7 +66,8 @@ class OperationalReportService
             ->limit(200)
             ->get();
 
-        $matchingOrders = DeliveryOrder::with('items')
+        $matchingOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
+            ->select(['id', 'customer_name', 'delivery_date', 'status'])
             ->whereIn('status', ['approved', 'processing', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('delivery_date', '<=', $end->toDateString()))
@@ -90,7 +91,8 @@ class OperationalReportService
             ];
         });
 
-        $pickSessions = DeliveryPickSession::with('items')
+        $pickSessions = DeliveryPickSession::with(['items:id,pick_session_id,scanned_at'])
+            ->select(['id', 'delivery_order_id', 'started_at', 'completed_at'])
             ->when($start, fn ($q) => $q->where('started_at', '>=', $start))
             ->when($end, fn ($q) => $q->where('started_at', '<=', $end))
             ->orderBy('started_at', 'desc')
@@ -171,7 +173,7 @@ class OperationalReportService
             ];
         });
 
-        $issuesBaseQuery = DeliveryIssue::with(['session'])
+        $issuesBaseQuery = DeliveryIssue::with(['session:id,delivery_order_id'])
             ->when($start, fn ($q) => $q->where('created_at', '>=', $start))
             ->when($end, fn ($q) => $q->where('created_at', '<=', $end));
 
@@ -195,7 +197,8 @@ class OperationalReportService
                 ];
             });
 
-        $fulfillmentOrders = DeliveryOrder::with('items')
+        $fulfillmentOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
+            ->select(['id', 'customer_name', 'delivery_date', 'status'])
             ->whereIn('status', ['approved', 'processing', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('delivery_date', '<=', $end->toDateString()))

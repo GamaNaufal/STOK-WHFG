@@ -17,6 +17,16 @@ return new class extends Migration
             $table->boolean('is_occupied')->default(false); // Status terisi/kosong
             $table->foreignId('current_pallet_id')->nullable()->constrained('pallets')->nullOnDelete(); // Palet mana yang sedang menempati (opsional untuk double check)
             $table->timestamps();
+
+            $table->index('is_occupied');
+            $table->unique('current_pallet_id', 'master_locations_current_pallet_id_unique');
+        });
+
+        Schema::table('stock_locations', function (Blueprint $table) {
+            $table->foreign('master_location_id')
+                ->references('id')
+                ->on('master_locations')
+                ->nullOnDelete();
         });
     }
 
@@ -25,6 +35,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('stock_locations', function (Blueprint $table) {
+            $table->dropForeign(['master_location_id']);
+        });
+
         Schema::dropIfExists('master_locations');
     }
 };

@@ -12,7 +12,7 @@ use App\Http\Controllers\ReportController;
 
 // Auth Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Protected Routes
@@ -104,6 +104,8 @@ Route::middleware('auth')->group(function () {
     // Stock View Routes (Warehouse Operator, PPC, Admin Warehouse, Supervisi, Admin)
     Route::middleware('role:warehouse_operator,ppc,admin_warehouse,supervisi,admin')->group(function () {
         Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
+        Route::get('/stock-view/export-part', [StockViewController::class, 'exportByPart'])->name('stock-view.export-part');
+        Route::get('/stock-view/export-pallet', [StockViewController::class, 'exportByPallet'])->name('stock-view.export-pallet');
     });
 
     // Reports - Supervisi + Admin IT

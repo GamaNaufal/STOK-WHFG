@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\AuditService;
+use App\Exports\AuditTrailExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 
 class AuditController extends Controller
@@ -76,41 +78,9 @@ class AuditController extends Controller
 
         $auditLogs = $query->with('user')->orderBy('created_at', 'desc')->get();
 
-        // Generate CSV
-        $csvFileName = 'audit-trail-' . now()->format('Y-m-d-H-i-s') . '.csv';
+        // Export ke Excel
+        $fileName = 'audit-trail-' . now()->format('Y-m-d-H-i-s') . '.xlsx';
         
-        $headers = [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => "attachment; filename=\"$csvFileName\"",
-        ];
-
-        $columns = ['ID', 'Tanggal', 'Waktu', 'Tipe', 'Aksi', 'Model', 'Model ID', 'Operator', 'Deskripsi', 'IP Address'];
-
-        $callback = function() use ($auditLogs, $columns) {
-            $file = fopen('php://output', 'w');
-            
-            // Header
-            fputcsv($file, $columns);
-
-            // Data
-            foreach ($auditLogs as $log) {
-                fputcsv($file, [
-                    $log->id,
-                    $log->created_at->format('d/m/Y'),
-                    $log->created_at->format('H:i:s'),
-                    ucfirst(str_replace('_', ' ', $log->type)),
-                    ucfirst($log->action),
-                    $log->model ?? '-',
-                    $log->model_id ?? '-',
-                    $log->user?->name ?? 'System',
-                    $log->description ?? '-',
-                    $log->ip_address ?? '-',
-                ]);
-            }
-
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return Excel::download(new AuditTrailExport($auditLogs), $fileName);
     }
 }

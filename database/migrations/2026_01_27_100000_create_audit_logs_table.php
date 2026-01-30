@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             
             // Tipe audit: 'stock_input', 'stock_withdrawal', 'delivery_pickup', dll
-            $table->enum('type', ['stock_input', 'stock_withdrawal', 'delivery_pickup', 'delivery_redo', 'other']);
+            $table->enum('type', ['stock_input', 'stock_withdrawal', 'delivery_pickup', 'delivery_redo', 'pallet_merged', 'box_pallet_moved', 'other']);
             
             // Model yang diaudit
             $table->string('model')->nullable(); // 'StockInput', 'StockWithdrawal', dll

@@ -23,15 +23,15 @@
                 </p>
             </div>
             <div>
-                <form method="GET" action="{{ route('stock-view.index') }}" class="d-flex gap-2">
+                <form method="GET" class="d-flex gap-2">
                     @if($viewMode === 'part' && $groupedByPart->count() > 0)
-                        <button type="button" onclick="exportToExcel('part')" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600;">
+                        <a href="{{ route('stock-view.export-part', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
                             <i class="bi bi-download"></i> Export Excel
-                        </button>
+                        </a>
                     @elseif($viewMode === 'pallet' && $groupedByPallet->count() > 0)
-                        <button type="button" onclick="exportToExcel('pallet')" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600;">
+                        <a href="{{ route('stock-view.export-pallet', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
                             <i class="bi bi-download"></i> Export Excel
-                        </button>
+                        </a>
                     @endif
                 </form>
             </div>

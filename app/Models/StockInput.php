@@ -17,6 +17,7 @@ class StockInput extends Model
         'pcs_quantity',
         'box_quantity',
         'stored_at',
+        'part_numbers',
     ];
 
     protected $casts = [
@@ -24,6 +25,7 @@ class StockInput extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'part_numbers' => 'array',
     ];
 
     public function pallet()

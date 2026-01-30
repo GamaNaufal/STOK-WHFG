@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Box;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\StockLocation;

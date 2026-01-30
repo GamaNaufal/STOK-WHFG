@@ -10,11 +10,41 @@ use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class StockInputController extends Controller
 {
+    private function resolveActivePallet(): Pallet
+    {
+        $pallet_id = session('current_pallet_id');
+        $pallet = $pallet_id ? Pallet::find($pallet_id) : null;
+
+        if ($pallet) {
+            return $pallet;
+        }
+
+        $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
+            ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
+            ->first();
+
+        $nextNumber = 1;
+        if ($lastPallet) {
+            preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
+            $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
+            $nextNumber = $lastNumber + 1;
+        }
+
+        $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+        $pallet = Pallet::create([
+            'pallet_number' => $palletNumber,
+        ]);
+
+        session(['current_pallet_id' => $pallet->id]);
+
+        return $pallet;
+    }
+
     public function index()
     {
         return view('warehouse.stock-input.index');
@@ -52,38 +82,7 @@ class StockInputController extends Controller
             }
         }
 
-        // Get pallet from session or create new one
-        $pallet_id = session('current_pallet_id');
-        $pallet = null;
-
-        if ($pallet_id) {
-            $pallet = Pallet::find($pallet_id);
-        }
-
-        // If no pallet yet, auto-generate new pallet number
-        if (!$pallet) {
-            $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
-                ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
-                ->first();
-
-            $nextNumber = 1;
-            if ($lastPallet) {
-                // Extract only the last number (after the last hyphen) to handle both formats
-                preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
-                $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
-                $nextNumber = $lastNumber + 1;
-            }
-
-            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-
-            // Create new pallet
-            $pallet = Pallet::create([
-                'pallet_number' => $palletNumber,
-            ]);
-
-            // Store pallet ID in session
-            session(['current_pallet_id' => $pallet->id]);
-        }
+        $pallet = $this->resolveActivePallet();
 
         // Check if box already scanned dalam session ini
         $scannedBoxes = session('scanned_boxes', []);
@@ -235,38 +234,7 @@ class StockInputController extends Controller
             ], 400);
         }
 
-        // Get pallet from session or create new one
-        $pallet_id = session('current_pallet_id');
-        $pallet = null;
-
-        if ($pallet_id) {
-            $pallet = Pallet::find($pallet_id);
-        }
-
-        // If no pallet yet, auto-generate new pallet number
-        if (!$pallet) {
-            $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
-                ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
-                ->first();
-
-            $nextNumber = 1;
-            if ($lastPallet) {
-                // Extract only the last number (after the last hyphen) to handle both formats
-                preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
-                $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
-                $nextNumber = $lastNumber + 1;
-            }
-
-            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-
-            // Create new pallet
-            $pallet = Pallet::create([
-                'pallet_number' => $palletNumber,
-            ]);
-
-            // Store pallet ID in session
-            session(['current_pallet_id' => $pallet->id]);
-        }
+        $pallet = $this->resolveActivePallet();
 
         // Check if box already in this pallet
         $existingBox = $pallet->boxes()->where('box_id', $box->id)->first();
@@ -498,13 +466,25 @@ class StockInputController extends Controller
                 $totalPcs += (int) ($box['pcs_quantity'] ?? $box['qty_box'] ?? 0);
             }
 
+            // Get first pallet item for part_number
+            $palletItem = $pallet->items()->first();
+            
+            // Collect all unique part numbers from pallet items
+            $partNumbers = $pallet->items()
+                ->pluck('part_number')
+                ->unique()
+                ->values()
+                ->toArray();
+            
             $stockInput = StockInput::create([
                 'pallet_id' => $pallet->id,
+                'pallet_item_id' => $palletItem?->id,
                 'user_id' => auth()->id(),
                 'warehouse_location' => $locationCode ?? 'Unknown',
                 'pcs_quantity' => $totalPcs,
                 'box_quantity' => count($scannedBoxes),
                 'stored_at' => now(),
+                'part_numbers' => $partNumbers,
             ]);
 
             // Log audit trail

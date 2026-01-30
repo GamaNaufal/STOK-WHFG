@@ -23,7 +23,7 @@
                 </p>
             </div>
             <a href="{{ route('audit.export', array_filter($filters)) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600;">
-                <i class="bi bi-download"></i> Export CSV
+                <i class="bi bi-download"></i> Export Excel
             </a>
         </div>
     </div>
@@ -37,7 +37,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Aksi</p>
-                        <h2 class="fw-bold" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $summary['total_actions'] }}</h2>
+                        <h2 class="fw-bold" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ intval($summary['total_actions']) }}</h2>
                     </div>
                     <i class="bi bi-file-text" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
                 </div>
@@ -50,7 +50,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Input Stok</p>
-                        <h2 class="fw-bold" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ $summary['stock_inputs'] }}</h2>
+                        <h2 class="fw-bold" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ intval($summary['stock_inputs']) }}</h2>
                     </div>
                     <i class="bi bi-inbox" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
                 </div>
@@ -63,7 +63,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Pengambilan Stok</p>
-                        <h2 class="fw-bold" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $summary['stock_withdrawals'] }}</h2>
+                        <h2 class="fw-bold" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ intval($summary['stock_withdrawals']) }}</h2>
                     </div>
                     <i class="bi bi-box-seam" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
                 </div>
@@ -75,10 +75,10 @@
             <div class="card-body" style="padding: 24px;">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
-                        <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Pengiriman</p>
-                        <h2 class="fw-bold" style="color: #ff9800; margin: 0; font-size: 2.5rem;">{{ $summary['delivery_pickups'] }}</h2>
+                        <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Redo Delivery</p>
+                        <h2 class="fw-bold" style="color: #ff9800; margin: 0; font-size: 2.5rem;">{{ intval($summary['delivery_redos']) }}</h2>
                     </div>
-                    <i class="bi bi-truck" style="font-size: 2.5rem; color: #ff9800; opacity: 0.2;"></i>
+                    <i class="bi bi-arrow-clockwise" style="font-size: 2.5rem; color: #ff9800; opacity: 0.2;"></i>
                 </div>
             </div>
         </div>
@@ -158,7 +158,6 @@
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Aksi</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Operator</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Deskripsi</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Detail</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -201,15 +200,6 @@
                                     <small class="text-muted" title="{{ $log->description ?? '-' }}">
                                         {{ $log->description ? substr($log->description, 0, 50) . (strlen($log->description) > 50 ? '...' : '') : '-' }}
                                     </small>
-                                </td>
-                                <td style="padding: 16px 20px; text-align: center;">
-                                    @if($log->new_values)
-                                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#detailModal{{ $log->id }}" style="border-radius: 4px; font-size: 12px;">
-                                            <i class="bi bi-eye"></i> Lihat
-                                        </button>
-                                    @else
-                                        <small class="text-muted">-</small>
-                                    @endif
                                 </td>
                             </tr>
                         @endforeach

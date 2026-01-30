@@ -37,15 +37,15 @@ Artisan::command('locations:sync', function () {
 })->purpose('Sync master_locations occupancy from latest stock_locations');
 
 Artisan::command('delivery:purge-completions', function () {
-    $expired = \App\Models\DeliveryCompletion::where('status', 'completed')
+    $expiredSessions = \App\Models\DeliveryPickSession::where('completion_status', 'completed')
+        ->whereNotNull('redo_until')
         ->where('redo_until', '<', now())
         ->get();
 
-    foreach ($expired as $completion) {
-        $sessionId = $completion->pick_session_id;
+    foreach ($expiredSessions as $session) {
+        $sessionId = $session->id;
         \App\Models\DeliveryPickItem::where('pick_session_id', $sessionId)->delete();
         \App\Models\DeliveryPickSession::where('id', $sessionId)->delete();
-        $completion->delete();
     }
 
     $this->info('Expired completion data purged.');

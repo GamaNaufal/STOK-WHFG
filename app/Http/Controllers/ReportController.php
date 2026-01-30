@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Exports\OperationalReportsExport;
-use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Models\StockWithdrawal;
 use App\Services\OperationalReportService;
@@ -183,7 +182,7 @@ class ReportController extends Controller
 
         // Part number filter
         if ($request->filled('part_number')) {
-            $query->where('pallet_item_id', function ($q) {
+            $query->whereIn('pallet_item_id', function ($q) {
                 $q->select('id')
                   ->from('pallet_items')
                   ->where('part_number', 'like', '%' . request()->input('part_number') . '%');
@@ -229,7 +228,7 @@ class ReportController extends Controller
     }
 
     /**
-     * Export withdrawal report to CSV
+     * Export withdrawal report to Excel
      */
     public function exportWithdrawalCsv(Request $request)
     {
@@ -249,29 +248,14 @@ class ReportController extends Controller
 
         $withdrawals = $query->orderBy('withdrawn_at', 'desc')->get();
 
-        $csv = "No,Tanggal,Part Number,Box Diambil,PCS Diambil,Lokasi,Operator,Status,Keterangan\n";
-
-        foreach ($withdrawals as $idx => $withdrawal) {
-            $status = $withdrawal->status === 'completed' ? 'Selesai' : 'Dibatalkan';
-            $csv .= ($idx + 1) . "," . 
-                    $withdrawal->withdrawn_at->format('d/m/Y H:i') . "," . 
-                    $withdrawal->part_number . "," . 
-                    (int) ceil($withdrawal->box_quantity) . "," . 
-                    $withdrawal->pcs_quantity . "," . 
-                    $withdrawal->warehouse_location . "," . 
-                    $withdrawal->user->name . "," . 
-                    $status . "," . 
-                    ($withdrawal->notes ?? '') . "\n";
-        }
-
-        return response($csv, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="withdrawal_report_' . now()->format('Ymd_His') . '.csv"',
-        ]);
+        return Excel::download(
+            new \App\Exports\StockWithdrawalExport($withdrawals),
+            'stock_withdrawal_report_' . now()->format('Ymd_His') . '.xlsx'
+        );
     }
 
     /**
-     * Export stock input report to CSV
+     * Export stock input report to Excel
      */
     public function exportStockInputCsv(Request $request)
     {
@@ -287,24 +271,9 @@ class ReportController extends Controller
 
         $stockInputs = $query->orderBy('stored_at', 'desc')->get();
 
-        $csv = "No,Pallet Number,Part Number,Box Qty,PCS Qty,Lokasi,Operator,Tanggal Input\n";
-
-        $idx = 1;
-        foreach ($stockInputs as $input) {
-            $csv .= $idx . "," . 
-                    $input->pallet->pallet_number . "," . 
-                    $input->palletItem->part_number . "," . 
-                    (int)$input->box_quantity . "," . 
-                    $input->pcs_quantity . "," . 
-                    $input->warehouse_location . "," . 
-                    $input->user->name . "," . 
-                    $input->stored_at->format('d/m/Y H:i') . "\n";
-            $idx++;
-        }
-
-        return response($csv, 200, [
-            'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="stock_input_report_' . now()->format('Ymd_His') . '.csv"',
-        ]);
+        return Excel::download(
+            new \App\Exports\StockInputExport($stockInputs),
+            'stock_input_report_' . now()->format('Ymd_His') . '.xlsx'
+        );
     }
 }

@@ -18,6 +18,10 @@ return new class extends Migration
             $table->integer('box_quantity');
             $table->integer('pcs_quantity');
             $table->timestamps();
+
+            $table->unique(['pallet_id', 'part_number']);
+            $table->index('pallet_id');
+            $table->index('part_number');
         });
     }
 

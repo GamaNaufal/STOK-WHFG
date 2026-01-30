@@ -3,9 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterLocation;
-use App\Models\Pallet;
 use App\Models\PalletItem;
-use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -50,11 +48,17 @@ class StockWithdrawalController extends Controller
             ->limit(20)
             ->pluck('part_number');
 
-        $parts = $boxParts->merge($legacyParts)->unique();
+        $parts = $boxParts->merge($legacyParts)->unique()->values();
+
+        if ($parts->isEmpty()) {
+            return response()->json(['results' => []]);
+        }
+
+        $totals = $this->getTotalsByPartNumbers($parts->all());
 
         $results = [];
         foreach ($parts as $partNumber) {
-            $totalQty = $this->getTotalStockForPart($partNumber);
+            $totalQty = (int) ($totals[$partNumber] ?? 0);
             if ($totalQty > 0) {
                 $results[] = [
                     'part_number' => $partNumber,
@@ -262,6 +266,8 @@ class StockWithdrawalController extends Controller
         ]);
 
         $items = $request->input('items');
+        $partNumbers = collect($items)->pluck('part_number')->filter()->values();
+        $totals = $this->getTotalsByPartNumbers($partNumbers->all());
 
         try {
             DB::beginTransaction();
@@ -274,7 +280,7 @@ class StockWithdrawalController extends Controller
                 $requestedQty = $cartItem['pcs_quantity'];
 
                 // Get total available stock
-                $totalStock = $this->getTotalStockForPart($partNumber);
+                $totalStock = (int) ($totals[$partNumber] ?? 0);
 
                 if ($totalStock < $requestedQty) {
                     throw new \Exception("Stok tidak cukup untuk part {$partNumber}! Available: {$totalStock} PCS, Requested: {$requestedQty} PCS");
@@ -373,6 +379,8 @@ class StockWithdrawalController extends Controller
 
         $items = $request->input('items');
         $previewData = [];
+        $partNumbers = collect($items)->pluck('part_number')->filter()->values();
+        $totals = $this->getTotalsByPartNumbers($partNumbers->all());
 
         try {
             foreach ($items as $cartItem) {
@@ -380,7 +388,7 @@ class StockWithdrawalController extends Controller
                 $requestedQty = $cartItem['pcs_quantity'];
 
                 // Get total available stock
-                $totalStock = $this->getTotalStockForPart($partNumber);
+                $totalStock = (int) ($totals[$partNumber] ?? 0);
 
                 if ($totalStock < $requestedQty) {
                     return response()->json([
@@ -501,6 +509,45 @@ class StockWithdrawalController extends Controller
                 $q->whereHas('stockLocation');
             })
             ->sum('box_quantity');
+    }
+
+    /**
+     * Get total stock for multiple part numbers
+     */
+    private function getTotalsByPartNumbers(array $partNumbers): array
+    {
+        $partNumbers = array_values(array_unique(array_filter($partNumbers)));
+        if (empty($partNumbers)) {
+            return [];
+        }
+
+        $boxTotals = DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.is_withdrawn', false)
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->whereIn('boxes.part_number', $partNumbers)
+            ->groupBy('boxes.part_number')
+            ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
+            ->pluck('total', 'boxes.part_number');
+
+        $legacyTotals = PalletItem::select('part_number', DB::raw('SUM(pcs_quantity) as total'))
+            ->whereIn('part_number', $partNumbers)
+            ->where('pcs_quantity', '>', 0)
+            ->whereHas('pallet', function ($q) {
+                $q->whereHas('stockLocation')
+                  ->doesntHave('boxes');
+            })
+            ->groupBy('part_number')
+            ->pluck('total', 'part_number');
+
+        $totals = [];
+        foreach ($partNumbers as $partNumber) {
+            $totals[$partNumber] = (int) ($boxTotals[$partNumber] ?? 0) + (int) ($legacyTotals[$partNumber] ?? 0);
+        }
+
+        return $totals;
     }
 
     /**

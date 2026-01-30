@@ -25,7 +25,14 @@ return new class extends Migration
             $table->string('lot03')->nullable();
             $table->longText('qr_code'); // QR Code (encoded)
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); // Admin yang membuat
+            $table->boolean('is_withdrawn')->default(false);
+            $table->dateTime('withdrawn_at')->nullable();
             $table->timestamps();
+            $table->softDeletes();
+
+            $table->index('part_number');
+            $table->index('user_id');
+            $table->index('created_at');
         });
 
         Schema::create('pallet_boxes', function (Blueprint $table) {
@@ -37,6 +44,13 @@ return new class extends Migration
             // Composite unique key - satu pallet tidak boleh punya box yang sama 2x
             $table->unique(['pallet_id', 'box_id']);
         });
+
+        Schema::table('stock_withdrawals', function (Blueprint $table) {
+            $table->foreign('box_id')
+                ->references('id')
+                ->on('boxes')
+                ->nullOnDelete();
+        });
     }
 
     /**
@@ -44,6 +58,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('stock_withdrawals', function (Blueprint $table) {
+            $table->dropForeign(['box_id']);
+        });
+
         Schema::dropIfExists('pallet_boxes');
         Schema::dropIfExists('boxes');
     }

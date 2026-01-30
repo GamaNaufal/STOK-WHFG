@@ -14,9 +14,14 @@ return new class extends Migration
             $table->foreignId('box_id')->constrained('boxes')->onDelete('cascade');
             $table->string('part_number');
             $table->integer('pcs_quantity');
-            $table->string('status')->default('pending'); // pending, scanned
+            $table->enum('status', ['pending', 'scanned', 'verified', 'failed'])->default('pending');
             $table->dateTime('scanned_at')->nullable();
+            $table->foreignId('scanned_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
+
+            $table->index('pick_session_id');
+            $table->index('status');
+            $table->index('part_number');
         });
     }
 
