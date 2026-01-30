@@ -19,7 +19,7 @@
 @if($userRole === 'warehouse_operator')
 <div class="row mb-4">
     <div class="col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah seluruh pallet di sistem.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -32,7 +32,7 @@
         </div>
     </div>
     <div class="col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;" data-bs-toggle="tooltip" data-bs-placement="top" title="Pallet yang memiliki stok aktif dan sudah tersimpan di lokasi.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -48,7 +48,7 @@
 
 <div class="row mb-4">
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #3BC1A8;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #3BC1A8;" data-bs-toggle="tooltip" data-bs-placement="top" title="Pallet yang belum memiliki lokasi penyimpanan.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -61,7 +61,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #005461;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #005461;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah lokasi penyimpanan terdaftar.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -74,7 +74,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;" data-bs-toggle="tooltip" data-bs-placement="top" title="Sesi picking dengan status scanning/blocked.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -127,7 +127,7 @@
 @elseif($userRole === 'sales')
 <div class="row mb-4">
     <div class="col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah seluruh order penjualan.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -140,7 +140,7 @@
         </div>
     </div>
     <div class="col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;" data-bs-toggle="tooltip" data-bs-placement="top" title="Order yang dibuat hari ini.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -156,7 +156,7 @@
 
 <div class="row mb-4">
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ffc107;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ffc107;" data-bs-toggle="tooltip" data-bs-placement="top" title="Order berstatus pending.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -169,7 +169,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;" data-bs-toggle="tooltip" data-bs-placement="top" title="Order berstatus approved.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -182,7 +182,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #28a745;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #28a745;" data-bs-toggle="tooltip" data-bs-placement="top" title="Order berstatus completed.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -219,7 +219,7 @@
 @elseif($userRole === 'ppc')
 <div class="row mb-4">
     <div class="col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ff6b6b;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ff6b6b;" data-bs-toggle="tooltip" data-bs-placement="top" title="Order menunggu persetujuan.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -232,7 +232,7 @@
         </div>
     </div>
     <div class="col-md-6 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;" data-bs-toggle="tooltip" data-bs-placement="top" title="Order yang sudah disetujui.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -248,7 +248,7 @@
 
 <div class="row mb-4">
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah seluruh order.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -261,7 +261,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;" data-bs-toggle="tooltip" data-bs-placement="top" title="Total PCS stok aktif.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -274,7 +274,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #28a745;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #28a745;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah item/part dengan stok aktif.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -448,7 +448,7 @@
 @elseif($userRole === 'admin_warehouse')
 <div class="row mb-4">
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah lokasi penyimpanan terdaftar.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -461,7 +461,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah seluruh pallet di sistem.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -474,7 +474,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;" data-bs-toggle="tooltip" data-bs-placement="top" title="Pallet dengan stok aktif.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -490,7 +490,7 @@
 
 <div class="row mb-4">
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #28a745;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #28a745;" data-bs-toggle="tooltip" data-bs-placement="top" title="Total PCS stok aktif.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -503,7 +503,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ff6b6b;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ff6b6b;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah scan issue berstatus pending.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -516,7 +516,7 @@
         </div>
     </div>
     <div class="col-md-4 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #005461;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #005461;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah item/part dengan stok aktif.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -585,7 +585,7 @@
 @else
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #0C7779;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah seluruh pallet di sistem.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -599,7 +599,7 @@
         </div>
     </div>
     <div class="col-md-3 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #249E94;" data-bs-toggle="tooltip" data-bs-placement="top" title="Pallet dengan stok aktif.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -612,7 +612,7 @@
         </div>
     </div>
     <div class="col-md-3 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #17a2b8;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah lokasi penyimpanan terdaftar.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -625,7 +625,7 @@
         </div>
     </div>
     <div class="col-md-3 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #28a745;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #28a745;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah item/part dengan stok aktif.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -641,7 +641,7 @@
 
 <div class="row mb-4">
     <div class="col-md-3 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ffc107;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ffc107;" data-bs-toggle="tooltip" data-bs-placement="top" title="Total box aktif (belum withdrawn).">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -654,7 +654,7 @@
         </div>
     </div>
     <div class="col-md-3 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #005461;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #005461;" data-bs-toggle="tooltip" data-bs-placement="top" title="Total PCS stok aktif.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -667,7 +667,7 @@
         </div>
     </div>
     <div class="col-md-3 mb-3">
-        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ff6b6b;">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-left: 4px solid #ff6b6b;" data-bs-toggle="tooltip" data-bs-placement="top" title="Jumlah seluruh order penjualan.">
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <div>
@@ -750,4 +750,15 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const tooltipTriggers = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltipTriggers.forEach((el) => {
+            new bootstrap.Tooltip(el);
+        });
+    });
+</script>
 @endsection

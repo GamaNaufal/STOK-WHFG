@@ -12,25 +12,53 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
+    private function buildStockSummaryTotals(): array
+    {
+        $items = collect();
+
+        $palletQuery = Pallet::with(['stockLocation', 'items', 'boxes'])
+            ->whereHas('stockLocation', function ($q) {
+                $q->where('warehouse_location', '!=', 'Unknown');
+            });
+
+        $palletQuery->chunkById(200, function ($pallets) use (&$items) {
+            foreach ($pallets as $pallet) {
+                $activeBoxes = $pallet->boxes->where('is_withdrawn', false);
+
+                if ($activeBoxes->isNotEmpty()) {
+                    foreach ($activeBoxes as $box) {
+                        $items->push([
+                            'box_quantity' => 1,
+                            'pcs_quantity' => (int) $box->pcs_quantity,
+                        ]);
+                    }
+                } else {
+                    $legacyItems = $pallet->items->filter(function ($item) {
+                        return $item->pcs_quantity > 0 || $item->box_quantity > 0;
+                    });
+
+                    foreach ($legacyItems as $item) {
+                        $items->push([
+                            'box_quantity' => (int) $item->box_quantity,
+                            'pcs_quantity' => (int) $item->pcs_quantity,
+                        ]);
+                    }
+                }
+            }
+        });
+
+        return [
+            'total_box' => (int) $items->sum('box_quantity'),
+            'total_pcs' => $items->sum('pcs_quantity') ?? 0,
+        ];
+    }
+
     public function index(Request $request)
     {
         $user = auth()->user();
         $userRole = $user->role;
         $stats = [];
-
-        // Helper function untuk hitung boxes berdasarkan PCS
-        $calculateActualBoxes = function() {
-            $totalPcs = PalletItem::where(function ($q) {
-                $q->where('pcs_quantity', '>', 0)
-                  ->orWhere('box_quantity', '>', 0);
-            })->sum('pcs_quantity') ?? 0;
-            $totalBox = PalletItem::where(function ($q) {
-                $q->where('pcs_quantity', '>', 0)
-                  ->orWhere('box_quantity', '>', 0);
-            })->sum('box_quantity') ?? 0;
-            
-            return (int)$totalBox;
-        };
+        $stockSummaryTotals = $this->buildStockSummaryTotals();
 
         // WAREHOUSE OPERATOR
         if ($userRole === 'warehouse_operator') {
@@ -51,10 +79,7 @@ class DashboardController extends Controller
                     $q->where('pcs_quantity', '>', 0)
                       ->orWhere('box_quantity', '>', 0);
                 })->count(),
-                'total_pcs' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->sum('pcs_quantity') ?? 0,
+                                'total_pcs' => $stockSummaryTotals['total_pcs'],
                 'pending_deliveries' => DeliveryPickSession::whereIn('status', ['scanning', 'blocked'])->count(),
             ];
         }
@@ -76,10 +101,7 @@ class DashboardController extends Controller
                 'pending_approval' => DeliveryOrder::where('status', 'pending')->count(),
                 'approved_orders' => DeliveryOrder::where('status', 'approved')->count(),
                 'total_orders' => DeliveryOrder::count(),
-                'total_stok_pcs' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->sum('pcs_quantity') ?? 0,
+                'total_stok_pcs' => $stockSummaryTotals['total_pcs'],
                 'total_stok_items' => PalletItem::where(function ($q) {
                     $q->where('pcs_quantity', '>', 0)
                       ->orWhere('box_quantity', '>', 0);
@@ -105,10 +127,7 @@ class DashboardController extends Controller
                 'total_locations' => StockLocation::distinct('warehouse_location')->count(),
                 'total_pallets' => Pallet::count(),
                 'pallets_with_location' => $palletsWithActiveStock,
-                'total_pcs' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->sum('pcs_quantity') ?? 0,
+                                'total_pcs' => $stockSummaryTotals['total_pcs'],
                 'pending_scan_issues' => \App\Models\DeliveryIssue::where('status', 'pending')->count(),
                 'total_items' => PalletItem::where(function ($q) {
                     $q->where('pcs_quantity', '>', 0)
@@ -135,11 +154,8 @@ class DashboardController extends Controller
                     $q->where('pcs_quantity', '>', 0)
                       ->orWhere('box_quantity', '>', 0);
                 })->count(),
-                'total_box' => $calculateActualBoxes(),
-                'total_pcs' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->sum('pcs_quantity') ?? 0,
+                                'total_box' => $stockSummaryTotals['total_box'],
+                                'total_pcs' => $stockSummaryTotals['total_pcs'],
                 'total_orders' => DeliveryOrder::count(),
                 'pending_orders' => DeliveryOrder::where('status', 'pending')->count(),
             ];
