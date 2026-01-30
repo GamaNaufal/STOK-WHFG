@@ -155,13 +155,13 @@
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                alert('Pengiriman selesai.');
+                showToast('Pengiriman selesai.', 'success');
                 window.location.href = '{{ route('delivery.index') }}';
             } else {
-                alert(data.message || 'Tidak bisa menyelesaikan.');
+                showToast(data.message || 'Tidak bisa menyelesaikan.', 'danger');
             }
         })
-        .catch(() => alert('Gagal koneksi.'));
+        .catch(() => showToast('Gagal koneksi.', 'danger'));
     });
 </script>
 @endsection

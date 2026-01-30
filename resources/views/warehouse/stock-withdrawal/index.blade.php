@@ -575,7 +575,7 @@
             },
             error: function(xhr) {
                 const message = xhr.responseJSON?.message || 'Terjadi kesalahan saat memuat preview';
-                alert('Error: ' + message);
+                showToast('Error: ' + message, 'danger');
             }
         });
     });
@@ -668,7 +668,7 @@
             },
             success: function(response) {
                 if (response.success) {
-                    alert('Pengambilan stok berhasil diproses!');
+                    showToast('Pengambilan stok berhasil diproses!', 'success');
                     cart = {};
                     loadStockData();
                     bootstrap.Modal.getInstance(document.getElementById('previewModal')).hide();
@@ -676,7 +676,7 @@
             },
             error: function(xhr) {
                 const message = xhr.responseJSON?.message || 'Terjadi kesalahan';
-                alert('Error: ' + message);
+                showToast('Error: ' + message, 'danger');
             }
         });
     });

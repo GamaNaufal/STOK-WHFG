@@ -729,7 +729,7 @@
 
     document.getElementById('btnProcessAll').addEventListener('click', function() {
         if (pendingProcessItems.length === 0) {
-            alert('Tidak ada item untuk diproses.');
+            showToast('Tidak ada item untuk diproses.', 'warning');
             return;
         }
 
@@ -762,10 +762,10 @@
                 fulfillModal.hide();
                 picklistModal.show();
             } else {
-                alert(data.message || 'Gagal membuat pick session.');
+                showToast(data.message || 'Gagal membuat pick session.', 'danger');
             }
         })
-        .catch(() => alert('Gagal proses.'));
+        .catch(() => showToast('Gagal proses.', 'danger'));
     });
 </script>
 @endsection

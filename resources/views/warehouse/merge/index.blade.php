@@ -360,7 +360,7 @@
                     
                     // Check if already in list
                     if(selectedPallets.find(item => item.id === p.id)) {
-                        alert("Pallet ini sudah masuk daftar!");
+                        showToast('Pallet ini sudah masuk daftar!', 'warning');
                         document.getElementById('scanInput').value = '';
                         return;
                     }
@@ -373,12 +373,12 @@
                     document.getElementById('resLocation').textContent = 'Loc: ' + (p.location || '-'); // Using || because location might be string "Not Stored"
                     
                 } else {
-                    alert(data.message);
+                    showToast(data.message, 'danger');
                     document.getElementById('searchResultCard').style.display = 'none';
                     currentPreview = null;
                 }
             })
-            .catch(err => alert("Error: " + err));
+            .catch(err => showToast('Error: ' + err, 'danger'));
     }
 
     function addToMergeList() {
@@ -396,7 +396,7 @@
 
     function addFromList(palletData) {
         if(selectedPallets.find(item => item.id === palletData.id)) {
-            alert("Pallet " + palletData.pallet_number + " sudah masuk daftar!");
+            showToast('Pallet ' + palletData.pallet_number + ' sudah masuk daftar!', 'warning');
             return;
         }
         selectedPallets.push(palletData);
@@ -474,13 +474,13 @@
 
     function processMerge() {
         if(selectedPallets.length < 2) {
-            alert("Pilih minimal 2 pallet untuk digabungkan!");
+            showToast('Pilih minimal 2 pallet untuk digabungkan!', 'warning');
             return;
         }
 
         const locationVal = searchInput.value.trim();
         if(!locationVal) {
-            alert("Harap tentukan lokasi untuk pallet baru!");
+            showToast('Harap tentukan lokasi untuk pallet baru!', 'warning');
             searchInput.focus();
             return;
         }
@@ -506,13 +506,13 @@
         .then(res => res.json())
         .then(data => {
             if(data.success) {
-                alert(data.message);
+                showToast(data.message, 'success');
                 window.location.reload();
             } else {
-                alert(data.message);
+                showToast(data.message, 'danger');
             }
         })
-        .catch(err => alert("Error: " + err));
+        .catch(err => showToast('Error: ' + err, 'danger'));
     }
 </script>
 @endsection

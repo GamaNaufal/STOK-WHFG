@@ -597,7 +597,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert('Error: ' + data.error);
+                    showToast('Error: ' + data.error, 'danger');
                     return;
                 }
 
@@ -639,7 +639,7 @@
             })
             .catch(error => {
                 console.error('Error:', error);
-                alert('Error loading detail data');
+                showToast('Error loading detail data', 'danger');
                 document.getElementById('detailLoadingSpinner').style.display = 'none';
             });
 
@@ -657,7 +657,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert('Error: ' + data.error);
+                    showToast('Error: ' + data.error, 'danger');
                     return;
                 }
 
@@ -698,7 +698,7 @@
     function exportToExcel(viewType) {
         const table = document.querySelector('table');
         if (!table) {
-            alert('Tidak ada data untuk diexport');
+            showToast('Tidak ada data untuk diexport', 'warning');
             return;
         }
 

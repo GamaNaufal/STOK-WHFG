@@ -267,69 +267,84 @@
     <div class="row g-4">
         <!-- Form Section -->
         <div class="col-lg-5">
-            <form action="{{ route('delivery.store') }}" method="POST" class="form-card">
-                @csrf
-                <div class="card-header">
-                    <h6>
-                        <i class="bi bi-plus-circle"></i> Pesanan Delivery Baru
-                    </h6>
-                </div>
-                <div class="card-body">
-                    <!-- Customer Name -->
-                    <div class="mb-4">
-                        <label class="form-label">Nama Pelanggan</label>
-                        <input type="text" name="customer_name" class="form-control" placeholder="Masukkan nama pelanggan" required>
+            @if(in_array(auth()->user()->role, ['sales', 'admin']))
+                <form action="{{ route('delivery.store') }}" method="POST" class="form-card">
+                    @csrf
+                    <div class="card-header">
+                        <h6>
+                            <i class="bi bi-plus-circle"></i> Pesanan Delivery Baru
+                        </h6>
                     </div>
-
-                    <!-- Delivery Date -->
-                    <div class="mb-4">
-                        <label class="form-label">Tanggal Delivery</label>
-                        <input type="date" name="delivery_date" class="form-control" required>
-                    </div>
-
-                    <!-- Items Section -->
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <label class="form-label mb-0">Item Barang</label>
-                            <button type="button" class="btn btn-sm btn-add" id="add-item-btn">
-                                <i class="bi bi-plus-lg"></i> Tambah Item
-                            </button>
+                    <div class="card-body">
+                        <!-- Customer Name -->
+                        <div class="mb-4">
+                            <label class="form-label">Nama Pelanggan</label>
+                            <input type="text" name="customer_name" class="form-control" placeholder="Masukkan nama pelanggan" required>
                         </div>
-                        
-                        <div id="items-container" class="space-y-2">
-                            <div class="row g-2 item-row">
-                                <div class="col-lg-6">
-                                    <select name="items[0][part_number]" class="form-control form-select part-select" required>
-                                        <option value="">Pilih No Part</option>
-                                        @foreach($partNumbers as $partNumber)
-                                            <option value="{{ $partNumber }}">{{ $partNumber }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="col-lg-4">
-                                    <input type="number" name="items[0][quantity]" class="form-control" placeholder="Qty" min="1" required>
-                                </div>
-                                <div class="col-lg-2">
-                                    <button type="button" class="btn btn-remove remove-item w-100" title="Hapus item">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
+
+                        <!-- Delivery Date -->
+                        <div class="mb-4">
+                            <label class="form-label">Tanggal Delivery</label>
+                            <input type="date" name="delivery_date" class="form-control" required>
+                        </div>
+
+                        <!-- Items Section -->
+                        <div class="mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <label class="form-label mb-0">Item Barang</label>
+                                <button type="button" class="btn btn-sm btn-add" id="add-item-btn">
+                                    <i class="bi bi-plus-lg"></i> Tambah Item
+                                </button>
+                            </div>
+                            
+                            <div id="items-container" class="space-y-2">
+                                <div class="row g-2 item-row">
+                                    <div class="col-lg-6">
+                                        <select name="items[0][part_number]" class="form-control form-select part-select" required>
+                                            <option value="">Pilih No Part</option>
+                                            @foreach($partNumbers as $partNumber)
+                                                <option value="{{ $partNumber }}">{{ $partNumber }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                    <div class="col-lg-4">
+                                        <input type="number" name="items[0][quantity]" class="form-control" placeholder="Qty" min="1" required>
+                                    </div>
+                                    <div class="col-lg-2">
+                                        <button type="button" class="btn btn-remove remove-item w-100" title="Hapus item">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <!-- Notes -->
-                    <div class="mb-4">
-                        <label class="form-label">Catatan / Keterangan</label>
-                        <textarea name="notes" class="form-control" rows="3" placeholder="Tambahkan catatan khusus jika ada..."></textarea>
-                    </div>
+                        <!-- Notes -->
+                        <div class="mb-4">
+                            <label class="form-label">Catatan / Keterangan</label>
+                            <textarea name="notes" class="form-control" rows="3" placeholder="Tambahkan catatan khusus jika ada..."></textarea>
+                        </div>
 
-                    <!-- Submit Button -->
-                    <button type="submit" class="btn btn-submit">
-                        <i class="bi bi-check-circle"></i> Submit Pesanan
-                    </button>
+                        <!-- Submit Button -->
+                        <button type="submit" class="btn btn-submit">
+                            <i class="bi bi-check-circle"></i> Submit Pesanan
+                        </button>
+                    </div>
+                </form>
+            @else
+                <div class="form-card">
+                    <div class="card-header">
+                        <h6>
+                            <i class="bi bi-eye"></i> Mode Lihat Saja
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i> Anda sedang dalam mode lihat saja. PPC tidak dapat membuat atau mengubah pesanan.
+                        </div>
+                    </div>
                 </div>
-            </form>
+            @endif
         </div>
 
         <!-- History Section -->
@@ -382,9 +397,11 @@
                                             <div class="alert-correction">
                                                 <strong>Perlu Koreksi:</strong> {{ $order->notes }}
                                             </div>
-                                            <a href="{{ route('delivery.edit', $order->id) }}" class="btn btn-edit-correction btn-sm">
-                                                <i class="bi bi-pencil-square"></i> Edit Koreksi
-                                            </a>
+                                            @if(in_array(auth()->user()->role, ['sales', 'admin']))
+                                                <a href="{{ route('delivery.edit', $order->id) }}" class="btn btn-edit-correction btn-sm">
+                                                    <i class="bi bi-pencil-square"></i> Edit Koreksi
+                                                </a>
+                                            @endif
                                         @else
                                             <small class="text-muted">{{ $order->items->count() }} Item</small>
                                         @endif
@@ -418,6 +435,10 @@
             const container = document.getElementById('items-container');
             const addBtn = document.getElementById('add-item-btn');
 
+            if (!container || !addBtn) {
+                return;
+            }
+
             function initPartSelects(context) {
                 const selects = (context || document).querySelectorAll('.part-select');
                 selects.forEach(select => {
@@ -426,7 +447,7 @@
                             width: '100%',
                             placeholder: 'Pilih No Part',
                             allowClear: true,
-                            minimumResultsForSearch: 5
+                            minimumResultsForSearch: 0
                         });
                         select.dataset.enhanced = 'true';
                     }

@@ -176,15 +176,15 @@
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                alert(data.message);
+                showToast(data.message, 'success');
                 location.reload();
             } else {
-                alert('Error: ' + data.message);
+                showToast('Error: ' + data.message, 'danger');
             }
         })
         .catch(e => {
             console.error('Error:', e);
-            alert('Terjadi kesalahan');
+            showToast('Terjadi kesalahan', 'danger');
         })
         .finally(() => {
             this.disabled = false;

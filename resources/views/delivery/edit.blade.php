@@ -1,5 +1,36 @@
 @extends('shared.layouts.app')
 
+@section('styles')
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        .item-row {
+            background: #f8f9fa;
+            padding: 0.875rem;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        .btn-remove {
+            background: #fee2e2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 0.5rem;
+        }
+        .btn-remove:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-add {
+            background: #e0f5f3;
+            color: #0C7779;
+            border: 1px solid #b3e5db;
+            font-weight: 500;
+            border-radius: 6px;
+            padding: 0.5rem 1rem;
+        }
+    </style>
+@endsection
+
 @section('content')
 <div class="row mb-4">
     <div class="col-12">
@@ -30,12 +61,46 @@
                         </div>
     
                         <div class="alert alert-info">
-                            <small><i class="bi bi-info-circle"></i> Items from this delivery order are now managed through the picking session system.</small>
+                            <small><i class="bi bi-info-circle"></i> Anda dapat memperbarui No Part dan Qty untuk koreksi sebelum diajukan kembali.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">Item Barang</label>
+                                <button type="button" class="btn btn-sm btn-add" id="add-item-btn">
+                                    <i class="bi bi-plus-lg"></i> Tambah Item
+                                </button>
+                            </div>
+
+                            <div id="items-container" class="space-y-2">
+                                @foreach($order->items as $index => $item)
+                                    <div class="row g-2 item-row">
+                                        <div class="col-lg-6">
+                                            <select name="items[{{ $index }}][part_number]" class="form-control form-select part-select" required>
+                                                <option value="">Pilih No Part</option>
+                                                @foreach($partNumbers as $partNumber)
+                                                    <option value="{{ $partNumber }}" {{ $item->part_number === $partNumber ? 'selected' : '' }}>
+                                                        {{ $partNumber }}
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+                                        <div class="col-lg-4">
+                                            <input type="number" name="items[{{ $index }}][quantity]" class="form-control" placeholder="Qty" min="1" value="{{ $item->quantity }}" required>
+                                        </div>
+                                        <div class="col-lg-2">
+                                            <button type="button" class="btn btn-remove remove-item w-100" title="Hapus item">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
                         </div>
     
                         <div class="mb-3">
                             <label class="form-label">Notes (optional)</label>
-                            <textarea name="notes" class="form-control" rows="2"></textarea>
+                            <textarea name="notes" class="form-control" rows="2">{{ old('notes') }}</textarea>
                         </div>
     
                         <button type="submit" class="btn btn-warning w-100">Submit Correction</button>
@@ -46,9 +111,81 @@
     </div>
 </div>
 
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Items management has been moved to the picking session system
-    });
-</script>
+@section('scripts')
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            let itemIndex = {{ $order->items->count() }};
+            const container = document.getElementById('items-container');
+            const addBtn = document.getElementById('add-item-btn');
+
+            function initPartSelects(context) {
+                const selects = (context || document).querySelectorAll('.part-select');
+                selects.forEach(select => {
+                    if (!select.dataset.enhanced) {
+                        window.jQuery(select).select2({
+                            width: '100%',
+                            placeholder: 'Pilih No Part',
+                            allowClear: true,
+                            minimumResultsForSearch: 0
+                        });
+                        select.dataset.enhanced = 'true';
+                    }
+                });
+            }
+
+            function updateRemoveButtons() {
+                const rows = container.getElementsByClassName('item-row');
+                if (rows.length === 1) {
+                    rows[0].querySelector('.remove-item').disabled = true;
+                } else {
+                    Array.from(rows).forEach(row => {
+                        row.querySelector('.remove-item').disabled = false;
+                    });
+                }
+            }
+
+            addBtn.addEventListener('click', function() {
+                const row = document.createElement('div');
+                row.className = 'row g-2 item-row';
+                row.innerHTML = `
+                    <div class="col-lg-6">
+                        <select name="items[${itemIndex}][part_number]" class="form-control form-select part-select" required>
+                            <option value="">Pilih No Part</option>
+                            @foreach($partNumbers as $partNumber)
+                                <option value="{{ $partNumber }}">{{ $partNumber }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-lg-4">
+                        <input type="number" name="items[${itemIndex}][quantity]" class="form-control" placeholder="Qty" min="1" required>
+                    </div>
+                    <div class="col-lg-2">
+                        <button type="button" class="btn btn-remove remove-item w-100" title="Hapus item">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(row);
+                itemIndex++;
+                updateRemoveButtons();
+                initPartSelects(row);
+            });
+
+            container.addEventListener('click', function(e) {
+                if (e.target.closest('.remove-item')) {
+                    const row = e.target.closest('.item-row');
+                    if (container.getElementsByClassName('item-row').length > 1) {
+                        row.remove();
+                        updateRemoveButtons();
+                    }
+                }
+            });
+
+            updateRemoveButtons();
+            initPartSelects(document);
+        });
+    </script>
+@endsection
 @endsection

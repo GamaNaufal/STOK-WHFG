@@ -289,7 +289,7 @@
 </div>
 
 <div class="row">
-    <div class="col-md-12 mb-4">
+    <div class="col-md-6 mb-4">
         <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-top: 4px solid #ff6b6b;">
             <div class="card-body text-center">
                 <div class="mb-3">
@@ -301,6 +301,22 @@
                 </p>
                 <a href="{{ route('delivery.approvals') }}" class="btn" style="background: #ff6b6b; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat Approval
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 mb-4">
+        <div class="card shadow-sm border-0 h-100" style="background: #f5f7fa; border-top: 4px solid #0C7779;">
+            <div class="card-body text-center">
+                <div class="mb-3">
+                    <i class="bi bi-truck" style="font-size: 3rem; color: #0C7779;"></i>
+                </div>
+                <h5 class="card-title" style="color: #1f2937;">Delivery Schedule</h5>
+                <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
+                    Lihat jadwal delivery (read-only)
+                </p>
+                <a href="{{ route('delivery.index') }}" class="btn" style="background: #0C7779; color: white; border: none;">
+                    <i class="bi bi-arrow-right"></i> Lihat Jadwal
                 </a>
             </div>
         </div>

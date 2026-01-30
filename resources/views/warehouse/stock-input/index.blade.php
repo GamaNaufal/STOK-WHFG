@@ -768,7 +768,7 @@
         })
         .then(data => {
             // Success
-            alert('Stok berhasil disimpan di lokasi: ' + selectedCode); // Simple feedback
+            showToast('Stok berhasil disimpan di lokasi: ' + selectedCode, 'success');
             window.location.href = '{{ route("stock-input.index") }}';
         })
         .catch(error => {

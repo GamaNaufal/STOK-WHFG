@@ -43,9 +43,8 @@ class DeliveryOrderController extends Controller
         $user = \Illuminate\Support\Facades\Auth::user();
         
            // Strict Role Check: Admin & Warehouse Operator only
-                     if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+                 if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse', 'ppc'], true)) {
              if ($user->role === 'sales') return redirect()->route('delivery.create');
-             if ($user->role === 'ppc') return redirect()->route('delivery.approvals');
              return redirect('/')->with('error', 'Unauthorized access to Schedule.');
         }
 
@@ -141,15 +140,26 @@ class DeliveryOrderController extends Controller
     public function createOrder()
     {
         $user = \Illuminate\Support\Facades\Auth::user();
-        if ($user->role !== 'sales' && $user->role !== 'admin') {
+        if (!in_array($user->role, ['sales', 'admin', 'ppc'])) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
         }
 
-        $myOrders = \App\Models\DeliveryOrder::with(['items'])
-            ->where('sales_user_id', $user->id)
-            ->orderBy('created_at', 'desc')
-            ->limit(50)
-            ->get();
+        if ($user->role === 'ppc') {
+            return redirect()->route('delivery.index');
+        }
+
+        if (in_array($user->role, ['sales', 'admin'])) {
+            $myOrders = \App\Models\DeliveryOrder::with(['items'])
+                ->where('sales_user_id', $user->id)
+                ->orderBy('created_at', 'desc')
+                ->limit(50)
+                ->get();
+        } else {
+            $myOrders = \App\Models\DeliveryOrder::with(['items'])
+                ->orderBy('created_at', 'desc')
+                ->limit(100)
+                ->get();
+        }
 
         $partNumbers = \App\Models\PartSetting::orderBy('part_number', 'asc')
             ->pluck('part_number');
@@ -267,7 +277,10 @@ class DeliveryOrderController extends Controller
             return redirect()->route('delivery.create')->with('error', 'Order tidak dalam status koreksi.');
         }
 
-        return view('delivery.edit', compact('order'));
+        $partNumbers = \App\Models\PartSetting::orderBy('part_number', 'asc')
+            ->pluck('part_number');
+
+        return view('delivery.edit', compact('order', 'partNumbers'));
     }
 
     // Sales: Update correction request

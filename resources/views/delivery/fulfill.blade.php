@@ -202,13 +202,13 @@
         .then(res => res.json())
         .then(data => {
             if(data.success) {
-                alert('Withdrawal Successful');
+                showToast('Withdrawal Successful', 'success');
                 location.reload();
             } else {
-                alert('Error: ' + data.message);
+                showToast('Error: ' + data.message, 'danger');
             }
         })
-        .catch(err => alert('Error connecting to server'));
+        .catch(err => showToast('Error connecting to server', 'danger'));
     });
 
     document.getElementById('btnRecalc').addEventListener('click', function() {

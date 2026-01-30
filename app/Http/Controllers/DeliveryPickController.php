@@ -401,8 +401,19 @@ class DeliveryPickController extends Controller
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
-        $issues = DeliveryIssue::with(['session.order'])->where('status', 'pending')->orderBy('created_at', 'desc')->get();
-        return view('delivery.scan-issues', compact('issues'));
+        $issues = DeliveryIssue::with(['session.order'])
+            ->where('status', 'pending')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        $historyIssues = DeliveryIssue::with(['session.order'])
+            ->where('status', '!=', 'pending')
+            ->orderBy('resolved_at', 'desc')
+            ->orderBy('created_at', 'desc')
+            ->limit(200)
+            ->get();
+
+        return view('delivery.scan-issues', compact('issues', 'historyIssues'));
     }
 
     private function getBoxesByFIFO(string $partNumber, int $requestedPcs)
