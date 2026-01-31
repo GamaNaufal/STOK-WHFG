@@ -78,31 +78,76 @@ class StockWithdrawalController extends Controller
         $request->validate([
             'part_number' => 'required|string',
             'pcs_quantity' => 'required|integer|min:1',
+            'delivery_order_id' => 'nullable|integer',
         ]);
 
         $partNumber = $request->input('part_number');
-        $requestedQty = $request->input('pcs_quantity');
+        $requestedQty = (int) $request->input('pcs_quantity');
+        $orderId = $request->input('delivery_order_id');
 
-        // Get total available stock
-        $totalStock = $this->getTotalStockForPart($partNumber);
+        $reservedLocations = [];
+        $reservedTotal = 0;
 
-        if ($totalStock < $requestedQty) {
-            return response()->json([
-                'success' => false,
-                'message' => "Stok tidak cukup! Available: {$totalStock} PCS, Requested: {$requestedQty} PCS",
-                'available' => $totalStock,
-                'requested' => $requestedQty,
-            ], 422);
+        if ($orderId) {
+            $reservedBoxes = $this->getReservedBoxesForOrder((int) $orderId, $partNumber);
+            foreach ($reservedBoxes as $box) {
+                $reservedLocations[] = [
+                    'pallet_id' => $box->pallet_id,
+                    'pallet_number' => $box->pallet_number,
+                    'warehouse_location' => $box->warehouse_location,
+                    'stored_date' => $box->stored_at ? \Carbon\Carbon::parse($box->stored_at)->format('d/m/Y H:i') : '-',
+                    'available_pcs' => (int) $box->pcs_quantity,
+                    'available_box' => 1,
+                    'pcs_per_box' => (int) $box->pcs_quantity,
+                    'will_take_pcs' => (int) $box->pcs_quantity,
+                    'will_take_box' => 1,
+                    'box_number' => $box->box_number,
+                    'order' => count($reservedLocations) + 1,
+                    'is_not_full' => (bool) $box->is_not_full,
+                    'is_reserved' => true,
+                ];
+                $reservedTotal += (int) $box->pcs_quantity;
+            }
         }
 
-        // Get locations in FIFO order
-        $locations = $this->getLocationsByFIFO($partNumber, $requestedQty);
+        $remainingQty = max(0, $requestedQty - $reservedTotal);
+
+        if (!$orderId) {
+            // Get total available stock (exclude reserved boxes)
+            $totalStock = $this->getTotalStockForPart($partNumber, true);
+
+            if ($totalStock < $requestedQty) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Stok tidak cukup! Available: {$totalStock} PCS, Requested: {$requestedQty} PCS",
+                    'available' => $totalStock,
+                    'requested' => $requestedQty,
+                ], 422);
+            }
+
+            $locations = $this->getLocationsByFIFO($partNumber, $requestedQty, true, false);
+        } else {
+            $locations = $remainingQty > 0
+                ? $this->getLocationsByFIFO($partNumber, $remainingQty, true, true)
+                : [];
+
+            if ($remainingQty > 0 && count($locations) === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stok tidak cukup untuk sisa kebutuhan. Butuh box not full.',
+                    'available' => $reservedTotal,
+                    'requested' => $requestedQty,
+                ], 422);
+            }
+        }
+
+        $locations = array_merge($reservedLocations, $locations);
 
         return response()->json([
             'success' => true,
             'part_number' => $partNumber,
             'requested_qty' => $requestedQty,
-            'total_available' => $totalStock,
+            'total_available' => $orderId ? ($reservedTotal + $this->getTotalStockForPart($partNumber, true)) : $this->getTotalStockForPart($partNumber, true),
             'locations' => $locations,
         ]);
     }
@@ -477,7 +522,7 @@ class StockWithdrawalController extends Controller
     /**
      * Get total stock for a part number (exclude items with 0 quantity)
      */
-    private function getTotalStockForPart($partNumber)
+    private function getTotalStockForPart($partNumber, bool $excludeAssigned = false)
     {
         $boxTotal = DB::table('boxes')
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
@@ -485,6 +530,9 @@ class StockWithdrawalController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
+            ->when($excludeAssigned, function ($q) {
+                $q->whereNull('boxes.assigned_delivery_order_id');
+            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->sum('boxes.pcs_quantity');
 
@@ -553,7 +601,7 @@ class StockWithdrawalController extends Controller
     /**
      * Get warehouse locations in FIFO order
      */
-    private function getLocationsByFIFO($partNumber, $requestedQty)
+    private function getLocationsByFIFO($partNumber, $requestedQty, bool $excludeAssigned = false, bool $strictRemaining = false)
     {
         $locations = [];
         $remainingQty = $requestedQty;
@@ -564,12 +612,16 @@ class StockWithdrawalController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
+            ->when($excludeAssigned, function ($q) {
+                $q->whereNull('boxes.assigned_delivery_order_id');
+            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select([
                 'boxes.id as box_id',
                 'boxes.box_number',
                 'boxes.pcs_quantity',
+                'boxes.is_not_full',
                 'pallets.id as pallet_id',
                 'pallets.pallet_number',
                 'stock_locations.warehouse_location',
@@ -580,6 +632,10 @@ class StockWithdrawalController extends Controller
         foreach ($boxRows as $box) {
             if ($remainingQty <= 0) {
                 break;
+            }
+
+            if ($strictRemaining && (int) $box->pcs_quantity > $remainingQty) {
+                continue;
             }
 
             $takeQty = min($remainingQty, (int) $box->pcs_quantity);
@@ -596,6 +652,8 @@ class StockWithdrawalController extends Controller
                 'will_take_box' => 1,
                 'box_number' => $box->box_number,
                 'order' => count($locations) + 1,
+                'is_not_full' => (bool) $box->is_not_full,
+                'is_reserved' => false,
             ];
 
             $remainingQty -= (int) $box->pcs_quantity;
@@ -647,6 +705,29 @@ class StockWithdrawalController extends Controller
         }
 
         return $locations;
+    }
+
+    private function getReservedBoxesForOrder(int $orderId, string $partNumber)
+    {
+        return DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.part_number', $partNumber)
+            ->where('boxes.is_withdrawn', false)
+            ->where('boxes.assigned_delivery_order_id', $orderId)
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderBy('boxes.created_at', 'asc')
+            ->select([
+                'boxes.box_number',
+                'boxes.pcs_quantity',
+                'boxes.is_not_full',
+                'pallets.id as pallet_id',
+                'pallets.pallet_number',
+                'stock_locations.warehouse_location',
+                'stock_locations.stored_at',
+            ])
+            ->get();
     }
 
     /**

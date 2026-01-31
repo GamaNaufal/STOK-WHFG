@@ -17,6 +17,7 @@ class DeliveryOrderController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->where('boxes.is_withdrawn', false)
+            ->whereNull('boxes.assigned_delivery_order_id')
             ->groupBy('boxes.part_number')
             ->pluck('total', 'boxes.part_number');
 
@@ -37,6 +38,32 @@ class DeliveryOrderController extends Controller
         return $availableByPart;
     }
 
+    private function getReservedStockByOrder(): array
+    {
+        $rows = Box::select(
+                'boxes.assigned_delivery_order_id',
+                'boxes.part_number',
+                DB::raw('SUM(boxes.pcs_quantity) as total')
+            )
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->where('boxes.is_withdrawn', false)
+            ->whereNotNull('boxes.assigned_delivery_order_id')
+            ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number')
+            ->get();
+
+        $reserved = [];
+        foreach ($rows as $row) {
+            $orderId = (int) $row->assigned_delivery_order_id;
+            $partNumber = $row->part_number;
+            $reserved[$orderId][$partNumber] = (int) $row->total;
+        }
+
+        return $reserved;
+    }
+
     // Dashboard: Only Approved Schedule (Visible to Admin & Warehouse)
     public function index()
     {
@@ -55,19 +82,21 @@ class DeliveryOrderController extends Controller
 
         // Precompute available stock per part (PCS)
         $availableByPart = $this->getAvailableStockByPart();
+        $reservedByOrder = $this->getReservedStockByOrder();
 
         $runningRequired = [];
 
-        $approvedOrders->each(function ($order) use ($availableByPart, &$runningRequired) {
+        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, &$runningRequired) {
             $allAvailable = true;
 
             $today = now()->timezone(config('app.timezone'))->startOfDay();
             $deliveryDate = \Carbon\Carbon::parse($order->delivery_date)->timezone(config('app.timezone'))->startOfDay();
             $order->days_remaining = $today->diffInDays($deliveryDate, false);
 
-            $order->items->each(function ($item) use ($availableByPart, &$runningRequired, &$allAvailable) {
+            $order->items->each(function ($item) use ($availableByPart, $reservedByOrder, $order, &$runningRequired, &$allAvailable) {
                 $partNumber = $item->part_number;
-                $available = (int) ($availableByPart[$partNumber] ?? 0);
+                $reservedForOrder = (int) ($reservedByOrder[$order->id][$partNumber] ?? 0);
+                $available = (int) ($availableByPart[$partNumber] ?? 0) + $reservedForOrder;
 
                 $runningRequired[$partNumber] = ($runningRequired[$partNumber] ?? 0) + (int) $item->quantity;
 
@@ -189,6 +218,7 @@ class DeliveryOrderController extends Controller
 
         // Precompute available stock per part (PCS) - same logic as delivery schedule
         $availableByPart = $this->getAvailableStockByPart();
+        $reservedByOrder = $this->getReservedStockByOrder();
 
         $sequenceOrders = $approvedOrders->concat($pendingOrders)->sort(function ($a, $b) {
             $dateA = \Carbon\Carbon::parse($a->delivery_date)->startOfDay();
@@ -203,10 +233,11 @@ class DeliveryOrderController extends Controller
 
         $runningRequired = [];
 
-        $sequenceOrders->each(function ($order) use ($availableByPart, &$runningRequired) {
-            $order->items->each(function ($item) use ($availableByPart, &$runningRequired) {
+        $sequenceOrders->each(function ($order) use ($availableByPart, $reservedByOrder, &$runningRequired) {
+            $order->items->each(function ($item) use ($availableByPart, $reservedByOrder, $order, &$runningRequired) {
                 $partNumber = $item->part_number;
-                $available = (int) ($availableByPart[$partNumber] ?? 0);
+                $reservedForOrder = (int) ($reservedByOrder[$order->id][$partNumber] ?? 0);
+                $available = (int) ($availableByPart[$partNumber] ?? 0) + $reservedForOrder;
 
                 $runningRequired[$partNumber] = ($runningRequired[$partNumber] ?? 0) + (int) $item->quantity;
 

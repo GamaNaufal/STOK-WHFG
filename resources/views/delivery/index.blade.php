@@ -689,7 +689,8 @@
                     },
                     body: JSON.stringify({
                         part_number: item.part_number,
-                        pcs_quantity: qty
+                        pcs_quantity: qty,
+                        delivery_order_id: currentOrderId
                     })
                 })
                 .then(res => res.json())
@@ -698,9 +699,10 @@
                     if (data.success) {
                         tableBody.innerHTML = '';
                         data.locations.forEach(loc => {
+                            const labels = `${loc.is_not_full ? '<span class="badge bg-warning text-dark ms-1">Not Full</span>' : ''}${loc.is_reserved ? '<span class="badge bg-info text-dark ms-1">Reserved</span>' : ''}`;
                             tableBody.innerHTML += `
                                 <tr>
-                                    <td>${loc.box_number}</td>
+                                    <td>${loc.box_number} ${labels}</td>
                                     <td>${loc.pallet_number}</td>
                                     <td>${loc.warehouse_location}</td>
                                     <td>${loc.stored_date}</td>

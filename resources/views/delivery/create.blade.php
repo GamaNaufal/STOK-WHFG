@@ -403,8 +403,25 @@
                                                 </a>
                                             @endif
                                         @else
-                                            <small class="text-muted">{{ $order->items->count() }} Item</small>
+                                            <div class="d-flex align-items-center gap-2">
+                                                <small class="text-muted">{{ $order->items->count() }} Item</small>
+                                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#order-detail-{{ $order->id }}">
+                                                    <i class="bi bi-eye"></i> Detail
+                                                </button>
+                                            </div>
                                         @endif
+                                    </td>
+                                </tr>
+                                <tr class="collapse" id="order-detail-{{ $order->id }}">
+                                    <td colspan="4" class="bg-light">
+                                        <div class="p-3">
+                                            <div class="fw-bold mb-2">Detail Item</div>
+                                            <ul class="mb-0">
+                                                @foreach($order->items as $item)
+                                                    <li>{{ $item->part_number }} - {{ $item->quantity }} PCS</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
                                     </td>
                                 </tr>
                                 @empty

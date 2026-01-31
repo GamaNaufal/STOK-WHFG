@@ -24,10 +24,14 @@ class Box extends Model
         'lot03',
         'is_withdrawn',
         'withdrawn_at',
+        'is_not_full',
+        'not_full_reason',
+        'assigned_delivery_order_id',
     ];
 
     protected $casts = [
         'is_withdrawn' => 'boolean',
+        'is_not_full' => 'boolean',
         'withdrawn_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
@@ -62,6 +66,11 @@ class Box extends Model
     public function deliveryPickItems()
     {
         return $this->hasMany(DeliveryPickItem::class);
+    }
+
+    public function assignedDeliveryOrder()
+    {
+        return $this->belongsTo(DeliveryOrder::class, 'assigned_delivery_order_id');
     }
 
     // Scope helper

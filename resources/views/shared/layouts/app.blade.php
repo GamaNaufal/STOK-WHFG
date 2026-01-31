@@ -238,6 +238,12 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('box-not-full.approvals') ? 'active' : '' }}" 
+                                       href="{{ route('box-not-full.approvals') }}">
+                                        <i class="bi bi-clipboard-check"></i> Approval Box Not Full
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('reports*') ? 'active' : '' }}" 
                                        data-bs-toggle="collapse" href="#laporanMenu" role="button" aria-expanded="{{ request()->routeIs('reports*') ? 'true' : 'false' }}" aria-controls="laporanMenu">
                                         <i class="bi bi-file-earmark-pdf"></i> Laporan
@@ -279,6 +285,12 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('box-not-full.create') ? 'active' : '' }}" 
+                                       href="{{ route('box-not-full.create') }}">
+                                        <i class="bi bi-exclamation-circle"></i> Box Not Full
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('delivery.pick.issues') ? 'active' : '' }}" 
                                        href="{{ route('delivery.pick.issues') }}">
                                         <i class="bi bi-bell"></i> Scan Issues
@@ -310,6 +322,18 @@
                                     <a class="nav-link {{ request()->routeIs('stock-input*') ? 'active' : '' }}" 
                                        href="{{ route('stock-input.index') }}">
                                         <i class="bi bi-plus-circle"></i> Input Stok
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('box-not-full.create') ? 'active' : '' }}" 
+                                       href="{{ route('box-not-full.create') }}">
+                                        <i class="bi bi-exclamation-circle"></i> Box Not Full
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('box-not-full.approvals') ? 'active' : '' }}" 
+                                       href="{{ route('box-not-full.approvals') }}">
+                                        <i class="bi bi-clipboard-check"></i> Approval Box Not Full
                                     </a>
                                 </li>
                                 <li class="nav-item">

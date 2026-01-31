@@ -48,7 +48,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/barcode-scanner/scan', [BarcodeController::class, 'scan'])->name('barcode.scan');
     });
 
-    // Stock Input Routes (Warehouse Operator) - Scan QR Box
+    // Stock Input Routes (Warehouse Operator/Admin) - Scan QR Box
     Route::middleware('role:warehouse_operator,admin')->group(function () {
         Route::get('/stock-input', [StockInputController::class, 'index'])->name('stock-input.index');
         Route::post('/stock-input/scan-box', [StockInputController::class, 'scanBox'])->name('stock-input.scan-box');
@@ -57,6 +57,19 @@ Route::middleware('auth')->group(function () {
         Route::get('/stock-input/get-pallet-data', [StockInputController::class, 'getCurrentPalletData'])->name('stock-input.get-pallet-data');
         Route::post('/stock-input/clear-session', [StockInputController::class, 'clearSession'])->name('stock-input.clear-session');
         Route::post('/stock-input/store', [StockInputController::class, 'store'])->name('stock-input.store');
+    });
+
+    // Box Not Full (Admin Warehouse & Admin)
+    Route::middleware('role:admin_warehouse,admin')->group(function () {
+        Route::get('/box-not-full', [\App\Http\Controllers\NotFullBoxRequestController::class, 'create'])->name('box-not-full.create');
+        Route::post('/box-not-full', [\App\Http\Controllers\NotFullBoxRequestController::class, 'store'])->name('box-not-full.store');
+    });
+
+    // Box Not Full Approvals (Supervisi & Admin)
+    Route::middleware('role:supervisi,admin')->group(function () {
+        Route::get('/box-not-full/approvals', [\App\Http\Controllers\NotFullBoxRequestController::class, 'approvals'])->name('box-not-full.approvals');
+        Route::post('/box-not-full/{id}/approve', [\App\Http\Controllers\NotFullBoxRequestController::class, 'approve'])->name('box-not-full.approve');
+        Route::post('/box-not-full/{id}/reject', [\App\Http\Controllers\NotFullBoxRequestController::class, 'reject'])->name('box-not-full.reject');
     });
 
     // Delivery Stock Routes (Sales, PPC, Warehouse, Admin) - Replaces Stock Withdrawal

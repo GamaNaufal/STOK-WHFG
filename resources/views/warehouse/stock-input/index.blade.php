@@ -106,6 +106,7 @@
                                 <small class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
                                     <i class="bi bi-info-circle"></i> Scan No Part setelah scan ID Box
                                 </small>
+
                             </div>
                         </form>
 
@@ -642,7 +643,7 @@
                                 </div>
                                 <div class="col-md-3">
                                     <small class="text-muted">Qty Box</small>
-                                    <div class="fw-bold">${box.qty_box ?? '-'}</div>
+                                    <div class="fw-bold">${box.qty_box ?? '-'} ${box.is_not_full ? '<span class="badge bg-warning text-dark ms-1">Not Full</span>' : ''}</div>
                                 </div>
                             `;
                             itemsList.appendChild(boxRow);

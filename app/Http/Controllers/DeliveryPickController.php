@@ -54,8 +54,22 @@ class DeliveryPickController extends Controller
                         continue;
                     }
 
-                    $boxes = $this->getBoxesByFIFO($item->part_number, $remainingQty);
-                    $totalPcs = $boxes->sum('pcs_quantity');
+                    $reservedBoxes = $this->getReservedBoxesForOrder($order->id, $item->part_number);
+                    foreach ($reservedBoxes as $box) {
+                        DeliveryPickItem::create([
+                            'pick_session_id' => $session->id,
+                            'box_id' => $box->id,
+                            'part_number' => $box->part_number,
+                            'pcs_quantity' => (int) $box->pcs_quantity,
+                            'status' => 'pending',
+                        ]);
+                    }
+
+                    $reservedTotal = $reservedBoxes->sum('pcs_quantity');
+                    $remainingAfterReserved = max(0, $remainingQty - (int) $reservedTotal);
+
+                    $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved);
+                    $totalPcs = $boxes->sum('pcs_quantity') + (int) $reservedTotal;
 
                     if ($totalPcs < $remainingQty) {
                         throw new \Exception('Stok box tidak cukup untuk part ' . $item->part_number);
@@ -416,11 +430,36 @@ class DeliveryPickController extends Controller
         return view('delivery.scan-issues', compact('issues', 'historyIssues'));
     }
 
+    private function getReservedBoxesForOrder(int $orderId, string $partNumber)
+    {
+        return Box::query()
+            ->where('part_number', $partNumber)
+            ->where('is_withdrawn', false)
+            ->where('assigned_delivery_order_id', $orderId)
+            ->whereNotIn('boxes.id', function ($q) {
+                $q->select('box_id')
+                  ->from('delivery_pick_items')
+                  ->whereIn('pick_session_id', function ($q2) {
+                      $q2->select('id')
+                        ->from('delivery_pick_sessions')
+                        ->whereIn('status', ['scanning', 'blocked', 'approved']);
+                  });
+            })
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderBy('boxes.created_at', 'asc')
+            ->select('boxes.*')
+            ->get();
+    }
+
     private function getBoxesByFIFO(string $partNumber, int $requestedPcs)
     {
         $boxes = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
+            ->whereNull('boxes.assigned_delivery_order_id')
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
                   ->from('delivery_pick_items')
@@ -444,6 +483,9 @@ class DeliveryPickController extends Controller
         foreach ($boxes as $box) {
             if ($remaining <= 0) {
                 break;
+            }
+            if ((int) $box->pcs_quantity > $remaining) {
+                continue;
             }
             $selected->push($box);
             $remaining -= (int) $box->pcs_quantity;

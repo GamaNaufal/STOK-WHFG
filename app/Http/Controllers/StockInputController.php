@@ -8,6 +8,8 @@ use App\Models\PalletItem;
 use App\Models\PartSetting;
 use App\Models\StockLocation;
 use App\Models\StockInput;
+use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -113,6 +115,9 @@ class StockInputController extends Controller
     {
         $validated = $request->validate([
             'part_number' => 'required|string',
+            'pcs_quantity' => 'nullable|integer|min:1',
+            'not_full_reason' => 'nullable|string',
+            'delivery_order_id' => 'nullable|integer|exists:delivery_orders,id',
         ]);
 
         $pendingBox = session('pending_box');
@@ -131,6 +136,42 @@ class StockInputController extends Controller
                 'success' => false,
                 'message' => 'No Part belum terdaftar di Master Part.'
             ], 400);
+        }
+
+        $fixedQty = (int) $partSetting->qty_box;
+        $pcsQuantity = $validated['pcs_quantity'] ?? $fixedQty;
+        $isNotFull = $pcsQuantity !== $fixedQty;
+
+        if ($pcsQuantity > $fixedQty) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Qty box tidak boleh melebihi fixed qty.'
+            ], 422);
+        }
+
+        if ($isNotFull) {
+            if (empty($validated['not_full_reason'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Alasan box not full wajib diisi.'
+                ], 422);
+            }
+
+            if (empty($validated['delivery_order_id'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Box not full wajib disisipkan ke salah satu delivery.'
+                ], 422);
+            }
+
+            $deliveryOrder = DeliveryOrder::whereIn('status', ['approved', 'processing'])
+                ->find($validated['delivery_order_id']);
+            if (!$deliveryOrder) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Delivery yang dipilih tidak valid.'
+                ], 422);
+            }
         }
 
         $pallet_id = session('current_pallet_id');
@@ -155,8 +196,11 @@ class StockInputController extends Controller
         $scannedBoxes[] = [
             'box_number' => $pendingBox['box_number'],
             'part_number' => $partNumber,
-            'pcs_quantity' => $partSetting->qty_box,
-            'qty_box' => $partSetting->qty_box,
+            'pcs_quantity' => $pcsQuantity,
+            'qty_box' => $fixedQty,
+            'is_not_full' => $isNotFull,
+            'not_full_reason' => $isNotFull ? $validated['not_full_reason'] : null,
+            'delivery_order_id' => $isNotFull ? (int) $validated['delivery_order_id'] : null,
         ];
         session(['scanned_boxes' => $scannedBoxes]);
 
@@ -169,11 +213,11 @@ class StockInputController extends Controller
                 'pallet_id' => $pallet->id,
                 'part_number' => $partNumber,
                 'box_quantity' => 1,
-                'pcs_quantity' => $partSetting->qty_box,
+                'pcs_quantity' => $pcsQuantity,
             ]);
         } else {
             $palletItem->increment('box_quantity');
-            $palletItem->increment('pcs_quantity', $partSetting->qty_box);
+            $palletItem->increment('pcs_quantity', $pcsQuantity);
         }
 
         session()->forget('pending_box');
@@ -184,7 +228,9 @@ class StockInputController extends Controller
             'pallet_number' => $pallet->pallet_number,
             'box_number' => $pendingBox['box_number'],
             'part_number' => $partNumber,
-            'qty_box' => $partSetting->qty_box,
+            'qty_box' => $fixedQty,
+            'pcs_quantity' => $pcsQuantity,
+            'is_not_full' => $isNotFull,
             'boxes_in_pallet' => count($scannedBoxes),
         ]);
     }
@@ -400,14 +446,39 @@ class StockInputController extends Controller
             foreach ($scannedBoxes as $scannedBox) {
                 $box = Box::where('box_number', $scannedBox['box_number'])->first();
                 if (!$box) {
+                    if (!empty($scannedBox['is_not_full']) && empty($scannedBox['delivery_order_id'])) {
+                        throw new \Exception('Box not full wajib disisipkan ke delivery.');
+                    }
+
                     $box = Box::create([
                         'box_number' => $scannedBox['box_number'],
                         'part_number' => $scannedBox['part_number'],
-                        'pcs_quantity' => $scannedBox['qty_box'],
-                        'qr_code' => $scannedBox['box_number'] . '|' . $scannedBox['part_number'] . '|' . $scannedBox['qty_box'],
+                        'pcs_quantity' => $scannedBox['pcs_quantity'] ?? $scannedBox['qty_box'],
+                        'qr_code' => $scannedBox['box_number'] . '|' . $scannedBox['part_number'] . '|' . ($scannedBox['pcs_quantity'] ?? $scannedBox['qty_box']),
                         'user_id' => auth()->id(),
-                        'qty_box' => $scannedBox['qty_box'],
+                        'qty_box' => $scannedBox['qty_box'] ?? null,
+                        'is_not_full' => (bool) ($scannedBox['is_not_full'] ?? false),
+                        'not_full_reason' => $scannedBox['not_full_reason'] ?? null,
+                        'assigned_delivery_order_id' => $scannedBox['delivery_order_id'] ?? null,
                     ]);
+
+                    if (!empty($scannedBox['is_not_full']) && !empty($scannedBox['delivery_order_id'])) {
+                        $order = DeliveryOrder::with('items')->find($scannedBox['delivery_order_id']);
+                        if ($order) {
+                            $item = $order->items()->where('part_number', $scannedBox['part_number'])->first();
+                            if ($item) {
+                                $item->quantity += (int) ($scannedBox['pcs_quantity'] ?? 0);
+                                $item->save();
+                            } else {
+                                DeliveryOrderItem::create([
+                                    'delivery_order_id' => $order->id,
+                                    'part_number' => $scannedBox['part_number'],
+                                    'quantity' => (int) ($scannedBox['pcs_quantity'] ?? 0),
+                                    'fulfilled_quantity' => 0,
+                                ]);
+                            }
+                        }
+                    }
                 }
 
                 $pallet->boxes()->attach($box->id);
