@@ -5,10 +5,107 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\Box;
 use App\Models\PalletItem;
+use App\Models\PartSetting;
 use Illuminate\Support\Facades\DB;
 
 class DeliveryOrderController extends Controller
 {
+    private function buildFifoPoolsByPart(): array
+    {
+        $boxRows = DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.is_withdrawn', false)
+            ->whereNull('boxes.assigned_delivery_order_id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.created_at')
+            ->get();
+
+        $legacyRows = PalletItem::where('pcs_quantity', '>', 0)
+            ->whereHas('pallet', function ($q) {
+                $q->whereHas('stockLocation')
+                  ->doesntHave('boxes');
+            })
+            ->select('part_number', 'pcs_quantity', 'created_at')
+            ->get();
+
+        $combined = [];
+        foreach ($boxRows as $row) {
+            $combined[] = [
+                'part_number' => $row->part_number,
+                'pcs_quantity' => (int) $row->pcs_quantity,
+                'created_at' => $row->created_at,
+            ];
+        }
+
+        foreach ($legacyRows as $row) {
+            $combined[] = [
+                'part_number' => $row->part_number,
+                'pcs_quantity' => (int) $row->pcs_quantity,
+                'created_at' => $row->created_at,
+            ];
+        }
+
+        usort($combined, function ($a, $b) {
+            return strtotime($a['created_at']) <=> strtotime($b['created_at']);
+        });
+
+        $pools = [];
+        foreach ($combined as $row) {
+            $pools[$row['part_number']][] = (int) $row['pcs_quantity'];
+        }
+
+        return $pools;
+    }
+    private function getStrictFulfillableForOrder(int $orderId, string $partNumber, int $requiredQty): int
+    {
+        $reservedBoxes = Box::query()
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.part_number', $partNumber)
+            ->where('boxes.is_withdrawn', false)
+            ->where('boxes.assigned_delivery_order_id', $orderId)
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderBy('boxes.created_at', 'asc')
+            ->select('boxes.pcs_quantity')
+            ->get();
+
+        $reservedTotal = (int) $reservedBoxes->sum('pcs_quantity');
+        $remaining = max(0, $requiredQty - $reservedTotal);
+
+        if ($remaining <= 0) {
+            return $reservedTotal;
+        }
+
+        $fifoBoxes = Box::query()
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.part_number', $partNumber)
+            ->where('boxes.is_withdrawn', false)
+            ->whereNull('boxes.assigned_delivery_order_id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderBy('boxes.created_at', 'asc')
+            ->select('boxes.pcs_quantity')
+            ->get();
+
+        $fifoTotal = 0;
+        foreach ($fifoBoxes as $box) {
+            if ($remaining <= 0) {
+                break;
+            }
+            $boxQty = (int) $box->pcs_quantity;
+            if ($boxQty > $remaining) {
+                continue;
+            }
+            $fifoTotal += $boxQty;
+            $remaining -= $boxQty;
+        }
+
+        return $reservedTotal + $fifoTotal;
+    }
     private function getAvailableStockByPart(): array
     {
         $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
@@ -84,29 +181,61 @@ class DeliveryOrderController extends Controller
         $availableByPart = $this->getAvailableStockByPart();
         $reservedByOrder = $this->getReservedStockByOrder();
 
-        $runningRequired = [];
+        $fifoPools = $this->buildFifoPoolsByPart();
 
-        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, &$runningRequired) {
+        $partSettings = PartSetting::pluck('qty_box', 'part_number');
+
+        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $partSettings, &$fifoPools) {
             $allAvailable = true;
 
             $today = now()->timezone(config('app.timezone'))->startOfDay();
             $deliveryDate = \Carbon\Carbon::parse($order->delivery_date)->timezone(config('app.timezone'))->startOfDay();
             $order->days_remaining = $today->diffInDays($deliveryDate, false);
 
-            $order->items->each(function ($item) use ($availableByPart, $reservedByOrder, $order, &$runningRequired, &$allAvailable) {
+            $order->items->each(function ($item) use ($availableByPart, $reservedByOrder, $order, $partSettings, &$fifoPools, &$allAvailable) {
                 $partNumber = $item->part_number;
                 $reservedForOrder = (int) ($reservedByOrder[$order->id][$partNumber] ?? 0);
                 $available = (int) ($availableByPart[$partNumber] ?? 0) + $reservedForOrder;
 
-                $runningRequired[$partNumber] = ($runningRequired[$partNumber] ?? 0) + (int) $item->quantity;
-
-                $previousRequired = $runningRequired[$partNumber] - (int) $item->quantity;
-                $remainingBefore = $available - $previousRequired;
-
                 $item->available_total = $available;
-                $item->remaining_before = max(0, $remainingBefore);
-                $item->display_fulfilled = max(0, min((int) $item->quantity, $remainingBefore));
-                $item->is_fulfillable = $remainingBefore >= (int) $item->quantity;
+                $requiredQty = (int) $item->quantity;
+                $remainingNeeded = max(0, $requiredQty - $reservedForOrder);
+
+                $takenFromFifo = 0;
+                $pool = $fifoPools[$partNumber] ?? [];
+                $needsNotFull = false;
+
+                if ($remainingNeeded > 0 && isset($partSettings[$partNumber])) {
+                    $fixedQty = (int) $partSettings[$partNumber];
+                    if ($fixedQty > 0) {
+                        $fullBoxesRequired = intdiv($remainingNeeded, $fixedQty);
+                        $remainder = $remainingNeeded % $fixedQty;
+                        $availableFullBoxes = 0;
+                        foreach ($pool as $qty) {
+                            if ((int) $qty === $fixedQty) {
+                                $availableFullBoxes++;
+                            }
+                        }
+                        $needsNotFull = $remainder > 0 && $availableFullBoxes >= $fullBoxesRequired;
+                    }
+                }
+
+                while ($remainingNeeded > 0 && count($pool) > 0) {
+                    $nextBoxQty = (int) $pool[0];
+                    if ($nextBoxQty > $remainingNeeded) {
+                        break;
+                    }
+                    $takenFromFifo += $nextBoxQty;
+                    $remainingNeeded -= $nextBoxQty;
+                    array_shift($pool);
+                }
+
+                $fifoPools[$partNumber] = $pool;
+
+                $strictFulfillable = min($requiredQty, $reservedForOrder + $takenFromFifo);
+                $item->display_fulfilled = $strictFulfillable;
+                $item->is_fulfillable = $strictFulfillable >= $requiredQty;
+                $item->needs_not_full = $needsNotFull;
 
                 if (!$item->is_fulfillable) {
                     $allAvailable = false;
@@ -285,7 +414,7 @@ class DeliveryOrderController extends Controller
         return response()->json([
             'order_id' => $order->id,
             'customer_name' => $order->customer_name,
-            'delivery_date' => $order->delivery_date->format('d M Y'),
+            'delivery_date' => \Carbon\Carbon::parse($order->delivery_date)->format('d M Y'),
             'items' => $items,
         ]);
     }

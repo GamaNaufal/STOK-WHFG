@@ -2,6 +2,32 @@
 
 @section('title', 'Box Not Full - Warehouse FG Yamato')
 
+@section('styles')
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <style>
+        .select2-container .select2-selection--single {
+            height: 38px;
+            padding: 4px 8px;
+        }
+
+        .select2-container--default .select2-selection--single .select2-selection__rendered {
+            line-height: 28px;
+        }
+
+        @media (max-width: 992px) {
+            .card-body {
+                padding: 20px !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .row.g-4 > [class*="col-"] {
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
+@endsection
+
 @section('content')
 <div class="container-fluid">
     <div class="row mb-4">
@@ -35,7 +61,6 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">No Part</label>
-                                <input type="text" id="partSearchInput" class="form-control mb-2" placeholder="Cari No Part...">
                                 <select name="part_number" id="partNumberSelect" class="form-select" required>
                                     <option value="">Pilih No Part</option>
                                     @foreach($partNumbers as $part)
@@ -175,16 +200,17 @@
 @endsection
 
 @section('scripts')
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
-    const partSearchInput = document.getElementById('partSearchInput');
     const partSelect = document.getElementById('partNumberSelect');
 
-    partSearchInput.addEventListener('input', () => {
-        const term = partSearchInput.value.toLowerCase();
-        Array.from(partSelect.options).forEach((opt) => {
-            if (!opt.value) return;
-            const match = opt.text.toLowerCase().includes(term);
-            opt.hidden = !match;
+    window.jQuery(function() {
+        window.jQuery(partSelect).select2({
+            width: '100%',
+            placeholder: 'Pilih No Part',
+            allowClear: true,
+            minimumResultsForSearch: 0
         });
     });
 

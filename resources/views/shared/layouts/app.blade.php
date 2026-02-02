@@ -23,6 +23,10 @@
             box-shadow: 2px 0 8px rgba(0,0,0,0.05);
             border-right: 1px solid #e5e9f0;
         }
+        .sidebar.offcanvas {
+            width: 85vw;
+            max-width: 320px;
+        }
         .sidebar .px-3 {
             border-bottom: 1px solid #e5e9f0;
             padding-bottom: 1.5rem !important;
@@ -129,24 +133,87 @@
             color: #0C7779;
             font-size: 0.75rem;
         }
+
+        @media (max-width: 1200px) {
+            .container-fluid > .row {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                min-height: auto;
+                box-shadow: none;
+                border-right: none;
+            }
+
+            .main-content {
+                width: 100% !important;
+                padding: 1rem !important;
+            }
+
+            .table-responsive {
+                overflow-x: auto;
+            }
+
+            .card,
+            .section-card,
+            .history-card {
+                margin-bottom: 1rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar .nav-link {
+                padding: 0.6rem 0.75rem;
+            }
+
+            .page-header,
+            .section-header {
+                padding: 1rem !important;
+            }
+
+            .btn,
+            .btn-sm,
+            .btn-lg {
+                width: 100%;
+                margin-bottom: 0.5rem;
+            }
+
+            .action-buttons {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+        }
     </style>
     
     @yield('styles')
 </head>
 <body>
     <div class="container-fluid">
+        <div class="d-lg-none sticky-top" style="background: #f8f9fb; border-bottom: 1px solid #e5e9f0; z-index: 1030;">
+            <div class="d-flex align-items-center justify-content-between px-3 py-2">
+                <div class="fw-bold" style="color:#0C7779;"><i class="bi bi-box2"></i> Warehouse FG</div>
+                <button class="btn btn-primary" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+                    <i class="bi bi-list"></i> Menu
+                </button>
+            </div>
+        </div>
         <div class="row">
-            <!-- Sidebar -->
-            <nav class="col-md-2 sidebar d-md-block">
-                <div class="position-sticky pt-3">
-                    <div class="px-3 mb-4">
-                        <h4 class="mb-0">
-                            <i class="bi bi-box2"></i> Warehouse FG
-                        </h4>
-                        <small class="text-muted">PT. Yamatogomu Indonesia</small>
-                    </div>
-                    
-                    <ul class="nav flex-column px-2">
+            <!-- Sidebar (Offcanvas on Mobile) -->
+            <nav class="col-md-2 sidebar offcanvas offcanvas-start offcanvas-lg" tabindex="-1" id="mobileSidebar">
+                <div class="offcanvas-header d-lg-none">
+                    <h5 class="offcanvas-title"><i class="bi bi-box2"></i> Warehouse FG</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+                </div>
+                <div class="offcanvas-body p-0">
+                    <div class="position-sticky pt-3">
+                        <div class="px-3 mb-4">
+                            <h4 class="mb-0">
+                                <i class="bi bi-box2"></i> Warehouse FG
+                            </h4>
+                            <small class="text-muted">PT. Yamatogomu Indonesia</small>
+                        </div>
+                        
+                        <ul class="nav flex-column px-2">
                         @if(auth()->check())
                             <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" 
@@ -423,28 +490,34 @@
                         @endif
                     </ul>
 
-                    @if(auth()->check())
-                        <hr class="my-3" style="border-color: rgba(255,255,255,0.2);">
-                        <div class="px-2">
-                            <small class="text-muted">Logged in as:</small>
-                            <p class="mb-3">
-                                <strong>{{ auth()->user()->name }}</strong>
-                                <br>
-                                <span class="badge bg-info">{{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}</span>
-                            </p>
-                            <form method="POST" action="{{ route('logout') }}" style="display: inline;">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">
-                                    <i class="bi bi-box-arrow-right"></i> Logout
-                                </button>
-                            </form>
-                        </div>
-                    @endif
+                        @if(auth()->check())
+                            <hr class="my-3" style="border-color: rgba(255,255,255,0.2);">
+                            <div class="px-2">
+                                <small class="text-muted">Logged in as:</small>
+                                <p class="mb-3">
+                                    <strong>{{ auth()->user()->name }}</strong>
+                                    <br>
+                                    <span class="badge bg-info">{{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}</span>
+                                </p>
+                                <form method="POST" action="{{ route('logout') }}" style="display: inline;">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                                        <i class="bi bi-box-arrow-right"></i> Logout
+                                    </button>
+                                </form>
+                            </div>
+                        @endif
+                    </div>
                 </div>
             </nav>
 
             <!-- Main Content -->
             <main class="col-md-10 main-content">
+                <div class="d-lg-none mb-3">
+                    <button class="btn btn-primary w-100" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
+                        <i class="bi bi-list"></i> Menu
+                    </button>
+                </div>
                 @if (session('success'))
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
                         <i class="bi bi-check-circle"></i> {{ session('success') }}

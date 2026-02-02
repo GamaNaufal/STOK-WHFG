@@ -79,6 +79,45 @@
             letter-spacing: 0.8px;
         }
 
+        @media (max-width: 992px) {
+            .section-header {
+                padding: 1rem 1.25rem;
+                flex-wrap: wrap;
+            }
+
+            .modern-table thead {
+                display: none;
+            }
+
+            .modern-table tbody tr {
+                display: block;
+                border-bottom: 1px solid #e5e7eb;
+                padding: 0.75rem 0.5rem;
+            }
+
+            .modern-table tbody td {
+                display: flex;
+                justify-content: space-between;
+                gap: 1rem;
+                padding: 0.35rem 0.5rem;
+                border: none;
+                white-space: normal;
+            }
+
+            .part-item {
+                flex-wrap: wrap;
+            }
+
+            .part-qty {
+                margin-top: 0.25rem;
+            }
+
+            .action-buttons {
+                justify-content: flex-start;
+                flex-wrap: wrap;
+            }
+        }
+
         .modern-table tbody tr {
             border-bottom: 1px solid #e9ecef;
             transition: background 0.2s ease;
@@ -414,6 +453,9 @@
                                     <span class="part-qty {{ ($item->is_fulfillable ?? false) ? 'ok' : 'warning' }}">
                                         {{ $item->display_fulfilled ?? 0 }} / {{ $item->quantity }}
                                     </span>
+                                    @if(!empty($item->needs_not_full))
+                                        <span class="ms-2 badge bg-warning text-dark">Butuh Box Not Full</span>
+                                    @endif
                                 </div>
                             @endforeach
                         </td>
@@ -618,6 +660,16 @@
     }
 
     let pendingProcessItems = [];
+    const processBtn = document.getElementById('btnProcessAll');
+
+    function updateProcessButton() {
+        const hasError = pendingProcessItems.some(item => item.hasFifoError);
+        if (processBtn) {
+            processBtn.disabled = hasError;
+            processBtn.style.opacity = hasError ? '0.6' : '1';
+            processBtn.style.pointerEvents = hasError ? 'none' : 'auto';
+        }
+    }
 
     function renderFulfillItems(items) {
         const container = document.getElementById('fulfillItems');
@@ -629,6 +681,7 @@
                 return;
             }
 
+            item.hasFifoError = false;
             pendingProcessItems.push(item);
 
             const section = document.createElement('div');
@@ -698,6 +751,15 @@
                     loadingEl.style.display = 'none';
                     if (data.success) {
                         tableBody.innerHTML = '';
+                        if (!data.locations || data.locations.length === 0) {
+                            item.hasFifoError = true;
+                            errorEl.textContent = 'Tidak ada rekomendasi. Butuh box not full.';
+                            errorEl.style.display = 'block';
+                            updateProcessButton();
+                            return;
+                        }
+
+                        item.hasFifoError = false;
                         data.locations.forEach(loc => {
                             const labels = `${loc.is_not_full ? '<span class="badge bg-warning text-dark ms-1">Not Full</span>' : ''}${loc.is_reserved ? '<span class="badge bg-info text-dark ms-1">Reserved</span>' : ''}`;
                             tableBody.innerHTML += `
@@ -712,15 +774,20 @@
                             `;
                         });
                         tableWrap.style.display = 'block';
+                        updateProcessButton();
                     } else {
+                        item.hasFifoError = true;
                         errorEl.textContent = data.message || 'Tidak dapat menghitung FIFO.';
                         errorEl.style.display = 'block';
+                        updateProcessButton();
                     }
                 })
                 .catch(() => {
                     loadingEl.style.display = 'none';
+                    item.hasFifoError = true;
                     errorEl.textContent = 'Gagal memuat FIFO.';
                     errorEl.style.display = 'block';
+                    updateProcessButton();
                 });
             }
 
