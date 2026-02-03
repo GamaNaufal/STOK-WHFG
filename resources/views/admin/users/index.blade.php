@@ -111,47 +111,26 @@
                 const deleteUrl = btn.getAttribute('data-delete-url') || '#';
                 const userName = btn.getAttribute('data-user-name') || 'user';
 
-                Swal.fire({
-                    title: '<strong>Hapus User?</strong>',
-                    html: `
-                        <div style="text-align: left; padding: 10px;">
-                            <p style="margin-bottom: 15px;">Anda akan menghapus user <strong style="color: #dc2626;">${userName}</strong> dari sistem.</p>
-                            
-                            <div style="background: #fee2e2; padding: 12px; border-radius: 8px; border-left: 4px solid #dc2626; margin-bottom: 15px;">
-                                <i class="bi bi-exclamation-triangle" style="color: #dc2626;"></i> 
-                                <strong style="color: #991b1b;">Perhatian:</strong>
-                                <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #991b1b;">
-                                    <li>User tidak akan bisa login lagi</li>
-                                    <li>Semua data aktivitas tetap tersimpan</li>
-                                    <li>Tindakan ini <strong>tidak dapat dibatalkan</strong></li>
-                                </ul>
-                            </div>
-                        </div>
-                    `,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: '<i class="bi bi-trash"></i> Ya, Hapus User',
-                    cancelButtonText: '<i class="bi bi-x-circle"></i> Batal',
-                    confirmButtonColor: '#dc2626',
-                    cancelButtonColor: '#6b7280',
-                    reverseButtons: true,
-                    width: '550px',
-                    customClass: {
-                        confirmButton: 'btn btn-lg',
-                        cancelButton: 'btn btn-lg'
+                WarehouseAlert.delete({
+                    title: 'Hapus User?',
+                    itemName: `user <strong>${userName}</strong>`,
+                    warningItems: [
+                        'User tidak akan bisa login lagi',
+                        'Semua data aktivitas tetap tersimpan',
+                        'Tindakan ini <strong>tidak dapat dibatalkan</strong>'
+                    ],
+                    confirmText: 'Ya, Hapus User',
+                    onConfirm: () => {
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = deleteUrl;
+                        form.innerHTML = `
+                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="_method" value="DELETE">
+                        `;
+                        document.body.appendChild(form);
+                        form.submit();
                     }
-                }).then((result) => {
-                    if (!result.isConfirmed) return;
-
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = deleteUrl;
-                    form.innerHTML = `
-                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="_method" value="DELETE">
-                    `;
-                    document.body.appendChild(form);
-                    form.submit();
                 });
             });
         });

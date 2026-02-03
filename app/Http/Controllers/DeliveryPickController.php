@@ -321,20 +321,66 @@ class DeliveryPickController extends Controller
         try {
             // Find all boxes from pick session items and get their withdrawals
             $boxIds = $session->items()->pluck('box_id')->toArray();
+            $notFullBoxCount = 0;
+            $notFullRequests = collect();
             
             if (!empty($boxIds)) {
+                // Then handle withdrawals and pallet items - do this FIRST to get pallet info
                 $withdrawals = StockWithdrawal::whereIn('box_id', $boxIds)
                     ->where('status', 'completed')
                     ->get();
 
-                foreach ($withdrawals as $withdrawal) {
-                    $box = $withdrawal->box;
-                    if ($box) {
+                // First, get all boxes from the session with their pallets
+                $allSessionBoxes = Box::with('pallets')->whereIn('id', $boxIds)->get();
+                
+                // Reset withdrawn status and re-attach to pallets
+                foreach ($allSessionBoxes as $box) {
+                    // Find the withdrawal record for this box to get original pallet
+                    $withdrawal = $withdrawals->firstWhere('box_id', $box->id);
+                    
+                    if ($box->is_withdrawn) {
                         $box->is_withdrawn = false;
                         $box->withdrawn_at = null;
                         $box->save();
                     }
+                    
+                    // Check if box is attached to a pallet
+                    if ($box->pallets->isEmpty()) {
+                        // Box was detached, need to re-attach
+                        $palletId = null;
+                        
+                        // Try to find pallet via withdrawal->pallet_item_id
+                        if ($withdrawal && $withdrawal->pallet_item_id) {
+                            $palletItem = PalletItem::find($withdrawal->pallet_item_id);
+                            if ($palletItem) {
+                                $palletId = $palletItem->pallet_id;
+                            }
+                        }
+                        
+                        // If still no pallet, try to find via stock_inputs using the box
+                        // This handles boxes that were created directly without pallet_item_id
+                        if (!$palletId) {
+                            $stockInput = \DB::table('stock_inputs')
+                                ->join('boxes', 'boxes.id', '=', \DB::raw($box->id))
+                                ->where('boxes.box_number', $box->box_number)
+                                ->select('stock_inputs.pallet_id')
+                                ->orderBy('stock_inputs.id', 'desc')
+                                ->first();
+                            
+                            if ($stockInput) {
+                                $palletId = $stockInput->pallet_id;
+                            }
+                        }
+                        
+                        // Re-attach box to pallet if we found it
+                        if ($palletId) {
+                            $box->pallets()->attach($palletId);
+                        }
+                    }
+                }
 
+                // Now process withdrawals and restore pallet items
+                foreach ($withdrawals as $withdrawal) {
                     if ($withdrawal->pallet_item_id) {
                         $palletItem = PalletItem::find($withdrawal->pallet_item_id);
                         if ($palletItem) {
@@ -346,6 +392,51 @@ class DeliveryPickController extends Controller
 
                     $withdrawal->status = 'reversed';
                     $withdrawal->save();
+                }
+                
+                // Handle boxes from this delivery session
+                foreach ($allSessionBoxes as $box) {
+                    // Reload box to get latest state after withdrawal processing
+                    $box->refresh();
+                    
+                    // Check if this box was picked in this delivery
+                    if ($box->assigned_delivery_order_id == $session->order->id) {
+                        // Box was part of this delivery, clear the assignment
+                        $box->assigned_delivery_order_id = null;
+                        $box->save();
+                        
+                        if ($box->is_not_full) {
+                            $notFullBoxCount++;
+                        }
+                    }
+                    // Note: We do NOT reset is_not_full flag because boxes that were not full
+                    // before this delivery should remain not full after redo
+                }
+
+                // Clean up related not_full_box_requests
+                $notFullRequests = \App\Models\NotFullBoxRequest::where('delivery_order_id', $session->order->id)
+                    ->whereIn('status', ['approved', 'pending'])
+                    ->get();
+                
+                foreach ($notFullRequests as $request) {
+                    $request->status = 'cancelled_by_redo';
+                    $request->save();
+                }
+
+                // Log not_full boxes restoration if any were affected
+                if ($notFullBoxCount > 0 || $notFullRequests->count() > 0) {
+                    AuditService::log(
+                        'delivery_redo',
+                        'not_full_restored',
+                        'DeliveryPickSession',
+                        $session->id,
+                        [],
+                        [
+                            'restored_not_full_boxes' => $notFullBoxCount,
+                            'cancelled_requests' => $notFullRequests->count()
+                        ],
+                        "Redo delivery: {$notFullBoxCount} box not_full dikembalikan ke stok, {$notFullRequests->count()} request dibatalkan"
+                    );
                 }
 
                 // Log batch reversal satu kali dengan detail semua boxes
@@ -373,7 +464,20 @@ class DeliveryPickController extends Controller
             $order->save();
 
             DB::commit();
-            return redirect()->back()->with('success', 'Redo berhasil.');
+            
+            // Build detailed success message
+            $successMessage = 'Redo berhasil.';
+            if ($notFullBoxCount > 0 || $notFullRequests->count() > 0) {
+                $successMessage .= ' Stok yang ditarik dan box not_full telah dikembalikan ke inventori.';
+                if ($notFullBoxCount > 0) {
+                    $successMessage .= " {$notFullBoxCount} box not_full dikembalikan.";
+                }
+                if ($notFullRequests->count() > 0) {
+                    $successMessage .= " {$notFullRequests->count()} request not_full dibatalkan.";
+                }
+            }
+            
+            return redirect()->back()->with('success', $successMessage);
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Redo gagal: ' . $e->getMessage());

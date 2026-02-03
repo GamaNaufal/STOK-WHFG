@@ -1,44 +1,40 @@
 @extends('shared.layouts.app')
 
-@section('title', 'Fulfill Delivery Order')
+@section('title', 'Penuhi Pesanan Pengiriman')
 
 @section('content')
-<div class="row mb-4">
-    <div class="col-12 d-flex justify-content-between align-items-center">
-        <div>
-            <h1 class="h3 text-gray-800">
-                <i class="bi bi-box-seam"></i> Fulfill Order #{{ $order->id }}
-            </h1>
-            <p class="text-muted">Customer: <strong>{{ $order->customer_name }}</strong> | Date: {{ $order->delivery_date->format('d M Y') }}</p>
-        </div>
-        <a href="{{ route('delivery.index') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Back to Dashboard
-        </a>
-    </div>
-</div>
+<!-- Page Header Component -->
+<x-page-header 
+    title="Penuhi Pesanan #{{ $order->id }}" 
+    icon="bi-box-seam"
+    subtitle="Pelanggan: {{ $order->customer_name }} | Tanggal: {{ $order->delivery_date->format('d M Y') }}"
+>
+    <a href="{{ route('delivery.index') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Kembali ke Dashboard
+    </a>
+</x-page-header>
 
 <div class="row">
-    <div class="col-md-12">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-light fw-bold">Items to Withdraw</div>
-            <div class="card-body p-0">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
-                        <thead>
-                            <tr>
-                                <th class="ps-3">Part Number</th>
-                                <th class="text-center">Required</th>
-                                <th class="text-center">Fulfilled</th>
-                                <th class="text-center">Remaining</th>
-                                <th class="text-end pe-3">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="4" class="ps-3 text-muted">
-                                    <small>Items are tracked through the picking session. Use the picking system to fulfill this order.</small>
-                                </td>
-                            </tr>
+    <div class="col-12">
+        <x-card title="Barang untuk Diambil">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-3">Nomor Part</th>
+                            <th class="text-center">Dibutuhkan</th>
+                            <th class="text-center">Terpenuhi</th>
+                            <th class="text-center">Sisa</th>
+                            <th class="text-end pe-3">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td colspan="5" class="ps-3 text-muted text-center py-4">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <small>Barang dilacak melalui sesi pengambilan. Gunakan sistem pengambilan untuk memenuhi pesanan ini.</small>
+                            </td>
+                        </tr>
                                     </button>
                                     @else
                                     <span class="badge bg-success"><i class="bi bi-check"></i> Done</span>
@@ -98,7 +94,7 @@
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="btnConfirmWithdraw">Confirm Withdrawal</button>
+                <x-button type="button" variant="primary" id="btnConfirmWithdraw">Konfirmasi Pengambilan</x-button>
             </div>
         </div>
     </div>

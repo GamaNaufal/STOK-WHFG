@@ -196,7 +196,11 @@
         @else
             <div class="p-5 text-center">
                 <i class="bi bi-inbox" style="font-size: 3rem; color: #e5e7eb;"></i>
-                <h5 class="mt-3 text-muted" style="font-weight: 600;">Tidak ada data pengambilan</h5>
+                <x-empty-state 
+                    icon="bi-box-arrow-right"
+                    title="Belum Ada Data Pengambilan"
+                    message="Data pengambilan stok akan muncul setelah ada transaksi pengambilan"
+                />
             </div>
         @endif
     </div>

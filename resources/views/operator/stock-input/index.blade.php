@@ -698,18 +698,12 @@
     let lastScanTime = 0;
 
     const showConfirm = ({ title, message, confirmText, onConfirm }) => {
-        Swal.fire({
+        WarehouseAlert.confirm({
             title: title,
-            text: message,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: confirmText,
-            cancelButtonText: 'Batal',
-            confirmButtonColor: '#0C7779',
-            reverseButtons: true
-        }).then((result) => {
-            if (!result.isConfirmed) return;
-            onConfirm();
+            message: message,
+            confirmText: confirmText,
+            confirmColor: '#0C7779',
+            onConfirm: onConfirm
         });
     };
 

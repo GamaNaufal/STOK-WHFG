@@ -546,19 +546,15 @@
     }
 
     document.getElementById('clearCartBtn').addEventListener('click', function() {
-        Swal.fire({
+        WarehouseAlert.confirm({
             title: 'Kosongkan Keranjang?',
-            text: 'Semua item di keranjang akan dihapus.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Hapus',
-            cancelButtonText: 'Batal',
-            confirmButtonColor: '#dc2626',
-            reverseButtons: true
-        }).then((result) => {
-            if (!result.isConfirmed) return;
-            cart = {};
-            updateCartDisplay();
+            message: 'Semua item di keranjang akan dihapus.',
+            confirmText: 'Ya, Kosongkan',
+            confirmColor: '#DC2626',
+            onConfirm: () => {
+                cart = {};
+                updateCartDisplay();
+            }
         });
     });
 

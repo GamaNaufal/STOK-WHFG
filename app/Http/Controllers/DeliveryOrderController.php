@@ -19,7 +19,7 @@ class DeliveryOrderController extends Controller
             ->where('boxes.is_withdrawn', false)
             ->whereNull('boxes.assigned_delivery_order_id')
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
-            ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.created_at')
+            ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full', 'boxes.created_at')
             ->get();
 
         $legacyRows = PalletItem::where('pcs_quantity', '>', 0)
@@ -35,6 +35,7 @@ class DeliveryOrderController extends Controller
             $combined[] = [
                 'part_number' => $row->part_number,
                 'pcs_quantity' => (int) $row->pcs_quantity,
+                'is_not_full' => (bool) $row->is_not_full,
                 'created_at' => $row->created_at,
             ];
         }
@@ -43,6 +44,7 @@ class DeliveryOrderController extends Controller
             $combined[] = [
                 'part_number' => $row->part_number,
                 'pcs_quantity' => (int) $row->pcs_quantity,
+                'is_not_full' => false,
                 'created_at' => $row->created_at,
             ];
         }
@@ -53,7 +55,10 @@ class DeliveryOrderController extends Controller
 
         $pools = [];
         foreach ($combined as $row) {
-            $pools[$row['part_number']][] = (int) $row['pcs_quantity'];
+            $pools[$row['part_number']][] = [
+                'qty' => (int) $row['pcs_quantity'],
+                'is_not_full' => $row['is_not_full'],
+            ];
         }
 
         return $pools;
@@ -211,23 +216,41 @@ class DeliveryOrderController extends Controller
                         $fullBoxesRequired = intdiv($remainingNeeded, $fixedQty);
                         $remainder = $remainingNeeded % $fixedQty;
                         $availableFullBoxes = 0;
-                        foreach ($pool as $qty) {
-                            if ((int) $qty === $fixedQty) {
+                        $hasNotFullBoxForRemainder = false;
+                        
+                        foreach ($pool as $box) {
+                            $qty = is_array($box) ? (int) $box['qty'] : (int) $box;
+                            $isNotFull = is_array($box) ? (bool) $box['is_not_full'] : false;
+                            
+                            if ($qty === $fixedQty) {
                                 $availableFullBoxes++;
+                            } elseif ($remainder > 0 && ($isNotFull || $qty < $fixedQty)) {
+                                // Found a not-full box or partial box that can help with remainder
+                                $hasNotFullBoxForRemainder = true;
                             }
                         }
-                        $needsNotFull = $remainder > 0 && $availableFullBoxes >= $fullBoxesRequired;
+                        
+                        // Only need not-full if there's remainder AND we have full boxes but NO not-full box
+                        $needsNotFull = $remainder > 0 && $availableFullBoxes >= $fullBoxesRequired && !$hasNotFullBoxForRemainder;
                     }
                 }
 
                 while ($remainingNeeded > 0 && count($pool) > 0) {
-                    $nextBoxQty = (int) $pool[0];
-                    if ($nextBoxQty > $remainingNeeded) {
+                    $box = $pool[0];
+                    $nextBoxQty = is_array($box) ? (int) $box['qty'] : (int) $box;
+                    $isNotFull = is_array($box) ? (bool) $box['is_not_full'] : false;
+                    
+                    // Allow taking box if:
+                    // 1. Box qty <= remaining (normal case)
+                    // 2. Box is not_full (can be taken even if larger, to fulfill remainder)
+                    if ($nextBoxQty <= $remainingNeeded || $isNotFull) {
+                        $takenFromFifo += $nextBoxQty;
+                        $remainingNeeded -= $nextBoxQty;
+                        array_shift($pool);
+                    } else {
+                        // Box is too large and not marked as not_full, skip it
                         break;
                     }
-                    $takenFromFifo += $nextBoxQty;
-                    $remainingNeeded -= $nextBoxQty;
-                    array_shift($pool);
                 }
 
                 $fifoPools[$partNumber] = $pool;

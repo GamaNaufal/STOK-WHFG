@@ -136,7 +136,7 @@
             </div>
         </form>
         <a href="{{ route('audit.index') }}" class="btn btn-sm mt-2" style="background: #f3f4f6; color: #6b7280; border: none; border-radius: 8px;">
-            <i class="bi bi-arrow-clockwise"></i> Reset
+            <i class="bi bi-arrow-clockwise"></i> Atur Ulang
         </a>
     </div>
 </div>
@@ -214,7 +214,11 @@
         @else
             <div class="p-5 text-center">
                 <i class="bi bi-inbox" style="font-size: 3rem; color: #e5e7eb;"></i>
-                <h5 class="mt-3 text-muted" style="font-weight: 600;">Tidak ada data audit trail</h5>
+                <x-empty-state 
+                    icon="bi-file-earmark-text"
+                    title="Belum Ada Data Audit"
+                    message="Data audit trail akan muncul ketika ada aktivitas sistem"
+                />
             </div>
         @endif
     </div>

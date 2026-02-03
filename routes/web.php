@@ -9,6 +9,7 @@ use App\Http\Controllers\StockInputController;
 use App\Http\Controllers\StockViewController;
 use App\Http\Controllers\StockWithdrawalController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ProfileController;
 
 // Auth Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -19,22 +20,12 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
-<<<<<<< Updated upstream
-    Route::get('/profile', [\App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
-    Route::put('/profile', [\App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
+    // Profile Routes - Available to all authenticated users
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-    // Admin Routes - Box Management (QR Code Generation)
-=======
     // Admin Routes - User Management
->>>>>>> Stashed changes
     Route::middleware('role:admin')->group(function () {
-        // Box Management - DISABLED (fitur tidak dipakai lagi)
-        // Route::get('/boxes', [BoxController::class, 'index'])->name('boxes.index');
-        // Route::get('/boxes/create', [BoxController::class, 'create'])->name('boxes.create');
-        // Route::post('/boxes', [BoxController::class, 'store'])->name('boxes.store');
-        // Route::get('/boxes/{box}', [BoxController::class, 'show'])->name('boxes.show');
-        // Route::delete('/boxes/{box}', [BoxController::class, 'destroy'])->name('boxes.destroy');
-        
         // CRUD Users (Kelola User)
         Route::resource('users', \App\Http\Controllers\UserController::class);
     });

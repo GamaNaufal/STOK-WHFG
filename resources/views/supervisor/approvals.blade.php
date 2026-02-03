@@ -1,211 +1,236 @@
 @extends('shared.layouts.app')
 
-@section('title', 'Approval Box Not Full')
+@section('title', 'Persetujuan Box Not Full')
+
+@push('styles')
+<style>
+    @media (max-width: 768px) {
+        .table-responsive {
+            font-size: 0.875rem;
+        }
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+        }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+    }
+    
+    .bg-outline-primary {
+        background-color: transparent !important;
+    }
+    
+    .bg-outline-success {
+        background-color: transparent !important;
+    }
+</style>
+@endpush
 
 @section('content')
-<div class="container-fluid">
-    <!-- Modern Header Banner -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
-                        color: white; 
-                        padding: 40px 30px; 
-                        border-radius: 12px; 
-                        box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);">
-                <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
-                    <i class="bi bi-clipboard-check"></i> Approval Box Not Full
-                </h1>
-                <p style="margin: 0; opacity: 0.95; font-size: 15px;">
-                    Daftar permintaan box not full yang menunggu persetujuan Anda
-                </p>
-            </div>
-        </div>
-    </div>
+<!-- Page Header Component -->
+<x-page-header 
+    title="Persetujuan Box Not Full" 
+    icon="bi-clipboard-check"
+    subtitle="Daftar permintaan box not full yang menunggu persetujuan Anda"
+/>
 
-    <!-- Pending Requests Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm border-0" style="border-left: 4px solid #0C7779;">
-                <div class="card-header text-white" style="background-color: #0C7779;">
-                    <i class="bi bi-hourglass-split"></i> Permintaan Menunggu Persetujuan
+<!-- Pending Requests Section -->
+<div class="row mb-4">
+    <div class="col-12">
+        <x-card title="Permintaan Menunggu Persetujuan" icon="bi-hourglass-split">
+            @if($requests->isEmpty())
+                <x-empty-state 
+                    icon="bi-inbox"
+                    title="Tidak Ada Permintaan Pending"
+                    message="Semua permintaan box not full telah diproses"
+                />
+            @else
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-nowrap">ID Box</th>
+                                <th class="text-nowrap">No Part</th>
+                                <th class="text-nowrap text-center">PCS</th>
+                                <th class="text-nowrap text-center">Fixed</th>
+                                <th class="text-nowrap">Delivery Order</th>
+                                <th class="text-nowrap">Tipe</th>
+                                <th class="text-nowrap">Target</th>
+                                <th class="text-nowrap">Alasan</th>
+                                <th class="text-nowrap">Requester</th>
+                                <th class="text-nowrap text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($requests as $req)
+                                <tr>
+                                    <td>
+                                        <span class="badge bg-primary">{{ $req->box_number }}</span>
+                                    </td>
+                                    <td>
+                                        <code class="text-primary bg-light px-2 py-1 rounded">{{ $req->part_number }}</code>
+                                    </td>
+                                    <td class="text-center">
+                                        <strong>{{ number_format($req->pcs_quantity) }}</strong>
+                                        <small class="text-muted d-block">PCS</small>
+                                    </td>
+                                    <td class="text-center">
+                                        <strong>{{ number_format($req->fixed_qty) }}</strong>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="badge bg-info mb-1">#{{ $req->delivery_order_id }}</span>
+                                            @if($req->deliveryOrder)
+                                                <small class="text-muted">{{ Str::limit($req->deliveryOrder->customer_name, 20) }}</small>
+                                                <small class="text-muted">{{ $req->deliveryOrder->delivery_date->format('d M Y') }}</small>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if($req->request_type === 'additional')
+                                            <span class="badge bg-info">
+                                                <i class="bi bi-plus-circle"></i> Tambahan
+                                            </span>
+                                        @else
+                                            <span class="badge bg-purple text-white" style="background-color: #9b59b6;">
+                                                <i class="bi bi-puzzle"></i> Pelengkap
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($req->targetPallet)
+                                            <span class="badge bg-outline-primary border border-primary text-primary">
+                                                <i class="bi bi-box"></i> {{ $req->targetPallet->pallet_number }}
+                                            </span>
+                                        @elseif($req->targetLocation)
+                                            <span class="badge bg-outline-success border border-success text-success">
+                                                <i class="bi bi-geo-alt"></i> {{ $req->targetLocation->code }}
+                                            </span>
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ Str::limit($req->reason, 30) }}</small>
+                                    </td>
+                                    <td>
+                                        <strong class="text-dark">{{ $req->requester?->name ?? '-' }}</strong>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex gap-1 justify-content-center flex-wrap">
+                                            <form method="POST" action="{{ route('box-not-full.approve', $req->id) }}" class="d-inline">
+                                                @csrf
+                                                <x-button 
+                                                    type="submit" 
+                                                    variant="success"
+                                                    size="sm"
+                                                    title="Setujui permintaan ini"
+                                                    onclick="return confirm('Apakah Anda yakin ingin menyetujui permintaan ini?')"
+                                                >
+                                                    <i class="bi bi-check-circle"></i>
+                                                    <span class="d-none d-lg-inline">Approve</span>
+                                                </x-button>
+                                            </form>
+                                            <form method="POST" action="{{ route('box-not-full.reject', $req->id) }}" class="d-inline">
+                                                @csrf
+                                                <x-button 
+                                                    type="submit" 
+                                                    variant="danger"
+                                                    size="sm"
+                                                    title="Tolak permintaan ini"
+                                                    onclick="return confirm('Apakah Anda yakin ingin menolak permintaan ini?')"
+                                                >
+                                                    <i class="bi bi-x-circle"></i>
+                                                    <span class="d-none d-lg-inline">Reject</span>
+                                                </x-button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-                <div class="card-body p-0">
-                    @if($requests->isEmpty())
-                        <div class="p-5 text-center">
-                            <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
-                            <h5 class="mt-3 text-muted">Tidak ada permintaan pending</h5>
-                            <p class="text-muted small">Semua permintaan box not full telah diproses</p>
-                        </div>
-                    @else
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead style="background-color: #f5f7fa; color: #0C7779;">
-                                    <tr>
-                                        <th style="width: 12%;">ID Box</th>
-                                        <th style="width: 12%;">No Part</th>
-                                        <th style="width: 8%;">PCS</th>
-                                        <th style="width: 8%;">Fixed</th>
-                                        <th style="width: 15%;">Delivery Order</th>
-                                        <th style="width: 10%;">Tipe</th>
-                                        <th style="width: 12%;">Target</th>
-                                        <th style="width: 15%;">Alasan</th>
-                                        <th style="width: 12%;">Requester</th>
-                                        <th style="width: 18%; text-align: center;">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($requests as $req)
-                                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                                            <td>
-                                                <strong style="color: #0C7779;">{{ $req->box_number }}</strong>
-                                            </td>
-                                            <td>
-                                                <code style="background-color: #f0f4f7; padding: 4px 8px; border-radius: 4px;">{{ $req->part_number }}</code>
-                                            </td>
-                                            <td>{{ $req->pcs_quantity }} PCS</td>
-                                            <td>{{ $req->fixed_qty }}</td>
-                                            <td>
-                                                <small>
-                                                    <strong>#{{ $req->delivery_order_id }}</strong>
-                                                    @if($req->deliveryOrder)
-                                                        <br>{{ $req->deliveryOrder->customer_name }}
-                                                        <br><span class="text-muted">{{ $req->deliveryOrder->delivery_date->format('d M Y') }}</span>
-                                                    @endif
-                                                </small>
-                                            </td>
-                                            <td>
-                                                @if($req->request_type === 'additional')
-                                                    <span class="badge" style="background-color: #3498db; color: white;">
-                                                        <i class="bi bi-plus-circle"></i> Tambahan
-                                                    </span>
-                                                @else
-                                                    <span class="badge" style="background-color: #9b59b6; color: white;">
-                                                        <i class="bi bi-plus-lg"></i> Pelengkap
-                                                    </span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                @if($req->targetPallet)
-                                                    <span class="badge bg-light" style="color: #0C7779; border: 1px solid #0C7779;">
-                                                        <i class="bi bi-box"></i> {{ $req->targetPallet->pallet_number }}
-                                                    </span>
-                                                @elseif($req->targetLocation)
-                                                    <span class="badge bg-light" style="color: #249E94; border: 1px solid #249E94;">
-                                                        <i class="bi bi-geo-alt"></i> {{ $req->targetLocation->code }}
-                                                    </span>
-                                                @else
-                                                    <span class="text-muted">-</span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <small>{{ $req->reason }}</small>
-                                            </td>
-                                            <td>
-                                                <small><strong>{{ $req->requester?->name ?? '-' }}</strong></small>
-                                            </td>
-                                            <td>
-                                                <div class="d-flex gap-2 justify-content-center">
-                                                    <form method="POST" action="{{ route('box-not-full.approve', $req->id) }}" style="display: inline;">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm" style="background-color: #249E94; color: white; border: none; padding: 6px 12px;" title="Setujui permintaan ini">
-                                                            <i class="bi bi-check-circle"></i> Approve
-                                                        </button>
-                                                    </form>
-                                                    <form method="POST" action="{{ route('box-not-full.reject', $req->id) }}" style="display: inline;">
-                                                        @csrf
-                                                        <button type="submit" class="btn btn-sm" style="background-color: #e74c3c; color: white; border: none; padding: 6px 12px;" title="Tolak permintaan ini">
-                                                            <i class="bi bi-x-circle"></i> Reject
-                                                        </button>
-                                                    </form>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        </div>
+            @endif
+        </x-card>
     </div>
+</div>
 
-    <!-- History Section -->
-    <div class="row">
-        <div class="col-12">
-            <div class="card shadow-sm border-0" style="border-left: 4px solid #0C7779;">
-                <div class="card-header text-white" style="background-color: #0C7779;">
-                    <i class="bi bi-clock-history"></i> Riwayat Approval
+<!-- History Section -->
+<div class="row">
+    <div class="col-12">
+        <x-card title="Riwayat Persetujuan" icon="bi-clock-history">
+            @if($historyRequests->isEmpty())
+                <x-empty-state 
+                    icon="bi-calendar-x"
+                    title="Belum Ada Riwayat Persetujuan"
+                    message="Riwayat persetujuan akan muncul di sini setelah ada permintaan yang diproses"
+                />
+            @else
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-nowrap">Tanggal</th>
+                                <th class="text-nowrap">ID Box</th>
+                                <th class="text-nowrap">No Part</th>
+                                <th class="text-nowrap text-center">PCS</th>
+                                <th class="text-nowrap">Delivery Order</th>
+                                <th class="text-nowrap">Status</th>
+                                <th class="text-nowrap">Requester</th>
+                                <th class="text-nowrap">Approver</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($historyRequests as $req)
+                                <tr>
+                                    <td>
+                                        <small class="text-muted">{{ $req->updated_at->format('d/m/Y H:i') }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ $req->box_number }}</span>
+                                    </td>
+                                    <td>
+                                        <code class="text-primary bg-light px-2 py-1 rounded">{{ $req->part_number }}</code>
+                                    </td>
+                                    <td class="text-center">
+                                        <strong>{{ number_format($req->pcs_quantity) }}</strong>
+                                        <small class="text-muted d-block">PCS</small>
+                                    </td>
+                                    <td>
+                                        <div class="d-flex flex-column">
+                                            <span class="badge bg-info mb-1">#{{ $req->delivery_order_id }}</span>
+                                            @if($req->deliveryOrder)
+                                                <small class="text-muted">{{ Str::limit($req->deliveryOrder->customer_name, 20) }}</small>
+                                            @endif
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @if($req->status === 'approved')
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle"></i> Disetujui
+                                            </span>
+                                        @else
+                                            <span class="badge bg-danger">
+                                                <i class="bi bi-x-circle"></i> Ditolak
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        <strong class="text-dark">{{ $req->requester?->name ?? '-' }}</strong>
+                                    </td>
+                                    <td>
+                                        <strong class="text-dark">{{ $req->approver?->name ?? '-' }}</strong>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-                <div class="card-body p-0">
-                    @if($historyRequests->isEmpty())
-                        <div class="p-5 text-center">
-                            <i class="bi bi-calendar-x" style="font-size: 3rem; color: #ccc;"></i>
-                            <h5 class="mt-3 text-muted">Belum ada riwayat approval</h5>
-                            <p class="text-muted small">Riwayat approval akan muncul di sini setelah ada permintaan yang diproses</p>
-                        </div>
-                    @else
-                        <div class="table-responsive">
-                            <table class="table table-hover mb-0">
-                                <thead style="background-color: #f5f7fa; color: #0C7779;">
-                                    <tr>
-                                        <th style="width: 14%;">Tanggal</th>
-                                        <th style="width: 12%;">ID Box</th>
-                                        <th style="width: 12%;">No Part</th>
-                                        <th style="width: 8%;">PCS</th>
-                                        <th style="width: 18%;">Delivery Order</th>
-                                        <th style="width: 10%;">Status</th>
-                                        <th style="width: 13%;">Requester</th>
-                                        <th style="width: 13%;">Approver</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($historyRequests as $req)
-                                        <tr style="border-bottom: 1px solid #e5e7eb;">
-                                            <td>
-                                                <small class="text-muted">{{ $req->updated_at->format('d/m/Y H:i') }}</small>
-                                            </td>
-                                            <td>
-                                                <strong style="color: #0C7779;">{{ $req->box_number }}</strong>
-                                            </td>
-                                            <td>
-                                                <code style="background-color: #f0f4f7; padding: 4px 8px; border-radius: 4px;">{{ $req->part_number }}</code>
-                                            </td>
-                                            <td>{{ $req->pcs_quantity }} PCS</td>
-                                            <td>
-                                                <small>
-                                                    <strong>#{{ $req->delivery_order_id }}</strong>
-                                                    @if($req->deliveryOrder)
-                                                        <br>{{ $req->deliveryOrder->customer_name }}
-                                                    @endif
-                                                </small>
-                                            </td>
-                                            <td>
-                                                @if($req->status === 'approved')
-                                                    <span class="badge" style="background-color: #249E94; color: white;">
-                                                        <i class="bi bi-check-circle"></i> Approved
-                                                    </span>
-                                                @else
-                                                    <span class="badge" style="background-color: #e74c3c; color: white;">
-                                                        <i class="bi bi-x-circle"></i> Rejected
-                                                    </span>
-                                                @endif
-                                            </td>
-                                            <td>
-                                                <small><strong>{{ $req->requester?->name ?? '-' }}</strong></small>
-                                            </td>
-                                            <td>
-                                                <small><strong>{{ $req->approver?->name ?? '-' }}</strong></small>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                </div>
-            </div>
-        </div>
+            @endif
+        </x-card>
     </div>
 </div>
 @endsection

@@ -185,40 +185,6 @@
         </div>
     </div>
 </div>
-
-<div class="modal fade" id="deletePartModal" tabindex="-1" aria-labelledby="deletePartModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content" style="border: none; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);">
-            <div class="modal-header" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; border: none; border-radius: 12px 12px 0 0;">
-                <h5 class="modal-title" id="deletePartModalLabel">
-                    <i class="bi bi-exclamation-triangle"></i> Hapus No Part
-                </h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body p-4">
-                <p class="mb-3" style="color: #374151;">Anda yakin ingin menghapus No Part berikut?</p>
-                <div class="p-3" style="background-color: #fef2f2; border-left: 4px solid #ef4444; border-radius: 8px;">
-                    <div class="fw-bold" id="deletePartNumber" style="color: #7f1d1d; font-size: 16px;">-</div>
-                </div>
-                <div class="text-muted small mt-3" style="color: #6b7280;">
-                    <i class="bi bi-info-circle"></i> Tindakan ini tidak dapat dibatalkan. Data akan dihapus secara permanen.
-                </div>
-            </div>
-            <div class="modal-footer" style="border-top: 1px solid #e5e7eb;">
-                <button type="button" class="btn" style="background-color: #e5e7eb; color: #374151; border: none; padding: 8px 16px; border-radius: 6px;" data-bs-dismiss="modal">
-                    <i class="bi bi-x-circle"></i> Batal
-                </button>
-                <form id="deletePartForm" method="POST" class="d-inline">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn" style="background-color: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px;">
-                        <i class="bi bi-trash"></i> Hapus
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 @endsection
 
 @section('scripts')
@@ -229,10 +195,6 @@
         const pagination = document.getElementById('part-pagination');
         const baseUrl = "{{ url('part-settings') }}";
         const searchUrl = "{{ route('part-settings.search') }}";
-        const deleteModalEl = document.getElementById('deletePartModal');
-        const deleteModal = deleteModalEl ? new bootstrap.Modal(deleteModalEl) : null;
-        const deleteForm = document.getElementById('deletePartForm');
-        const deletePartNumber = document.getElementById('deletePartNumber');
 
         let searchTimer = null;
 
@@ -299,12 +261,29 @@
             const buttons = document.querySelectorAll('.js-delete-btn');
             buttons.forEach((btn) => {
                 btn.addEventListener('click', () => {
-                    if (!deleteModal || !deleteForm || !deletePartNumber) return;
                     const deleteUrl = btn.getAttribute('data-delete-url') || '#';
                     const partNumber = btn.getAttribute('data-part-number') || '-';
-                    deleteForm.setAttribute('action', deleteUrl);
-                    deletePartNumber.textContent = partNumber;
-                    deleteModal.show();
+                    
+                    WarehouseAlert.delete({
+                        title: 'Hapus No Part?',
+                        itemName: `No Part <strong>${partNumber}</strong>`,
+                        warningItems: [
+                            'Tindakan ini <strong>tidak dapat dibatalkan</strong>',
+                            'Data akan dihapus secara permanen'
+                        ],
+                        confirmText: 'Ya, Hapus',
+                        onConfirm: () => {
+                            const form = document.createElement('form');
+                            form.method = 'POST';
+                            form.action = deleteUrl;
+                            form.innerHTML = `
+                                <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="_method" value="DELETE">
+                            `;
+                            document.body.appendChild(form);
+                            form.submit();
+                        }
+                    });
                 });
             });
         };

@@ -95,6 +95,15 @@
             font-weight: bold;
             font-size: 1.3rem;
         }
+        
+        /* SweetAlert2 Custom Styles */
+        .swal2-warehouse-popup .swal2-html-container ul li {
+            color: inherit !important;
+        }
+        .swal2-warehouse-popup .swal2-html-container ul li strong {
+            color: inherit !important;
+        }
+        
         .btn-primary {
             background-color: #0C7779;
             border-color: #0C7779;
@@ -357,7 +366,7 @@
                             <li class="nav-item">
                                 <a class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" 
                                    href="{{ route('profile.edit') }}">
-                                    <i class="bi bi-person"></i> Edit Profile
+                                    <i class="bi bi-person"></i> Edit Profil
                                 </a>
                             </li>
 
@@ -579,6 +588,12 @@
                                     </a>
                                 </li>
                                 <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('expired-box*') ? 'active' : '' }}" 
+                                       href="{{ route('expired-box.index') }}">
+                                        <i class="bi bi-exclamation-triangle"></i> Expired Box
+                                    </a>
+                                </li>
+                                <li class="nav-item">
                                     <a class="nav-link {{ request()->routeIs('delivery.pick.issues') ? 'active' : '' }}" 
                                        href="{{ route('delivery.pick.issues') }}">
                                         <i class="bi bi-bell"></i> Scan Issues
@@ -645,7 +660,7 @@
                                     <span class="badge bg-info">{{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}</span>
                                 </p>
                                 <a href="{{ route('profile.edit') }}" class="btn btn-sm btn-outline-light w-100 mb-2">
-                                    <i class="bi bi-person"></i> Edit Profile
+                                    <i class="bi bi-person"></i> Edit Profil
                                 </a>
                                 <form method="POST" action="{{ route('logout') }}" style="display: inline;">
                                     @csrf
@@ -685,6 +700,7 @@
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="{{ asset('js/alert-helper.js') }}"></script>
 
     <script>
         window.showToast = function(message, type = 'info') {

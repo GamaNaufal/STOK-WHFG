@@ -841,17 +841,14 @@
             const deleteUrl = btn.getAttribute('data-delete-url') || '#';
             const orderId = btn.getAttribute('data-order-id') || '-';
 
-            Swal.fire({
+            WarehouseAlert.delete({
                 title: 'Hapus Jadwal #' + orderId + '?',
-                text: 'Tindakan ini tidak dapat dibatalkan.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Hapus',
-                cancelButtonText: 'Batal',
-                confirmButtonColor: '#dc2626',
-                reverseButtons: true
-            }).then((result) => {
-                if (!result.isConfirmed) return;
+                itemName: 'jadwal delivery ini',
+                warningItems: [
+                    'Tindakan ini <strong>tidak dapat dibatalkan</strong>'
+                ],
+                confirmText: 'Ya, Hapus',
+                onConfirm: () => {
 
                 const form = document.createElement('form');
                 form.method = 'POST';
@@ -862,6 +859,7 @@
                 `;
                 document.body.appendChild(form);
                 form.submit();
+                }
             });
         });
     });

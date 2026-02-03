@@ -159,29 +159,30 @@
                 const code = btn.getAttribute('data-location-code') || '-';
                 const status = btn.getAttribute('data-location-status') || 'kosong';
 
-                Swal.fire({
-                    title: 'Hapus Lokasi ' + code,
-                    text: status === 'terisi'
-                        ? 'Lokasi ini masih terisi pallet. Menghapus akan melepaskan data lokasi terkait.'
-                        : 'Lokasi ini kosong dan akan dihapus.',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Hapus',
-                    cancelButtonText: 'Batal',
-                    confirmButtonColor: '#dc2626',
-                    reverseButtons: true
-                }).then((result) => {
-                    if (!result.isConfirmed) return;
+                const warningMessage = status === 'terisi'
+                    ? `Lokasi <strong>${code}</strong> masih terisi pallet. Menghapus akan melepaskan data lokasi terkait.`
+                    : `Lokasi <strong>${code}</strong> kosong dan akan dihapus.`;
+                    
+                const warnings = status === 'terisi' 
+                    ? ['Lokasi masih <strong>terisi pallet</strong>', 'Data lokasi akan <strong>dilepaskan</strong>']
+                    : ['Tindakan ini <strong>tidak dapat dibatalkan</strong>'];
 
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.action = deleteUrl;
-                    form.innerHTML = `
-                        <input type="hidden" name="_token" value="{{ csrf_token() }}">
-                        <input type="hidden" name="_method" value="DELETE">
-                    `;
-                    document.body.appendChild(form);
-                    form.submit();
+                WarehouseAlert.delete({
+                    title: 'Hapus Lokasi?',
+                    itemName: `lokasi ${code}`,
+                    warningItems: warnings,
+                    confirmText: 'Ya, Hapus',
+                    onConfirm: () => {
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = deleteUrl;
+                        form.innerHTML = `
+                            <input type="hidden" name="_token" value="{{ csrf_token() }}">
+                            <input type="hidden" name="_method" value="DELETE">
+                        `;
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
                 });
             });
         });

@@ -502,39 +502,18 @@
             return;
         }
 
-        Swal.fire({
-            title: '<strong>Konfirmasi Merge Pallet</strong>',
-            html: `
-                <div style="text-align: left; padding: 10px;">
-                    <p style="margin-bottom: 15px;">Anda akan menggabungkan <strong style="color: #0C7779;">${selectedPallets.length} pallet</strong> menjadi satu pallet baru.</p>
-                    
-                    <div style="background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 15px;">
-                        <i class="bi bi-exclamation-triangle" style="color: #f59e0b;"></i> 
-                        <strong style="color: #92400e;">Perhatian:</strong>
-                        <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #92400e;">
-                            <li>Pallet lama akan <strong>dihapus permanent</strong></li>
-                            <li>Box akan dipindahkan ke pallet baru</li>
-                            <li>Tindakan ini <strong>tidak dapat dibatalkan</strong></li>
-                        </ul>
-                    </div>
-                    
-                    <p style="margin: 0;"><i class="bi bi-geo-alt"></i> <strong>Lokasi Baru:</strong> <span style="color: #0C7779;">${locationVal}</span></p>
-                </div>
-            `,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: '<i class="bi bi-check-circle"></i> Ya, Gabungkan!',
-            cancelButtonText: '<i class="bi bi-x-circle"></i> Batal',
-            confirmButtonColor: '#0C7779',
-            cancelButtonColor: '#dc2626',
-            reverseButtons: true,
-            width: '600px',
-            customClass: {
-                confirmButton: 'btn btn-lg',
-                cancelButton: 'btn btn-lg'
-            }
-        }).then((result) => {
-            if (!result.isConfirmed) return;
+        WarehouseAlert.confirm({
+            title: 'Konfirmasi Merge Pallet',
+            message: `Anda akan menggabungkan <strong style="color: #0C7779;">${selectedPallets.length} pallet</strong> menjadi satu pallet baru.`,
+            warningItems: [
+                'Pallet lama akan <strong>dihapus permanent</strong>',
+                'Box akan dipindahkan ke pallet baru',
+                'Tindakan ini <strong>tidak dapat dibatalkan</strong>'
+            ],
+            infoText: `<strong>Lokasi Baru:</strong> <span style="color: #0C7779; font-weight: 700;">${locationVal}</span>`,
+            confirmText: 'Ya, Gabungkan!',
+            confirmColor: '#10B981',
+            onConfirm: () => {
 
             const ids = selectedPallets.map(p => p.id);
             const locId = selectedLocationId.value;
@@ -562,6 +541,7 @@
                 }
             })
             .catch(err => showToast('Error: ' + err, 'danger'));
+            }
         });
     }
 </script>

@@ -206,49 +206,24 @@
                 const customerName = form.querySelector('[name="customer_name"]')?.value || '';
                 
                 if (!customerName || items === 0) {
-                    Swal.fire({
-                        icon: 'error',
+                    WarehouseAlert.error({
                         title: 'Data Tidak Lengkap',
-                        text: 'Harap isi nama customer dan minimal 1 item pesanan',
-                        confirmButtonColor: '#f59e0b'
+                        message: 'Harap isi nama customer dan minimal 1 item pesanan'
                     });
                     return;
                 }
 
-                Swal.fire({
-                    title: '<strong>Konfirmasi Submit Correction</strong>',
-                    html: `
-                        <div style="text-align: left; padding: 10px;">
-                            <p style="margin-bottom: 15px;">Perubahan pada delivery order akan dikirim untuk <strong style="color: #f59e0b;">review ulang oleh PPC</strong>.</p>
-                            
-                            <div style="background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 15px;">
-                                <strong style="color: #d97706;">Detail Koreksi:</strong>
-                                <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #92400e;">
-                                    <li><strong>Customer:</strong> ${customerName}</li>
-                                    <li><strong>Jumlah Item:</strong> ${items} item</li>
-                                    <li><strong>Status:</strong> Menunggu approval PPC</li>
-                                </ul>
-                            </div>
-                            
-                            <p style="margin: 0; font-size: 14px; color: #6b7280;">
-                                <i class="bi bi-info-circle"></i> Order akan kembali ke status pending setelah submit.
-                            </p>
-                        </div>
-                    `,
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: '<i class="bi bi-check-circle"></i> Submit Correction',
-                    cancelButtonText: '<i class="bi bi-x-circle"></i> Batal',
-                    confirmButtonColor: '#f59e0b',
-                    cancelButtonColor: '#6b7280',
-                    reverseButtons: true,
-                    width: '550px',
-                    customClass: {
-                        confirmButton: 'btn btn-lg',
-                        cancelButton: 'btn btn-lg'
-                    }
-                }).then((result) => {
-                    if (result.isConfirmed) {
+                WarehouseAlert.info({
+                    title: 'Konfirmasi Submit Correction',
+                    message: 'Perubahan pada delivery order akan dikirim untuk <strong style="color: #f59e0b;">review ulang oleh PPC</strong>.',
+                    details: {
+                        'Customer': customerName,
+                        'Jumlah Item': `${items} item`,
+                        'Status': 'Menunggu approval PPC'
+                    },
+                    infoText: 'Order akan kembali ke status pending setelah submit.',
+                    confirmText: 'Submit Correction',
+                    onConfirm: () => {
                         form.submit();
                     }
                 });

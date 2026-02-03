@@ -8,6 +8,7 @@ use App\Models\StockLocation;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryPickSession;
 use App\Services\OperationalReportService;
+use App\Services\ExpiredBoxService;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -122,17 +123,28 @@ class DashboardController extends Controller
                 });
             })->count();
 
+            // Get expired box information
+            $expiredService = app(ExpiredBoxService::class);
+            $expiredService->syncStatuses();
+            $expiredBoxes = $expiredService->getExpirableBoxesQuery()
+                ->whereIn('boxes.expired_status', ['warning', 'expired'])
+                ->get();
+            $warningBoxes = $expiredBoxes->filter(fn($row) => $row->expired_status === 'warning')->count();
+            $expiredBoxesCount = $expiredBoxes->filter(fn($row) => $row->expired_status === 'expired')->count();
+
             $stats = [
                 'role_label' => 'Admin Warehouse',
                 'total_locations' => StockLocation::distinct('warehouse_location')->count(),
                 'total_pallets' => Pallet::count(),
                 'pallets_with_location' => $palletsWithActiveStock,
-                                'total_pcs' => $stockSummaryTotals['total_pcs'],
+                'total_pcs' => $stockSummaryTotals['total_pcs'],
                 'pending_scan_issues' => \App\Models\DeliveryIssue::where('status', 'pending')->count(),
                 'total_items' => PalletItem::where(function ($q) {
                     $q->where('pcs_quantity', '>', 0)
                       ->orWhere('box_quantity', '>', 0);
                 })->count(),
+                'warning_boxes' => $warningBoxes,
+                'expired_boxes' => $expiredBoxesCount,
             ];
         }
         // ADMIN IT (Full access)
@@ -144,6 +156,15 @@ class DashboardController extends Controller
                 });
             })->count();
 
+            // Get expired box information
+            $expiredService = app(ExpiredBoxService::class);
+            $expiredService->syncStatuses();
+            $expiredBoxes = $expiredService->getExpirableBoxesQuery()
+                ->whereIn('boxes.expired_status', ['warning', 'expired'])
+                ->get();
+            $warningBoxes = $expiredBoxes->filter(fn($row) => $row->expired_status === 'warning')->count();
+            $expiredBoxesCount = $expiredBoxes->filter(fn($row) => $row->expired_status === 'expired')->count();
+
             $stats = [
                 'role_label' => 'Admin IT',
                 'total_pallets' => Pallet::count(),
@@ -154,10 +175,12 @@ class DashboardController extends Controller
                     $q->where('pcs_quantity', '>', 0)
                       ->orWhere('box_quantity', '>', 0);
                 })->count(),
-                                'total_box' => $stockSummaryTotals['total_box'],
-                                'total_pcs' => $stockSummaryTotals['total_pcs'],
+                'total_box' => $stockSummaryTotals['total_box'],
+                'total_pcs' => $stockSummaryTotals['total_pcs'],
                 'total_orders' => DeliveryOrder::count(),
                 'pending_orders' => DeliveryOrder::where('status', 'pending')->count(),
+                'warning_boxes' => $warningBoxes,
+                'expired_boxes' => $expiredBoxesCount,
             ];
         }
 

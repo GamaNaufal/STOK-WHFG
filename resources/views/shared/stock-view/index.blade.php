@@ -868,7 +868,7 @@
                 </button>
                 @if($search)
                     <a href="{{ route('stock-view.index', ['view_mode' => $viewMode]) }}" class="btn btn-outline-danger border-0" style="border-radius: 0 10px 10px 0; background: white;">
-                        <i class="bi bi-x-circle"></i> Reset
+                        <i class="bi bi-x-circle"></i> Atur Ulang
                     </a>
                 @endif
             </form>

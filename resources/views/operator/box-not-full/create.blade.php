@@ -242,49 +242,24 @@
         const targetType = document.getElementById('targetLocation').checked ? 'Lokasi' : 'Pallet';
         
         if (!partNumber || !boxQty) {
-            Swal.fire({
-                icon: 'error',
+            WarehouseAlert.error({
                 title: 'Data Tidak Lengkap',
-                text: 'Harap isi semua field yang diperlukan',
-                confirmButtonColor: '#0C7779'
+                message: 'Harap isi semua field yang diperlukan'
             });
             return;
         }
 
-        Swal.fire({
-            title: '<strong>Konfirmasi Kirim Request</strong>',
-            html: `
-                <div style="text-align: left; padding: 10px;">
-                    <p style="margin-bottom: 15px;">Request box not full akan dikirim ke <strong style="color: #0C7779;">Supervisor</strong> untuk approval.</p>
-                    
-                    <div style="background: #f0f9ff; padding: 12px; border-radius: 8px; border-left: 4px solid #0C7779; margin-bottom: 15px;">
-                        <strong style="color: #0C7779;">Detail Request:</strong>
-                        <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #1e40af;">
-                            <li><strong>Part Number:</strong> ${partNumber}</li>
-                            <li><strong>Jumlah Box:</strong> ${boxQty} box</li>
-                            <li><strong>Tujuan:</strong> ${targetType}</li>
-                        </ul>
-                    </div>
-                    
-                    <p style="margin: 0; font-size: 14px; color: #6b7280;">
-                        <i class="bi bi-info-circle"></i> Pastikan data sudah benar sebelum mengirim.
-                    </p>
-                </div>
-            `,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: '<i class="bi bi-send"></i> Kirim Request',
-            cancelButtonText: '<i class="bi bi-x-circle"></i> Batal',
-            confirmButtonColor: '#0C7779',
-            cancelButtonColor: '#6b7280',
-            reverseButtons: true,
-            width: '550px',
-            customClass: {
-                confirmButton: 'btn btn-lg',
-                cancelButton: 'btn btn-lg'
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
+        WarehouseAlert.info({
+            title: 'Konfirmasi Kirim Request',
+            message: 'Request box not full akan dikirim ke <strong style="color: #0C7779;">Supervisor</strong> untuk approval.',
+            details: {
+                'Part Number': partNumber,
+                'Jumlah Box': `${boxQty} box`,
+                'Tujuan': targetType
+            },
+            infoText: 'Pastikan data sudah benar sebelum mengirim.',
+            confirmText: 'Kirim Request',
+            onConfirm: () => {
                 form.submit();
             }
         });

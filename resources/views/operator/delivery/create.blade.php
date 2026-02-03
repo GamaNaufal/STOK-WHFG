@@ -531,48 +531,23 @@
             const customerName = form.querySelector('[name="customer_name"]')?.value || '';
             
             if (!customerName || items === 0) {
-                Swal.fire({
-                    icon: 'error',
+                WarehouseAlert.error({
                     title: 'Data Tidak Lengkap',
-                    text: 'Harap isi nama customer dan minimal 1 item pesanan',
-                    confirmButtonColor: '#0C7779'
+                    message: 'Harap isi nama customer dan minimal 1 item pesanan'
                 });
                 return;
             }
 
-            Swal.fire({
-                title: '<strong>Konfirmasi Submit Pesanan</strong>',
-                html: `
-                    <div style="text-align: left; padding: 10px;">
-                        <p style="margin-bottom: 15px;">Pesanan delivery order akan dibuat dan menunggu approval dari <strong style="color: #0C7779;">PPC</strong>.</p>
-                        
-                        <div style="background: #f0f9ff; padding: 12px; border-radius: 8px; border-left: 4px solid #0C7779; margin-bottom: 15px;">
-                            <strong style="color: #0C7779;">Detail Pesanan:</strong>
-                            <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #1e40af;">
-                                <li><strong>Customer:</strong> ${customerName}</li>
-                                <li><strong>Jumlah Item:</strong> ${items} item</li>
-                            </ul>
-                        </div>
-                        
-                        <p style="margin: 0; font-size: 14px; color: #6b7280;">
-                            <i class="bi bi-info-circle"></i> Pastikan data pesanan sudah benar sebelum submit.
-                        </p>
-                    </div>
-                `,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: '<i class="bi bi-check-circle"></i> Submit Pesanan',
-                cancelButtonText: '<i class="bi bi-x-circle"></i> Batal',
-                confirmButtonColor: '#0C7779',
-                cancelButtonColor: '#6b7280',
-                reverseButtons: true,
-                width: '550px',
-                customClass: {
-                    confirmButton: 'btn btn-lg',
-                    cancelButton: 'btn btn-lg'
-                }
-            }).then((result) => {
-                if (result.isConfirmed) {
+            WarehouseAlert.info({
+                title: 'Konfirmasi Submit Pesanan',
+                message: 'Pesanan delivery order akan dibuat dan menunggu approval dari <strong style="color: #0C7779;">PPC</strong>.',
+                details: {
+                    'Customer': customerName,
+                    'Jumlah Item': `${items} item`
+                },
+                infoText: 'Pastikan data pesanan sudah benar sebelum submit.',
+                confirmText: 'Submit Pesanan',
+                onConfirm: () => {
                     form.submit();
                 }
             });

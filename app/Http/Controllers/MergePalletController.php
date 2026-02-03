@@ -71,31 +71,7 @@ class MergePalletController extends Controller
             }, 'stockLocation.masterLocation'])
             ->first();
 
-<<<<<<< Updated upstream
-        if ($pallet) {
-            // Check if location is occupied (jika ada stockLocation)
-            if ($pallet->stockLocation) {
-                $masterLocation = $pallet->stockLocation->masterLocation;
-                if ($masterLocation && $masterLocation->is_occupied === false) {
-                    // Lokasi sudah kosong, jangan boleh merge
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Pallet tidak dapat dimerge - lokasi sudah kosong'
-                    ], 404);
-                }
-            }
-
-            // Calculate stats (only active boxes)
-            $activeBoxes = $pallet->boxes
-                ->where('is_withdrawn', false)
-                ->whereNotIn('expired_status', ['handled', 'expired']);
-            $totalBox = $activeBoxes->count();
-            $totalPcs = $activeBoxes->sum('pcs_quantity');
-            $location = $pallet->stockLocation->warehouse_location ?? 'Not Stored';
-
-=======
         if (!$pallet) {
->>>>>>> Stashed changes
             return response()->json([
                 'success' => false,
                 'message' => 'Pallet tidak ditemukan'

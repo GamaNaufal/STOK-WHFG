@@ -3,17 +3,16 @@
 @section('title', 'Dashboard - Warehouse FG Yamato')
 
 @section('content')
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="h2">
-            <i class="bi bi-speedometer2"></i> Dashboard
-        </h1>
-        <p class="text-muted">Selamat datang di Sistem Stok Penyimpanan Warehouse Finish Good Yamato</p>
-        @if(isset($stats['role_label']))
-            <span class="badge" style="background: #0C7779; color: white; font-size: 0.9rem; padding: 0.5rem 1rem;">{{ $stats['role_label'] }}</span>
-        @endif
-    </div>
-</div>
+<!-- Page Header Component -->
+<x-page-header 
+    title="Dashboard Sistem" 
+    icon="bi-speedometer2"
+    subtitle="Selamat datang di Sistem Stok Penyimpanan Warehouse Finish Good Yamato"
+>
+    @if(isset($stats['role_label']))
+        <span class="badge" style="background: #0C7779; color: white; font-size: 0.9rem; padding: 0.5rem 1rem;">{{ $stats['role_label'] }}</span>
+    @endif
+</x-page-header>
 
 {{-- WAREHOUSE OPERATOR DASHBOARD --}}
 @if($userRole === 'warehouse_operator')
