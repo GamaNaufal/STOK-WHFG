@@ -2,8 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\BoxController;
-use App\Http\Controllers\BarcodeController;
+// use App\Http\Controllers\BoxController; // DISABLED - fitur tidak dipakai
+// use App\Http\Controllers\BarcodeController; // DISABLED - fitur tidak dipakai
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\StockInputController;
 use App\Http\Controllers\StockViewController;
@@ -19,16 +19,21 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+<<<<<<< Updated upstream
     Route::get('/profile', [\App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [\App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
 
     // Admin Routes - Box Management (QR Code Generation)
+=======
+    // Admin Routes - User Management
+>>>>>>> Stashed changes
     Route::middleware('role:admin')->group(function () {
-        Route::get('/boxes', [BoxController::class, 'index'])->name('boxes.index');
-        Route::get('/boxes/create', [BoxController::class, 'create'])->name('boxes.create');
-        Route::post('/boxes', [BoxController::class, 'store'])->name('boxes.store');
-        Route::get('/boxes/{box}', [BoxController::class, 'show'])->name('boxes.show');
-        Route::delete('/boxes/{box}', [BoxController::class, 'destroy'])->name('boxes.destroy');
+        // Box Management - DISABLED (fitur tidak dipakai lagi)
+        // Route::get('/boxes', [BoxController::class, 'index'])->name('boxes.index');
+        // Route::get('/boxes/create', [BoxController::class, 'create'])->name('boxes.create');
+        // Route::post('/boxes', [BoxController::class, 'store'])->name('boxes.store');
+        // Route::get('/boxes/{box}', [BoxController::class, 'show'])->name('boxes.show');
+        // Route::delete('/boxes/{box}', [BoxController::class, 'destroy'])->name('boxes.destroy');
         
         // CRUD Users (Kelola User)
         Route::resource('users', \App\Http\Controllers\UserController::class);

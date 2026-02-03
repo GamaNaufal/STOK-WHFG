@@ -14,23 +14,24 @@ class MergePalletController extends Controller
 {
     public function index()
     {
-        // Get all pallets with boxes
-        $allPallets = Pallet::has('boxes')
-            ->with(['stockLocation', 'boxes'])
-            ->withCount('boxes')
+        // Get all pallets with active boxes only
+        $allPallets = Pallet::whereHas('boxes', function($query) {
+                $query->where('is_withdrawn', false);
+            })
+            ->with(['stockLocation.masterLocation', 'boxes' => function($query) {
+                $query->where('is_withdrawn', false); // Only load active boxes
+            }])
+            ->withCount(['boxes as active_boxes_count' => function($query) {
+                $query->where('is_withdrawn', false);
+            }])
             ->orderBy('id', 'desc')
             ->limit(50)
             ->get();
 
-        // Filter: exclude pallets yang kosong atau sudah dideliver semua
+        // Filter: exclude pallets yang kosong atau lokasi sudah tidak occupied
         $pallets = $allPallets->filter(function($pallet) {
-            // Check if pallet still has active boxes (not all withdrawn)
-            $activeBoxes = $pallet->boxes->filter(function($box) {
-                return !$box->is_withdrawn; // Only count non-withdrawn boxes
-            });
-            
-            // Exclude jika semua boxes sudah withdrawn (pallet kosong)
-            if ($activeBoxes->isEmpty()) {
+            // Exclude jika tidak ada active boxes
+            if ($pallet->boxes->isEmpty()) {
                 return false;
             }
             
@@ -56,18 +57,21 @@ class MergePalletController extends Controller
             ->limit(20)
             ->get();
 
-        return view('warehouse.merge.index', compact('pallets', 'mergeHistory'));
+        return view('operator.merge.index', compact('pallets', 'mergeHistory'));
     }
 
     public function searchPallet(Request $request)
     {
         $code = $request->query('code'); // Detect pallet number only
         
-        // Find by Pallet Number
+        // Find by Pallet Number - force fresh data
         $pallet = Pallet::where('pallet_number', $code)
-            ->with(['boxes', 'stockLocation'])
+            ->with(['boxes' => function($query) {
+                $query->where('is_withdrawn', false); // Only load active boxes
+            }, 'stockLocation.masterLocation'])
             ->first();
 
+<<<<<<< Updated upstream
         if ($pallet) {
             // Check if location is occupied (jika ada stockLocation)
             if ($pallet->stockLocation) {
@@ -89,29 +93,57 @@ class MergePalletController extends Controller
             $totalPcs = $activeBoxes->sum('pcs_quantity');
             $location = $pallet->stockLocation->warehouse_location ?? 'Not Stored';
 
+=======
+        if (!$pallet) {
+>>>>>>> Stashed changes
             return response()->json([
-                'success' => true,
-                'pallet' => [
-                    'id' => $pallet->id,
-                    'pallet_number' => $pallet->pallet_number,
-                    'total_box' => $totalBox,
-                    'total_pcs' => $totalPcs,
-                    'location' => $location,
-                    'items' => $activeBoxes->map(function($box) {
-                        return [
-                            'box_number' => $box->box_number,
-                            'part_number' => $box->part_number,
-                            'pcs_quantity' => $box->pcs_quantity
-                        ];
-                    })
-                ]
-            ]);
+                'success' => false,
+                'message' => 'Pallet tidak ditemukan'
+            ], 404);
         }
 
+        // Check if pallet has any active boxes
+        if ($pallet->boxes->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pallet tidak memiliki box aktif (semua box sudah withdrawn)'
+            ], 404);
+        }
+
+        // Check if location is occupied (jika ada stockLocation)
+        if ($pallet->stockLocation) {
+            $masterLocation = $pallet->stockLocation->masterLocation;
+            if ($masterLocation && $masterLocation->is_occupied === false) {
+                // Lokasi sudah kosong, jangan boleh merge
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pallet tidak dapat dimerge - lokasi sudah kosong'
+                ], 404);
+            }
+        }
+
+        // Calculate stats (only active boxes - already filtered in query)
+        $totalBox = $pallet->boxes->count();
+        $totalPcs = $pallet->boxes->sum('pcs_quantity');
+        $location = $pallet->stockLocation->warehouse_location ?? 'Not Stored';
+
         return response()->json([
-            'success' => false,
-            'message' => 'Pallet tidak ditemukan'
-        ], 404);
+            'success' => true,
+            'pallet' => [
+                'id' => $pallet->id,
+                'pallet_number' => $pallet->pallet_number,
+                'total_box' => $totalBox,
+                'total_pcs' => $totalPcs,
+                'location' => $location,
+                'items' => $pallet->boxes->map(function($box) {
+                    return [
+                        'box_number' => $box->box_number,
+                        'part_number' => $box->part_number,
+                        'pcs_quantity' => $box->pcs_quantity
+                    ];
+                })
+            ]
+        ]);
     }
 
     public function store(Request $request)

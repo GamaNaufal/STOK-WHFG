@@ -9,8 +9,8 @@ class PartSettingController extends Controller
 {
     public function index()
     {
-        $parts = PartSetting::orderBy('part_number')->paginate(20);
-        return view('warehouse.part-settings.index', compact('parts'));
+        $parts = PartSetting::orderBy('part_number')->paginate(10);
+        return view('operator.part-settings.index', compact('parts'));
     }
 
     public function search(Request $request)
@@ -32,7 +32,7 @@ class PartSettingController extends Controller
 
     public function create()
     {
-        return view('warehouse.part-settings.create');
+        return view('operator.part-settings.create');
     }
 
     public function store(Request $request)
@@ -49,7 +49,7 @@ class PartSettingController extends Controller
 
     public function edit(PartSetting $partSetting)
     {
-        return view('warehouse.part-settings.edit', compact('partSetting'));
+        return view('operator.part-settings.edit', compact('partSetting'));
     }
 
     public function update(Request $request, PartSetting $partSetting)

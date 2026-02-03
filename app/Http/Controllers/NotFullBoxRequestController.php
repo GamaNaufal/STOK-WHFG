@@ -40,7 +40,7 @@ class NotFullBoxRequestController extends Controller
             ->limit(50)
             ->get();
 
-        return view('warehouse.box-not-full.create', compact('partNumbers', 'deliveryOrders', 'pallets', 'locations', 'historyRequests'));
+        return view('operator.box-not-full.create', compact('partNumbers', 'deliveryOrders', 'pallets', 'locations', 'historyRequests'));
     }
 
     public function store(Request $request)
@@ -118,7 +118,7 @@ class NotFullBoxRequestController extends Controller
             ->limit(100)
             ->get();
 
-        return view('warehouse.box-not-full.approvals', compact('requests', 'historyRequests'));
+        return view('supervisor.approvals', compact('requests', 'historyRequests'));
     }
 
     public function approve($id)

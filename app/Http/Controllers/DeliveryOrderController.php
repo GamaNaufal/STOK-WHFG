@@ -291,7 +291,7 @@ class DeliveryOrderController extends Controller
 
         $historyRows = $historyRows->sortByDesc('completed_at')->values();
 
-        return view('delivery.index', compact('approvedOrders', 'completedOrders', 'historyRows'));
+        return view('operator.delivery.index', compact('approvedOrders', 'completedOrders', 'historyRows'));
     }
 
     // Sales Page: Input Form & History
@@ -322,7 +322,7 @@ class DeliveryOrderController extends Controller
         $partNumbers = \App\Models\PartSetting::orderBy('part_number', 'asc')
             ->pluck('part_number');
 
-        return view('delivery.create', compact('myOrders', 'partNumbers'));
+        return view('operator.delivery.create', compact('myOrders', 'partNumbers'));
     }
 
     // PPC Page: Pending Approvals
@@ -387,7 +387,7 @@ class DeliveryOrderController extends Controller
             ->limit(15)
             ->get();
 
-        return view('delivery.approvals', compact('pendingOrders', 'historyOrders'));
+        return view('operator.delivery.approvals', compact('pendingOrders', 'historyOrders'));
     }
 
     // Fetch order items for fulfill modal
@@ -440,7 +440,7 @@ class DeliveryOrderController extends Controller
         $partNumbers = \App\Models\PartSetting::orderBy('part_number', 'asc')
             ->pluck('part_number');
 
-        return view('delivery.edit', compact('order', 'partNumbers'));
+        return view('operator.delivery.edit', compact('order', 'partNumbers'));
     }
 
     // Sales: Update correction request

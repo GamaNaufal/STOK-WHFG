@@ -3,14 +3,26 @@
 @section('title', 'Refactor Merge Pallet')
 
 @section('content')
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="h3 text-gray-800">
-            <i class="bi bi-intersect"></i> Merge Pallet
-        </h1>
-        <p class="text-muted">Pilih beberapa pallet existing untuk digabungkan menjadi <strong>Satu Pallet Baru</strong>.</p>
+<div class="container-fluid">
+    <!-- Modern Gradient Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
+                        color: white; 
+                        padding: 40px 30px; 
+                        border-radius: 12px; 
+                        box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);">
+                <div>
+                    <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
+                        <i class="bi bi-intersect"></i> Merge Pallet
+                    </h1>
+                    <p style="margin: 0; opacity: 0.95; font-size: 15px;">
+                        Pilih beberapa pallet existing untuk digabungkan menjadi <strong>Satu Pallet Baru</strong>
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
 <div class="row">
     <!-- LEFT: Search & Add -->
@@ -56,12 +68,14 @@
                         @forelse($pallets as $p)
                             @php
                                 $loc = $p->stockLocation ? $p->stockLocation->warehouse_location : 'No Loc';
+                                $activeBoxCount = $p->boxes->count();
+                                $totalPcs = $p->boxes->sum('pcs_quantity');
                                 $pData = [
                                     'id' => $p->id,
                                     'pallet_number' => $p->pallet_number,
                                     'location' => $loc,
-                                    'total_box' => $p->boxes_count,
-                                    'total_pcs' => $p->boxes->sum('pcs_quantity')
+                                    'total_box' => $activeBoxCount,
+                                    'total_pcs' => $totalPcs
                                 ];
                             @endphp
                             <div id="left-pallet-{{ $p->id }}" class="list-group-item d-flex justify-content-between align-items-center">
@@ -70,7 +84,7 @@
                                     <div class="text-muted" style="font-size: 0.75rem;">
                                         <i class="bi bi-geo-alt"></i> {{ $loc }}
                                         &bull; 
-                                        {{ $p->boxes_count }} Box
+                                        {{ $activeBoxCount }} Box
                                     </div>
                                 </div>
                                 <button type="button" class="btn btn-sm btn-outline-primary" 
@@ -427,15 +441,18 @@
             document.getElementById('btnProcess').classList.add('btn-secondary');
         } else {
             selectedPallets.forEach((p, index) => {
-                totalBox += parseInt(p.total_box);
-                totalPcs += parseFloat(p.total_pcs);
+                const boxCount = parseInt(p.total_box) || 0;
+                const pcsCount = parseFloat(p.total_pcs) || 0;
+                
+                totalBox += boxCount;
+                totalPcs += pcsCount;
 
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="ps-3 fw-bold text-dark">${p.pallet_number}</td>
                     <td><span class="badge bg-light text-dark border">${p.location || '-'}</span></td>
-                    <td class="text-center">${p.total_box}</td>
-                    <td class="text-center">${p.total_pcs}</td>
+                    <td class="text-center">${boxCount}</td>
+                    <td class="text-center">${pcsCount}</td>
                     <td class="text-end pe-3">
                         <button class="btn btn-sm btn-outline-danger" onclick="removeFromList(${index})">
                             <i class="bi bi-trash"></i>
@@ -486,14 +503,36 @@
         }
 
         Swal.fire({
-            title: 'Konfirmasi Merge Pallet',
-            text: `Yakin ingin menggabungkan ${selectedPallets.length} pallet ini menjadi SATU pallet baru di lokasi ${locationVal}? Pallet lama akan dihapus.`,
+            title: '<strong>Konfirmasi Merge Pallet</strong>',
+            html: `
+                <div style="text-align: left; padding: 10px;">
+                    <p style="margin-bottom: 15px;">Anda akan menggabungkan <strong style="color: #0C7779;">${selectedPallets.length} pallet</strong> menjadi satu pallet baru.</p>
+                    
+                    <div style="background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 15px;">
+                        <i class="bi bi-exclamation-triangle" style="color: #f59e0b;"></i> 
+                        <strong style="color: #92400e;">Perhatian:</strong>
+                        <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #92400e;">
+                            <li>Pallet lama akan <strong>dihapus permanent</strong></li>
+                            <li>Box akan dipindahkan ke pallet baru</li>
+                            <li>Tindakan ini <strong>tidak dapat dibatalkan</strong></li>
+                        </ul>
+                    </div>
+                    
+                    <p style="margin: 0;"><i class="bi bi-geo-alt"></i> <strong>Lokasi Baru:</strong> <span style="color: #0C7779;">${locationVal}</span></p>
+                </div>
+            `,
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonText: 'Merge',
-            cancelButtonText: 'Batal',
+            confirmButtonText: '<i class="bi bi-check-circle"></i> Ya, Gabungkan!',
+            cancelButtonText: '<i class="bi bi-x-circle"></i> Batal',
             confirmButtonColor: '#0C7779',
-            reverseButtons: true
+            cancelButtonColor: '#dc2626',
+            reverseButtons: true,
+            width: '600px',
+            customClass: {
+                confirmButton: 'btn btn-lg',
+                cancelButton: 'btn btn-lg'
+            }
         }).then((result) => {
             if (!result.isConfirmed) return;
 

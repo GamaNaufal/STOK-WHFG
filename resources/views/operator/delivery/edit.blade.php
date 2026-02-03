@@ -32,16 +32,28 @@
 @endsection
 
 @section('content')
-<div class="row mb-4">
-    <div class="col-12">
-        <h1 class="h3 text-gray-800">
-            <i class="bi bi-pencil-square"></i> Edit Request (Correction)
-        </h1>
+<div class="container-fluid">
+    <!-- Modern Gradient Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+                        color: white; 
+                        padding: 40px 30px; 
+                        border-radius: 12px; 
+                        box-shadow: 0 8px 24px rgba(245, 158, 11, 0.15);">
+                <div>
+                    <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
+                        <i class="bi bi-pencil-square"></i> Edit Request (Correction)
+                    </h1>
+                    <p style="margin: 0; opacity: 0.95; font-size: 15px;">
+                        Perbaiki delivery request yang sudah dibuat
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
 
-<div class="container-fluid py-2">
-    <div class="row">
+<div class="row">
         <div class="col-md-8 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header py-3 bg-warning text-dark">
@@ -185,6 +197,62 @@
 
             updateRemoveButtons();
             initPartSelects(document);
+
+            // Add SweetAlert2 confirmation before form submission
+            document.querySelector('form')?.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const form = this;
+                const items = form.querySelectorAll('.item-row').length;
+                const customerName = form.querySelector('[name="customer_name"]')?.value || '';
+                
+                if (!customerName || items === 0) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Data Tidak Lengkap',
+                        text: 'Harap isi nama customer dan minimal 1 item pesanan',
+                        confirmButtonColor: '#f59e0b'
+                    });
+                    return;
+                }
+
+                Swal.fire({
+                    title: '<strong>Konfirmasi Submit Correction</strong>',
+                    html: `
+                        <div style="text-align: left; padding: 10px;">
+                            <p style="margin-bottom: 15px;">Perubahan pada delivery order akan dikirim untuk <strong style="color: #f59e0b;">review ulang oleh PPC</strong>.</p>
+                            
+                            <div style="background: #fef3c7; padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 15px;">
+                                <strong style="color: #d97706;">Detail Koreksi:</strong>
+                                <ul style="margin: 8px 0 0 0; padding-left: 20px; color: #92400e;">
+                                    <li><strong>Customer:</strong> ${customerName}</li>
+                                    <li><strong>Jumlah Item:</strong> ${items} item</li>
+                                    <li><strong>Status:</strong> Menunggu approval PPC</li>
+                                </ul>
+                            </div>
+                            
+                            <p style="margin: 0; font-size: 14px; color: #6b7280;">
+                                <i class="bi bi-info-circle"></i> Order akan kembali ke status pending setelah submit.
+                            </p>
+                        </div>
+                    `,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: '<i class="bi bi-check-circle"></i> Submit Correction',
+                    cancelButtonText: '<i class="bi bi-x-circle"></i> Batal',
+                    confirmButtonColor: '#f59e0b',
+                    cancelButtonColor: '#6b7280',
+                    reverseButtons: true,
+                    width: '550px',
+                    customClass: {
+                        confirmButton: 'btn btn-lg',
+                        cancelButton: 'btn btn-lg'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        form.submit();
+                    }
+                });
+            });
         });
     </script>
 @endsection

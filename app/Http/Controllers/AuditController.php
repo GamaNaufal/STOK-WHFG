@@ -38,7 +38,7 @@ class AuditController extends Controller
         // Get all users untuk dropdown
         $users = User::orderBy('name')->get();
 
-        return view('audit.index', compact('auditLogs', 'filters', 'summary', 'users'));
+        return view('supervisor.audit.index', compact('auditLogs', 'filters', 'summary', 'users'));
     }
 
     public function export(Request $request)

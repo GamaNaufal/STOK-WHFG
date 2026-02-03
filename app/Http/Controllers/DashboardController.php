@@ -111,7 +111,7 @@ class DashboardController extends Controller
         // SUPERVISI
         elseif ($userRole === 'supervisi') {
             $data = app(OperationalReportService::class)->build($request);
-            return view('warehouse.reports.operational', $data);
+            return view('operator.reports.operational', $data);
         }
         // ADMIN WAREHOUSE
         elseif ($userRole === 'admin_warehouse') {

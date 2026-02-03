@@ -17,7 +17,7 @@ class StockWithdrawalController extends Controller
     public function fulfillOrder($id)
     {
         $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
-        return view('delivery.fulfill', compact('order'));
+        return view('operator.delivery.fulfill', compact('order'));
     }
 
     /**
@@ -744,7 +744,7 @@ class StockWithdrawalController extends Controller
             ->orderBy('created_at', 'desc')
             ->paginate(50);
 
-        return view('warehouse.stock-withdrawal.history', [
+        return view('operator.stock-withdrawal.history', [
             'withdrawals' => $withdrawals,
         ]);
     }

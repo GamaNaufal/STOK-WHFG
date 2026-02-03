@@ -14,7 +14,7 @@ class ReportController extends Controller
     public function operationalReports(Request $request)
     {
         $data = app(OperationalReportService::class)->build($request);
-        return view('warehouse.reports.operational', $data);
+        return view('operator.reports.operational', $data);
     }
 
     public function exportOperationalExcel(Request $request)
@@ -158,7 +158,7 @@ class ReportController extends Controller
         // Get all users for filter
         $users = \App\Models\User::whereIn('role', ['warehouse_operator', 'admin'])->get();
 
-        return view('warehouse.reports.withdrawal', [
+        return view('operator.reports.withdrawal', [
             'withdrawals' => $withdrawals,
             'totalWithdrawals' => $totalWithdrawals,
             'totalPcsWithdrawn' => $totalPcsWithdrawn,
@@ -223,7 +223,7 @@ class ReportController extends Controller
         // Get unique warehouse locations from stock_inputs
         $locations = StockInput::distinct('warehouse_location')->pluck('warehouse_location');
 
-        return view('warehouse.reports.stock-input', [
+        return view('operator.reports.stock-input', [
             'stockInputs' => $stockInputs,
             'totalRecords' => $totalRecords,
             'totalItems' => $totalPcs,

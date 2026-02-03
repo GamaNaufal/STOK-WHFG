@@ -49,7 +49,7 @@ class StockInputController extends Controller
 
     public function index()
     {
-        return view('warehouse.stock-input.index');
+        return view('operator.stock-input.index');
     }
 
     // API untuk scan Barcode box (dari hardware scanner)

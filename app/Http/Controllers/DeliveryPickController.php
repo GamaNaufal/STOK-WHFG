@@ -113,7 +113,7 @@ class DeliveryPickController extends Controller
         $session = DeliveryPickSession::with(['items.box', 'issues'])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
         $order = DeliveryOrder::findOrFail($orderId);
 
-        return view('delivery.scan', compact('session', 'order'));
+        return view('operator.delivery.scan', compact('session', 'order'));
     }
 
     public function scanBox(Request $request, $sessionId)
@@ -404,7 +404,7 @@ class DeliveryPickController extends Controller
         
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('delivery.picklist_pdf', compact('order', 'session'));
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('operator.delivery.picklist_pdf', compact('order', 'session'));
         return $pdf->stream('picklist-order-' . $order->id . '.pdf');
     }
 
@@ -427,7 +427,7 @@ class DeliveryPickController extends Controller
             ->limit(200)
             ->get();
 
-        return view('delivery.scan-issues', compact('issues', 'historyIssues'));
+        return view('operator.delivery.scan-issues', compact('issues', 'historyIssues'));
     }
 
     private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null)
