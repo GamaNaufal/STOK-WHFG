@@ -82,7 +82,9 @@ class MergePalletController extends Controller
             }
 
             // Calculate stats (only active boxes)
-            $activeBoxes = $pallet->boxes->where('is_withdrawn', false);
+            $activeBoxes = $pallet->boxes
+                ->where('is_withdrawn', false)
+                ->whereNotIn('expired_status', ['handled', 'expired']);
             $totalBox = $activeBoxes->count();
             $totalPcs = $activeBoxes->sum('pcs_quantity');
             $location = $pallet->stockLocation->warehouse_location ?? 'Not Stored';
@@ -156,7 +158,9 @@ class MergePalletController extends Controller
                 
                 $sourcePallets[] = $sourcePallet;
                 $palletNumbers[] = $sourcePallet->pallet_number; // Store pallet_number
-                $activeBoxes = $sourcePallet->boxes->where('is_withdrawn', false);
+                $activeBoxes = $sourcePallet->boxes
+                    ->where('is_withdrawn', false)
+                    ->whereNotIn('expired_status', ['handled', 'expired']);
                 $allBoxes = array_merge($allBoxes, $activeBoxes->values()->toArray());
 
                 foreach ($activeBoxes as $box) {

@@ -22,7 +22,9 @@ class StockViewController extends Controller
                 $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
 
                 // Prefer active boxes as source of truth
-                $activeBoxes = $pallet->boxes->where('is_withdrawn', false);
+                $activeBoxes = $pallet->boxes
+                    ->where('is_withdrawn', false)
+                    ->whereNotIn('expired_status', ['handled', 'expired']);
 
                 if ($activeBoxes->isNotEmpty()) {
                     if ($search) {
@@ -214,6 +216,8 @@ class StockViewController extends Controller
                 'pcs_quantity' => $item['pcs_quantity'],
                 'location' => $item['location'] ?? 'Unknown',
                 'created_at' => $item['created_at']->format('d M Y H:i'),
+                'is_not_full' => (bool) ($item['is_not_full'] ?? false),
+                'not_full_reason' => $item['not_full_reason'] ?? null,
             ];
         });
 
@@ -238,7 +242,10 @@ class StockViewController extends Controller
 
         // Priority 1: Use Boxes (Source of Truth for FIFO created_at)
         if ($pallet->boxes->count() > 0) {
-            $boxIds = $pallet->boxes->where('is_withdrawn', false)->pluck('id');
+            $boxIds = $pallet->boxes
+                ->where('is_withdrawn', false)
+                ->whereNotIn('expired_status', ['handled', 'expired'])
+                ->pluck('id');
             $originLogs = \App\Models\AuditLog::where('type', 'box_pallet_moved')
                 ->where('model', 'Box')
                 ->whereIn('model_id', $boxIds)
@@ -249,7 +256,10 @@ class StockViewController extends Controller
                     return $logs->first();
                 });
 
-            $items = $pallet->boxes->where('is_withdrawn', false)->map(function ($box) use ($originLogs) {
+            $items = $pallet->boxes
+                ->where('is_withdrawn', false)
+                ->whereNotIn('expired_status', ['handled', 'expired'])
+                ->map(function ($box) use ($originLogs) {
                 $log = $originLogs->get($box->id);
                 $origin = $log?->getOldValuesArray()['from_pallet'] ?? null;
 

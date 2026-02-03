@@ -51,9 +51,14 @@ class OperationalReportService
     public function build(Request $request, bool $forExport = false): array
     {
         [$start, $end, $rangeLabel] = $this->resolveDateRange($request);
+        $groupBy = $request->input('group_by', 'day');
+        if (!in_array($groupBy, ['day', 'week', 'month'], true)) {
+            $groupBy = 'day';
+        }
 
         $currentHandling = Box::query()
             ->where('is_withdrawn', false)
+            ->whereNotIn('expired_status', ['handled', 'expired'])
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->leftJoin('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
@@ -153,6 +158,65 @@ class OperationalReportService
                     'inbound_pcs' => (int) ($inboundByDay[$key] ?? 0),
                     'outbound_pcs' => (int) ($outboundByDay[$key] ?? 0),
                 ];
+            }
+        }
+
+        $deliveryPlanByDay = DB::table('delivery_orders as orders')
+            ->join('delivery_order_items as items', 'items.delivery_order_id', '=', 'orders.id')
+            ->whereIn('orders.status', ['approved', 'processing', 'completed'])
+            ->when($start, fn ($q) => $q->whereDate('orders.delivery_date', '>=', $start->toDateString()))
+            ->when($end, fn ($q) => $q->whereDate('orders.delivery_date', '<=', $end->toDateString()))
+            ->select(DB::raw('DATE(orders.delivery_date) as day'), DB::raw('SUM(items.quantity) as qty'))
+            ->groupBy('day')
+            ->pluck('qty', 'day');
+
+        $deliveryActualByDay = DB::table('delivery_orders as orders')
+            ->join('delivery_order_items as items', 'items.delivery_order_id', '=', 'orders.id')
+            ->whereIn('orders.status', ['approved', 'processing', 'completed'])
+            ->when($start, fn ($q) => $q->whereDate('orders.delivery_date', '>=', $start->toDateString()))
+            ->when($end, fn ($q) => $q->whereDate('orders.delivery_date', '<=', $end->toDateString()))
+            ->select(DB::raw('DATE(orders.delivery_date) as day'), DB::raw('SUM(COALESCE(items.fulfilled_quantity, 0)) as qty'))
+            ->groupBy('day')
+            ->pluck('qty', 'day');
+
+        $deliveryTrend = [];
+        if ($start && $end) {
+            $period = Carbon::parse($start)->daysUntil($end->copy()->addDay());
+            foreach ($period as $day) {
+                $key = $day->format('Y-m-d');
+                $planQty = (int) ($deliveryPlanByDay[$key] ?? 0);
+                $actualQty = (int) ($deliveryActualByDay[$key] ?? 0);
+
+                if ($groupBy === 'week') {
+                    $bucketStart = $day->copy()->startOfWeek();
+                    $bucketEnd = $day->copy()->endOfWeek();
+                    if ($start) {
+                        $bucketStart = $bucketStart->lt($start) ? $start->copy() : $bucketStart;
+                    }
+                    if ($end) {
+                        $bucketEnd = $bucketEnd->gt($end) ? $end->copy() : $bucketEnd;
+                    }
+                    $bucketKey = $bucketStart->format('Y-m-d');
+                    $label = $bucketStart->format('d M') . ' - ' . $bucketEnd->format('d M Y');
+                } elseif ($groupBy === 'month') {
+                    $bucketStart = $day->copy()->startOfMonth();
+                    $bucketKey = $bucketStart->format('Y-m');
+                    $label = $bucketStart->format('M Y');
+                } else {
+                    $bucketKey = $key;
+                    $label = $day->format('d M Y');
+                }
+
+                if (!isset($deliveryTrend[$bucketKey])) {
+                    $deliveryTrend[$bucketKey] = [
+                        'label' => $label,
+                        'planned_qty' => 0,
+                        'actual_qty' => 0,
+                    ];
+                }
+
+                $deliveryTrend[$bucketKey]['planned_qty'] += $planQty;
+                $deliveryTrend[$bucketKey]['actual_qty'] += $actualQty;
             }
         }
 
@@ -276,6 +340,8 @@ class OperationalReportService
             'matchingReport' => $matchingReport,
             'processingReport' => $processingReport,
             'throughputDays' => $throughputDays,
+            'deliveryTrend' => array_values($deliveryTrend),
+            'deliveryGroupBy' => $groupBy,
             'peakHours' => $peakHours,
             'issueSummary' => $issueSummary,
             'issueList' => $issueList,

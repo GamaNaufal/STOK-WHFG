@@ -54,7 +54,7 @@ class DeliveryPickController extends Controller
                         continue;
                     }
 
-                    $reservedBoxes = $this->getReservedBoxesForOrder($order->id, $item->part_number);
+                    $reservedBoxes = $this->getReservedBoxesForOrder($order->id, $item->part_number, $order->delivery_date);
                     foreach ($reservedBoxes as $box) {
                         DeliveryPickItem::create([
                             'pick_session_id' => $session->id,
@@ -68,7 +68,7 @@ class DeliveryPickController extends Controller
                     $reservedTotal = $reservedBoxes->sum('pcs_quantity');
                     $remainingAfterReserved = max(0, $remainingQty - (int) $reservedTotal);
 
-                    $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved);
+                    $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved, $order->delivery_date);
                     $totalPcs = $boxes->sum('pcs_quantity') + (int) $reservedTotal;
 
                     if ($totalPcs < $remainingQty) {
@@ -130,19 +130,19 @@ class DeliveryPickController extends Controller
 
         $box = Box::where('box_number', $request->box_number)->first();
 
-        if ($box && $box->is_withdrawn) {
+        if ($box && ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true))) {
             DeliveryIssue::create([
                 'pick_session_id' => $session->id,
                 'box_id' => $box->id,
                 'scanned_code' => $request->box_number,
-                'issue_type' => 'box_withdrawn',
+                'issue_type' => $box->is_withdrawn ? 'box_withdrawn' : 'box_expired',
                 'status' => 'pending',
             ]);
 
             $session->status = 'blocked';
             $session->save();
 
-            return response()->json(['success' => false, 'message' => 'Box sudah withdrawn. Menunggu approval admin.'], 422);
+            return response()->json(['success' => false, 'message' => $box->is_withdrawn ? 'Box sudah withdrawn. Menunggu approval admin.' : 'Box sudah expired/handled. Menunggu approval admin.'], 422);
         }
 
         $pickItem = $box ? $session->items()->where('box_id', $box->id)->first() : null;
@@ -430,11 +430,17 @@ class DeliveryPickController extends Controller
         return view('delivery.scan-issues', compact('issues', 'historyIssues'));
     }
 
-    private function getReservedBoxesForOrder(int $orderId, string $partNumber)
+    private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null)
     {
-        return Box::query()
+        $storedAtSub = DB::table('pallet_boxes as pb')
+            ->join('stock_inputs as si', 'si.pallet_id', '=', 'pb.pallet_id')
+            ->select('pb.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
+            ->groupBy('pb.box_id');
+
+        $query = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
+            ->whereNotIn('expired_status', ['handled', 'expired'])
             ->where('assigned_delivery_order_id', $orderId)
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
@@ -448,17 +454,33 @@ class DeliveryPickController extends Controller
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->leftJoinSub($storedAtSub, 'stock_in', function ($join) {
+                $join->on('stock_in.box_id', '=', 'boxes.id');
+            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')
-            ->get();
+            ->when($deliveryDate, function ($q) use ($deliveryDate) {
+                $q->where(function ($inner) use ($deliveryDate) {
+                    $inner->whereNull('stock_in.stored_at')
+                        ->orWhereRaw('DATE_ADD(stock_in.stored_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
+                });
+            });
+
+        return $query->get();
     }
 
-    private function getBoxesByFIFO(string $partNumber, int $requestedPcs)
+    private function getBoxesByFIFO(string $partNumber, int $requestedPcs, $deliveryDate = null)
     {
+        $storedAtSub = DB::table('pallet_boxes as pb')
+            ->join('stock_inputs as si', 'si.pallet_id', '=', 'pb.pallet_id')
+            ->select('pb.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
+            ->groupBy('pb.box_id');
+
         $boxes = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
+            ->whereNotIn('expired_status', ['handled', 'expired'])
             ->whereNull('boxes.assigned_delivery_order_id')
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
@@ -472,7 +494,16 @@ class DeliveryPickController extends Controller
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->leftJoinSub($storedAtSub, 'stock_in', function ($join) {
+                $join->on('stock_in.box_id', '=', 'boxes.id');
+            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->when($deliveryDate, function ($q) use ($deliveryDate) {
+                $q->where(function ($inner) use ($deliveryDate) {
+                    $inner->whereNull('stock_in.stored_at')
+                        ->orWhereRaw('DATE_ADD(stock_in.stored_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
+                });
+            })
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')
             ->get();

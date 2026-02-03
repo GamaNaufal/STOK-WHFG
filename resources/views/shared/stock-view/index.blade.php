@@ -631,6 +631,7 @@
                             </td>
                             <td style="padding: 12px 8px; color: #1f2937; font-size: 13px;">
                                 <span class="badge bg-primary" style="font-size: 11px;">${pallet.box_quantity} BOX</span>
+                                ${pallet.is_not_full ? '<span class="badge bg-warning text-dark ms-1" style="font-size: 10px;" title="Box not full">NOT FULL</span>' : ''}
                             </td>
                             <td style="padding: 12px 8px; color: #1f2937; font-weight: 600; font-size: 13px;">
                                 <span class="badge bg-success">${pallet.pcs_quantity} PCS</span>
@@ -1494,6 +1495,7 @@
                             </td>
                             <td style="padding: 12px 8px; color: #1f2937; font-size: 13px;">
                                 <span class="badge bg-primary" style="font-size: 11px;">${pallet.box_quantity} BOX</span>
+                                ${pallet.is_not_full ? '<span class="badge bg-warning text-dark ms-1" style="font-size: 10px;" title="Box not full">NOT FULL</span>' : ''}
                             </td>
                             <td style="padding: 12px 8px; color: #1f2937; font-weight: 600; font-size: 13px;">
                                 <span class="badge bg-success">${pallet.pcs_quantity} PCS</span>

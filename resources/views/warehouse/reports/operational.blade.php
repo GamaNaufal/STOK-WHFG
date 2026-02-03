@@ -28,7 +28,7 @@
     <div class="card shadow-sm border-0 mb-4" id="audit-report">
         <div class="card-body">
             <form method="GET" action="{{ url()->current() }}" class="row g-3 align-items-end">
-                <div class="col-md-3">
+                <div class="col-lg-2 col-md-4">
                     <label class="form-label">Quick Period</label>
                     <select name="period" class="form-select">
                         <option value="today" {{ request('period') === 'today' ? 'selected' : '' }}>Hari Ini</option>
@@ -38,15 +38,23 @@
                     </select>
                     <small class="text-muted">Jika isi date range, akan override.</small>
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-2 col-md-4">
+                    <label class="form-label">Group By</label>
+                    <select name="group_by" class="form-select">
+                        <option value="day" {{ request('group_by', 'day') === 'day' ? 'selected' : '' }}>Harian</option>
+                        <option value="week" {{ request('group_by') === 'week' ? 'selected' : '' }}>Mingguan</option>
+                        <option value="month" {{ request('group_by') === 'month' ? 'selected' : '' }}>Bulanan</option>
+                    </select>
+                </div>
+                <div class="col-lg-3 col-md-4">
                     <label class="form-label">Start Date</label>
                     <input type="date" name="start_date" class="form-control" value="{{ request('start_date') }}">
                 </div>
-                <div class="col-md-3">
+                <div class="col-lg-3 col-md-4">
                     <label class="form-label">End Date</label>
                     <input type="date" name="end_date" class="form-control" value="{{ request('end_date') }}">
                 </div>
-                <div class="col-md-3 d-flex gap-2">
+                <div class="col-lg-2 col-md-4 d-flex gap-2">
                     <button class="btn btn-primary w-100">Apply</button>
                     <a href="{{ route('dashboard', ['period' => 'week']) }}" class="btn btn-outline-secondary w-100">Reset</a>
                 </div>
@@ -238,7 +246,7 @@
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
                     <h6 class="fw-bold mb-3">Schedule Fulfillment Performance</h6>
-                    <canvas id="fulfillmentChart" height="140"></canvas>
+                    <div id="fulfillmentChart" style="height: 260px;"></div>
                     <div class="collapse mt-3" id="fulfillment-detail">
                         <div class="card card-body border-0 shadow-sm">
                             <div id="fulfillment-full" class="d-none">
@@ -696,6 +704,8 @@
 @endsection
 
 @section('scripts')
+<script src="https://code.highcharts.com/highcharts.js"></script>
+<script src="https://code.highcharts.com/modules/pattern-fill.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
     const throughputLabels = @json(collect($throughputDays)->pluck('date'));
@@ -742,37 +752,57 @@
         options: { responsive: true, scales: { y: { beginAtZero: true } } }
     });
 
-    const fulfillmentChart = new Chart(document.getElementById('fulfillmentChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Full', 'Partial'],
-            datasets: [{
-                data: [{{ $fulfillmentRate }}, {{ 100 - $fulfillmentRate }}],
-                backgroundColor: ['#16a34a', '#f97316']
-            }]
+    const deliveryLabels = @json(collect($deliveryTrend)->pluck('label'));
+    const deliveryPlan = @json(collect($deliveryTrend)->pluck('planned_qty'));
+    const deliveryActual = @json(collect($deliveryTrend)->pluck('actual_qty'));
+
+    Highcharts.chart('fulfillmentChart', {
+        chart: { type: 'column' },
+        title: { text: null },
+        xAxis: {
+            categories: deliveryLabels,
+            crosshair: true
         },
-        options: { responsive: true }
+        yAxis: {
+            min: 0,
+            title: { text: 'QTY' }
+        },
+        tooltip: {
+            shared: true,
+            valueSuffix: ' QTY'
+        },
+        plotOptions: {
+            column: {
+                pointPadding: 0.1,
+                borderWidth: 0
+            }
+        },
+        series: [
+            {
+                name: 'Rencana Sales',
+                data: deliveryPlan,
+                color: {
+                    pattern: {
+                        path: {
+                            d: 'M 0 0 L 10 10',
+                            stroke: '#f97316',
+                            strokeWidth: 2
+                        },
+                        width: 10,
+                        height: 10,
+                        color: 'rgba(249,115,22,0.2)'
+                    }
+                }
+            },
+            {
+                name: 'Aktual Delivery',
+                data: deliveryActual,
+                color: '#0C7779'
+            }
+        ],
+        credits: { enabled: false },
+        legend: { align: 'center', verticalAlign: 'bottom' }
     });
-
-    const fulfillmentDetail = document.getElementById('fulfillment-detail');
-    const fulfillmentFull = document.getElementById('fulfillment-full');
-    const fulfillmentPartial = document.getElementById('fulfillment-partial');
-    const fulfillmentCollapse = new bootstrap.Collapse(fulfillmentDetail, { toggle: false });
-
-    document.getElementById('fulfillmentChart').onclick = (evt) => {
-        const points = fulfillmentChart.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
-        if (!points.length) return;
-        const index = points[0].index;
-        if (index === 0) {
-            fulfillmentFull.classList.remove('d-none');
-            fulfillmentPartial.classList.add('d-none');
-        } else {
-            fulfillmentPartial.classList.remove('d-none');
-            fulfillmentFull.classList.add('d-none');
-        }
-        fulfillmentCollapse.show();
-        fulfillmentDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    };
 
     const popoverTriggers = document.querySelectorAll('[data-bs-toggle="popover"]');
     popoverTriggers.forEach((el) => {

@@ -32,6 +32,7 @@ class StockWithdrawalController extends Controller
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->where('boxes.part_number', 'like', '%' . $query . '%')
             ->distinct()
@@ -530,6 +531,7 @@ class StockWithdrawalController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
             })
@@ -574,6 +576,7 @@ class StockWithdrawalController extends Controller
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->whereIn('boxes.part_number', $partNumbers)
             ->groupBy('boxes.part_number')
@@ -612,6 +615,7 @@ class StockWithdrawalController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
             })
@@ -715,6 +719,7 @@ class StockWithdrawalController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->where('boxes.assigned_delivery_order_id', $orderId)
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')

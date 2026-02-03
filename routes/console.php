@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -50,3 +51,12 @@ Artisan::command('delivery:purge-completions', function () {
 
     $this->info('Expired completion data purged.');
 })->purpose('Purge completed delivery data after redo window');
+
+Artisan::command('expired-box:send-test', function () {
+    app(\App\Services\ExpiredBoxService::class)->sendDailySummary();
+    $this->info('Expired box email summary sent (if data exists).');
+})->purpose('Send expired box summary email on demand');
+
+Schedule::call(function () {
+    app(\App\Services\ExpiredBoxService::class)->sendDailySummary();
+})->dailyAt('07:00');

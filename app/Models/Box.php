@@ -27,12 +27,16 @@ class Box extends Model
         'is_not_full',
         'not_full_reason',
         'assigned_delivery_order_id',
+        'expired_status',
+        'handled_at',
+        'handled_by',
     ];
 
     protected $casts = [
         'is_withdrawn' => 'boolean',
         'is_not_full' => 'boolean',
         'withdrawn_at' => 'datetime',
+        'handled_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -73,10 +77,16 @@ class Box extends Model
         return $this->belongsTo(DeliveryOrder::class, 'assigned_delivery_order_id');
     }
 
+    public function handledBy()
+    {
+        return $this->belongsTo(User::class, 'handled_by');
+    }
+
     // Scope helper
     public function scopeActive($query)
     {
-        return $query->where('is_withdrawn', false);
+        return $query->where('is_withdrawn', false)
+            ->whereNotIn('expired_status', ['handled', 'expired']);
     }
 
     public function scopeWithdrawn($query)

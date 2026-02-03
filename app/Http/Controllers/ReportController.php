@@ -74,6 +74,12 @@ class ReportController extends Controller
                 $row['inbound_pcs'],
                 $row['outbound_pcs'],
             ])->toArray(),
+            'delivery_trend_headings' => ['Period', 'Planned Qty', 'Actual Qty'],
+            'delivery_trend_rows' => collect($data->deliveryTrend ?? [])->map(fn ($row) => [
+                $row['label'] ?? '- ',
+                $row['planned_qty'] ?? 0,
+                $row['actual_qty'] ?? 0,
+            ])->toArray(),
             'mismatch_headings' => ['Order', 'Scanned', 'Issue Type', 'Status', 'Tanggal'],
             'mismatch_rows' => $data->issueList->map(fn ($row) => [
                 $row['order_id'],
@@ -104,7 +110,12 @@ class ReportController extends Controller
             ])->toArray(),
         ];
 
-        return Excel::download(new OperationalReportsExport($exportData), 'operational_reports_' . now()->format('Ymd_His') . '.xlsx');
+        return Excel::download(
+            new OperationalReportsExport($exportData),
+            'operational_reports_' . now()->format('Ymd_His') . '.xlsx',
+            \Maatwebsite\Excel\Excel::XLSX,
+            ['includeCharts' => true]
+        );
     }
     /**
      * Show withdrawal history report

@@ -19,6 +19,9 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+    Route::get('/profile', [\App\Http\Controllers\ProfileController::class, 'edit'])->name('profile.edit');
+    Route::put('/profile', [\App\Http\Controllers\ProfileController::class, 'update'])->name('profile.update');
+
     // Admin Routes - Box Management (QR Code Generation)
     Route::middleware('role:admin')->group(function () {
         Route::get('/boxes', [BoxController::class, 'index'])->name('boxes.index');
@@ -126,6 +129,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');
         Route::get('/reports/stock-input', [ReportController::class, 'stockInputReport'])->name('reports.stock-input');
         Route::get('/reports/operational/export', [ReportController::class, 'exportOperationalExcel'])->name('reports.operational.export');
+
+        Route::get('/expired-box', [\App\Http\Controllers\ExpiredBoxController::class, 'index'])->name('expired-box.index');
+        Route::post('/expired-box/{box}/handle', [\App\Http\Controllers\ExpiredBoxController::class, 'handle'])->name('expired-box.handle');
 
         // Audit Trail Report
         Route::get('/audit-trail', [\App\Http\Controllers\AuditController::class, 'index'])->name('audit.index');

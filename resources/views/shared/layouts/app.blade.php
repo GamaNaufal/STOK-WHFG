@@ -354,6 +354,12 @@
                                     <i class="bi bi-house"></i> Dashboard
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" 
+                                   href="{{ route('profile.edit') }}">
+                                    <i class="bi bi-person"></i> Edit Profile
+                                </a>
+                            </li>
 
                             <!-- ==================== WAREHOUSE OPERATOR ==================== -->
                             @if(auth()->user()->role === 'warehouse_operator')
@@ -441,6 +447,12 @@
                                     <a class="nav-link {{ request()->routeIs('box-not-full.approvals') ? 'active' : '' }}" 
                                        href="{{ route('box-not-full.approvals') }}">
                                         <i class="bi bi-clipboard-check"></i> Approval Box Not Full
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link {{ request()->routeIs('expired-box*') ? 'active' : '' }}" 
+                                       href="{{ route('expired-box.index') }}">
+                                        <i class="bi bi-exclamation-triangle"></i> Expired Box
                                     </a>
                                 </li>
                                 <li class="nav-item">
@@ -632,6 +644,9 @@
                                     <br>
                                     <span class="badge bg-info">{{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}</span>
                                 </p>
+                                <a href="{{ route('profile.edit') }}" class="btn btn-sm btn-outline-light w-100 mb-2">
+                                    <i class="bi bi-person"></i> Edit Profile
+                                </a>
                                 <form method="POST" action="{{ route('logout') }}" style="display: inline;">
                                     @csrf
                                     <button type="submit" class="btn btn-sm btn-outline-danger w-100">
