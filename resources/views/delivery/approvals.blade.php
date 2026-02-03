@@ -433,7 +433,8 @@
                                         <tr>
                                             <th style="text-align: left;">Part</th>
                                             <th>Required</th>
-                                            <th>Available</th>
+                                            <th>Aktual</th>
+                                            <th>Total Stock</th>
                                             <th>Status</th>
                                         </tr>
                                     </thead>
@@ -443,8 +444,9 @@
                                             <td style="text-align: left;">{{ $item->part_number }}</td>
                                             <td>{{ $item->quantity }}</td>
                                             <td class="@if($item->stock_warning) status-warning @else status-ok @endif">
-                                                {{ $item->available_stock ?? 0 }}
+                                                {{ $item->remaining_before ?? 0 }}
                                             </td>
+                                            <td>{{ $item->available_total ?? 0 }}</td>
                                             <td>
                                                 @if($item->stock_warning)
                                                     <span class="badge-warning">⚠ Low</span>

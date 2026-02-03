@@ -38,9 +38,12 @@ class StockViewController extends Controller
                             'pallet_number' => $pallet->pallet_number,
                             'location' => $location,
                             'part_number' => $box->part_number,
+                            'box_number' => $box->box_number,
                             'box_quantity' => 1,
                             'pcs_quantity' => (int) $box->pcs_quantity,
                             'created_at' => $box->created_at,
+                            'is_not_full' => (bool) $box->is_not_full,
+                            'not_full_reason' => $box->not_full_reason,
                         ]);
                     }
                 } else {
@@ -62,9 +65,12 @@ class StockViewController extends Controller
                             'pallet_number' => $pallet->pallet_number,
                             'location' => $location,
                             'part_number' => $item->part_number,
+                            'box_number' => null,
                             'box_quantity' => (int) $item->box_quantity,
                             'pcs_quantity' => (int) $item->pcs_quantity,
                             'created_at' => $item->created_at,
+                            'is_not_full' => false,
+                            'not_full_reason' => null,
                         ]);
                     }
                 }
@@ -80,6 +86,9 @@ class StockViewController extends Controller
         $viewMode = $request->input('view_mode', 'part'); // Default view by part
 
         $items = $this->buildStockItems($search);
+        if ($viewMode === 'not_full') {
+            $items = $items->filter(fn ($item) => !empty($item['is_not_full']))->values();
+        }
         // Calculate total pallets from the filtered items
         $totalPallets = $items->pluck('pallet_id')->unique()->count();
 
@@ -127,6 +136,22 @@ class StockViewController extends Controller
                 ];
             });
         }
+
+        $notFullBoxes = collect();
+        if ($viewMode === 'not_full') {
+            $notFullBoxes = $items->map(function ($item) {
+                return [
+                    'pallet_id' => $item['pallet_id'],
+                    'box_number' => $item['box_number'] ?? '-',
+                    'part_number' => $item['part_number'],
+                    'pcs_quantity' => $item['pcs_quantity'],
+                    'location' => $item['location'] ?? 'Unknown',
+                    'pallet_number' => $item['pallet_number'],
+                    'created_at' => $item['created_at'],
+                    'reason' => $item['not_full_reason'] ?? null,
+                ];
+            })->values();
+        }
         
         // Calculate totals for summary cards regardless of view mode
         // We use the raw items collection to calculate these compatible with both views
@@ -136,7 +161,8 @@ class StockViewController extends Controller
 
         return view('shared.stock-view.index', compact(
             'groupedByPart', 
-            'groupedByPallet', 
+            'groupedByPallet',
+            'notFullBoxes',
             'search', 
             'viewMode', 
             'totalPallets',
@@ -191,12 +217,13 @@ class StockViewController extends Controller
             ];
         });
 
+
         return response()->json([
             'part_number' => $partNumber,
             'total_box' => (int)$totalBox,
             'total_pcs' => $totalPcs,
             'pallet_count' => $items->pluck('pallet_id')->unique()->count(),
-            'pallets' => $palletDetails
+            'pallets' => $palletDetails,
         ]);
     }
 
@@ -233,6 +260,8 @@ class StockViewController extends Controller
                     'pcs_quantity' => (int)$box->pcs_quantity,
                     'created_at' => $box->created_at->format('d M Y H:i'),
                     'origin_pallet' => $origin,
+                    'is_not_full' => (bool) $box->is_not_full,
+                    'not_full_reason' => $box->not_full_reason,
                 ];
             });
         } else {
@@ -247,6 +276,8 @@ class StockViewController extends Controller
                     'pcs_quantity' => (int)$item->pcs_quantity,
                     'created_at' => $item->created_at->format('d M Y H:i'),
                     'origin_pallet' => null,
+                    'is_not_full' => false,
+                    'not_full_reason' => null,
                 ];
             });
         }

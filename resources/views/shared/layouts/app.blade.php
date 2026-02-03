@@ -133,8 +133,30 @@
             color: #0C7779;
             font-size: 0.75rem;
         }
+        .main-content {
+            width: 100%;
+            min-height: 100vh;
+        }
+        .table-responsive {
+            -webkit-overflow-scrolling: touch;
+        }
+        .table th,
+        .table td {
+            vertical-align: middle;
+        }
+        .form-control,
+        .form-select,
+        .input-group,
+        .btn,
+        .btn-group {
+            max-width: 100%;
+        }
+        .card,
+        .modal-content {
+            overflow-wrap: anywhere;
+        }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 991.98px) {
             .container-fluid > .row {
                 flex-direction: column;
             }
@@ -161,6 +183,78 @@
             }
         }
 
+        @media (max-width: 992px) {
+            .sidebar.offcanvas {
+                width: 90vw;
+                max-width: 360px;
+            }
+
+            nav.sidebar .position-sticky {
+                position: static !important;
+            }
+
+            .card[style*="position: sticky"] {
+                position: static !important;
+                top: auto !important;
+            }
+
+            .table {
+                font-size: 0.9rem;
+            }
+
+            .table th,
+            .table td {
+                white-space: nowrap;
+            }
+
+            .card-header,
+            .card-body,
+            .card-footer {
+                padding: 0.9rem !important;
+            }
+
+            .btn-lg {
+                padding: 0.65rem 1rem;
+                font-size: 1rem;
+            }
+        }
+
+        @media (min-width: 992px) {
+            .container-fluid > .row {
+                flex-wrap: nowrap;
+                align-items: stretch;
+            }
+
+            .sidebar.offcanvas {
+                position: static;
+                transform: none !important;
+                visibility: visible !important;
+                height: auto;
+                width: 16.66666667% !important;
+                max-width: none !important;
+                flex: 0 0 16.66666667%;
+                background-color: #f8f9fb;
+            }
+
+            .main-content {
+                flex: 1 1 auto;
+                width: auto !important;
+            }
+
+            .sidebar.offcanvas .offcanvas-header {
+                display: none;
+            }
+
+            .sidebar.offcanvas .offcanvas-body {
+                display: block;
+                padding: 0;
+            }
+
+            .offcanvas-backdrop {
+                display: none !important;
+            }
+        }
+
         @media (max-width: 768px) {
             .sidebar .nav-link {
                 padding: 0.6rem 0.75rem;
@@ -181,6 +275,45 @@
             .action-buttons {
                 flex-wrap: wrap;
                 gap: 0.5rem;
+            }
+
+            .table-responsive {
+                margin-bottom: 1rem;
+            }
+
+            .input-group {
+                flex-wrap: wrap;
+            }
+
+            .input-group > .form-control,
+            .input-group > .form-select,
+            .input-group > .btn {
+                width: 100%;
+                border-radius: 0.5rem !important;
+            }
+
+            .main-content {
+                padding: 0.75rem !important;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .btn,
+            .btn-sm,
+            .btn-lg {
+                width: 100%;
+            }
+
+            .row.g-3,
+            .row.g-2 {
+                row-gap: 0.75rem;
+            }
+
+            .card-header h5,
+            .card-header h6,
+            .card-body h5,
+            .card-body h6 {
+                font-size: 1rem;
             }
         }
     </style>
@@ -513,11 +646,6 @@
 
             <!-- Main Content -->
             <main class="col-md-10 main-content">
-                <div class="d-lg-none mb-3">
-                    <button class="btn btn-primary w-100" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileSidebar" aria-controls="mobileSidebar">
-                        <i class="bi bi-list"></i> Menu
-                    </button>
-                </div>
                 @if (session('success'))
                     <div class="alert alert-success alert-dismissible fade show" role="alert">
                         <i class="bi bi-check-circle"></i> {{ session('success') }}
