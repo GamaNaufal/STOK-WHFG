@@ -11,6 +11,15 @@ use Illuminate\Support\Str;
 
 class StockWithdrawalController extends Controller
 {
+    private function baseBoxStockQuery()
+    {
+        return DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown');
+    }
+
     /**
      * Show the fulfillment page for a delivery order
      */
@@ -27,13 +36,9 @@ class StockWithdrawalController extends Controller
     {
         $query = $request->input('q', '');
 
-        $boxParts = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $boxParts = $this->baseBoxStockQuery()
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->where('boxes.part_number', 'like', '%' . $query . '%')
             ->distinct()
             ->limit(20)
@@ -525,17 +530,13 @@ class StockWithdrawalController extends Controller
      */
     private function getTotalStockForPart($partNumber, bool $excludeAssigned = false)
     {
-        $boxTotal = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $boxTotal = $this->baseBoxStockQuery()
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
             })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->sum('boxes.pcs_quantity');
 
         $legacyTotal = PalletItem::where('part_number', $partNumber)
@@ -571,13 +572,9 @@ class StockWithdrawalController extends Controller
             return [];
         }
 
-        $boxTotals = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $boxTotals = $this->baseBoxStockQuery()
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->whereIn('boxes.part_number', $partNumbers)
             ->groupBy('boxes.part_number')
             ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
@@ -609,17 +606,13 @@ class StockWithdrawalController extends Controller
         $locations = [];
         $remainingQty = $requestedQty;
 
-        $boxRows = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $boxRows = $this->baseBoxStockQuery()
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
             })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select([
                 'boxes.id as box_id',
@@ -713,15 +706,11 @@ class StockWithdrawalController extends Controller
 
     private function getReservedBoxesForOrder(int $orderId, string $partNumber)
     {
-        return DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        return $this->baseBoxStockQuery()
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->where('boxes.assigned_delivery_order_id', $orderId)
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select([
                 'boxes.box_number',

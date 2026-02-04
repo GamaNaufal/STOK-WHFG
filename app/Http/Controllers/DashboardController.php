@@ -13,6 +13,45 @@ use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
+    private function activePalletQuery(bool $requireLocation = false)
+    {
+        $query = Pallet::whereHas('items', function ($q) {
+            $q->where(function ($subQ) {
+                $subQ->where('pcs_quantity', '>', 0)
+                     ->orWhere('box_quantity', '>', 0);
+            });
+        });
+
+        if ($requireLocation) {
+            $query->has('stockLocation');
+        }
+
+        return $query;
+    }
+
+    private function countActiveItems(): int
+    {
+        return PalletItem::where(function ($q) {
+            $q->where('pcs_quantity', '>', 0)
+              ->orWhere('box_quantity', '>', 0);
+        })->count();
+    }
+
+    private function getExpiredBoxStats(): array
+    {
+        $expiredService = app(ExpiredBoxService::class);
+        $expiredService->syncStatuses();
+
+        $expiredBoxes = $expiredService->getExpirableBoxesQuery()
+            ->whereIn('boxes.expired_status', ['warning', 'expired'])
+            ->get();
+
+        return [
+            'warning_boxes' => $expiredBoxes->filter(fn ($row) => $row->expired_status === 'warning')->count(),
+            'expired_boxes' => $expiredBoxes->filter(fn ($row) => $row->expired_status === 'expired')->count(),
+        ];
+    }
+
     private function buildStockSummaryTotals(): array
     {
         $items = collect();
@@ -63,12 +102,7 @@ class DashboardController extends Controller
 
         // WAREHOUSE OPERATOR
         if ($userRole === 'warehouse_operator') {
-            $palletsWithActiveStock = Pallet::whereHas('items', function ($q) {
-                $q->where(function ($subQ) {
-                    $subQ->where('pcs_quantity', '>', 0)
-                         ->orWhere('box_quantity', '>', 0);
-                });
-            })->has('stockLocation')->count();
+            $palletsWithActiveStock = $this->activePalletQuery(true)->count();
 
             $stats = [
                 'role_label' => 'Warehouse Operator',
@@ -76,11 +110,8 @@ class DashboardController extends Controller
                 'pallets_with_location' => $palletsWithActiveStock,
                 'pallets_without_location' => Pallet::doesntHave('stockLocation')->count(),
                 'total_locations' => StockLocation::distinct('warehouse_location')->count(),
-                'total_items' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->count(),
-                                'total_pcs' => $stockSummaryTotals['total_pcs'],
+                'total_items' => $this->countActiveItems(),
+                'total_pcs' => $stockSummaryTotals['total_pcs'],
                 'pending_deliveries' => DeliveryPickSession::whereIn('status', ['scanning', 'blocked'])->count(),
             ];
         }
@@ -103,10 +134,7 @@ class DashboardController extends Controller
                 'approved_orders' => DeliveryOrder::where('status', 'approved')->count(),
                 'total_orders' => DeliveryOrder::count(),
                 'total_stok_pcs' => $stockSummaryTotals['total_pcs'],
-                'total_stok_items' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->count(),
+                'total_stok_items' => $this->countActiveItems(),
             ];
         }
         // SUPERVISI
@@ -116,21 +144,8 @@ class DashboardController extends Controller
         }
         // ADMIN WAREHOUSE
         elseif ($userRole === 'admin_warehouse') {
-            $palletsWithActiveStock = Pallet::whereHas('items', function ($q) {
-                $q->where(function ($subQ) {
-                    $subQ->where('pcs_quantity', '>', 0)
-                         ->orWhere('box_quantity', '>', 0);
-                });
-            })->count();
-
-            // Get expired box information
-            $expiredService = app(ExpiredBoxService::class);
-            $expiredService->syncStatuses();
-            $expiredBoxes = $expiredService->getExpirableBoxesQuery()
-                ->whereIn('boxes.expired_status', ['warning', 'expired'])
-                ->get();
-            $warningBoxes = $expiredBoxes->filter(fn($row) => $row->expired_status === 'warning')->count();
-            $expiredBoxesCount = $expiredBoxes->filter(fn($row) => $row->expired_status === 'expired')->count();
+            $palletsWithActiveStock = $this->activePalletQuery()->count();
+            $expiredStats = $this->getExpiredBoxStats();
 
             $stats = [
                 'role_label' => 'Admin Warehouse',
@@ -139,31 +154,15 @@ class DashboardController extends Controller
                 'pallets_with_location' => $palletsWithActiveStock,
                 'total_pcs' => $stockSummaryTotals['total_pcs'],
                 'pending_scan_issues' => \App\Models\DeliveryIssue::where('status', 'pending')->count(),
-                'total_items' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->count(),
-                'warning_boxes' => $warningBoxes,
-                'expired_boxes' => $expiredBoxesCount,
+                'total_items' => $this->countActiveItems(),
+                'warning_boxes' => $expiredStats['warning_boxes'],
+                'expired_boxes' => $expiredStats['expired_boxes'],
             ];
         }
         // ADMIN IT (Full access)
         elseif ($userRole === 'admin') {
-            $palletsWithActiveStock = Pallet::whereHas('items', function ($q) {
-                $q->where(function ($subQ) {
-                    $subQ->where('pcs_quantity', '>', 0)
-                         ->orWhere('box_quantity', '>', 0);
-                });
-            })->count();
-
-            // Get expired box information
-            $expiredService = app(ExpiredBoxService::class);
-            $expiredService->syncStatuses();
-            $expiredBoxes = $expiredService->getExpirableBoxesQuery()
-                ->whereIn('boxes.expired_status', ['warning', 'expired'])
-                ->get();
-            $warningBoxes = $expiredBoxes->filter(fn($row) => $row->expired_status === 'warning')->count();
-            $expiredBoxesCount = $expiredBoxes->filter(fn($row) => $row->expired_status === 'expired')->count();
+            $palletsWithActiveStock = $this->activePalletQuery()->count();
+            $expiredStats = $this->getExpiredBoxStats();
 
             $stats = [
                 'role_label' => 'Admin IT',
@@ -171,16 +170,13 @@ class DashboardController extends Controller
                 'today_pallets' => Pallet::whereDate('created_at', today())->count(),
                 'pallets_with_location' => $palletsWithActiveStock,
                 'total_locations' => StockLocation::distinct('warehouse_location')->count(),
-                'total_items' => PalletItem::where(function ($q) {
-                    $q->where('pcs_quantity', '>', 0)
-                      ->orWhere('box_quantity', '>', 0);
-                })->count(),
+                'total_items' => $this->countActiveItems(),
                 'total_box' => $stockSummaryTotals['total_box'],
                 'total_pcs' => $stockSummaryTotals['total_pcs'],
                 'total_orders' => DeliveryOrder::count(),
                 'pending_orders' => DeliveryOrder::where('status', 'pending')->count(),
-                'warning_boxes' => $warningBoxes,
-                'expired_boxes' => $expiredBoxesCount,
+                'warning_boxes' => $expiredStats['warning_boxes'],
+                'expired_boxes' => $expiredStats['expired_boxes'],
             ];
         }
 

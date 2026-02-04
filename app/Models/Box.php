@@ -42,13 +42,6 @@ class Box extends Model
         'deleted_at' => 'datetime',
     ];
 
-    protected $indexes = [
-        'part_number',
-        'box_number',
-        'user_id',
-        'created_at',
-    ];
-
     public function user()
     {
         return $this->belongsTo(User::class);

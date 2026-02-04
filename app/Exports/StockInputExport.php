@@ -96,7 +96,9 @@ class StockInputExport implements FromCollection, WithHeadings, WithStyles
 
     public function styles(Worksheet $sheet)
     {
-        $lastRow = $this->stockInputs->count() + 1;
+        $lastRow = !empty($this->groupEndRows)
+            ? max($this->groupEndRows)
+            : 1;
 
         // Apply borders to all cells
         $sheet->getStyle('A1:J' . $lastRow)->applyFromArray([

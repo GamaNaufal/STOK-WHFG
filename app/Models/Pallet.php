@@ -10,6 +10,26 @@ class Pallet extends Model
         'pallet_number',
     ];
 
+    public static function createNext(): self
+    {
+        $lastPallet = static::where('pallet_number', 'like', 'PLT-0%')
+            ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
+            ->first();
+
+        $nextNumber = 1;
+        if ($lastPallet) {
+            preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
+            $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
+            $nextNumber = $lastNumber + 1;
+        }
+
+        $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+        return static::create([
+            'pallet_number' => $palletNumber,
+        ]);
+    }
+
     public function items()
     {
         return $this->hasMany(PalletItem::class);

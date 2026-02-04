@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Models\MasterLocation;
 use App\Models\StockLocation;
 
 class StockLocationObserver
@@ -11,7 +12,7 @@ class StockLocationObserver
      */
     public function created(StockLocation $stockLocation): void
     {
-        $masterLocation = \App\Models\MasterLocation::where('code', $stockLocation->warehouse_location)->first();
+        $masterLocation = MasterLocation::where('code', $stockLocation->warehouse_location)->first();
 
         if ($masterLocation) {
             $masterLocation->update([
@@ -30,7 +31,7 @@ class StockLocationObserver
         $originalPalletId = $stockLocation->getOriginal('pallet_id');
 
         if ($originalCode && $originalCode !== $stockLocation->warehouse_location) {
-            $oldLocation = \App\Models\MasterLocation::where('code', $originalCode)->first();
+            $oldLocation = MasterLocation::where('code', $originalCode)->first();
 
             if ($oldLocation && $oldLocation->current_pallet_id == $originalPalletId) {
                 $oldLocation->update([
@@ -42,7 +43,7 @@ class StockLocationObserver
 
         $newCode = $stockLocation->warehouse_location;
         if ($newCode) {
-            $newLocation = \App\Models\MasterLocation::where('code', $newCode)->first();
+            $newLocation = MasterLocation::where('code', $newCode)->first();
 
             if ($newLocation) {
                 $newLocation->update([
@@ -58,18 +59,13 @@ class StockLocationObserver
      */
     public function deleted(StockLocation $stockLocation): void
     {
-        // Cari MasterLocation berdasarkan kode
-        $masterLocation = \App\Models\MasterLocation::where('code', $stockLocation->warehouse_location)->first();
+        $masterLocation = MasterLocation::where('code', $stockLocation->warehouse_location)->first();
 
-        if ($masterLocation) {
-             // Cek apakah lokasi ini masih dipakai oleh pallet lain? (Seharusnya 1:1, tapi untuk safety)
-             // Jika relasinya 1 lokasi 1 pallet, maka langsung set false.
-             if ($masterLocation->current_pallet_id == $stockLocation->pallet_id) {
-                 $masterLocation->update([
-                     'is_occupied' => false,
-                     'current_pallet_id' => null
-                 ]);
-             }
+        if ($masterLocation && $masterLocation->current_pallet_id == $stockLocation->pallet_id) {
+            $masterLocation->update([
+                'is_occupied' => false,
+                'current_pallet_id' => null,
+            ]);
         }
     }
 

@@ -16,6 +16,22 @@ use Illuminate\Support\Facades\DB;
 
 class OperationalReportService
 {
+    private function buildDeliveryQtyByDay(?Carbon $start, ?Carbon $end, string $field): \Illuminate\Support\Collection
+    {
+        $sumExpression = $field === 'fulfilled_quantity'
+            ? DB::raw('SUM(COALESCE(items.fulfilled_quantity, 0)) as qty')
+            : DB::raw('SUM(items.quantity) as qty');
+
+        return DB::table('delivery_orders as orders')
+            ->join('delivery_order_items as items', 'items.delivery_order_id', '=', 'orders.id')
+            ->whereIn('orders.status', ['approved', 'processing', 'completed'])
+            ->when($start, fn ($q) => $q->whereDate('orders.delivery_date', '>=', $start->toDateString()))
+            ->when($end, fn ($q) => $q->whereDate('orders.delivery_date', '<=', $end->toDateString()))
+            ->select(DB::raw('DATE(orders.delivery_date) as day'), $sumExpression)
+            ->groupBy('day')
+            ->pluck('qty', 'day');
+    }
+
     private function resolveDateRange(Request $request): array
     {
         $start = null;
@@ -161,23 +177,8 @@ class OperationalReportService
             }
         }
 
-        $deliveryPlanByDay = DB::table('delivery_orders as orders')
-            ->join('delivery_order_items as items', 'items.delivery_order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['approved', 'processing', 'completed'])
-            ->when($start, fn ($q) => $q->whereDate('orders.delivery_date', '>=', $start->toDateString()))
-            ->when($end, fn ($q) => $q->whereDate('orders.delivery_date', '<=', $end->toDateString()))
-            ->select(DB::raw('DATE(orders.delivery_date) as day'), DB::raw('SUM(items.quantity) as qty'))
-            ->groupBy('day')
-            ->pluck('qty', 'day');
-
-        $deliveryActualByDay = DB::table('delivery_orders as orders')
-            ->join('delivery_order_items as items', 'items.delivery_order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['approved', 'processing', 'completed'])
-            ->when($start, fn ($q) => $q->whereDate('orders.delivery_date', '>=', $start->toDateString()))
-            ->when($end, fn ($q) => $q->whereDate('orders.delivery_date', '<=', $end->toDateString()))
-            ->select(DB::raw('DATE(orders.delivery_date) as day'), DB::raw('SUM(COALESCE(items.fulfilled_quantity, 0)) as qty'))
-            ->groupBy('day')
-            ->pluck('qty', 'day');
+        $deliveryPlanByDay = $this->buildDeliveryQtyByDay($start, $end, 'quantity');
+        $deliveryActualByDay = $this->buildDeliveryQtyByDay($start, $end, 'fulfilled_quantity');
 
         $deliveryTrend = [];
         if ($start && $end) {

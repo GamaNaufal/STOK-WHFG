@@ -7,18 +7,24 @@ use App\Models\Box;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class DeliveryOrderController extends Controller
 {
-    private function buildFifoPoolsByPart(): array
+    private function baseBoxStockQuery()
     {
-        $boxRows = DB::table('boxes')
+        return DB::table('boxes')
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown');
+    }
+
+    private function buildFifoPoolsByPart(): array
+    {
+        $boxRows = $this->baseBoxStockQuery()
             ->where('boxes.is_withdrawn', false)
             ->whereNull('boxes.assigned_delivery_order_id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full', 'boxes.created_at')
             ->get();
 
@@ -65,14 +71,10 @@ class DeliveryOrderController extends Controller
     }
     private function getStrictFulfillableForOrder(int $orderId, string $partNumber, int $requiredQty): int
     {
-        $reservedBoxes = Box::query()
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $reservedBoxes = $this->baseBoxStockQuery()
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->where('boxes.assigned_delivery_order_id', $orderId)
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.pcs_quantity')
             ->get();
@@ -84,14 +86,10 @@ class DeliveryOrderController extends Controller
             return $reservedTotal;
         }
 
-        $fifoBoxes = Box::query()
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $fifoBoxes = $this->baseBoxStockQuery()
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->whereNull('boxes.assigned_delivery_order_id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.pcs_quantity')
             ->get();
@@ -113,11 +111,8 @@ class DeliveryOrderController extends Controller
     }
     private function getAvailableStockByPart(): array
     {
-        $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+        $boxTotals = $this->baseBoxStockQuery()
+            ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
             ->where('boxes.is_withdrawn', false)
             ->whereNull('boxes.assigned_delivery_order_id')
             ->groupBy('boxes.part_number')
@@ -142,15 +137,12 @@ class DeliveryOrderController extends Controller
 
     private function getReservedStockByOrder(): array
     {
-        $rows = Box::select(
+        $rows = $this->baseBoxStockQuery()
+            ->select(
                 'boxes.assigned_delivery_order_id',
                 'boxes.part_number',
                 DB::raw('SUM(boxes.pcs_quantity) as total')
             )
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->where('boxes.is_withdrawn', false)
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number')
@@ -170,11 +162,13 @@ class DeliveryOrderController extends Controller
     public function index()
     {
         $user = \Illuminate\Support\Facades\Auth::user();
-        
-           // Strict Role Check: Admin & Warehouse Operator only
-                 if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse', 'ppc'], true)) {
-             if ($user->role === 'sales') return redirect()->route('delivery.create');
-             return redirect('/')->with('error', 'Unauthorized access to Schedule.');
+
+        // Strict Role Check: Admin & Warehouse Operator only
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse', 'ppc'], true)) {
+            if ($user->role === 'sales') {
+                return redirect()->route('delivery.create');
+            }
+            return redirect('/')->with('error', 'Unauthorized access to Schedule.');
         }
 
         $approvedOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
@@ -516,7 +510,12 @@ class DeliveryOrderController extends Controller
             return redirect()->route('delivery.create')->with('success', 'Perbaikan berhasil dikirim ulang ke PPC.');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
-            return redirect()->back()->with('error', 'Error update order: ' . $e->getMessage());
+            Log::error('Delivery order update failed', [
+                'order_id' => $order->id,
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+            return redirect()->back()->with('error', 'Gagal memperbarui order. Silakan coba lagi atau hubungi admin.');
         }
     }
 
@@ -538,10 +537,6 @@ class DeliveryOrderController extends Controller
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
-            // Check if updating existing (resubmit correction) or new
-            // Implementation note: User didn't ask for edit/resubmit UI yet, just status flow.
-            // For now, assume this creates NEW. Editing requires ID.
-            
             $order = \App\Models\DeliveryOrder::create([
                 'sales_user_id' => \Illuminate\Support\Facades\Auth::id(),
                 'customer_name' => $request->customer_name,
@@ -562,7 +557,11 @@ class DeliveryOrderController extends Controller
             return redirect()->back()->with('success', 'Delivery Order submitted to PPC.');
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
-            return redirect()->back()->with('error', 'Error creating order: ' . $e->getMessage());
+            Log::error('Delivery order create failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+            return redirect()->back()->with('error', 'Gagal membuat order. Silakan coba lagi atau hubungi admin.');
         }
     }
 

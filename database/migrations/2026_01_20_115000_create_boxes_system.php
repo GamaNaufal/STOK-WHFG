@@ -26,6 +26,12 @@ return new class extends Migration
             $table->longText('qr_code'); // QR Code (encoded)
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade'); // Admin yang membuat
             $table->boolean('is_withdrawn')->default(false);
+            $table->boolean('is_not_full')->default(false);
+            $table->text('not_full_reason')->nullable();
+            $table->unsignedBigInteger('assigned_delivery_order_id')->nullable();
+            $table->string('expired_status')->default('active')->index();
+            $table->dateTime('handled_at')->nullable();
+            $table->foreignId('handled_by')->nullable()->constrained('users')->nullOnDelete();
             $table->dateTime('withdrawn_at')->nullable();
             $table->timestamps();
             $table->softDeletes();
@@ -33,6 +39,7 @@ return new class extends Migration
             $table->index('part_number');
             $table->index('user_id');
             $table->index('created_at');
+            $table->index('assigned_delivery_order_id');
         });
 
         Schema::create('pallet_boxes', function (Blueprint $table) {

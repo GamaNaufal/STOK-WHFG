@@ -35,6 +35,13 @@ return new class extends Migration
             $table->integer('fulfilled_quantity')->default(0); // For warehouse tracking
             $table->timestamps();
         });
+
+        Schema::table('boxes', function (Blueprint $table) {
+            $table->foreign('assigned_delivery_order_id')
+                ->references('id')
+                ->on('delivery_orders')
+                ->nullOnDelete();
+        });
     }
 
     /**
@@ -42,6 +49,10 @@ return new class extends Migration
      */
     public function down(): void
     {
+        Schema::table('boxes', function (Blueprint $table) {
+            $table->dropForeign(['assigned_delivery_order_id']);
+        });
+
         Schema::dropIfExists('delivery_order_items');
         Schema::dropIfExists('delivery_orders');
     }

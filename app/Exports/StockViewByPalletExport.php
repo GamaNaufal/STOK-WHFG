@@ -51,7 +51,9 @@ class StockViewByPalletExport implements FromCollection, WithHeadings, WithStyle
 
     public function styles(Worksheet $sheet)
     {
-        $lastRow = $this->stocks->count() + 1;
+        $lastRow = !empty($this->groupEndRows)
+            ? max($this->groupEndRows)
+            : 1;
 
         // Apply borders to all cells
         $sheet->getStyle('A1:D' . $lastRow)->applyFromArray([

@@ -114,4 +114,24 @@ return [
 
     'prefix' => env('CACHE_PREFIX', Str::slug((string) env('APP_NAME', 'laravel')).'-cache-'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Read-only & Response Cache Controls
+    |--------------------------------------------------------------------------
+    |
+    | These toggles are used for short-lived caching of read-only data and
+    | responses in production. Keep TTLs short to minimize stale data risk.
+    |
+    */
+
+    'readonly' => [
+        'enabled' => env('READONLY_CACHE_ENABLED', false),
+        'ttl_seconds' => (int) env('READONLY_CACHE_TTL_SECONDS', 180),
+    ],
+
+    'response' => [
+        'enabled' => env('RESPONSE_CACHE_ENABLED', false),
+        'ttl_seconds' => (int) env('RESPONSE_CACHE_TTL_SECONDS', 120),
+    ],
+
 ];

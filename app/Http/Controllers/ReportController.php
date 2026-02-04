@@ -7,19 +7,61 @@ use App\Models\StockInput;
 use App\Models\StockWithdrawal;
 use App\Services\OperationalReportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
     public function operationalReports(Request $request)
     {
+        $cacheConfig = config('cache.readonly');
+        $cacheEnabled = (bool) ($cacheConfig['enabled'] ?? false);
+        $cacheTtl = (int) ($cacheConfig['ttl_seconds'] ?? 180);
+
+        $cacheKey = null;
+        $userId = Auth::id() ?? 'guest';
+        if ($cacheEnabled) {
+            $cacheKey = 'report:operational:' . $userId . ':' . md5(json_encode($request->query()));
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                return view('operator.reports.operational', $cached);
+            }
+        }
+
         $data = app(OperationalReportService::class)->build($request);
+
+        if ($cacheEnabled && $cacheKey) {
+            Cache::put($cacheKey, $data, $cacheTtl);
+        }
         return view('operator.reports.operational', $data);
     }
 
     public function exportOperationalExcel(Request $request)
     {
-        $data = (object) app(OperationalReportService::class)->build($request, true);
+        $cacheConfig = config('cache.readonly');
+        $cacheEnabled = (bool) ($cacheConfig['enabled'] ?? false);
+        $cacheTtl = (int) ($cacheConfig['ttl_seconds'] ?? 180);
+
+        $cacheKey = null;
+        $userId = Auth::id() ?? 'guest';
+        $exportDataArray = null;
+        if ($cacheEnabled) {
+            $cacheKey = 'report:operational:export:' . $userId . ':' . md5(json_encode($request->query()));
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                $exportDataArray = $cached;
+            }
+        }
+
+        if (!$exportDataArray) {
+            $exportDataArray = app(OperationalReportService::class)->build($request, true);
+            if ($cacheEnabled && $cacheKey) {
+                Cache::put($cacheKey, $exportDataArray, $cacheTtl);
+            }
+        }
+
+        $data = (object) $exportDataArray;
         $start = $data->start;
         $end = $data->end;
         $rangeLabel = $data->rangeLabel;
@@ -122,6 +164,20 @@ class ReportController extends Controller
      */
     public function withdrawalReport(Request $request)
     {
+        $cacheConfig = config('cache.readonly');
+        $cacheEnabled = (bool) ($cacheConfig['enabled'] ?? false);
+        $cacheTtl = (int) ($cacheConfig['ttl_seconds'] ?? 180);
+
+        $cacheKey = null;
+        $userId = Auth::id() ?? 'guest';
+        if ($cacheEnabled) {
+            $cacheKey = 'report:withdrawal:' . $userId . ':' . md5(json_encode($request->query()));
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                return view('operator.reports.withdrawal', $cached);
+            }
+        }
+
         $query = StockWithdrawal::with(['user', 'palletItem']);
 
         // Date range filter
@@ -158,7 +214,7 @@ class ReportController extends Controller
         // Get all users for filter
         $users = \App\Models\User::whereIn('role', ['warehouse_operator', 'admin'])->get();
 
-        return view('operator.reports.withdrawal', [
+        $data = [
             'withdrawals' => $withdrawals,
             'totalWithdrawals' => $totalWithdrawals,
             'totalPcsWithdrawn' => $totalPcsWithdrawn,
@@ -171,7 +227,13 @@ class ReportController extends Controller
                 'part_number' => $request->input('part_number'),
                 'user_id' => $request->input('user_id'),
             ]
-        ]);
+        ];
+
+        if ($cacheEnabled && $cacheKey) {
+            Cache::put($cacheKey, $data, $cacheTtl);
+        }
+
+        return view('operator.reports.withdrawal', $data);
     }
 
     /**
@@ -179,6 +241,20 @@ class ReportController extends Controller
      */
     public function stockInputReport(Request $request)
     {
+        $cacheConfig = config('cache.readonly');
+        $cacheEnabled = (bool) ($cacheConfig['enabled'] ?? false);
+        $cacheTtl = (int) ($cacheConfig['ttl_seconds'] ?? 180);
+
+        $cacheKey = null;
+        $userId = Auth::id() ?? 'guest';
+        if ($cacheEnabled) {
+            $cacheKey = 'report:stock-input:' . $userId . ':' . md5(json_encode($request->query()));
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                return view('operator.reports.stock-input', $cached);
+            }
+        }
+
         // Get stock inputs from stock_inputs table
         $query = StockInput::with(['pallet.items', 'palletItem', 'user']);
 
@@ -223,7 +299,7 @@ class ReportController extends Controller
         // Get unique warehouse locations from stock_inputs
         $locations = StockInput::distinct('warehouse_location')->pluck('warehouse_location');
 
-        return view('operator.reports.stock-input', [
+        $data = [
             'stockInputs' => $stockInputs,
             'totalRecords' => $totalRecords,
             'totalItems' => $totalPcs,
@@ -235,7 +311,13 @@ class ReportController extends Controller
                 'part_number' => $request->input('part_number'),
                 'warehouse_location' => $request->input('warehouse_location'),
             ]
-        ]);
+        ];
+
+        if ($cacheEnabled && $cacheKey) {
+            Cache::put($cacheKey, $data, $cacheTtl);
+        }
+
+        return view('operator.reports.stock-input', $data);
     }
 
     /**

@@ -13,7 +13,8 @@ use PhpOffice\PhpSpreadsheet\Style\Border;
 
 class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, ShouldAutoSize
 {
-    protected $auditLogs;    protected $groupEndRows = []; // Track the last row of each audit log group
+    protected $auditLogs;
+    protected $groupEndRows = []; // Track the last row of each audit log group
     public function __construct($auditLogs)
     {
         $this->auditLogs = $auditLogs;
@@ -134,7 +135,9 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
 
     public function styles(Worksheet $sheet)
     {
-        $lastRow = $this->auditLogs->count() + 1;
+        $lastRow = !empty($this->groupEndRows)
+            ? max($this->groupEndRows)
+            : 1;
 
         // Apply borders to all cells
         $sheet->getStyle('A1:J' . $lastRow)->applyFromArray([

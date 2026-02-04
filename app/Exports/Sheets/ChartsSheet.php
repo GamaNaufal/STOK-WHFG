@@ -70,9 +70,13 @@ class ChartsSheet implements FromArray, WithTitle, WithDrawings, WithStyles, Wit
     {
         $sheet = $this->title();
 
-        $throughputCount = max(1, count($this->throughputRows));
-        $peakCount = max(1, count($this->peakRows));
-        $deliveryCount = max(1, count($this->deliveryTrendRows));
+        $throughputRows = $this->normalizeRows($this->throughputRows, ['-', 0, 0]);
+        $peakRows = $this->normalizeRows($this->peakRows, ['-', 0, 0]);
+        $deliveryRows = $this->normalizeRows($this->deliveryTrendRows, ['-', 0, 0]);
+
+        $throughputCount = max(1, count($throughputRows));
+        $peakCount = max(1, count($peakRows));
+        $deliveryCount = max(1, count($deliveryRows));
 
         $throughputTitleRow = 1;
         $throughputHeaderRow = 2;
@@ -101,9 +105,9 @@ class ChartsSheet implements FromArray, WithTitle, WithDrawings, WithStyles, Wit
             'Inbound vs Outbound Trend',
             $this->buildLineChartConfig(
                 'Inbound vs Outbound Trend',
-                array_column($this->normalizeRows($this->throughputRows, ['-', 0, 0]), 0),
-                array_column($this->normalizeRows($this->throughputRows, ['-', 0, 0]), 1),
-                array_column($this->normalizeRows($this->throughputRows, ['-', 0, 0]), 2)
+                array_column($throughputRows, 0),
+                array_column($throughputRows, 1),
+                array_column($throughputRows, 2)
             ),
             'A' . $throughputChartStartRow,
             960,
@@ -114,9 +118,9 @@ class ChartsSheet implements FromArray, WithTitle, WithDrawings, WithStyles, Wit
             'Peak Hours',
             $this->buildColumnChartConfig(
                 'Peak Hours',
-                array_column($this->normalizeRows($this->peakRows, ['-', 0, 0]), 0),
-                array_column($this->normalizeRows($this->peakRows, ['-', 0, 0]), 1),
-                array_column($this->normalizeRows($this->peakRows, ['-', 0, 0]), 2)
+                array_column($peakRows, 0),
+                array_column($peakRows, 1),
+                array_column($peakRows, 2)
             ),
             'A' . $peakChartStartRow,
             960,
@@ -127,9 +131,9 @@ class ChartsSheet implements FromArray, WithTitle, WithDrawings, WithStyles, Wit
             'Schedule Fulfillment Performance',
             $this->buildColumnChartConfig(
                 'Schedule Fulfillment Performance',
-                array_column($this->normalizeRows($this->deliveryTrendRows, ['-', 0, 0]), 0),
-                array_column($this->normalizeRows($this->deliveryTrendRows, ['-', 0, 0]), 1),
-                array_column($this->normalizeRows($this->deliveryTrendRows, ['-', 0, 0]), 2),
+                array_column($deliveryRows, 0),
+                array_column($deliveryRows, 1),
+                array_column($deliveryRows, 2),
                 ['Rencana Sales', 'Aktual Delivery']
             ),
             'A' . $deliveryChartStartRow,

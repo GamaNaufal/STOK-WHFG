@@ -25,22 +25,7 @@ class StockInputController extends Controller
             return $pallet;
         }
 
-        $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
-            ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
-            ->first();
-
-        $nextNumber = 1;
-        if ($lastPallet) {
-            preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
-            $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
-            $nextNumber = $lastNumber + 1;
-        }
-
-        $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-
-        $pallet = Pallet::create([
-            'pallet_number' => $palletNumber,
-        ]);
+        $pallet = Pallet::createNext();
 
         session(['current_pallet_id' => $pallet->id]);
 
@@ -426,12 +411,6 @@ class StockInputController extends Controller
 
             $pallet = Pallet::with(['items'])->findOrFail($validated['pallet_id']);
 
-            // Verify pallet has items (scanned QR) (INI KHUSUS UNTUK FLOW SCAN QR BARU - JIKA KITA PAKAI LOGIC DI BAWAH, LOGIC INI MUNGKIN PERLU DISESUAIKAN)
-            // KARENA SAAT INI ITEM BELUM DI ATTACH KE PALLET (MASIH DI SESSION)
-            // TAPI DI KODE SEBELUMNYA `items` RELASI KE `PalletItems` SUDAH DIBUAT SAAT SCAN? TIDAK, SAAT SCAN HANYA SESSION.
-            
-            // LOGIC KOREKSI: Relasi items (PalletItems) baru dibuat di bawah, jadi pengecekan valid disini harusnya check Session.
-            
             // Get scanned boxes dari session
             $scannedBoxes = session('scanned_boxes', []);
             
@@ -489,8 +468,7 @@ class StockInputController extends Controller
             $locationCode = null;
 
             if ($locationId) {
-                // Cari MasterLocation
-                $masterLocation = \App\Models\MasterLocation::find($locationId);
+                $masterLocation = MasterLocation::find($locationId);
                 if ($masterLocation && !$masterLocation->is_occupied) {
                      $locationCode = $masterLocation->code;
                      
@@ -511,7 +489,7 @@ class StockInputController extends Controller
 
                  // Kalau input text manual, cek apakah ada di master location
                  if ($locationCode) {
-                     $masterLocation = \App\Models\MasterLocation::where('code', $locationCode)->first();
+                     $masterLocation = MasterLocation::where('code', $locationCode)->first();
                      if ($masterLocation) {
                          if ($masterLocation->is_occupied) {
                              throw new \Exception("Lokasi {$locationCode} sudah terisi!");
@@ -562,8 +540,7 @@ class StockInputController extends Controller
             AuditService::logStockInput($stockInput, 'created');
 
             // Clear session data
-            session()->forget('scanned_boxes');
-            session()->forget('current_pallet_id'); // Jangan lupa clear pallet ID juga
+            session()->forget(['scanned_boxes', 'current_pallet_id']);
 
             DB::commit(); // Commit transaction
 

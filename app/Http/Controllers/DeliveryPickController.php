@@ -17,6 +17,41 @@ use Illuminate\Support\Str;
 
 class DeliveryPickController extends Controller
 {
+    private function basePickableBoxQuery(string $partNumber, $deliveryDate = null)
+    {
+        $storedAtSub = DB::table('pallet_boxes as pb')
+            ->join('stock_inputs as si', 'si.pallet_id', '=', 'pb.pallet_id')
+            ->select('pb.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
+            ->groupBy('pb.box_id');
+
+        return Box::query()
+            ->where('part_number', $partNumber)
+            ->where('is_withdrawn', false)
+            ->whereNotIn('expired_status', ['handled', 'expired'])
+            ->whereNotIn('boxes.id', function ($q) {
+                $q->select('box_id')
+                  ->from('delivery_pick_items')
+                  ->whereIn('pick_session_id', function ($q2) {
+                      $q2->select('id')
+                        ->from('delivery_pick_sessions')
+                        ->whereIn('status', ['scanning', 'blocked', 'approved']);
+                  });
+            })
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->leftJoinSub($storedAtSub, 'stock_in', function ($join) {
+                $join->on('stock_in.box_id', '=', 'boxes.id');
+            })
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->when($deliveryDate, function ($q) use ($deliveryDate) {
+                $q->where(function ($inner) use ($deliveryDate) {
+                    $inner->whereNull('stock_in.stored_at')
+                        ->orWhereRaw('DATE_ADD(stock_in.stored_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
+                });
+            });
+    }
+
     public function startPick($orderId)
     {
         $user = auth()->user();
@@ -536,78 +571,18 @@ class DeliveryPickController extends Controller
 
     private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null)
     {
-        $storedAtSub = DB::table('pallet_boxes as pb')
-            ->join('stock_inputs as si', 'si.pallet_id', '=', 'pb.pallet_id')
-            ->select('pb.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
-            ->groupBy('pb.box_id');
-
-        $query = Box::query()
-            ->where('part_number', $partNumber)
-            ->where('is_withdrawn', false)
-            ->whereNotIn('expired_status', ['handled', 'expired'])
+        $query = $this->basePickableBoxQuery($partNumber, $deliveryDate)
             ->where('assigned_delivery_order_id', $orderId)
-            ->whereNotIn('boxes.id', function ($q) {
-                $q->select('box_id')
-                  ->from('delivery_pick_items')
-                  ->whereIn('pick_session_id', function ($q2) {
-                      $q2->select('id')
-                        ->from('delivery_pick_sessions')
-                        ->whereIn('status', ['scanning', 'blocked', 'approved']);
-                  });
-            })
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->leftJoinSub($storedAtSub, 'stock_in', function ($join) {
-                $join->on('stock_in.box_id', '=', 'boxes.id');
-            })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.*')
-            ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $q->where(function ($inner) use ($deliveryDate) {
-                    $inner->whereNull('stock_in.stored_at')
-                        ->orWhereRaw('DATE_ADD(stock_in.stored_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
-                });
-            });
+            ->select('boxes.*');
 
         return $query->get();
     }
 
     private function getBoxesByFIFO(string $partNumber, int $requestedPcs, $deliveryDate = null)
     {
-        $storedAtSub = DB::table('pallet_boxes as pb')
-            ->join('stock_inputs as si', 'si.pallet_id', '=', 'pb.pallet_id')
-            ->select('pb.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
-            ->groupBy('pb.box_id');
-
-        $boxes = Box::query()
-            ->where('part_number', $partNumber)
-            ->where('is_withdrawn', false)
-            ->whereNotIn('expired_status', ['handled', 'expired'])
+        $boxes = $this->basePickableBoxQuery($partNumber, $deliveryDate)
             ->whereNull('boxes.assigned_delivery_order_id')
-            ->whereNotIn('boxes.id', function ($q) {
-                $q->select('box_id')
-                  ->from('delivery_pick_items')
-                  ->whereIn('pick_session_id', function ($q2) {
-                      $q2->select('id')
-                        ->from('delivery_pick_sessions')
-                        ->whereIn('status', ['scanning', 'blocked', 'approved']);
-                  });
-            })
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->leftJoinSub($storedAtSub, 'stock_in', function ($join) {
-                $join->on('stock_in.box_id', '=', 'boxes.id');
-            })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
-            ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $q->where(function ($inner) use ($deliveryDate) {
-                    $inner->whereNull('stock_in.stored_at')
-                        ->orWhereRaw('DATE_ADD(stock_in.stored_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
-                });
-            })
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')
             ->get();

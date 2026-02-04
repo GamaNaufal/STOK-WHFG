@@ -16,6 +16,7 @@ use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class NotFullBoxRequestController extends Controller
 {
@@ -140,7 +141,7 @@ class NotFullBoxRequestController extends Controller
                     throw new \Exception('Lokasi tidak tersedia.');
                 }
 
-                $pallet = $this->createNewPallet();
+                $pallet = Pallet::createNext();
                 $locationCode = $location->code;
 
                 $location->update([
@@ -223,7 +224,12 @@ class NotFullBoxRequestController extends Controller
             return redirect()->back()->with('success', 'Permintaan berhasil di-approve.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Gagal approve: ' . $e->getMessage());
+            Log::error('NotFullBoxRequest approval failed', [
+                'request_id' => $request->id,
+                'user_id' => Auth::id(),
+                'error' => $e->getMessage(),
+            ]);
+            return redirect()->back()->with('error', 'Gagal approve. Silakan coba lagi atau hubungi admin.');
         }
     }
 
@@ -243,23 +249,4 @@ class NotFullBoxRequestController extends Controller
         return redirect()->back()->with('success', 'Permintaan ditolak.');
     }
 
-    private function createNewPallet(): Pallet
-    {
-        $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
-            ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
-            ->first();
-
-        $nextNumber = 1;
-        if ($lastPallet) {
-            preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
-            $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
-            $nextNumber = $lastNumber + 1;
-        }
-
-        $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-
-        return Pallet::create([
-            'pallet_number' => $palletNumber,
-        ]);
-    }
 }

@@ -13,6 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
+            'response.cache' => \App\Http\Middleware\ResponseCache::class,
         ]);
 
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);

@@ -151,12 +151,13 @@ class AuditService
                     'warehouse_location' => $warehouseLocation,
                 ];
                 // Collect unique part numbers
-                if ($box->part_number && !in_array($box->part_number, $partNumbers)) {
-                    $partNumbers[] = $box->part_number;
+                if ($box->part_number) {
+                    $partNumbers[$box->part_number] = true;
                 }
             }
         }
 
+        $partNumbers = array_keys($partNumbers);
         $partNumberString = !empty($partNumbers) ? implode(', ', $partNumbers) : '-';
 
         $newValues = [

@@ -5,9 +5,34 @@ namespace App\Http\Controllers;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class StockViewController extends Controller
 {
+    private function getReadonlyCacheMeta(string $prefix, string $suffix): array
+    {
+        $cacheConfig = config('cache.readonly');
+        $cacheEnabled = (bool) ($cacheConfig['enabled'] ?? false);
+        $cacheTtl = (int) ($cacheConfig['ttl_seconds'] ?? 180);
+
+        if (!$cacheEnabled) {
+            return [
+                'enabled' => false,
+                'ttl' => $cacheTtl,
+                'key' => null,
+            ];
+        }
+
+        $userId = Auth::id() ?? 'guest';
+
+        return [
+            'enabled' => true,
+            'ttl' => $cacheTtl,
+            'key' => $prefix . ':' . $userId . ':' . $suffix,
+        ];
+    }
+
     private function buildStockItems(?string $search = null)
     {
         $palletQuery = Pallet::with(['stockLocation', 'items', 'boxes'])
@@ -177,6 +202,18 @@ class StockViewController extends Controller
     // API: Get stock grouped by part number
     public function apiGetStockByPart()
     {
+        $cacheMeta = $this->getReadonlyCacheMeta('stock:by-part', 'all');
+        $cacheEnabled = $cacheMeta['enabled'];
+        $cacheTtl = $cacheMeta['ttl'];
+        $cacheKey = $cacheMeta['key'];
+
+        if ($cacheEnabled && $cacheKey) {
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                return response()->json($cached);
+            }
+        }
+
         $items = $this->buildStockItems();
 
         $groupedByPart = $items->groupBy('part_number')->map(function ($itemGroup) {
@@ -190,12 +227,28 @@ class StockViewController extends Controller
             ];
         })->values();
 
+        if ($cacheEnabled && $cacheKey) {
+            Cache::put($cacheKey, $groupedByPart, $cacheTtl);
+        }
+
         return response()->json($groupedByPart);
     }
 
     // API: Get detailed information for a specific part number
     public function apiGetPartDetail($partNumber)
     {
+        $cacheMeta = $this->getReadonlyCacheMeta('stock:part-detail', md5($partNumber));
+        $cacheEnabled = $cacheMeta['enabled'];
+        $cacheTtl = $cacheMeta['ttl'];
+        $cacheKey = $cacheMeta['key'];
+
+        if ($cacheEnabled && $cacheKey) {
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                return response()->json($cached['payload'], $cached['status']);
+            }
+        }
+
         $items = $this->buildStockItems()
             ->filter(function ($item) use ($partNumber) {
                 return $item['part_number'] === $partNumber;
@@ -203,7 +256,11 @@ class StockViewController extends Controller
             ->values();
 
         if ($items->isEmpty()) {
-            return response()->json(['error' => 'Part not found'], 404);
+            $payload = ['error' => 'Part not found'];
+            if ($cacheEnabled && $cacheKey) {
+                Cache::put($cacheKey, ['payload' => $payload, 'status' => 404], $cacheTtl);
+            }
+            return response()->json($payload, 404);
         }
 
         $totalPcs = $items->sum('pcs_quantity');
@@ -222,22 +279,44 @@ class StockViewController extends Controller
         });
 
 
-        return response()->json([
+        $payload = [
             'part_number' => $partNumber,
             'total_box' => (int)$totalBox,
             'total_pcs' => $totalPcs,
             'pallet_count' => $items->pluck('pallet_id')->unique()->count(),
             'pallets' => $palletDetails,
-        ]);
+        ];
+
+        if ($cacheEnabled && $cacheKey) {
+            Cache::put($cacheKey, ['payload' => $payload, 'status' => 200], $cacheTtl);
+        }
+
+        return response()->json($payload);
     }
 
     // API: Get detailed information for a specific pallet
     public function apiGetPalletDetail($palletId)
     {
+        $cacheMeta = $this->getReadonlyCacheMeta('stock:pallet-detail', (string) (int) $palletId);
+        $cacheEnabled = $cacheMeta['enabled'];
+        $cacheTtl = $cacheMeta['ttl'];
+        $cacheKey = $cacheMeta['key'];
+
+        if ($cacheEnabled && $cacheKey) {
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                return response()->json($cached['payload'], $cached['status']);
+            }
+        }
+
         $pallet = Pallet::with(['items', 'boxes', 'stockLocation'])->find($palletId);
 
         if (!$pallet) {
-            return response()->json(['error' => 'Pallet not found'], 404);
+            $payload = ['error' => 'Pallet not found'];
+            if ($cacheEnabled && $cacheKey) {
+                Cache::put($cacheKey, ['payload' => $payload, 'status' => 404], $cacheTtl);
+            }
+            return response()->json($payload, 404);
         }
 
         // Priority 1: Use Boxes (Source of Truth for FIFO created_at)
@@ -292,11 +371,17 @@ class StockViewController extends Controller
             });
         }
 
-        return response()->json([
+        $payload = [
             'pallet_number' => $pallet->pallet_number,
             'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
-            'items' => $items->values() 
-        ]);
+            'items' => $items->values()
+        ];
+
+        if ($cacheEnabled && $cacheKey) {
+            Cache::put($cacheKey, ['payload' => $payload, 'status' => 200], $cacheTtl);
+        }
+
+        return response()->json($payload);
     }
 
     /**

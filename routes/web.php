@@ -145,11 +145,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/delivery-completions/{completion}/redo', [\App\Http\Controllers\DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');
     });
 
-    // API Routes (Accessible by auth users, usually consumed by frontend scripts on allowed pages)
-    Route::get('/api/stock/by-part', [StockViewController::class, 'apiGetStockByPart']);
-    Route::get('/api/stock/part-detail/{partNumber}', [StockViewController::class, 'apiGetPartDetail']);
-    Route::get('/api/stock/pallet-detail/{palletId}', [StockViewController::class, 'apiGetPalletDetail']);
-    Route::get('/api/locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable']); // Search Available Locations
+    // API Routes (Accessible by stock view roles)
+    Route::middleware(['role:warehouse_operator,ppc,admin_warehouse,supervisi,admin', 'response.cache'])->group(function () {
+        Route::get('/api/stock/by-part', [StockViewController::class, 'apiGetStockByPart']);
+        Route::get('/api/stock/part-detail/{partNumber}', [StockViewController::class, 'apiGetPartDetail']);
+        Route::get('/api/stock/pallet-detail/{palletId}', [StockViewController::class, 'apiGetPalletDetail']);
+        Route::get('/api/locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable']); // Search Available Locations
+    });
 
 });
 
