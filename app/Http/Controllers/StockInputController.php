@@ -12,6 +12,7 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class StockInputController extends Controller
@@ -25,16 +26,16 @@ class StockInputController extends Controller
             return $pallet;
         }
 
-        $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
-            ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
-            ->first();
+        $maxNumber = Pallet::query()
+            ->where('pallet_number', 'like', 'PLT-%')
+            ->pluck('pallet_number')
+            ->map(function ($palletNumber) {
+                preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+                return isset($matches[1]) ? (int) $matches[1] : 0;
+            })
+            ->max() ?? 0;
 
-        $nextNumber = 1;
-        if ($lastPallet) {
-            preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
-            $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
-            $nextNumber = $lastNumber + 1;
-        }
+        $nextNumber = $maxNumber + 1;
 
         $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
@@ -204,7 +205,8 @@ class StockInputController extends Controller
         ];
         session(['scanned_boxes' => $scannedBoxes]);
 
-        $palletItem = $pallet->items()
+        $palletItem = PalletItem::query()
+            ->where('pallet_id', $pallet->id)
             ->where('part_number', $partNumber)
             ->first();
 
@@ -313,7 +315,8 @@ class StockInputController extends Controller
         session(['scanned_boxes' => $scannedBoxes]);
 
         // Create pallet item for preview (tapi belum commit ke database)
-        $palletItem = $pallet->items()
+        $palletItem = PalletItem::query()
+            ->where('pallet_id', $pallet->id)
             ->where('part_number', $part_number)
             ->first();
 
@@ -408,16 +411,169 @@ class StockInputController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    private function validateStoreRequest(Request $request): array
     {
-        $validated = $request->validate([
+        return $request->validate([
             'pallet_id' => 'required|exists:pallets,id',
             // 'warehouse_location' => 'required|string', // Validasi manual di bawah karena bisa 'location_id' atau text
         ]);
+    }
+
+    private function hasLocationInput(Request $request): bool
+    {
+        return (bool) ($request->input('location_id') || $request->input('warehouse_location'));
+    }
+
+    private function getScannedBoxes(): array
+    {
+        return session('scanned_boxes', []);
+    }
+
+    private function attachScannedBoxes(Pallet $pallet, array $scannedBoxes): void
+    {
+        foreach ($scannedBoxes as $scannedBox) {
+            $box = Box::where('box_number', $scannedBox['box_number'])->first();
+            if (!$box) {
+                if (!empty($scannedBox['is_not_full']) && empty($scannedBox['delivery_order_id'])) {
+                    throw new \Exception('Box not full wajib disisipkan ke delivery.');
+                }
+
+                $box = Box::create([
+                    'box_number' => $scannedBox['box_number'],
+                    'part_number' => $scannedBox['part_number'],
+                    'pcs_quantity' => $scannedBox['pcs_quantity'] ?? $scannedBox['qty_box'],
+                    'qr_code' => $scannedBox['box_number'] . '|' . $scannedBox['part_number'] . '|' . ($scannedBox['pcs_quantity'] ?? $scannedBox['qty_box']),
+                    'user_id' => Auth::id(),
+                    'qty_box' => $scannedBox['qty_box'] ?? null,
+                    'is_not_full' => (bool) ($scannedBox['is_not_full'] ?? false),
+                    'not_full_reason' => $scannedBox['not_full_reason'] ?? null,
+                    'assigned_delivery_order_id' => $scannedBox['delivery_order_id'] ?? null,
+                ]);
+
+                $this->updateDeliveryOrderForNotFull($scannedBox);
+            }
+
+            $pallet->boxes()->attach($box->id);
+        }
+    }
+
+    private function updateDeliveryOrderForNotFull(array $scannedBox): void
+    {
+        if (empty($scannedBox['is_not_full']) || empty($scannedBox['delivery_order_id'])) {
+            return;
+        }
+
+        $order = DeliveryOrder::with('items')->find($scannedBox['delivery_order_id']);
+        if (!$order) {
+            return;
+        }
+
+        $item = $order->items()->where('part_number', $scannedBox['part_number'])->first();
+        if ($item) {
+            $item->quantity += (int) ($scannedBox['pcs_quantity'] ?? 0);
+            $item->save();
+            return;
+        }
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => $scannedBox['part_number'],
+            'quantity' => (int) ($scannedBox['pcs_quantity'] ?? 0),
+            'fulfilled_quantity' => 0,
+        ]);
+    }
+
+    private function resolveLocationCode(Request $request, Pallet $pallet): ?string
+    {
+        $locationId = $request->input('location_id');
+        $locationCode = null;
+
+        if ($locationId) {
+            $masterLocation = \App\Models\MasterLocation::find($locationId);
+            if ($masterLocation && !$masterLocation->is_occupied) {
+                $locationCode = $masterLocation->code;
+
+                $masterLocation->update([
+                    'is_occupied' => true,
+                    'current_pallet_id' => $pallet->id
+                ]);
+            } else {
+                throw new \Exception('Lokasi yang dipilih sudah terisi!');
+            }
+
+            return $locationCode;
+        }
+
+        $locationCode = $request->input('warehouse_location');
+        if ($locationCode) {
+            $locationCode = strtoupper($locationCode);
+        }
+
+        if ($locationCode) {
+            $masterLocation = \App\Models\MasterLocation::where('code', $locationCode)->first();
+            if ($masterLocation) {
+                if ($masterLocation->is_occupied) {
+                    throw new \Exception("Lokasi {$locationCode} sudah terisi!");
+                }
+
+                $masterLocation->update([
+                    'is_occupied' => true,
+                    'current_pallet_id' => $pallet->id,
+                ]);
+            }
+        }
+
+        return $locationCode;
+    }
+
+    private function createStockLocationRecord(Pallet $pallet, ?string $locationCode): void
+    {
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => $locationCode ?? 'Unknown',
+            'stored_at' => now(),
+        ]);
+    }
+
+    private function createStockInputRecord(Pallet $pallet, array $scannedBoxes, ?string $locationCode): StockInput
+    {
+        $totalPcs = 0;
+        foreach ($scannedBoxes as $box) {
+            $totalPcs += (int) ($box['pcs_quantity'] ?? $box['qty_box'] ?? 0);
+        }
+
+        $palletItem = $pallet->items()->first();
+        $partNumbers = $pallet->items()
+            ->pluck('part_number')
+            ->unique()
+            ->values()
+            ->toArray();
+
+        return StockInput::create([
+            'pallet_id' => $pallet->id,
+            'pallet_item_id' => $palletItem?->id,
+            'user_id' => Auth::id(),
+            'warehouse_location' => $locationCode ?? 'Unknown',
+            'pcs_quantity' => $totalPcs,
+            'box_quantity' => count($scannedBoxes),
+            'stored_at' => now(),
+            'part_numbers' => $partNumbers,
+        ]);
+    }
+
+    private function clearStockInputSession(): void
+    {
+        session()->forget('scanned_boxes');
+        session()->forget('current_pallet_id');
+    }
+
+    public function store(Request $request)
+    {
+        $validated = $this->validateStoreRequest($request);
         
         // Validasi lokasi wajib
-        if (!$request->input('location_id') && !$request->input('warehouse_location')) {
-             return response()->json(['message' => 'Lokasi penyimpanan harus diisi!'], 422);
+        if (!$this->hasLocationInput($request)) {
+            return response()->json(['message' => 'Lokasi penyimpanan harus diisi!'], 422);
         }
 
         DB::beginTransaction(); // Start transaction to ensure data integrity
@@ -433,9 +589,10 @@ class StockInputController extends Controller
             // LOGIC KOREKSI: Relasi items (PalletItems) baru dibuat di bawah, jadi pengecekan valid disini harusnya check Session.
             
             // Get scanned boxes dari session
-            $scannedBoxes = session('scanned_boxes', []);
+            $scannedBoxes = $this->getScannedBoxes();
             
             if (empty($scannedBoxes)) {
+                DB::rollBack();
                 return response()->json([
                     'success' => false,
                     'message' => 'Tidak ada box yang ter-scan'
@@ -443,127 +600,20 @@ class StockInputController extends Controller
             }
 
             // Attach boxes ke palet sekarang (saat user klik Save)
-            foreach ($scannedBoxes as $scannedBox) {
-                $box = Box::where('box_number', $scannedBox['box_number'])->first();
-                if (!$box) {
-                    if (!empty($scannedBox['is_not_full']) && empty($scannedBox['delivery_order_id'])) {
-                        throw new \Exception('Box not full wajib disisipkan ke delivery.');
-                    }
-
-                    $box = Box::create([
-                        'box_number' => $scannedBox['box_number'],
-                        'part_number' => $scannedBox['part_number'],
-                        'pcs_quantity' => $scannedBox['pcs_quantity'] ?? $scannedBox['qty_box'],
-                        'qr_code' => $scannedBox['box_number'] . '|' . $scannedBox['part_number'] . '|' . ($scannedBox['pcs_quantity'] ?? $scannedBox['qty_box']),
-                        'user_id' => auth()->id(),
-                        'qty_box' => $scannedBox['qty_box'] ?? null,
-                        'is_not_full' => (bool) ($scannedBox['is_not_full'] ?? false),
-                        'not_full_reason' => $scannedBox['not_full_reason'] ?? null,
-                        'assigned_delivery_order_id' => $scannedBox['delivery_order_id'] ?? null,
-                    ]);
-
-                    if (!empty($scannedBox['is_not_full']) && !empty($scannedBox['delivery_order_id'])) {
-                        $order = DeliveryOrder::with('items')->find($scannedBox['delivery_order_id']);
-                        if ($order) {
-                            $item = $order->items()->where('part_number', $scannedBox['part_number'])->first();
-                            if ($item) {
-                                $item->quantity += (int) ($scannedBox['pcs_quantity'] ?? 0);
-                                $item->save();
-                            } else {
-                                DeliveryOrderItem::create([
-                                    'delivery_order_id' => $order->id,
-                                    'part_number' => $scannedBox['part_number'],
-                                    'quantity' => (int) ($scannedBox['pcs_quantity'] ?? 0),
-                                    'fulfilled_quantity' => 0,
-                                ]);
-                            }
-                        }
-                    }
-                }
-
-                $pallet->boxes()->attach($box->id);
-            }
+            $this->attachScannedBoxes($pallet, $scannedBoxes);
 
             // 2. Simpan lokasi palet
-            $locationId = $request->input('location_id'); // ID dari MasterLocation
-            $locationCode = null;
-
-            if ($locationId) {
-                // Cari MasterLocation
-                $masterLocation = \App\Models\MasterLocation::find($locationId);
-                if ($masterLocation && !$masterLocation->is_occupied) {
-                     $locationCode = $masterLocation->code;
-                     
-                     // Update status MasterLocation
-                     $masterLocation->update([
-                         'is_occupied' => true,
-                         'current_pallet_id' => $pallet->id
-                     ]);
-                } else {
-                     // Fallback jika lokasi sudah terisi tapi user maksa (seharusnya divalidasi UI)
-                     throw new \Exception("Lokasi yang dipilih sudah terisi!");
-                }
-            } else {
-                 $locationCode = $request->input('warehouse_location');
-                 if ($locationCode) {
-                     $locationCode = strtoupper($locationCode);
-                 }
-
-                 // Kalau input text manual, cek apakah ada di master location
-                 if ($locationCode) {
-                     $masterLocation = \App\Models\MasterLocation::where('code', $locationCode)->first();
-                     if ($masterLocation) {
-                         if ($masterLocation->is_occupied) {
-                             throw new \Exception("Lokasi {$locationCode} sudah terisi!");
-                         }
-
-                         $masterLocation->update([
-                             'is_occupied' => true,
-                             'current_pallet_id' => $pallet->id,
-                         ]);
-                     }
-                 }
-            }
-
-            StockLocation::create([
-                'pallet_id' => $pallet->id,
-                'warehouse_location' => $locationCode ?? 'Unknown',
-                'stored_at' => now(),
-            ]);
+            $locationCode = $this->resolveLocationCode($request, $pallet);
+            $this->createStockLocationRecord($pallet, $locationCode);
 
             // Create StockInput record for audit
-            $totalPcs = 0;
-            foreach ($scannedBoxes as $box) {
-                $totalPcs += (int) ($box['pcs_quantity'] ?? $box['qty_box'] ?? 0);
-            }
-
-            // Get first pallet item for part_number
-            $palletItem = $pallet->items()->first();
-            
-            // Collect all unique part numbers from pallet items
-            $partNumbers = $pallet->items()
-                ->pluck('part_number')
-                ->unique()
-                ->values()
-                ->toArray();
-            
-            $stockInput = StockInput::create([
-                'pallet_id' => $pallet->id,
-                'pallet_item_id' => $palletItem?->id,
-                'user_id' => auth()->id(),
-                'warehouse_location' => $locationCode ?? 'Unknown',
-                'pcs_quantity' => $totalPcs,
-                'box_quantity' => count($scannedBoxes),
-                'stored_at' => now(),
-                'part_numbers' => $partNumbers,
-            ]);
+            $stockInput = $this->createStockInputRecord($pallet, $scannedBoxes, $locationCode);
 
             // Log audit trail
             AuditService::logStockInput($stockInput, 'created');
 
             // Clear session data
-            session()->forget('scanned_boxes');
-            session()->forget('current_pallet_id'); // Jangan lupa clear pallet ID juga
+            $this->clearStockInputSession();
 
             DB::commit(); // Commit transaction
 

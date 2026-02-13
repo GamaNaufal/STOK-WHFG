@@ -445,6 +445,11 @@
                         </td>
                         <td>
                             {{ $order->customer_name }}
+                            @if(!empty($order->notes))
+                                <div class="mt-1 text-muted" style="font-size: 0.8rem; line-height: 1.35;">
+                                    {{ \Illuminate\Support\Str::limit($order->notes, 140) }}
+                                </div>
+                            @endif
                         </td>
                         <td>
                             @foreach($order->items as $item)

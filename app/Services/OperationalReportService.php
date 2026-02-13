@@ -16,6 +16,17 @@ use Illuminate\Support\Facades\DB;
 
 class OperationalReportService
 {
+    private function hourExpression(string $column): string
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if ($driver === 'sqlite') {
+            return "CAST(strftime('%H', {$column}) AS INTEGER)";
+        }
+
+        return "HOUR({$column})";
+    }
+
     private function resolveDateRange(Request $request): array
     {
         $start = null;
@@ -220,12 +231,15 @@ class OperationalReportService
             }
         }
 
+        $hourInExpr = $this->hourExpression('stored_at');
+        $hourOutExpr = $this->hourExpression('withdrawn_at');
+
         $inboundHours = $inboundQuery->clone()
-            ->select(DB::raw('HOUR(stored_at) as hour'), DB::raw('SUM(pcs_quantity) as pcs'))
+            ->select(DB::raw($hourInExpr . ' as hour'), DB::raw('SUM(pcs_quantity) as pcs'))
             ->groupBy('hour')
             ->pluck('pcs', 'hour');
         $outboundHours = $outboundQuery->clone()
-            ->select(DB::raw('HOUR(withdrawn_at) as hour'), DB::raw('SUM(pcs_quantity) as pcs'))
+            ->select(DB::raw($hourOutExpr . ' as hour'), DB::raw('SUM(pcs_quantity) as pcs'))
             ->groupBy('hour')
             ->pluck('pcs', 'hour');
 

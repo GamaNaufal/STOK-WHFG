@@ -12,14 +12,31 @@ use App\Models\PalletItem;
 use App\Models\StockWithdrawal;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class DeliveryPickController extends Controller
 {
+    public function verificationIndex()
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+            return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
+        }
+
+        $orders = DeliveryOrder::with('items')
+            ->whereIn('status', ['approved', 'processing'])
+            ->orderBy('delivery_date', 'asc')
+            ->limit(100)
+            ->get();
+
+        return view('operator.delivery.picking-verification', compact('orders'));
+    }
+
     public function startPick($orderId)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
@@ -103,17 +120,123 @@ class DeliveryPickController extends Controller
         ]);
     }
 
+    public function startVerification($orderId)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $order = DeliveryOrder::with('items')->findOrFail($orderId);
+
+        $existingSession = DeliveryPickSession::where('delivery_order_id', $order->id)
+            ->whereIn('status', ['scanning', 'blocked', 'approved'])
+            ->latest()
+            ->first();
+
+        if ($existingSession) {
+            return response()->json([
+                'session_id' => $existingSession->id,
+                'verify_url' => route('delivery.pick.verify', [$order->id, $existingSession->id]),
+                'final_scan_url' => route('delivery.pick.scan', [$order->id, $existingSession->id]),
+            ]);
+        }
+
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $user->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        try {
+            DB::transaction(function () use ($order, $session) {
+                foreach ($order->items as $item) {
+                    $remainingQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
+                    if ($remainingQty <= 0) {
+                        continue;
+                    }
+
+                    $reservedBoxes = $this->getReservedBoxesForOrder($order->id, $item->part_number, $order->delivery_date);
+                    foreach ($reservedBoxes as $box) {
+                        DeliveryPickItem::create([
+                            'pick_session_id' => $session->id,
+                            'box_id' => $box->id,
+                            'part_number' => $box->part_number,
+                            'pcs_quantity' => (int) $box->pcs_quantity,
+                            'status' => 'pending',
+                        ]);
+                    }
+
+                    $reservedTotal = $reservedBoxes->sum('pcs_quantity');
+                    $remainingAfterReserved = max(0, $remainingQty - (int) $reservedTotal);
+
+                    $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved, $order->delivery_date);
+                    $totalPcs = $boxes->sum('pcs_quantity') + (int) $reservedTotal;
+
+                    if ($totalPcs < $remainingQty) {
+                        throw new \Exception('Stok box tidak cukup untuk part ' . $item->part_number);
+                    }
+
+                    foreach ($boxes as $box) {
+                        DeliveryPickItem::create([
+                            'pick_session_id' => $session->id,
+                            'box_id' => $box->id,
+                            'part_number' => $box->part_number,
+                            'pcs_quantity' => (int) $box->pcs_quantity,
+                            'status' => 'pending',
+                        ]);
+                    }
+                }
+            });
+        } catch (\Exception $e) {
+            $session->delete();
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        if ($session->items()->count() === 0) {
+            $session->delete();
+            return response()->json(['message' => 'Semua item sudah terpenuhi.'], 422);
+        }
+
+        return response()->json([
+            'session_id' => $session->id,
+            'verify_url' => route('delivery.pick.verify', [$order->id, $session->id]),
+            'final_scan_url' => route('delivery.pick.scan', [$order->id, $session->id]),
+        ]);
+    }
+
     public function showScan($orderId, $sessionId)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
-        $session = DeliveryPickSession::with(['items.box', 'issues'])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
+        $session = DeliveryPickSession::with(['items.box.pallets.stockLocation', 'issues'])
+            ->where('delivery_order_id', $orderId)
+            ->findOrFail($sessionId);
         $order = DeliveryOrder::findOrFail($orderId);
 
         return view('operator.delivery.scan', compact('session', 'order'));
+    }
+
+    public function showVerificationScan($orderId, $sessionId)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+            return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
+        }
+
+        $session = DeliveryPickSession::with(['items.box.pallets.stockLocation'])
+            ->where('delivery_order_id', $orderId)
+            ->findOrFail($sessionId);
+
+        $order = DeliveryOrder::findOrFail($orderId);
+
+        $verifiedBoxIds = session('delivery_verification.' . $sessionId . '.box_ids', []);
+
+        return view('operator.delivery.verify-scan', compact('session', 'order', 'verifiedBoxIds'));
     }
 
     public function scanBox(Request $request, $sessionId)
@@ -168,7 +291,7 @@ class DeliveryPickController extends Controller
 
         $pickItem->status = 'scanned';
         $pickItem->scanned_at = now();
-        $pickItem->scanned_by = auth()->id();
+        $pickItem->scanned_by = Auth::id();
         $pickItem->save();
 
         $remaining = $session->items()->where('status', 'pending')->count();
@@ -177,17 +300,63 @@ class DeliveryPickController extends Controller
             'success' => true,
             'message' => 'Scan berhasil.',
             'remaining' => $remaining,
+            'box_id' => $box->id,
+        ]);
+    }
+
+    public function verifyScanBox(Request $request, $sessionId)
+    {
+        $request->validate([
+            'box_number' => 'required|string',
+        ]);
+
+        $session = DeliveryPickSession::with('items')->findOrFail($sessionId);
+
+        $box = Box::where('box_number', $request->box_number)->first();
+        if (!$box) {
+            return response()->json(['success' => false, 'message' => 'Box tidak sesuai daftar picking.'], 422);
+        }
+
+        if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
+            return response()->json(['success' => false, 'message' => 'Box tidak sesuai daftar picking.'], 422);
+        }
+
+        $pickItem = $session->items()->where('box_id', $box->id)->first();
+        if (!$pickItem) {
+            return response()->json(['success' => false, 'message' => 'Box tidak sesuai daftar picking.'], 422);
+        }
+
+        $sessionKey = 'delivery_verification.' . $sessionId . '.box_ids';
+        $verifiedBoxIds = session($sessionKey, []);
+
+        $already = in_array($box->id, $verifiedBoxIds, true);
+        if (!$already) {
+            $verifiedBoxIds[] = $box->id;
+            session([$sessionKey => array_values(array_unique($verifiedBoxIds))]);
+        }
+
+        $remaining = max(0, $session->items()->count() - count(array_unique($verifiedBoxIds)));
+
+        return response()->json([
+            'success' => true,
+            'message' => $already ? 'Box sudah diverifikasi.' : 'Scan verifikasi berhasil.',
+            'remaining' => $remaining,
+            'box_id' => $box->id,
         ]);
     }
 
     public function approveIssue(Request $request, $issueId)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
         $issue = DeliveryIssue::with('session')->findOrFail($issueId);
+        if ($issue->status !== 'pending') {
+            return redirect()->back()->with('error', 'Issue sudah diproses sebelumnya.');
+        }
+
         $issue->status = 'approved';
         $issue->resolved_by = $user->id;
         $issue->resolved_at = now();
@@ -243,7 +412,7 @@ class DeliveryPickController extends Controller
 
                 $withdrawal = StockWithdrawal::create([
                     'withdrawal_batch_id' => $batchId,
-                    'user_id' => auth()->id(),
+                    'user_id' => Auth::id(),
                     'pallet_item_id' => $palletItem?->id,
                     'box_id' => $box->id,
                     'part_number' => $box->part_number,
@@ -306,7 +475,7 @@ class DeliveryPickController extends Controller
 
     public function redo($sessionId)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
@@ -331,12 +500,17 @@ class DeliveryPickController extends Controller
                     ->get();
 
                 // First, get all boxes from the session with their pallets
+                /** @var \Illuminate\Database\Eloquent\Collection<int, \App\Models\Box> $allSessionBoxes */
                 $allSessionBoxes = Box::with('pallets')->whereIn('id', $boxIds)->get();
                 
                 // Reset withdrawn status and re-attach to pallets
                 foreach ($allSessionBoxes as $box) {
+                    if (!$box instanceof Box) {
+                        continue;
+                    }
+
                     // Find the withdrawal record for this box to get original pallet
-                    $withdrawal = $withdrawals->firstWhere('box_id', $box->id);
+                    $boxWithdrawal = $withdrawals->firstWhere('box_id', $box->id);
                     
                     if ($box->is_withdrawn) {
                         $box->is_withdrawn = false;
@@ -350,8 +524,8 @@ class DeliveryPickController extends Controller
                         $palletId = null;
                         
                         // Try to find pallet via withdrawal->pallet_item_id
-                        if ($withdrawal && $withdrawal->pallet_item_id) {
-                            $palletItem = PalletItem::find($withdrawal->pallet_item_id);
+                        if ($boxWithdrawal instanceof StockWithdrawal && $boxWithdrawal->pallet_item_id) {
+                            $palletItem = PalletItem::find($boxWithdrawal->pallet_item_id);
                             if ($palletItem) {
                                 $palletId = $palletItem->pallet_id;
                             }
@@ -360,8 +534,8 @@ class DeliveryPickController extends Controller
                         // If still no pallet, try to find via stock_inputs using the box
                         // This handles boxes that were created directly without pallet_item_id
                         if (!$palletId) {
-                            $stockInput = \DB::table('stock_inputs')
-                                ->join('boxes', 'boxes.id', '=', \DB::raw($box->id))
+                            $stockInput = DB::table('stock_inputs')
+                                ->join('boxes', 'boxes.id', '=', DB::raw($box->id))
                                 ->where('boxes.box_number', $box->box_number)
                                 ->select('stock_inputs.pallet_id')
                                 ->orderBy('stock_inputs.id', 'desc')
@@ -381,6 +555,10 @@ class DeliveryPickController extends Controller
 
                 // Now process withdrawals and restore pallet items
                 foreach ($withdrawals as $withdrawal) {
+                    if (!$withdrawal instanceof StockWithdrawal) {
+                        continue;
+                    }
+
                     if ($withdrawal->pallet_item_id) {
                         $palletItem = PalletItem::find($withdrawal->pallet_item_id);
                         if ($palletItem) {
@@ -396,6 +574,10 @@ class DeliveryPickController extends Controller
                 
                 // Handle boxes from this delivery session
                 foreach ($allSessionBoxes as $box) {
+                    if (!$box instanceof Box) {
+                        continue;
+                    }
+
                     // Reload box to get latest state after withdrawal processing
                     $box->refresh();
                     
@@ -457,7 +639,7 @@ class DeliveryPickController extends Controller
             $session->save();
 
             // Log delivery redo
-            AuditService::logDeliveryRedo($session->id, "Pengambilan delivery di-redo oleh " . auth()->user()->name);
+            AuditService::logDeliveryRedo($session->id, "Pengambilan delivery di-redo oleh " . (Auth::user()?->name ?? 'system'));
 
             $order = $session->order;
             $order->status = 'processing';
@@ -514,7 +696,7 @@ class DeliveryPickController extends Controller
 
     public function issues()
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }

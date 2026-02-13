@@ -9,7 +9,7 @@ class AuthController extends Controller
 {
     public function showLogin()
     {
-        if (auth()->check()) {
+        if (Auth::check()) {
             return redirect()->route('dashboard');
         }
         return view('shared.auth.login');

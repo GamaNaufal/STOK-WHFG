@@ -56,15 +56,19 @@
                                 <th class="ps-3">ID Box</th>
                                 <th>Part</th>
                                 <th>PCS</th>
+                                <th>Lokasi</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
                         <tbody id="requiredBoxes">
                             @foreach($session->items as $item)
-                                <tr>
+                                <tr data-box-id="{{ $item->box_id }}">
                                     <td class="ps-3 fw-bold">{{ $item->box->box_number }}</td>
                                     <td>{{ $item->part_number }}</td>
                                     <td>{{ $item->pcs_quantity }}</td>
+                                    <td>
+                                        {{ optional(optional($item->box->pallets->first())->stockLocation)->warehouse_location ?? 'Unknown' }}
+                                    </td>
                                     <td>
                                         @if($item->status === 'scanned')
                                             <span class="badge bg-success">Scanned</span>
@@ -98,26 +102,34 @@
     const btnComplete = document.getElementById('btnComplete');
     const sessionStatus = document.getElementById('sessionStatus');
 
+    function markRowScanned(boxId) {
+        const row = document.querySelector(`tr[data-box-id="${boxId}"]`);
+        if (!row) return;
+
+        const statusCell = row.querySelector('td:last-child');
+        if (statusCell) {
+            statusCell.innerHTML = '<span class="badge bg-success">Scanned</span>';
+        }
+
+        row.classList.add('table-success');
+    }
+
     function showMessage(message, type = 'success') {
         scanMessage.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
     }
 
-    // Handle Enter key in input
-    scanInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            btnScan.click();
-        }
-    });
-
-    btnScan.addEventListener('click', function () {
+    function submitScan() {
         const boxNumber = scanInput.value.trim();
         if (!boxNumber) {
             showMessage('ID Box wajib diisi.', 'danger');
             return;
         }
 
-        fetch('{{ route('delivery.pick.scan.submit', $session->id) }}', {
+        // Untuk barcode scanner hardware: setelah Enter/submit, bersihkan input
+        scanInput.value = '';
+        scanInput.focus();
+
+        fetch("{{ route('delivery.pick.scan.submit', $session->id) }}", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -130,22 +142,35 @@
             if (data.success) {
                 showMessage(data.message, 'success');
                 remainingCount.textContent = data.remaining;
+                if (data.box_id) {
+                    markRowScanned(data.box_id);
+                }
                 if (data.remaining === 0) {
                     btnComplete.disabled = false;
                 }
-                location.reload();
             } else {
                 showMessage(data.message || 'Scan gagal.', 'danger');
+
                 if (res.status === 423) {
                     sessionStatus.textContent = 'BLOCKED';
                 }
             }
         })
         .catch(() => showMessage('Gagal koneksi.', 'danger'));
+    }
+
+    // Handle Enter key in input
+    scanInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            submitScan();
+        }
     });
 
+    btnScan.addEventListener('click', submitScan);
+
     btnComplete.addEventListener('click', function () {
-        fetch('{{ route('delivery.pick.complete', $session->id) }}', {
+        fetch("{{ route('delivery.pick.complete', $session->id) }}", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -156,7 +181,7 @@
         .then(data => {
             if (data.success) {
                 showToast('Pengiriman selesai.', 'success');
-                window.location.href = '{{ route('delivery.index') }}';
+                window.location.href = "{{ route('delivery.index') }}";
             } else {
                 showToast(data.message || 'Tidak bisa menyelesaikan.', 'danger');
             }

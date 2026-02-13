@@ -172,7 +172,14 @@
     document.querySelectorAll('form[id^="approve-issue-"]').forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
-            const notesInput = this.querySelector('[name="notes"]');
+            const notesInput = document.querySelector(`[name="notes"][form="${this.id}"]`) || this.querySelector('[name="notes"]');
+            if (!notesInput) {
+                WarehouseAlert.error({
+                    title: 'Field Notes Tidak Ditemukan',
+                    message: 'Silakan refresh halaman lalu coba lagi.'
+                });
+                return;
+            }
             const notes = notesInput.value.trim();
             
             if (!notes) {

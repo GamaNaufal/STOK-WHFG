@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Box;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class BoxController extends Controller
 {
@@ -50,7 +51,7 @@ class BoxController extends Controller
             'lot02' => $validated['lot02'] ?? null,
             'lot03' => $validated['lot03'] ?? null,
             'qr_code' => $qrCode,
-            'user_id' => auth()->id(),
+            'user_id' => Auth::id(),
         ]);
 
         return redirect()->route('boxes.index')->with('success', 'Box berhasil dibuat.');

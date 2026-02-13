@@ -579,6 +579,12 @@ class DeliveryOrderController extends Controller
             'notes' => 'nullable|string'
         ]);
 
+        if ($request->status === 'approved' && trim((string) $request->notes) === '') {
+            return redirect()->back()
+                ->withErrors(['notes' => 'Keterangan PPC wajib diisi saat approve.'])
+                ->withInput();
+        }
+
         $order = \App\Models\DeliveryOrder::findOrFail($id);
         $order->status = $request->status;
         

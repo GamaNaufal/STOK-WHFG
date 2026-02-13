@@ -10,6 +10,7 @@ use App\Models\DeliveryPickSession;
 use App\Services\OperationalReportService;
 use App\Services\ExpiredBoxService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
@@ -56,7 +57,7 @@ class DashboardController extends Controller
 
     public function index(Request $request)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         $userRole = $user->role;
         $stats = [];
         $stockSummaryTotals = $this->buildStockSummaryTotals();

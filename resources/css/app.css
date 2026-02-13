@@ -1,11 +1,63 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
+:root {
+    --font-sans:
+        "Instrument Sans", ui-sans-serif, system-ui, sans-serif,
+        "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+        "Noto Color Emoji";
+}
 
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+/* Button component styles */
+.btn-custom {
+    border: none;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    background-color: var(--btn-bg, #0c7779);
+    color: var(--btn-text, #ffffff);
+    padding: var(--btn-padding, 8px 16px);
+}
+
+.btn-custom:hover {
+    background-color: var(--btn-hover, #249e94);
+}
+
+.btn-variant-primary {
+    --btn-bg: #0c7779;
+    --btn-hover: #249e94;
+    --btn-text: #ffffff;
+}
+.btn-variant-secondary {
+    --btn-bg: #249e94;
+    --btn-hover: #0c7779;
+    --btn-text: #ffffff;
+}
+.btn-variant-success {
+    --btn-bg: #10b981;
+    --btn-hover: #059669;
+    --btn-text: #ffffff;
+}
+.btn-variant-danger {
+    --btn-bg: #ef4444;
+    --btn-hover: #dc2626;
+    --btn-text: #ffffff;
+}
+.btn-variant-warning {
+    --btn-bg: #f59e0b;
+    --btn-hover: #d97706;
+    --btn-text: #ffffff;
+}
+.btn-variant-light {
+    --btn-bg: #e5e7eb;
+    --btn-hover: #d1d5db;
+    --btn-text: #374151;
+}
+
+.btn-size-sm {
+    --btn-padding: 6px 12px;
+}
+.btn-size-md {
+    --btn-padding: 8px 16px;
+}
+.btn-size-lg {
+    --btn-padding: 10px 24px;
 }

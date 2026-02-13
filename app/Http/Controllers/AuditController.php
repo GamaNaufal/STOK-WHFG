@@ -8,12 +8,13 @@ use App\Services\AuditService;
 use App\Exports\AuditTrailExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class AuditController extends Controller
 {
     public function index(Request $request)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!in_array($user->role, ['admin', 'supervisi'], true)) {
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
@@ -43,7 +44,7 @@ class AuditController extends Controller
 
     public function export(Request $request)
     {
-        $user = auth()->user();
+        $user = Auth::user();
         if (!in_array($user->role, ['admin', 'supervisi'], true)) {
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
@@ -80,7 +81,7 @@ class AuditController extends Controller
 
         // Export ke Excel
         $fileName = 'audit-trail-' . now()->format('Y-m-d-H-i-s') . '.xlsx';
-        
+
         return Excel::download(new AuditTrailExport($auditLogs), $fileName);
     }
 }

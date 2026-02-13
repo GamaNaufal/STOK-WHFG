@@ -87,8 +87,9 @@
                                         {{ $activeBoxCount }} Box
                                     </div>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-outline-primary" 
-                                    onclick='addFromList(@json($pData))'>
+                                <button type="button" class="btn btn-sm btn-outline-primary"
+                                    data-pallet='{{ json_encode($pData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) }}'
+                                    onclick="addFromList(this.dataset.pallet)">
                                     <i class="bi bi-plus"></i>
                                 </button>
                             </div>
@@ -409,6 +410,15 @@
     }
 
     function addFromList(palletData) {
+        if (typeof palletData === 'string') {
+            try {
+                palletData = JSON.parse(palletData);
+            } catch (e) {
+                showToast('Data pallet tidak valid.', 'danger');
+                return;
+            }
+        }
+
         if(selectedPallets.find(item => item.id === palletData.id)) {
             showToast('Pallet ' + palletData.pallet_number + ' sudah masuk daftar!', 'warning');
             return;

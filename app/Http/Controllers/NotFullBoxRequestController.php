@@ -245,16 +245,16 @@ class NotFullBoxRequestController extends Controller
 
     private function createNewPallet(): Pallet
     {
-        $lastPallet = Pallet::where('pallet_number', 'like', 'PLT-0%')
-            ->orderByRaw("CAST(SUBSTRING_INDEX(pallet_number, '-', -1) AS UNSIGNED) DESC")
-            ->first();
+        $maxNumber = Pallet::query()
+            ->where('pallet_number', 'like', 'PLT-%')
+            ->pluck('pallet_number')
+            ->map(function ($palletNumber) {
+                preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+                return isset($matches[1]) ? (int) $matches[1] : 0;
+            })
+            ->max() ?? 0;
 
-        $nextNumber = 1;
-        if ($lastPallet) {
-            preg_match('/-?(\d+)$/', $lastPallet->pallet_number, $matches);
-            $lastNumber = isset($matches[1]) ? (int) $matches[1] : 1;
-            $nextNumber = $lastNumber + 1;
-        }
+        $nextNumber = $maxNumber + 1;
 
         $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 

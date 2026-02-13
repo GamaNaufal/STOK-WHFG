@@ -3,7 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 // use App\Http\Controllers\BoxController; // DISABLED - fitur tidak dipakai
-// use App\Http\Controllers\BarcodeController; // DISABLED - fitur tidak dipakai
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\StockInputController;
 use App\Http\Controllers\StockViewController;
@@ -39,12 +38,6 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin_warehouse,admin')->group(function () {
         Route::get('part-settings/search', [\App\Http\Controllers\PartSettingController::class, 'search'])->name('part-settings.search');
         Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
-    });
-
-    // Barcode Scanner Routes
-    Route::middleware('role:admin,warehouse_operator')->group(function () {
-        Route::get('/barcode-scanner', [BarcodeController::class, 'scanner'])->name('barcode.scanner');
-        Route::post('/barcode-scanner/scan', [BarcodeController::class, 'scan'])->name('barcode.scan');
     });
 
     // Stock Input Routes (Warehouse Operator/Admin) - Scan QR Box
@@ -95,9 +88,13 @@ Route::middleware('auth')->group(function () {
         Route::post('/delivery-stock/confirm-withdrawal', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm'); // Keep logic
 
         // Picklist + Scan Flow
+        Route::get('/delivery-stock/picking-verification', [\App\Http\Controllers\DeliveryPickController::class, 'verificationIndex'])->name('delivery.pick.verification');
+        Route::post('/delivery-stock/{id}/start-verification', [\App\Http\Controllers\DeliveryPickController::class, 'startVerification'])->name('delivery.pick.start-verification');
         Route::post('/delivery-stock/{id}/start-pick', [\App\Http\Controllers\DeliveryPickController::class, 'startPick'])->name('delivery.pick.start');
         Route::get('/delivery-stock/{order}/pick/{session}/pdf', [\App\Http\Controllers\DeliveryPickController::class, 'pdf'])->name('delivery.pick.pdf');
+        Route::get('/delivery-stock/{order}/pick/{session}/verify', [\App\Http\Controllers\DeliveryPickController::class, 'showVerificationScan'])->name('delivery.pick.verify');
         Route::get('/delivery-stock/{order}/pick/{session}/scan', [\App\Http\Controllers\DeliveryPickController::class, 'showScan'])->name('delivery.pick.scan');
+        Route::post('/delivery-pick/{session}/verify-scan', [\App\Http\Controllers\DeliveryPickController::class, 'verifyScanBox'])->name('delivery.pick.verify.scan');
         Route::post('/delivery-pick/{session}/scan', [\App\Http\Controllers\DeliveryPickController::class, 'scanBox'])->name('delivery.pick.scan.submit');
         Route::post('/delivery-pick/{session}/complete', [\App\Http\Controllers\DeliveryPickController::class, 'complete'])->name('delivery.pick.complete');
         

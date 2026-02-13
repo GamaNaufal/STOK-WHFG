@@ -464,14 +464,14 @@
 
                         <!-- Action Buttons -->
                         <div class="action-buttons">
-                            <button class="btn-approve" onclick="openStatusModal({{ $order->id }}, 'approved')">
+                            <button class="btn-approve js-open-status-modal" data-order-id="{{ $order->id }}" data-status="approved" type="button">
                                 <i class="bi bi-check-circle"></i> Setujui
                             </button>
                             <div class="btn-group-horizontal">
-                                <button class="btn-correction" onclick="openStatusModal({{ $order->id }}, 'correction')">
+                                <button class="btn-correction js-open-status-modal" data-order-id="{{ $order->id }}" data-status="correction" type="button">
                                     <i class="bi bi-pencil"></i> Koreksi
                                 </button>
-                                <button class="btn-reject" onclick="openStatusModal({{ $order->id }}, 'rejected')">
+                                <button class="btn-reject js-open-status-modal" data-order-id="{{ $order->id }}" data-status="rejected" type="button">
                                     <i class="bi bi-x-circle"></i> Tolak
                                 </button>
                             </div>
@@ -597,6 +597,14 @@
 </div>
 
 <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.js-open-status-modal').forEach(function (button) {
+            button.addEventListener('click', function () {
+                openStatusModal(this.dataset.orderId, this.dataset.status);
+            });
+        });
+    });
+
     function openStatusModal(orderId, status) {
         const modal = new bootstrap.Modal(document.getElementById('statusModal'));
         const form = document.getElementById('statusForm');
@@ -612,8 +620,9 @@
         if (status === 'approved') {
             title.innerText = 'Setujui Pesanan Delivery';
             title.className = 'modal-title text-success';
-            confirmationText.innerText = 'Mengecek dampak jadwal...';
-            noteSection.style.display = 'none';
+            confirmationText.innerText = 'Mengecek dampak jadwal... Wajib isi keterangan approval dari PPC.';
+            noteSection.style.display = 'block';
+            noteSection.querySelector('textarea').required = true;
             impactWarning.classList.add('d-none');
             impactWarning.innerHTML = '';
 
