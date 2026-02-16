@@ -107,6 +107,7 @@
                     <option value="stock_input" {{ $filters['type'] === 'stock_input' ? 'selected' : '' }}>Input Stok</option>
                     <option value="stock_withdrawal" {{ $filters['type'] === 'stock_withdrawal' ? 'selected' : '' }}>Pengambilan Stok</option>
                     <option value="delivery_redo" {{ $filters['type'] === 'delivery_redo' ? 'selected' : '' }}>Redo Delivery</option>
+                    <option value="other" {{ $filters['type'] === 'other' ? 'selected' : '' }}>Perubahan Box</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -116,6 +117,7 @@
                     <option value="created" {{ $filters['action'] === 'created' ? 'selected' : '' }}>Created</option>
                     <option value="completed" {{ $filters['action'] === 'completed' ? 'selected' : '' }}>Completed</option>
                     <option value="reversed" {{ $filters['action'] === 'reversed' ? 'selected' : '' }}>Reversed</option>
+                    <option value="box_updated_by_admin_warehouse" {{ $filters['action'] === 'box_updated_by_admin_warehouse' ? 'selected' : '' }}>Edit Box (Admin Warehouse)</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -135,6 +137,9 @@
                 </button>
             </div>
         </form>
+        <a href="{{ route('audit.index', ['quick_filter' => 'box_edit']) }}" class="btn btn-sm mt-2" style="background: #dbeafe; color: #1e40af; border: none; border-radius: 8px;">
+            <i class="bi bi-funnel-fill"></i> Filter Perubahan Box
+        </a>
         <a href="{{ route('audit.index') }}" class="btn btn-sm mt-2" style="background: #f3f4f6; color: #6b7280; border: none; border-radius: 8px;">
             <i class="bi bi-arrow-clockwise"></i> Atur Ulang
         </a>
@@ -184,12 +189,21 @@
                                         @case('delivery_redo')
                                             <span class="badge" style="background-color: #fecaca; color: #7f1d1d;">Redo</span>
                                             @break
+                                        @case('other')
+                                            @if($log->action === 'box_updated_by_admin_warehouse')
+                                                <span class="badge" style="background-color: #dbeafe; color: #1e40af;">Perubahan Box</span>
+                                            @else
+                                                <span class="badge" style="background-color: #e5e7eb; color: #374151;">Lainnya</span>
+                                            @endif
+                                            @break
                                         @default
                                             <span class="badge" style="background-color: #e5e7eb; color: #374151;">Lainnya</span>
                                     @endswitch
                                 </td>
                                 <td style="padding: 16px 20px;">
-                                    <small style="color: #6b7280; font-weight: 600;">{{ ucfirst($log->action) }}</small>
+                                    <small style="color: #6b7280; font-weight: 600;">
+                                        {{ $log->action === 'box_updated_by_admin_warehouse' ? 'Edit Box (Admin Warehouse)' : ucfirst($log->action) }}
+                                    </small>
                                 </td>
                                 <td style="padding: 16px 20px;">
                                     <small style="color: #6b7280;">

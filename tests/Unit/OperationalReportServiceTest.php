@@ -60,8 +60,8 @@ class OperationalReportServiceTest extends TestCase
     {
         $sales = User::factory()->create(['role' => 'sales']);
 
-        $day1 = now()->subDays(2)->toDateString();
-        $day2 = now()->subDay()->toDateString();
+        $day1 = '2026-02-17';
+        $day2 = '2026-02-18';
 
         $orderA = DeliveryOrder::create([
             'sales_user_id' => $sales->id,
@@ -93,8 +93,8 @@ class OperationalReportServiceTest extends TestCase
 
         $service = app(OperationalReportService::class);
         $data = $service->build(new Request([
-            'start_date' => now()->subDays(3)->toDateString(),
-            'end_date' => now()->toDateString(),
+            'start_date' => $day1,
+            'end_date' => $day2,
             'group_by' => 'week',
         ]));
 

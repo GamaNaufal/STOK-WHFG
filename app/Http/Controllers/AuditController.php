@@ -19,6 +19,8 @@ class AuditController extends Controller
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
+        $quickFilter = $request->input('quick_filter');
+
         // Get filters from request
         $filters = [
             'start_date' => $request->input('start_date'),
@@ -26,7 +28,13 @@ class AuditController extends Controller
             'type' => $request->input('type'),
             'action' => $request->input('action'),
             'user_id' => $request->input('user_id'),
+            'quick_filter' => $quickFilter,
         ];
+
+        if ($quickFilter === 'box_edit') {
+            $filters['type'] = 'other';
+            $filters['action'] = 'box_updated_by_admin_warehouse';
+        }
 
         // Get audit logs dengan filters
         $auditLogs = AuditService::getAuditTrail($filters, 50);
@@ -49,6 +57,8 @@ class AuditController extends Controller
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
+        $quickFilter = $request->input('quick_filter');
+
         // Get filters
         $filters = [
             'start_date' => $request->input('start_date'),
@@ -56,7 +66,13 @@ class AuditController extends Controller
             'type' => $request->input('type'),
             'action' => $request->input('action'),
             'user_id' => $request->input('user_id'),
+            'quick_filter' => $quickFilter,
         ];
+
+        if ($quickFilter === 'box_edit') {
+            $filters['type'] = 'other';
+            $filters['action'] = 'box_updated_by_admin_warehouse';
+        }
 
         // Get all audit logs (no pagination for export)
         $query = AuditLog::query();

@@ -6,6 +6,56 @@
 - Frontend: Blade + Bootstrap CDN + Tailwind (Vite)
 - Database: MySQL
 
+## Struktur Layout Shell (Blade)
+
+Layout utama sekarang memakai pola orchestrator + sub-partial agar perubahan UI lebih terlokalisasi.
+
+Struktur inti:
+
+- `resources/views/shared/layouts/app.blade.php`
+    - include `shared.layouts.partials.layout-shell-styles`
+    - include `shared.layouts.partials.top-navbar`
+    - include `shared.layouts.partials.sidebar`
+    - include `shared.layouts.partials.layout-shell-scripts`
+
+Entry partial (delegator):
+
+- `resources/views/shared/layouts/partials/top-navbar.blade.php`
+    - delegasi ke `shared.layouts.partials.top-navbar.index`
+- `resources/views/shared/layouts/partials/sidebar.blade.php`
+    - delegasi ke `shared.layouts.partials.sidebar.index`
+- `resources/views/shared/layouts/partials/layout-shell-scripts.blade.php`
+    - delegasi ke `shared.layouts.partials.scripts.index`
+
+Sub-partial per domain:
+
+- Top Navbar:
+    - `resources/views/shared/layouts/partials/top-navbar/index.blade.php`
+    - `resources/views/shared/layouts/partials/top-navbar/sidebar-toggle.blade.php`
+    - `resources/views/shared/layouts/partials/top-navbar/global-search-form.blade.php`
+    - `resources/views/shared/layouts/partials/top-navbar/profile-dropdown.blade.php`
+- Sidebar:
+    - `resources/views/shared/layouts/partials/sidebar/index.blade.php`
+    - `resources/views/shared/layouts/partials/sidebar/brand-header.blade.php`
+    - `resources/views/shared/layouts/partials/sidebar/user-summary.blade.php`
+    - `resources/views/shared/layouts/partials/sidebar/role-warehouse-operator.blade.php`
+    - `resources/views/shared/layouts/partials/sidebar/role-sales.blade.php`
+    - `resources/views/shared/layouts/partials/sidebar/role-ppc.blade.php`
+    - `resources/views/shared/layouts/partials/sidebar/role-supervisi.blade.php`
+    - `resources/views/shared/layouts/partials/sidebar/role-admin-warehouse.blade.php`
+    - `resources/views/shared/layouts/partials/sidebar/role-admin.blade.php`
+- Scripts:
+    - `resources/views/shared/layouts/partials/scripts/index.blade.php`
+    - `resources/views/shared/layouts/partials/scripts/layout-shell-main.blade.php`
+    - `resources/views/shared/layouts/partials/scripts/toast.blade.php`
+
+Aturan maintenance singkat:
+
+1. Perubahan menu role dilakukan di file `role-*.blade.php`, bukan di `sidebar/index.blade.php`.
+2. Perubahan perilaku global search/sidebar toggle dilakukan di `scripts/layout-shell-main.blade.php`.
+3. `index.blade.php` dipakai untuk komposisi, hindari logika panjang di file delegator.
+4. Jika menambah blok UI baru, ikuti pola: `folder/index.blade.php` + sub-partial per concern.
+
 ## Domain Utama
 
 1. Stock Input (Warehouse)

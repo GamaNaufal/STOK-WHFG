@@ -115,6 +115,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
         Route::get('/stock-view/export-part', [StockViewController::class, 'exportByPart'])->name('stock-view.export-part');
         Route::get('/stock-view/export-pallet', [StockViewController::class, 'exportByPallet'])->name('stock-view.export-pallet');
+        Route::get('/stock-view/boxes/{boxId}/history', [StockViewController::class, 'boxHistory'])->name('stock-view.box-history');
+    });
+
+    Route::middleware('role:admin_warehouse,admin')->group(function () {
+        Route::post('/stock-view/boxes/{boxId}/update', [StockViewController::class, 'updateBox'])->name('stock-view.box-update');
     });
 
     // Reports - Supervisi + Admin IT

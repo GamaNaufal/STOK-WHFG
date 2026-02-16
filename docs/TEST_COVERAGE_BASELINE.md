@@ -1,7 +1,28 @@
 # Test Coverage Baseline (Feature + Unit)
 
-Tanggal: 2026-02-14
+Tanggal: 2026-02-16
 Tujuan: baseline resmi untuk melihat area yang sudah terjaga test, area yang masih gap, dan prioritas penambahan.
+
+## Update terbaru (2026-02-16)
+
+- Tambahan cakupan fitur edit box + audit:
+    - tests/Feature/StockViewBoxEditAuditTest.php
+        - update box oleh admin warehouse/admin
+        - role guard endpoint update
+        - endpoint history perubahan box
+        - not-full flag tetap terjaga saat edit
+        - sinkronisasi `pallet_items` saat part/pcs berubah
+        - dampak perubahan box ke angka pre-fulfillment di schedule delivery
+    - tests/Feature/AuditBoxEditFilterTest.php
+        - quick filter audit `box_edit` hanya memunculkan log perubahan box
+
+- Stabilitas unit report:
+    - tests/Unit/OperationalReportServiceTest.php
+        - skenario weekly trend dibuat deterministik (tanggal fixed dalam minggu yang sama)
+        - menghindari flaky test akibat boundary minggu dari `now()`
+
+- Status verifikasi terakhir:
+    - full suite: 44 passed, 0 failed
 
 ## 1) Ringkasan Cakupan Saat Ini
 
