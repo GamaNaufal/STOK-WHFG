@@ -6,6 +6,7 @@ use App\Models\ExpiredBoxReport;
 use App\Services\ExpiredBoxService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class ExpiredBoxController extends Controller
 {
@@ -21,10 +22,13 @@ class ExpiredBoxController extends Controller
         $warningBoxes = $boxesQuery->filter(fn ($row) => $row->expired_status === 'warning');
         $expiredBoxes = $boxesQuery->filter(fn ($row) => $row->expired_status === 'expired');
 
-        $handledHistory = ExpiredBoxReport::with('handler')
-            ->where('status', 'handled')
-            ->orderByDesc('handled_at')
-            ->paginate(50);
+        $handledHistory = collect();
+        if (Schema::hasTable('expired_box_reports')) {
+            $handledHistory = ExpiredBoxReport::with('handler')
+                ->where('status', 'handled')
+                ->orderByDesc('handled_at')
+                ->paginate(50);
+        }
 
         return view('warehouse.expired-box.index', compact('warningBoxes', 'expiredBoxes', 'handledHistory'));
     }

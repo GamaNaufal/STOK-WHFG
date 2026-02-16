@@ -9,9 +9,15 @@ use App\Mail\ExpiredBoxSummaryMail;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 
 class ExpiredBoxService
 {
+    private function canUseExpiredReports(): bool
+    {
+        return Schema::hasTable('expired_box_reports');
+    }
+
     public function syncStatuses(): void
     {
         $boxes = $this->getExpirableBoxesQuery()
@@ -62,19 +68,21 @@ class ExpiredBoxService
             'handled_by' => $userId,
         ]);
 
-        ExpiredBoxReport::create([
-            'box_id' => $row->id,
-            'box_number' => $row->box_number,
-            'part_number' => $row->part_number,
-            'pallet_id' => $row->pallet_id,
-            'pallet_number' => $row->pallet_number,
-            'warehouse_location' => $row->warehouse_location,
-            'stored_at' => $row->stored_at,
-            'age_months' => $ageMonths,
-            'status' => 'handled',
-            'handled_by' => $userId,
-            'handled_at' => now(),
-        ]);
+        if ($this->canUseExpiredReports()) {
+            ExpiredBoxReport::create([
+                'box_id' => $row->id,
+                'box_number' => $row->box_number,
+                'part_number' => $row->part_number,
+                'pallet_id' => $row->pallet_id,
+                'pallet_number' => $row->pallet_number,
+                'warehouse_location' => $row->warehouse_location,
+                'stored_at' => $row->stored_at,
+                'age_months' => $ageMonths,
+                'status' => 'handled',
+                'handled_by' => $userId,
+                'handled_at' => now(),
+            ]);
+        }
     }
 
     public function sendDailySummary(): void
@@ -137,6 +145,10 @@ class ExpiredBoxService
 
     private function ensureReportExists(object $row, int $ageMonths, string $status): void
     {
+        if (!$this->canUseExpiredReports()) {
+            return;
+        }
+
         $exists = ExpiredBoxReport::where('box_id', $row->id)
             ->where('status', $status)
             ->exists();

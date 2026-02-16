@@ -11,8 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (!Schema::hasTable('not_full_box_requests')) {
+            return;
+        }
+
         Schema::table('not_full_box_requests', function (Blueprint $table) {
-            $table->string('request_type')->default('supplement')->after('reason');
+            if (!Schema::hasColumn('not_full_box_requests', 'request_type')) {
+                $table->string('request_type')->default('supplement')->after('reason');
+            }
         });
     }
 
@@ -21,8 +27,14 @@ return new class extends Migration
      */
     public function down(): void
     {
+        if (!Schema::hasTable('not_full_box_requests')) {
+            return;
+        }
+
         Schema::table('not_full_box_requests', function (Blueprint $table) {
-            $table->dropColumn('request_type');
+            if (Schema::hasColumn('not_full_box_requests', 'request_type')) {
+                $table->dropColumn('request_type');
+            }
         });
     }
 };
