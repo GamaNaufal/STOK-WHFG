@@ -1,0 +1,109 @@
+:root {
+    --color-teal: #0c7779;
+    --color-turquoise: #249e94;
+    --color-green: #10b981;
+    --color-gray: #6b7280;
+    --color-gray-light: #e5e7eb;
+    --color-success: #e8f5e9;
+    --color-error: #fee2e2;
+    --color-info: #e0f2fe;
+}
+
+@media (min-width: 992px) {
+    .row.g-4 {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    .col-lg-8 {
+        flex: 0 0 auto;
+        width: 66.666667%;
+    }
+
+    .col-lg-4 {
+        flex: 0 0 auto;
+        width: 33.333333%;
+    }
+}
+
+#barcodeInput:focus,
+#warehouse_location:focus,
+#locationSearchInput:focus {
+    outline: none;
+    border-color: var(--color-teal) !important;
+    box-shadow: 0 0 0 4px rgba(12, 119, 121, 0.1);
+    transform: translateY(-2px);
+}
+
+#clear-pallet-btn:hover {
+    background: #d97706 !important;
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.3) !important;
+    transform: translateY(-2px);
+}
+
+#cancel-btn:hover {
+    background: #4b5563 !important;
+    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.2) !important;
+    transform: translateY(-2px);
+}
+
+#save-btn:hover {
+    box-shadow: 0 8px 24px rgba(12, 119, 121, 0.3) !important;
+    transform: translateY(-2px);
+}
+
+#itemsList > div {
+    background: #f9fafb;
+    border: 1px solid var(--color-gray-light);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: all 0.3s ease;
+}
+
+#itemsList > div:hover {
+    background: #f3f4f6;
+    border-color: var(--color-teal);
+    box-shadow: 0 2px 8px rgba(12, 119, 121, 0.1);
+}
+
+.btn,
+.form-control,
+.card {
+    transition:
+        background-color 0.3s ease,
+        box-shadow 0.3s ease,
+        transform 0.3s ease;
+}
+
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-teal);
+    border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--color-turquoise);
+}
+
+@media (max-width: 991px) {
+    .card-body {
+        padding: 20px !important;
+    }
+
+    .btn-lg {
+        width: 100%;
+    }
+
+    .col-lg-4 .card {
+        position: relative !important;
+        top: 0 !important;
+    }
+}
