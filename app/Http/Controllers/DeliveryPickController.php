@@ -509,8 +509,10 @@ class DeliveryPickController extends Controller
                         continue;
                     }
 
+                    $boxId = (int) $box->getKey();
+
                     // Find the withdrawal record for this box to get original pallet
-                    $boxWithdrawal = $withdrawals->firstWhere('box_id', $box->id);
+                    $boxWithdrawal = $withdrawals->firstWhere('box_id', $boxId);
                     
                     if ($box->is_withdrawn) {
                         $box->is_withdrawn = false;
@@ -524,8 +526,8 @@ class DeliveryPickController extends Controller
                         $palletId = null;
                         
                         // Try to find pallet via withdrawal->pallet_item_id
-                        if ($boxWithdrawal instanceof StockWithdrawal && $boxWithdrawal->pallet_item_id) {
-                            $palletItem = PalletItem::find($boxWithdrawal->pallet_item_id);
+                        if ($boxWithdrawal instanceof StockWithdrawal && $boxWithdrawal->getAttribute('pallet_item_id')) {
+                            $palletItem = PalletItem::find((int) $boxWithdrawal->getAttribute('pallet_item_id'));
                             if ($palletItem) {
                                 $palletId = $palletItem->pallet_id;
                             }
@@ -535,8 +537,8 @@ class DeliveryPickController extends Controller
                         // This handles boxes that were created directly without pallet_item_id
                         if (!$palletId) {
                             $stockInput = DB::table('stock_inputs')
-                                ->join('boxes', 'boxes.id', '=', DB::raw($box->id))
-                                ->where('boxes.box_number', $box->box_number)
+                                ->join('pallet_boxes', 'pallet_boxes.pallet_id', '=', 'stock_inputs.pallet_id')
+                                ->where('pallet_boxes.box_id', $boxId)
                                 ->select('stock_inputs.pallet_id')
                                 ->orderBy('stock_inputs.id', 'desc')
                                 ->first();
@@ -559,8 +561,8 @@ class DeliveryPickController extends Controller
                         continue;
                     }
 
-                    if ($withdrawal->pallet_item_id) {
-                        $palletItem = PalletItem::find($withdrawal->pallet_item_id);
+                    if ($withdrawal->getAttribute('pallet_item_id')) {
+                        $palletItem = PalletItem::find((int) $withdrawal->getAttribute('pallet_item_id'));
                         if ($palletItem) {
                             $palletItem->pcs_quantity += $withdrawal->pcs_quantity;
                             $palletItem->box_quantity += $withdrawal->box_quantity;

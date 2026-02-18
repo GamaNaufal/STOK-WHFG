@@ -122,7 +122,7 @@ class StockViewController extends Controller
         $groupedByPallet = collect();
         if ($viewMode === 'pallet') {
             $palletIds = $items->pluck('pallet_id')->unique()->values();
-            $mergedPalletIds = \App\Models\AuditLog::where('model', 'Pallet')
+            $mergedPalletIds = AuditLog::where('model', 'Pallet')
                 ->where('type', 'pallet_merged')
                 ->whereIn('model_id', $palletIds)
                 ->pluck('model_id')
@@ -257,7 +257,7 @@ class StockViewController extends Controller
                 ->where('is_withdrawn', false)
                 ->whereNotIn('expired_status', ['handled', 'expired'])
                 ->pluck('id');
-            $originLogs = \App\Models\AuditLog::where('type', 'box_pallet_moved')
+            $originLogs = AuditLog::where('type', 'box_pallet_moved')
                 ->where('model', 'Box')
                 ->whereIn('model_id', $boxIds)
                 ->orderBy('created_at', 'desc')
@@ -438,7 +438,8 @@ class StockViewController extends Controller
 
         $box = Box::findOrFail($boxId);
 
-        $logs = AuditLog::with('user')
+        $logs = AuditLog::query()
+            ->with('user')
             ->where('type', 'other')
             ->where('model', 'Box')
             ->where('action', 'box_updated_by_admin_warehouse')
@@ -446,17 +447,15 @@ class StockViewController extends Controller
             ->orderBy('created_at', 'desc')
             ->limit(20)
             ->get()
-            ->map(function ($log) {
-                return [
-                    'id' => $log->id,
-                    'action' => $log->action,
-                    'description' => $log->description,
-                    'old_values' => $log->getOldValuesArray(),
-                    'new_values' => $log->getNewValuesArray(),
-                    'user_name' => $log->user?->name ?? 'System',
-                    'created_at' => optional($log->created_at)->format('d M Y H:i:s'),
-                ];
-            })
+            ->map(fn ($log) => [
+                'id' => $log->id,
+                'action' => $log->action,
+                'description' => $log->description,
+                'old_values' => $log->old_values ?? [],
+                'new_values' => $log->new_values ?? [],
+                'user_name' => $log->user?->name ?? 'System',
+                'created_at' => optional($log->created_at)->format('d M Y H:i:s'),
+            ])
             ->values();
 
         return response()->json([

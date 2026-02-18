@@ -342,7 +342,7 @@ class DeliveryOrderController extends Controller
                 ->get();
         }
 
-        $partNumbers = \App\Models\PartSetting::orderBy('part_number', 'asc')
+        $partNumbers = PartSetting::orderBy('part_number', 'asc')
             ->pluck('part_number');
 
         return view('operator.delivery.create', compact('myOrders', 'partNumbers'));
@@ -460,7 +460,7 @@ class DeliveryOrderController extends Controller
             return redirect()->route('delivery.create')->with('error', 'Order tidak dalam status koreksi.');
         }
 
-        $partNumbers = \App\Models\PartSetting::orderBy('part_number', 'asc')
+        $partNumbers = PartSetting::orderBy('part_number', 'asc')
             ->pluck('part_number');
 
         return view('operator.delivery.edit', compact('order', 'partNumbers'));
@@ -489,7 +489,7 @@ class DeliveryOrderController extends Controller
             'notes' => 'nullable|string'
         ]);
 
-        \Illuminate\Support\Facades\DB::beginTransaction();
+        DB::beginTransaction();
         try {
             $order->customer_name = $request->customer_name;
             $order->delivery_date = $request->delivery_date;
@@ -511,11 +511,11 @@ class DeliveryOrderController extends Controller
                 ]);
             }
 
-            \Illuminate\Support\Facades\DB::commit();
+            DB::commit();
 
             return redirect()->route('delivery.create')->with('success', 'Perbaikan berhasil dikirim ulang ke PPC.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
+            DB::rollBack();
             return redirect()->back()->with('error', 'Error update order: ' . $e->getMessage());
         }
     }
@@ -536,7 +536,7 @@ class DeliveryOrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        \Illuminate\Support\Facades\DB::beginTransaction();
+        DB::beginTransaction();
         try {
             // Check if updating existing (resubmit correction) or new
             // Implementation note: User didn't ask for edit/resubmit UI yet, just status flow.
@@ -558,10 +558,10 @@ class DeliveryOrderController extends Controller
                 ]);
             }
 
-            \Illuminate\Support\Facades\DB::commit();
+            DB::commit();
             return redirect()->back()->with('success', 'Delivery Order submitted to PPC.');
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
+            DB::rollBack();
             return redirect()->back()->with('error', 'Error creating order: ' . $e->getMessage());
         }
     }

@@ -170,36 +170,36 @@
             tableBody.innerHTML = items.map((item) => {
                 const partNumber = escapeHtml(item.part_number ?? '');
                 const qtyBox = escapeHtml(item.qty_box ?? '');
-                const editUrl = \`\${baseUrl}/\${item.id}/edit\`;
-                const deleteUrl = \`\${baseUrl}/\${item.id}\`;
+                const editUrl = `${baseUrl}/${item.id}/edit`;
+                const deleteUrl = `${baseUrl}/${item.id}`;
 
-                return \`
+                return `
                     <tr style="border-bottom: 1px solid #e5e7eb;">
                         <td style="padding: 15px;">
-                            <strong style="color: #0C7779; font-size: 15px;">\${partNumber}</strong>
+                            <strong style="color: #0C7779; font-size: 15px;">${partNumber}</strong>
                         </td>
                         <td style="padding: 15px;">
                             <span class="badge" style="background-color: #e0f2fe; color: #0369a1; font-size: 13px; padding: 6px 12px;">
-                                \${qtyBox} Box
+                                ${qtyBox} Box
                             </span>
                         </td>
                         <td style="padding: 15px; text-align: center;">
                             <div class="d-flex gap-2 justify-content-center">
-                                <a href="\${editUrl}" class="btn btn-sm" style="background-color: #249E94; color: white; border: none; padding: 6px 12px; border-radius: 6px;" title="Edit no part">
+                                <a href="${editUrl}" class="btn btn-sm" style="background-color: #249E94; color: white; border: none; padding: 6px 12px; border-radius: 6px;" title="Edit no part">
                                     <i class="bi bi-pencil"></i> Edit
                                 </a>
                                 <button type="button"
                                     class="btn btn-sm js-delete-btn"
                                     style="background-color: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px;"
-                                    data-delete-url="\${deleteUrl}"
-                                    data-part-number="\${partNumber}"
+                                    data-delete-url="${deleteUrl}"
+                                    data-part-number="${partNumber}"
                                     title="Hapus no part">
                                     <i class="bi bi-trash"></i> Hapus
                                 </button>
                             </div>
                         </td>
                     </tr>
-                \`;
+                `;
             }).join('');
             
             bindDeleteButtons();
@@ -226,14 +226,14 @@
                 return;
             }
 
-            fetch(\`\${searchUrl}?q=\${encodeURIComponent(query)}\`)
+            fetch(`${searchUrl}?q=${encodeURIComponent(query)}`)
                 .then((response) => response.json())
                 .then((data) => {
                     pagination.classList.add('d-none');
                     renderRows(data.data || []);
                 })
                 .catch(() => {
-                    tableBody.innerHTML = \`
+                    tableBody.innerHTML = `
                         <tr>
                             <td colspan="3" class="text-center py-5">
                                 <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: #ef4444;"></i>
@@ -241,7 +241,7 @@
                                 <p class="text-muted small">Terjadi kesalahan saat mengambil data. Silakan coba lagi.</p>
                             </td>
                         </tr>
-                    \`;
+                    `;
                 });
         };
 

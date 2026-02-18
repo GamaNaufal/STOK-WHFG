@@ -28,8 +28,11 @@
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header text-white fw-bold" style="background-color: #EF4444;">
             <i class="bi bi-bell-fill"></i> Pending Issues
-            @if($issues->count() > 0)
-                <span class="badge bg-white text-danger ms-2">{{ $issues->count() }}</span>
+            @php
+                $pendingIssueCount = is_countable($issues) ? count($issues) : 0;
+            @endphp
+            @if($pendingIssueCount > 0)
+                <span class="badge bg-white text-danger ms-2">{{ $pendingIssueCount }}</span>
             @endif
         </div>
         <div class="card-body">

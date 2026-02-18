@@ -1,251 +1,3 @@
-{{--
-
-@section('title', 'Lihat Stok - Warehouse FG Yamato')
-
-@section('content')
-<!-- Modern Header Banner -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
-                    color: white; 
-                    padding: 40px 30px; 
-                    border-radius: 12px; 
-                    box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;">
-            <div>
-                <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
-                    <i class="bi bi-eye"></i> Lihat Stok Tersedia
-                </h1>
-                <p style="margin: 0; opacity: 0.95; font-size: 15px;">
-                    Pantau ketersediaan stok produk di gudang dengan detail lengkap
-                </p>
-            </div>
-            <div>
-                <form method="GET" class="d-flex gap-2">
-                    @if($viewMode === 'part' && $groupedByPart->count() > 0)
-                        <a href="{{ route('stock-view.export-part', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
-                            <i class="bi bi-download"></i> Export Excel
-                        </a>
-                    @elseif($viewMode === 'pallet' && $groupedByPallet->count() > 0)
-                        <a href="{{ route('stock-view.export-pallet', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
-                            <i class="bi bi-download"></i> Export Excel
-                        </a>
-                    @endif
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Search Bar -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="position-relative">
-            <form method="GET" action="{{ route('stock-view.index') }}" id="searchForm" class="input-group input-group-lg">
-                <input type="hidden" name="view_mode" value="{{ $viewMode }}">
-                <span class="input-group-text border-0" style="background: #0C7779; color: white; border-radius: 10px 0 0 10px; font-size: 1.2rem;">
-                    <i class="bi bi-search"></i>
-                </span>
-                <input type="text" name="search" id="searchInput" class="form-control form-control-lg border-0" 
-                       placeholder="{{ $viewMode === 'pallet' ? 'Cari berdasarkan No Pallet...' : 'Cari berdasarkan No Part...' }}" 
-                       value="{{ $search ?? '' }}"
-                       autocomplete="off"
-                       style="font-size: 1rem; padding: 14px 16px;">
-                <button class="btn btn-outline-secondary border-0" type="submit" style="border-radius: 0 10px 10px 0; background: white; color: #0C7779; font-weight: 600;">
-                    <!-- Detail Modal -->
-                    <div class="modal fade" id="detailModal" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(5px);">
-                        <div class="modal-dialog modal-dialog-centered modal-lg">
-                            <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-                                <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
-                                            color: white; 
-                                            padding: 24px;
-                                            border-radius: 12px 12px 0 0;
-                                            position: sticky;
-                                            top: 0;
-                                            z-index: 1020;">
-                                    <h5 class="modal-title fw-bold" style="margin: 0; font-size: 18px;">
-                                        <i class="bi bi-tag"></i> Detail Stok Per Part Number
-                                    </h5>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body" style="padding: 24px;">
-                                    <div id="detailLoadingSpinner" style="text-align: center; padding: 40px;">
-                                        <div class="spinner-border text-primary" role="status">
-                                            <span class="visually-hidden">Loading...</span>
-                                        </div>
-                                    </div>
-                                    <div id="detailContent" style="display: none;">
-                                        <div class="row g-3 mb-4">
-                                            <div class="col-12">
-                                                <p class="text-muted small" style="margin-bottom: 4px; font-weight: 600;">No Part</p>
-                                                <p style="font-size: 18px; font-weight: 700; color: #0C7779; margin: 0;" id="modalPartNumber">-</p>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="card border-0" style="background: #f9fafb; border-radius: 10px;">
-                loadingEl.style.display = 'none';
-                contentEl.style.display = 'block';
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                showToast('Error loading detail data', 'danger');
-                loadingEl.style.display = 'none';
-            });
-
-        detailModal.show();
-    };
-
-    // View pallet detail modal
-    window.viewPalletDetail = function(palletId) {
-        const loadingEl = document.getElementById('palletDetailLoadingSpinner');
-        const contentEl = document.getElementById('palletDetailContent');
-        if (!loadingEl || !contentEl) {
-            console.error('Pallet modal elements not found');
-            return;
-        }
-
-        // Show loading spinner
-        loadingEl.style.display = 'block';
-        contentEl.style.display = 'none';
-        
-        // Fetch detailed pallet information from API
-        fetch(`/api/stock/pallet-detail/${palletId}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.error) {
-                    showToast('Error: ' + data.error, 'danger');
-                    return;
-                }
-
-                // Populate summary
-                document.getElementById('modalPalletNumber').textContent = data.pallet_number;
-                document.getElementById('modalPalletLocation').textContent = data.location;
-
-                // Populate items table
-                const tableBody = document.getElementById('palletItemsTable');
-                if (data.items.length === 0) {
-                    tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">Tidak ada item di pallet ini</td></tr>';
-                } else {
-                    tableBody.innerHTML = data.items.map(item => `
-                        <tr>
-                            <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.box_number || '-'}</td>
-                            <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.part_number}</td>
-                            <td style="color: #6b7280; padding: 12px 8px;">${item.box_quantity}</td>
-                            <td style="color: #6b7280; padding: 12px 8px;">${item.pcs_quantity}</td>
-                            <td style="padding: 12px 8px;">
-                                ${item.is_not_full ? '<span class="badge bg-warning text-dark">Not Full</span>' : '<span class="badge bg-success">OK</span>'}
-                            </td>
-                            <td style="color: #6b7280; padding: 12px 8px;">${item.origin_pallet || '-'}</td>
-                            <td style="color: #6b7280; padding: 12px 8px;">${item.created_at}</td>
-                        </tr>
-                    `).join('');
-                }
-
-                // Show content and hide spinner
-                contentEl.style.display = 'block';
-                loadingEl.style.display = 'none';
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                loadingEl.innerHTML = '<p class="text-danger">Gagal memuat data</p>';
-            });
-            
-        palletDetailModal.show();
-    };
-
-    // Export to Excel
-    function exportToExcel(viewType) {
-        const table = document.querySelector('table');
-        if (!table) {
-            showToast('Tidak ada data untuk diexport', 'warning');
-            return;
-        }
-
-        let csv = '';
-        let fileName = '';
-
-        if (viewType === 'part') {
-            csv = 'No Part,Total Box,Total PCS\n';
-            fileName = `Stok_ByPart_${new Date().toISOString().split('T')[0]}.csv`;
-            
-            const rows = table.querySelectorAll('tbody tr');
-            rows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                if (cells.length >= 3) {
-                    const partNumber = cells[0].textContent.trim();
-                    const totalBox = cells[1].textContent.trim();
-                    const totalPcs = cells[2].textContent.trim();
-                    csv += `"${partNumber}","${totalBox}","${totalPcs}"\n`;
-                }
-            });
-        } else if (viewType === 'pallet') {
-            csv = 'No Pallet,Lokasi,Total Box,Total PCS\n';
-            fileName = `Stok_ByPallet_${new Date().toISOString().split('T')[0]}.csv`;
-            
-            const rows = table.querySelectorAll('tbody tr');
-            rows.forEach(row => {
-                const cells = row.querySelectorAll('td');
-                if (cells.length >= 4) {
-                    const palletNumber = cells[0].textContent.trim();
-                    const location = cells[1].textContent.trim();
-                    const totalBox = cells[2].textContent.trim();
-                    const totalPcs = cells[3].textContent.trim();
-                    csv += `"${palletNumber}","${location}","${totalBox}","${totalPcs}"\n`;
-                }
-            });
-        }
-
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        const url = URL.createObjectURL(blob);
-        
-        link.setAttribute('href', url);
-        link.setAttribute('download', fileName);
-        link.style.visibility = 'hidden';
-        
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
-
-    // Load initial suggestions
-    window.addEventListener('DOMContentLoaded', function() {
-        if (hasSearchUi && searchInput.value) {
-            loadSearchSuggestions(searchInput.value);
-        }
-    });
-
-    document.addEventListener('click', function(event) {
-        const partBtn = event.target.closest('.js-detail-part');
-        if (partBtn) {
-            event.preventDefault();
-            const partNumber = partBtn.getAttribute('data-part-number');
-            const totalBox = parseInt(partBtn.getAttribute('data-total-box'), 10) || 0;
-            const totalPcs = parseInt(partBtn.getAttribute('data-total-pcs'), 10) || 0;
-            const palletCount = parseInt(partBtn.getAttribute('data-pallet-count'), 10) || 0;
-            if (window.viewDetail) {
-                window.viewDetail(partNumber, totalBox, totalPcs, palletCount);
-            } else {
-                console.error('viewDetail is not available');
-            }
-            return;
-        }
-
-        const palletBtn = event.target.closest('.js-detail-pallet');
-        if (palletBtn) {
-            event.preventDefault();
-            const palletId = palletBtn.getAttribute('data-pallet-id');
-            if (window.viewPalletDetail) {
-                window.viewPalletDetail(palletId);
-            } else {
-                console.error('viewPalletDetail is not available');
-            }
-        }
-    }, true);
-</script>
-@endsection
---}}
 @extends('shared.layouts.app')
 
 @section('title', 'Lihat Stok - Warehouse FG Yamato')
@@ -375,17 +127,17 @@
         <div class="btn-group shadow-sm" style="border-radius: 8px;">
             <a href="{{ route('stock-view.index', ['view_mode' => 'part', 'search' => $search]) }}" 
                class="btn {{ $viewMode === 'part' ? 'btn-primary' : 'btn-light' }}"
-               style="{{ $viewMode === 'part' ? 'background: #0C7779; border-color: #0C7779;' : '' }}">
+               @if($viewMode === 'part') style="background: #0C7779; border-color: #0C7779;" @endif>
                 <i class="bi bi-tag"></i> By Part Number
             </a>
             <a href="{{ route('stock-view.index', ['view_mode' => 'pallet', 'search' => $search]) }}" 
                class="btn {{ $viewMode === 'pallet' ? 'btn-primary' : 'btn-light' }}"
-               style="{{ $viewMode === 'pallet' ? 'background: #0C7779; border-color: #0C7779;' : '' }}">
+               @if($viewMode === 'pallet') style="background: #0C7779; border-color: #0C7779;" @endif>
                 <i class="bi bi-layers"></i> By Pallet
             </a>
             <a href="{{ route('stock-view.index', ['view_mode' => 'not_full', 'search' => $search]) }}" 
                class="btn {{ $viewMode === 'not_full' ? 'btn-primary' : 'btn-light' }}"
-               style="{{ $viewMode === 'not_full' ? 'background: #0C7779; border-color: #0C7779;' : '' }}">
+               @if($viewMode === 'not_full') style="background: #0C7779; border-color: #0C7779;" @endif>
                 <i class="bi bi-exclamation-circle"></i> By Not Full
             </a>
         </div>
@@ -477,7 +229,6 @@
                                                     data-total-box="{{ $partData['total_box'] }}"
                                                     data-total-pcs="{{ $partData['total_pcs'] }}"
                                                     data-pallet-count="{{ $partData['items']->count() }}"
-                                                    onclick="window.viewDetail('{{ $partData['part_number'] }}', {{ $partData['total_box'] }}, {{ $partData['total_pcs'] }}, {{ $partData['items']->count() }})"
                                                     style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                                                            color: white; 
                                                            border: none; 
@@ -519,7 +270,6 @@
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <button type="button" class="btn btn-sm js-detail-pallet"
                                                data-pallet-id="{{ $palletData['pallet_id'] }}"
-                                               onclick="window.viewPalletDetail({{ $palletData['pallet_id'] }})" 
                                                style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                                                       color: white; 
                                                       border: none; 
@@ -561,7 +311,6 @@
                                             <div class="d-inline-flex gap-1 flex-wrap justify-content-center">
                                                 <button type="button" class="btn btn-sm js-detail-pallet"
                                                    data-pallet-id="{{ $box['pallet_id'] }}"
-                                                   onclick="window.viewPalletDetail({{ $box['pallet_id'] }})" 
                                                    style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                                                           color: white; 
                                                           border: none; 
@@ -839,6 +588,16 @@
     </div>
 </div>
 
+<script id="stockViewBootstrap" type="application/json">
+{!! json_encode([
+    'currentUserRole' => Auth::user()->role ?? null,
+    'allParts' => $groupedByPart->pluck('part_number')->values(),
+    'allPallets' => $groupedByPallet->pluck('pallet_number')->values(),
+    'viewMode' => $viewMode,
+    'csrfToken' => csrf_token(),
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) !!}
+</script>
+
 <style>
     .search-dropdown {
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -874,15 +633,24 @@
 
 @section('scripts')
 <script>
-    const currentUserRole = @json(Auth::user()->role ?? null);
+    const bootstrapDataEl = document.getElementById('stockViewBootstrap');
+    let bootstrapData = {};
+    try {
+        bootstrapData = bootstrapDataEl ? JSON.parse(bootstrapDataEl.textContent || '{}') : {};
+    } catch (error) {
+        console.error('Failed to parse stockViewBootstrap JSON:', error);
+    }
+
+    const currentUserRole = bootstrapData.currentUserRole ?? null;
     const canEditBox = currentUserRole === 'admin_warehouse' || currentUserRole === 'admin';
+    const csrfToken = bootstrapData.csrfToken || '';
     const editBoxModalEl = document.getElementById('editBoxModal');
     const boxHistoryModalEl = document.getElementById('boxHistoryModal');
     const editBoxModal = editBoxModalEl ? new bootstrap.Modal(editBoxModalEl) : null;
     const boxHistoryModal = boxHistoryModalEl ? new bootstrap.Modal(boxHistoryModalEl) : null;
-    const allParts = @json($groupedByPart->pluck('part_number')->values());
-    const allPallets = @json($groupedByPallet->pluck('pallet_number')->values());
-    const viewMode = '{{ $viewMode }}';
+    const allParts = Array.isArray(bootstrapData.allParts) ? bootstrapData.allParts : [];
+    const allPallets = Array.isArray(bootstrapData.allPallets) ? bootstrapData.allPallets : [];
+    const viewMode = bootstrapData.viewMode || 'part';
     const searchInput = document.getElementById('searchInput');
     const searchDropdown = document.getElementById('searchDropdown');
     const searchForm = document.getElementById('searchForm');
@@ -1222,7 +990,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': @json(csrf_token()),
+                        'X-CSRF-TOKEN': csrfToken,
                         'Accept': 'application/json',
                     },
                     body: JSON.stringify(payload),

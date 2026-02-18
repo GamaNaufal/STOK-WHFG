@@ -487,7 +487,7 @@
                                         <i class="bi bi-check-circle"></i> Selesai
                                     </span>
                                 @elseif($order->has_sufficient_stock)
-                                    <button class="btn-process" onclick="openFulfillModal({{ $order->id }})">
+                                    <button class="btn-process" onclick="openFulfillModal('{{ $order->id }}')">
                                         <i class="bi bi-box-seam"></i> Process
                                     </button>
                                 @else

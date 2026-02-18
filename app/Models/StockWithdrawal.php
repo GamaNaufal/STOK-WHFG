@@ -5,6 +5,20 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property int $id
+ * @property string|null $withdrawal_batch_id
+ * @property int|null $user_id
+ * @property int|null $pallet_item_id
+ * @property int|null $box_id
+ * @property string $part_number
+ * @property int $pcs_quantity
+ * @property int $box_quantity
+ * @property string $warehouse_location
+ * @property string $status
+ * @property string|null $notes
+ * @property \Illuminate\Support\Carbon|null $withdrawn_at
+ */
 class StockWithdrawal extends Model
 {
     use SoftDeletes;

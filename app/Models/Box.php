@@ -5,6 +5,22 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property int $id
+ * @property string $box_number
+ * @property string $part_number
+ * @property string|null $part_name
+ * @property int $pcs_quantity
+ * @property int|null $qty_box
+ * @property bool $is_withdrawn
+ * @property \Illuminate\Support\Carbon|null $withdrawn_at
+ * @property bool $is_not_full
+ * @property string|null $not_full_reason
+ * @property int|null $assigned_delivery_order_id
+ * @property string|null $expired_status
+ * @property \Illuminate\Support\Carbon|null $handled_at
+ * @property int|null $handled_by
+ */
 class Box extends Model
 {
     use SoftDeletes;

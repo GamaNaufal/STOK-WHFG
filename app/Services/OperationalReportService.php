@@ -7,9 +7,9 @@ use App\Models\Box;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryPickSession;
-use App\Models\PalletItem;
 use App\Models\StockInput;
 use App\Models\StockWithdrawal;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -59,15 +59,18 @@ class OperationalReportService
         return [$start, $end, $label];
     }
 
-    public function build(Request $request, bool $forExport = false): array
+    private function normalizeGroupBy(string $groupBy): string
     {
-        [$start, $end, $rangeLabel] = $this->resolveDateRange($request);
-        $groupBy = $request->input('group_by', 'day');
         if (!in_array($groupBy, ['day', 'week', 'month'], true)) {
-            $groupBy = 'day';
+            return 'day';
         }
 
-        $currentHandling = Box::query()
+        return $groupBy;
+    }
+
+    private function buildCurrentHandling()
+    {
+        return Box::query()
             ->where('is_withdrawn', false)
             ->whereNotIn('expired_status', ['handled', 'expired'])
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
@@ -81,7 +84,10 @@ class OperationalReportService
             ->orderBy('boxes.created_at', 'asc')
             ->limit(200)
             ->get();
+    }
 
+    private function buildMatchingReport(?Carbon $start, ?Carbon $end)
+    {
         $matchingOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
             ->select(['id', 'customer_name', 'delivery_date', 'status'])
             ->whereIn('status', ['approved', 'processing', 'completed'])
@@ -90,7 +96,7 @@ class OperationalReportService
             ->orderBy('delivery_date', 'asc')
             ->get();
 
-        $matchingReport = $matchingOrders->map(function ($order) {
+        return $matchingOrders->map(function ($order) {
             $required = (int) $order->items->sum('quantity');
             $fulfilled = (int) $order->items->sum('fulfilled_quantity');
             $rate = $required > 0 ? round(($fulfilled / $required) * 100, 1) : 0;
@@ -106,7 +112,10 @@ class OperationalReportService
                 'status' => $isFull ? 'Full' : 'Partial',
             ];
         });
+    }
 
+    private function buildProcessingReport(?Carbon $start, ?Carbon $end)
+    {
         $pickSessions = DeliveryPickSession::with(['items:id,pick_session_id,scanned_at'])
             ->select(['id', 'delivery_order_id', 'started_at', 'completed_at'])
             ->when($start, fn ($q) => $q->where('started_at', '>=', $start))
@@ -114,7 +123,7 @@ class OperationalReportService
             ->orderBy('started_at', 'desc')
             ->get();
 
-        $processingReport = $pickSessions->map(function ($session) {
+        return $pickSessions->map(function ($session) {
             $duration = $session->started_at && $session->completed_at
                 ? $session->started_at->diffInMinutes($session->completed_at)
                 : null;
@@ -136,7 +145,10 @@ class OperationalReportService
                 'scan_duration_min' => $scanDuration,
             ];
         });
+    }
 
+    private function buildInboundOutboundQueries(?Carbon $start, ?Carbon $end): array
+    {
         $inboundQuery = StockInput::query();
         $outboundQuery = StockWithdrawal::query()->where('status', 'completed');
 
@@ -149,6 +161,11 @@ class OperationalReportService
             $outboundQuery->where('withdrawn_at', '<=', $end);
         }
 
+        return [$inboundQuery, $outboundQuery];
+    }
+
+    private function buildThroughputDays(?Carbon $start, ?Carbon $end, $inboundQuery, $outboundQuery): array
+    {
         $inboundByDay = $inboundQuery->clone()
             ->select(DB::raw('DATE(stored_at) as day'), DB::raw('SUM(pcs_quantity) as pcs'))
             ->groupBy('day')
@@ -172,6 +189,11 @@ class OperationalReportService
             }
         }
 
+        return $throughputDays;
+    }
+
+    private function buildDeliveryTrend(?Carbon $start, ?Carbon $end, string $groupBy): array
+    {
         $deliveryPlanByDay = DB::table('delivery_orders as orders')
             ->join('delivery_order_items as items', 'items.delivery_order_id', '=', 'orders.id')
             ->whereIn('orders.status', ['approved', 'processing', 'completed'])
@@ -231,6 +253,11 @@ class OperationalReportService
             }
         }
 
+        return array_values($deliveryTrend);
+    }
+
+    private function buildPeakHours($inboundQuery, $outboundQuery)
+    {
         $hourInExpr = $this->hourExpression('stored_at');
         $hourOutExpr = $this->hourExpression('withdrawn_at');
 
@@ -243,14 +270,17 @@ class OperationalReportService
             ->groupBy('hour')
             ->pluck('pcs', 'hour');
 
-        $peakHours = collect(range(0, 23))->map(function ($hour) use ($inboundHours, $outboundHours) {
+        return collect(range(0, 23))->map(function ($hour) use ($inboundHours, $outboundHours) {
             return [
                 'hour' => str_pad((string) $hour, 2, '0', STR_PAD_LEFT) . ':00',
                 'inbound_pcs' => (int) ($inboundHours[$hour] ?? 0),
                 'outbound_pcs' => (int) ($outboundHours[$hour] ?? 0),
             ];
         });
+    }
 
+    private function buildIssueReport(?Carbon $start, ?Carbon $end): array
+    {
         $issuesBaseQuery = DeliveryIssue::with(['session:id,delivery_order_id'])
             ->when($start, fn ($q) => $q->where('created_at', '>=', $start))
             ->when($end, fn ($q) => $q->where('created_at', '<=', $end));
@@ -275,6 +305,11 @@ class OperationalReportService
                 ];
             });
 
+        return [$issueSummary, $issueList];
+    }
+
+    private function buildFulfillmentReport(?Carbon $start, ?Carbon $end): array
+    {
         $fulfillmentOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
             ->select(['id', 'customer_name', 'delivery_date', 'status'])
             ->whereIn('status', ['approved', 'processing', 'completed'])
@@ -304,6 +339,11 @@ class OperationalReportService
         $totalCount = $fulfillmentRows->count();
         $fulfillmentRate = $totalCount > 0 ? round(($fullCount / $totalCount) * 100, 1) : 0;
 
+        return [$fulfillmentRows, $fulfillmentRate];
+    }
+
+    private function buildAuditReport(Request $request, ?Carbon $start, ?Carbon $end, bool $forExport): array
+    {
         $auditBaseQuery = AuditLog::query()
             ->when($start, fn ($q) => $q->where('created_at', '>=', $start))
             ->when($end, fn ($q) => $q->where('created_at', '<=', $end));
@@ -317,7 +357,7 @@ class OperationalReportService
             ->orderBy('user_id')
             ->pluck('user_id');
 
-        $auditUserOptions = \App\Models\User::whereIn('id', $auditUsers->all())
+        $auditUserOptions = User::whereIn('id', $auditUsers->all())
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -346,6 +386,27 @@ class OperationalReportService
             $auditLogs = $auditLogs->paginate(20)->withQueryString();
         }
 
+        return [$auditSummary, $auditLogs, $auditTypes, $auditActions, $auditUserOptions];
+    }
+
+    public function build(Request $request, bool $forExport = false): array
+    {
+        [$start, $end, $rangeLabel] = $this->resolveDateRange($request);
+        $groupBy = $this->normalizeGroupBy((string) $request->input('group_by', 'day'));
+
+        $currentHandling = $this->buildCurrentHandling();
+        $matchingReport = $this->buildMatchingReport($start, $end);
+        $processingReport = $this->buildProcessingReport($start, $end);
+
+        [$inboundQuery, $outboundQuery] = $this->buildInboundOutboundQueries($start, $end);
+        $throughputDays = $this->buildThroughputDays($start, $end, $inboundQuery, $outboundQuery);
+        $deliveryTrend = $this->buildDeliveryTrend($start, $end, $groupBy);
+        $peakHours = $this->buildPeakHours($inboundQuery, $outboundQuery);
+
+        [$issueSummary, $issueList] = $this->buildIssueReport($start, $end);
+        [$fulfillmentRows, $fulfillmentRate] = $this->buildFulfillmentReport($start, $end);
+        [$auditSummary, $auditLogs, $auditTypes, $auditActions, $auditUserOptions] = $this->buildAuditReport($request, $start, $end, $forExport);
+
         return [
             'rangeLabel' => $rangeLabel,
             'start' => $start,
@@ -354,7 +415,7 @@ class OperationalReportService
             'matchingReport' => $matchingReport,
             'processingReport' => $processingReport,
             'throughputDays' => $throughputDays,
-            'deliveryTrend' => array_values($deliveryTrend),
+            'deliveryTrend' => $deliveryTrend,
             'deliveryGroupBy' => $groupBy,
             'peakHours' => $peakHours,
             'issueSummary' => $issueSummary,
