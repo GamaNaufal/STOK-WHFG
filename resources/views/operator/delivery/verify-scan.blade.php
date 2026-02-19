@@ -100,43 +100,94 @@
     const verifiedCount = document.getElementById('verifiedCount');
     const totalCount = document.getElementById('totalCount');
     const btnToFinal = document.getElementById('btnToFinal');
+    const requiredBoxRows = @json($session->items->map(function ($item) {
+        return [
+            'box_id' => $item->box_id,
+            'box_number' => (string) $item->box->box_number,
+        ];
+    })->values());
+    const initialVerifiedBoxIds = @json(array_values($verifiedBoxIds));
+
     let audioContext = null;
+    let requestQueue = Promise.resolve();
+    let activeOscillators = [];
+    const requiredBoxNumberToId = new Map();
+    const localVerifiedBoxIds = new Set(initialVerifiedBoxIds.map((id) => Number(id)));
+
+    function normalizeBoxNumber(value) {
+        return String(value || '').trim().toUpperCase();
+    }
+
+    requiredBoxRows.forEach((row) => {
+        const boxId = Number(row.box_id);
+        const normalized = normalizeBoxNumber(row.box_number);
+
+        if (!Number.isNaN(boxId) && normalized) {
+            requiredBoxNumberToId.set(normalized, boxId);
+        }
+    });
+
+    function ensureAudioContext() {
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().catch(() => {});
+        }
+    }
+
+    function registerOscillator(oscillator) {
+        activeOscillators.push(oscillator);
+        oscillator.onended = () => {
+            activeOscillators = activeOscillators.filter((item) => item !== oscillator);
+        };
+    }
+
+    function stopAllBeep() {
+        if (!audioContext) return;
+
+        const now = audioContext.currentTime;
+        activeOscillators.forEach((oscillator) => {
+            try {
+                oscillator.stop(now);
+            } catch (e) {}
+        });
+        activeOscillators = [];
+    }
 
     function playSuccessBeep() {
         try {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
+            ensureAudioContext();
+            stopAllBeep();
 
             const now = audioContext.currentTime;
-            const playTone = (frequency, startAt, duration, volume = 0.85) => {
+            const playTone = (frequency, startAt, duration, volume = 0.7) => {
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
 
-                oscillator.type = 'square';
+                oscillator.type = 'sine';
                 oscillator.frequency.setValueAtTime(frequency, startAt);
 
                 gainNode.gain.setValueAtTime(0.0001, startAt);
-                gainNode.gain.exponentialRampToValueAtTime(volume, startAt + 0.02);
+                gainNode.gain.exponentialRampToValueAtTime(volume, startAt + 0.01);
                 gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
 
                 oscillator.connect(gainNode);
                 gainNode.connect(audioContext.destination);
+                registerOscillator(oscillator);
                 oscillator.start(startAt);
                 oscillator.stop(startAt + duration + 0.01);
             };
 
-            playTone(650, now, 0.26, 0.85);
-            playTone(820, now + 0.30, 0.28, 0.85);
-            playTone(980, now + 0.62, 0.22, 0.8);
+            playTone(880, now, 0.09, 0.72);
+            playTone(1180, now + 0.10, 0.11, 0.72);
         } catch (e) {}
     }
 
     function playMismatchBeep() {
         try {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
+            ensureAudioContext();
 
             const now = audioContext.currentTime;
             const oscillator = audioContext.createOscillator();
@@ -144,16 +195,17 @@
 
             oscillator.type = 'square';
             oscillator.frequency.setValueAtTime(520, now);
-            oscillator.frequency.exponentialRampToValueAtTime(260, now + 0.42);
+            oscillator.frequency.exponentialRampToValueAtTime(320, now + 0.16);
 
             gainNode.gain.setValueAtTime(0.0001, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.9, now + 0.03);
-            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.46);
+            gainNode.gain.exponentialRampToValueAtTime(0.45, now + 0.01);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
 
             oscillator.connect(gainNode);
             gainNode.connect(audioContext.destination);
+            registerOscillator(oscillator);
             oscillator.start(now);
-            oscillator.stop(now + 0.48);
+            oscillator.stop(now + 0.19);
         } catch (e) {}
     }
 
@@ -162,7 +214,10 @@
     }
 
     function markRowVerified(boxId) {
-        const row = document.querySelector(`tr[data-box-id="${boxId}"]`);
+        const numericBoxId = Number(boxId);
+        localVerifiedBoxIds.add(numericBoxId);
+
+        const row = document.querySelector(`tr[data-box-id="${numericBoxId}"]`);
         if (!row) return;
 
         row.classList.add('table-success');
@@ -194,8 +249,21 @@
 
         scanInput.value = '';
         scanInput.focus();
+        ensureAudioContext();
 
-        fetch("{{ route('delivery.pick.verify.scan', $session->id) }}", {
+        const normalized = normalizeBoxNumber(boxNumber);
+        const localBoxId = requiredBoxNumberToId.get(normalized);
+        const canPlayOptimisticSuccess = Number.isInteger(localBoxId) && !localVerifiedBoxIds.has(localBoxId);
+
+        if (canPlayOptimisticSuccess) {
+            playSuccessBeep();
+        }
+
+        requestQueue = requestQueue.finally(() => processScanRequest(boxNumber, canPlayOptimisticSuccess));
+    }
+
+    function processScanRequest(boxNumber, hasOptimisticSuccess) {
+        return fetch("{{ route('delivery.pick.verify.scan', $session->id) }}", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -207,7 +275,9 @@
             const data = await res.json();
 
             if (data.success) {
-                playSuccessBeep();
+                if (!hasOptimisticSuccess) {
+                    playSuccessBeep();
+                }
                 showMessage(data.message, 'success');
                 if (data.box_id) {
                     markRowVerified(data.box_id);
@@ -219,7 +289,9 @@
             playMismatchBeep();
             showMessage(data.message || 'Scan verifikasi gagal.', 'danger');
         })
-        .catch(() => showMessage('Gagal koneksi.', 'danger'));
+        .catch((error) => {
+            showMessage('Gagal koneksi.', 'danger');
+        });
     }
 
     scanInput.addEventListener('keydown', function (e) {
@@ -230,5 +302,9 @@
     });
 
     btnScan.addEventListener('click', submitScan);
+
+    const unlockAudio = () => ensureAudioContext();
+    window.addEventListener('pointerdown', unlockAudio, { once: true });
+    window.addEventListener('keydown', unlockAudio, { once: true });
 </script>
 @endsection
