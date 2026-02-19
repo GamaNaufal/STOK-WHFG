@@ -100,30 +100,36 @@
     const verifiedCount = document.getElementById('verifiedCount');
     const totalCount = document.getElementById('totalCount');
     const btnToFinal = document.getElementById('btnToFinal');
-    const requiredBoxRows = @json($session->items->map(function ($item) {
-        return [
-            'box_id' => $item->box_id,
-            'box_number' => (string) $item->box->box_number,
-        ];
-    })->values());
-    const initialVerifiedBoxIds = @json(array_values($verifiedBoxIds));
 
     let audioContext = null;
     let requestQueue = Promise.resolve();
     let activeOscillators = [];
     const requiredBoxNumberToId = new Map();
-    const localVerifiedBoxIds = new Set(initialVerifiedBoxIds.map((id) => Number(id)));
+    const localVerifiedBoxIds = new Set();
 
     function normalizeBoxNumber(value) {
         return String(value || '').trim().toUpperCase();
     }
 
-    requiredBoxRows.forEach((row) => {
-        const boxId = Number(row.box_id);
-        const normalized = normalizeBoxNumber(row.box_number);
+    function compactBoxNumber(value) {
+        return normalizeBoxNumber(value).replace(/[^A-Z0-9]/g, '');
+    }
+
+    document.querySelectorAll('#requiredBoxes tr[data-box-id]').forEach((row) => {
+        const boxId = Number(row.getAttribute('data-box-id'));
+        const boxNumber = row.querySelector('td:first-child')?.textContent || '';
+        const normalized = normalizeBoxNumber(boxNumber);
+        const compact = compactBoxNumber(boxNumber);
 
         if (!Number.isNaN(boxId) && normalized) {
             requiredBoxNumberToId.set(normalized, boxId);
+            if (compact) {
+                requiredBoxNumberToId.set(compact, boxId);
+            }
+        }
+
+        if (row.classList.contains('table-success')) {
+            localVerifiedBoxIds.add(boxId);
         }
     });
 
@@ -252,7 +258,8 @@
         ensureAudioContext();
 
         const normalized = normalizeBoxNumber(boxNumber);
-        const localBoxId = requiredBoxNumberToId.get(normalized);
+        const compact = compactBoxNumber(boxNumber);
+        const localBoxId = requiredBoxNumberToId.get(normalized) ?? requiredBoxNumberToId.get(compact);
         const canPlayOptimisticSuccess = Number.isInteger(localBoxId) && !localVerifiedBoxIds.has(localBoxId);
 
         if (canPlayOptimisticSuccess) {
