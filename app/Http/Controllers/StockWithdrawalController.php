@@ -6,6 +6,7 @@ use App\Models\MasterLocation;
 use App\Models\PalletItem;
 use App\Models\StockWithdrawal;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -223,7 +224,7 @@ class StockWithdrawalController extends Controller
                 // Create withdrawal record
                 $withdrawal = StockWithdrawal::create([
                     'withdrawal_batch_id' => $batchId,
-                    'user_id' => auth()->id(),
+                    'user_id' => Auth::id(),
                     'pallet_item_id' => $item->id,
                     'part_number' => $partNumber,
                     'pcs_quantity' => $takeQty,
@@ -371,7 +372,7 @@ class StockWithdrawalController extends Controller
                     // Create withdrawal record
                     StockWithdrawal::create([
                         'withdrawal_batch_id' => $batchId,
-                        'user_id' => auth()->id(),
+                        'user_id' => Auth::id(),
                         'pallet_item_id' => $item->id,
                         'part_number' => $partNumber,
                         'pcs_quantity' => $takeQty,

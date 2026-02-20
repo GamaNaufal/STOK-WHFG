@@ -35,11 +35,8 @@
                                 <small>Barang dilacak melalui sesi pengambilan. Gunakan sistem pengambilan untuk memenuhi pesanan ini.</small>
                             </td>
                         </tr>
-                                    </button>
-                                    @else
-                                    <span class="badge bg-success"><i class="bi bi-check"></i> Done</span>
                         </tbody>
-                    </table>>
+                    </table>
                 </div>
             </div>
         </div>
