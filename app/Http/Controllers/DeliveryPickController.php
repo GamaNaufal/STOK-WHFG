@@ -720,11 +720,6 @@ class DeliveryPickController extends Controller
 
     private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null)
     {
-        $storedAtSub = DB::table('pallet_boxes as pb')
-            ->join('stock_inputs as si', 'si.pallet_id', '=', 'pb.pallet_id')
-            ->select('pb.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
-            ->groupBy('pb.box_id');
-
         $query = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
@@ -742,17 +737,11 @@ class DeliveryPickController extends Controller
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->leftJoinSub($storedAtSub, 'stock_in', function ($join) {
-                $join->on('stock_in.box_id', '=', 'boxes.id');
-            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $q->where(function ($inner) use ($deliveryDate) {
-                    $inner->whereNull('stock_in.stored_at')
-                        ->orWhereRaw('DATE_ADD(stock_in.stored_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
-                });
+                $q->whereRaw('DATE_ADD(boxes.created_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
             });
 
         return $query->get();
@@ -760,11 +749,6 @@ class DeliveryPickController extends Controller
 
     private function getBoxesByFIFO(string $partNumber, int $requestedPcs, $deliveryDate = null)
     {
-        $storedAtSub = DB::table('pallet_boxes as pb')
-            ->join('stock_inputs as si', 'si.pallet_id', '=', 'pb.pallet_id')
-            ->select('pb.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
-            ->groupBy('pb.box_id');
-
         $boxes = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
@@ -782,15 +766,9 @@ class DeliveryPickController extends Controller
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->leftJoinSub($storedAtSub, 'stock_in', function ($join) {
-                $join->on('stock_in.box_id', '=', 'boxes.id');
-            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $q->where(function ($inner) use ($deliveryDate) {
-                    $inner->whereNull('stock_in.stored_at')
-                        ->orWhereRaw('DATE_ADD(stock_in.stored_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
-                });
+                $q->whereRaw('DATE_ADD(boxes.created_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
             })
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')
