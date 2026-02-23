@@ -84,7 +84,7 @@
                                 </button>
                             </div>
 
-                            <div id="items-container" class="space-y-2">
+                            <div id="items-container" class="space-y-2" data-initial-count="{{ $order->items->count() }}">
                                 @foreach($order->items as $index => $item)
                                     <div class="row g-2 item-row">
                                         <div class="col-lg-6">
@@ -118,13 +118,15 @@
     </div>
 </div>
 
+@endsection
+
 @section('scripts')
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            let itemIndex = {{ $order->items->count() }};
             const container = document.getElementById('items-container');
+            let itemIndex = parseInt(container?.dataset.initialCount || '0', 10);
             const addBtn = document.getElementById('add-item-btn');
 
             function initPartSelects(context) {
@@ -225,5 +227,4 @@
             });
         });
     </script>
-@endsection
 @endsection

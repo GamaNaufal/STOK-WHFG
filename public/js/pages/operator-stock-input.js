@@ -43,6 +43,27 @@
     let existingPalletSearchTimeout;
     let isSelectingExistingPallet = false;
 
+    function showPostSaveBannerIfAny() {
+        const popup = document.getElementById("postSavePopup");
+        const popupText = document.getElementById("postSavePopupText");
+        if (!popup || !popupText) {
+            return;
+        }
+
+        const message = sessionStorage.getItem("stockInputPostSaveMessage");
+        if (!message) {
+            return;
+        }
+
+        popupText.textContent = message;
+        popup.style.display = "block";
+        sessionStorage.removeItem("stockInputPostSaveMessage");
+
+        setTimeout(() => {
+            popup.style.display = "none";
+        }, 1800);
+    }
+
     function setPalletModeUI(mode) {
         if (existingPalletPicker) {
             existingPalletPicker.style.display =
@@ -164,10 +185,37 @@
                     document.getElementById("box_count").textContent =
                         pallet.total_boxes;
 
+                    const palletSaveStatus =
+                        document.getElementById("palletSaveStatus");
+                    const boxInputStatus =
+                        document.getElementById("boxInputStatus");
+
+                    if (palletSaveStatus) {
+                        if (pallet.has_stock_location) {
+                            palletSaveStatus.style.background = "#ecfdf5";
+                            palletSaveStatus.style.border = "2px solid #86efac";
+                            palletSaveStatus.style.color = "#166534";
+                            palletSaveStatus.innerHTML = `<i class="bi bi-check-circle"></i> Status pallet: <strong>Sudah tersimpan</strong> di lokasi <strong>${pallet.warehouse_location || "-"}</strong>`;
+                        } else {
+                            palletSaveStatus.style.background = "#fff7ed";
+                            palletSaveStatus.style.border = "2px solid #fdba74";
+                            palletSaveStatus.style.color = "#9a3412";
+                            palletSaveStatus.innerHTML =
+                                '<i class="bi bi-clock-history"></i> Status pallet: <strong>Belum tersimpan</strong>';
+                        }
+                    }
+
                     const itemsList = document.getElementById("itemsList");
                     itemsList.innerHTML = "";
 
                     if (pallet.boxes && pallet.boxes.length > 0) {
+                        if (boxInputStatus) {
+                            boxInputStatus.style.background = "#ecfdf5";
+                            boxInputStatus.style.border = "2px solid #86efac";
+                            boxInputStatus.style.color = "#166534";
+                            boxInputStatus.innerHTML = `<i class="bi bi-check-circle"></i> <strong>${pallet.boxes.length} box sudah diinput</strong> ke pallet ini.`;
+                        }
+
                         pallet.boxes.forEach((box) => {
                             const boxRow = document.createElement("div");
                             boxRow.className = "row mb-2 p-2 bg-light rounded";
@@ -175,6 +223,7 @@
                                 <div class="col-md-3">
                                     <small class="text-muted">Box</small>
                                     <div class="fw-bold">${box.box_number}</div>
+                                    <span class="badge bg-success mt-1">Sudah diinput</span>
                                 </div>
                                 <div class="col-md-3">
                                     <small class="text-muted">Part</small>
@@ -191,6 +240,12 @@
                             `;
                             itemsList.appendChild(boxRow);
                         });
+                    } else if (boxInputStatus) {
+                        boxInputStatus.style.background = "#ecfeff";
+                        boxInputStatus.style.border = "2px solid #67e8f9";
+                        boxInputStatus.style.color = "#155e75";
+                        boxInputStatus.innerHTML =
+                            '<i class="bi bi-info-circle"></i> Belum ada box yang diinput.';
                     }
                 }
             },
@@ -296,6 +351,7 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
+        showPostSaveBannerIfAny();
         setPalletModeUI("new");
         barcodeInput.focus();
     });
@@ -606,6 +662,11 @@
                     selectedCode ||
                     currentPalletLocationCode ||
                     "(tanpa lokasi)";
+                sessionStorage.setItem(
+                    "stockInputPostSaveMessage",
+                    "Data pallet berhasil tersimpan di lokasi: " +
+                        savedLocation,
+                );
                 showToast(
                     "Stok berhasil disimpan di lokasi: " + savedLocation,
                     "success",

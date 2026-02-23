@@ -2,6 +2,10 @@
 
 @section('title', 'Lihat Stok - Warehouse FG Yamato')
 
+@section('styles')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+@endsection
+
 @section('content')
 <div class="row mb-4">
     <div class="col-12">
@@ -533,7 +537,12 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Part Number</label>
-                        <input type="text" id="editPartNumber" name="part_number" class="form-control" required>
+                        <select id="editPartNumber" name="part_number" class="form-select" required>
+                            <option value="">Pilih Part Number</option>
+                            @foreach($masterPartNumbers as $masterPartNumber)
+                                <option value="{{ $masterPartNumber }}">{{ $masterPartNumber }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">PCS Quantity</label>
@@ -593,6 +602,7 @@
 {!! json_encode([
     'currentUserRole' => Auth::user()->role ?? null,
     'allParts' => $groupedByPart->pluck('part_number')->values(),
+    'masterParts' => $masterPartNumbers,
     'allPallets' => $groupedByPallet->pluck('pallet_number')->values(),
     'viewMode' => $viewMode,
     'csrfToken' => csrf_token(),
@@ -629,10 +639,31 @@
     .table tbody tr:hover {
         background-color: #f9fafb;
     }
+
+    .select2-container {
+        width: 100% !important;
+    }
+
+    .select2-container--default .select2-selection--single {
+        height: calc(1.5em + .75rem + 2px);
+        border: 1px solid #ced4da;
+        border-radius: .375rem;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        line-height: calc(1.5em + .75rem);
+        padding-left: .75rem;
+    }
+
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: calc(1.5em + .75rem + 2px);
+    }
 </style>
 @endsection
 
 @section('scripts')
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
     const bootstrapDataEl = document.getElementById('stockViewBootstrap');
     let bootstrapData = {};
@@ -650,6 +681,7 @@
     const editBoxModal = editBoxModalEl ? new bootstrap.Modal(editBoxModalEl) : null;
     const boxHistoryModal = boxHistoryModalEl ? new bootstrap.Modal(boxHistoryModalEl) : null;
     const allParts = Array.isArray(bootstrapData.allParts) ? bootstrapData.allParts : [];
+    const masterParts = Array.isArray(bootstrapData.masterParts) ? bootstrapData.masterParts : [];
     const allPallets = Array.isArray(bootstrapData.allPallets) ? bootstrapData.allPallets : [];
     const viewMode = bootstrapData.viewMode || 'part';
     const searchInput = document.getElementById('searchInput');
@@ -662,6 +694,7 @@
     let initialEditBoxState = null;
     let currentPartNumber = null;
     let currentPalletId = null;
+    let editPartSelectEnhanced = false;
 
     function syncModalA11y(modalEl) {
         if (!modalEl) return;
@@ -699,6 +732,23 @@
         alertEl.classList.remove('d-none', 'alert-warning', 'alert-danger', 'alert-success', 'alert-info');
         alertEl.classList.add(`alert-${resolvedType}`);
         alertEl.textContent = message || '';
+    }
+
+    function initEditPartSelect() {
+        const selectEl = document.getElementById('editPartNumber');
+        if (!selectEl || !window.jQuery || !window.jQuery.fn || !window.jQuery.fn.select2) {
+            return;
+        }
+
+        if (!editPartSelectEnhanced) {
+            window.jQuery(selectEl).select2({
+                width: '100%',
+                placeholder: 'Pilih Part Number',
+                minimumResultsForSearch: 0,
+                dropdownParent: window.jQuery('#editBoxModal')
+            });
+            editPartSelectEnhanced = true;
+        }
     }
 
     const hasSearchUi = searchInput && searchDropdown && searchForm;
@@ -936,16 +986,35 @@
     function openEditBoxModal(dataset) {
         if (!editBoxModal) return;
         hideEditBoxInlineAlert();
+        initEditPartSelect();
+
         const initialStoredAt = parseDisplayDateToInputValue(dataset.storedAt || '');
         document.getElementById('editBoxId').value = dataset.boxId || '';
         document.getElementById('editBoxNumber').value = dataset.boxNumber || '';
-        document.getElementById('editPartNumber').value = dataset.partNumber || '';
+
+        const partSelect = document.getElementById('editPartNumber');
+        if (partSelect) {
+            const incomingPartNumber = (dataset.partNumber || '').trim();
+            partSelect.value = incomingPartNumber;
+            if (editPartSelectEnhanced && window.jQuery) {
+                window.jQuery(partSelect).val(incomingPartNumber).trigger('change.select2');
+            }
+
+            if (incomingPartNumber && !masterParts.includes(incomingPartNumber)) {
+                partSelect.value = '';
+                if (editPartSelectEnhanced && window.jQuery) {
+                    window.jQuery(partSelect).val('').trigger('change.select2');
+                }
+                showEditBoxInlineAlert('Part lama tidak ditemukan di master part. Silakan pilih part yang valid dari daftar.', 'warning');
+            }
+        }
+
         document.getElementById('editPcsQuantity').value = dataset.pcsQuantity || '';
         document.getElementById('editStoredAt').value = initialStoredAt;
         document.getElementById('editReason').value = '';
 
         initialEditBoxState = {
-            partNumber: (dataset.partNumber || '').trim(),
+            partNumber: (partSelect?.value || '').trim(),
             pcsQuantity: Number.parseInt(dataset.pcsQuantity || '0', 10) || 0,
             storedAt: initialStoredAt,
         };
@@ -1101,6 +1170,7 @@
         if (hasSearchUi && searchInput.value) {
             loadSearchSuggestions(searchInput.value);
         }
+        initEditPartSelect();
     });
 </script>
 @endsection

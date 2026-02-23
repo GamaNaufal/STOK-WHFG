@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\Box;
 use App\Models\Pallet;
 use App\Models\PalletItem;
+use App\Models\PartSetting;
 use App\Services\AuditService;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
@@ -169,6 +170,10 @@ class StockViewController extends Controller
         $summaryTotalBox = $items->sum('box_quantity');
         $summaryTotalPcs = $items->sum('pcs_quantity');
         $summaryTotalParts = $items->pluck('part_number')->unique()->count();
+        $masterPartNumbers = PartSetting::query()
+            ->orderBy('part_number')
+            ->pluck('part_number')
+            ->values();
 
         return view('shared.stock-view.index', compact(
             'groupedByPart', 
@@ -179,7 +184,8 @@ class StockViewController extends Controller
             'totalPallets',
             'summaryTotalBox',
             'summaryTotalPcs',
-            'summaryTotalParts'
+            'summaryTotalParts',
+            'masterPartNumbers'
         ));
     }
 
@@ -221,6 +227,8 @@ class StockViewController extends Controller
         $palletDetails = $items->map(function ($item) {
             return [
                 'box_id' => $item['box_id'] ?? null,
+                'part_number' => $item['part_number'] ?? null,
+                'box_number' => $item['box_number'] ?? null,
                 'pallet_number' => $item['pallet_number'],
                 'box_quantity' => $item['box_quantity'],
                 'pcs_quantity' => $item['pcs_quantity'],
@@ -322,13 +330,13 @@ class StockViewController extends Controller
         }
 
         $validated = $request->validate([
-            'part_number' => 'required|string|max:100',
+            'part_number' => 'required|string|max:100|exists:part_settings,part_number',
             'pcs_quantity' => 'required|integer|min:1',
             'stored_at' => 'required|date',
             'reason' => 'required|string|min:3|max:500',
         ]);
 
-        $newPartNumber = (string) $validated['part_number'];
+        $newPartNumber = trim((string) $validated['part_number']);
         $newPcsQuantity = (int) $validated['pcs_quantity'];
         $newStoredAt = Carbon::parse($validated['stored_at']);
 

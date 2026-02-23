@@ -10,7 +10,30 @@ return new class extends Migration
     public function up(): void
     {
         if (Schema::hasTable('delivery_pick_items')) {
-            DB::statement('DELETE newer FROM delivery_pick_items newer INNER JOIN delivery_pick_items older ON newer.pick_session_id = older.pick_session_id AND newer.box_id = older.box_id AND newer.id > older.id');
+            $driver = DB::getDriverName();
+
+            if ($driver === 'sqlite') {
+                DB::statement(
+                    'DELETE FROM delivery_pick_items
+                     WHERE id IN (
+                        SELECT newer.id
+                        FROM delivery_pick_items AS newer
+                        INNER JOIN delivery_pick_items AS older
+                            ON newer.pick_session_id = older.pick_session_id
+                           AND newer.box_id = older.box_id
+                           AND newer.id > older.id
+                     )'
+                );
+            } else {
+                DB::statement(
+                    'DELETE newer
+                     FROM delivery_pick_items AS newer
+                     INNER JOIN delivery_pick_items AS older
+                        ON newer.pick_session_id = older.pick_session_id
+                       AND newer.box_id = older.box_id
+                       AND newer.id > older.id'
+                );
+            }
 
             Schema::table('delivery_pick_items', function (Blueprint $table) {
                 $table->unique(['pick_session_id', 'box_id'], 'delivery_pick_items_session_box_unique');

@@ -8,6 +8,7 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\Pallet;
 use App\Models\PalletItem;
+use App\Models\PartSetting;
 use App\Models\StockLocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,9 +18,20 @@ class StockViewBoxEditAuditTest extends TestCase
 {
     use RefreshDatabase;
 
+    private function seedMasterParts(array $partNumbers): void
+    {
+        foreach ($partNumbers as $partNumber) {
+            PartSetting::firstOrCreate(
+                ['part_number' => $partNumber],
+                ['qty_box' => 1]
+            );
+        }
+    }
+
     public function test_admin_warehouse_can_update_box_and_audit_is_logged(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $this->seedMasterParts(['P-OLD', 'P-NEW']);
 
         $pallet = Pallet::create(['pallet_number' => 'PLT-BOX-EDIT-01']);
         StockLocation::create([
@@ -106,6 +118,7 @@ class StockViewBoxEditAuditTest extends TestCase
     public function test_box_update_is_rejected_when_no_data_changes(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $this->seedMasterParts(['P-NO-CHANGE']);
 
         $storedAt = now()->startOfMinute();
 
@@ -142,6 +155,37 @@ class StockViewBoxEditAuditTest extends TestCase
             'action' => 'box_updated_by_admin_warehouse',
             'model' => 'Box',
             'model_id' => $box->id,
+        ]);
+    }
+
+    public function test_box_update_is_rejected_when_part_number_not_in_master_part_settings(): void
+    {
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $this->seedMasterParts(['P-MASTER-ONLY']);
+
+        $box = Box::create([
+            'box_number' => 'BOX-INVALID-PART-01',
+            'part_number' => 'P-MASTER-ONLY',
+            'pcs_quantity' => 100,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-INVALID-PART-01|P-MASTER-ONLY|100',
+            'user_id' => $adminWarehouse->id,
+        ]);
+
+        $response = $this->actingAs($adminWarehouse)->postJson(route('stock-view.box-update', $box->id), [
+            'part_number' => 'P-NOT-IN-MASTER',
+            'pcs_quantity' => 120,
+            'stored_at' => now()->format('Y-m-d H:i:s'),
+            'reason' => 'Coba ubah ke part yang tidak terdaftar',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['part_number']);
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'part_number' => 'P-MASTER-ONLY',
+            'pcs_quantity' => 100,
         ]);
     }
 
@@ -190,6 +234,7 @@ class StockViewBoxEditAuditTest extends TestCase
     public function test_box_edit_keeps_not_full_flag_and_syncs_pallet_items(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $this->seedMasterParts(['P-NF-OLD', 'P-NF-NEW']);
 
         $pallet = Pallet::create(['pallet_number' => 'PLT-NF-01']);
         StockLocation::create([
@@ -254,6 +299,7 @@ class StockViewBoxEditAuditTest extends TestCase
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
         $ppc = User::factory()->create(['role' => 'ppc']);
         $sales = User::factory()->create(['role' => 'sales']);
+        $this->seedMasterParts(['P-FIFO-01']);
 
         $pallet = Pallet::create(['pallet_number' => 'PLT-FIFO-01']);
         StockLocation::create([

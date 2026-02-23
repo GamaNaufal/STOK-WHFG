@@ -13,7 +13,32 @@ return new class extends Migration
             return;
         }
 
-        DB::statement('DELETE newer FROM expired_box_reports newer INNER JOIN expired_box_reports older ON newer.box_id = older.box_id AND newer.status = older.status AND newer.box_id IS NOT NULL AND newer.id > older.id');
+        $driver = DB::getDriverName();
+
+        if ($driver === 'sqlite') {
+            DB::statement(
+                'DELETE FROM expired_box_reports
+                 WHERE id IN (
+                    SELECT newer.id
+                    FROM expired_box_reports AS newer
+                    INNER JOIN expired_box_reports AS older
+                        ON newer.box_id = older.box_id
+                       AND newer.status = older.status
+                       AND newer.box_id IS NOT NULL
+                       AND newer.id > older.id
+                 )'
+            );
+        } else {
+            DB::statement(
+                'DELETE newer
+                 FROM expired_box_reports AS newer
+                 INNER JOIN expired_box_reports AS older
+                    ON newer.box_id = older.box_id
+                   AND newer.status = older.status
+                   AND newer.box_id IS NOT NULL
+                   AND newer.id > older.id'
+            );
+        }
 
         Schema::table('expired_box_reports', function (Blueprint $table) {
             $table->unique(['box_id', 'status'], 'expired_box_reports_box_status_unique');

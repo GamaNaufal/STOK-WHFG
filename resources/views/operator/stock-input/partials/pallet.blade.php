@@ -10,6 +10,10 @@
             <i class="bi bi-box2"></i> Detail Palet Saat Ini
         </div>
         <div class="card-body" style="padding: 24px;">
+            <div id="palletSaveStatus" class="alert mb-4" style="background: #fff7ed; border: 2px solid #fdba74; color: #9a3412; border-radius: 10px; padding: 12px 14px;">
+                <i class="bi bi-clock-history"></i> Status pallet: <strong>Belum tersimpan</strong>
+            </div>
+
             <div class="row">
                 <div class="col-md-6">
                     <div class="mb-3">
@@ -27,6 +31,9 @@
 
             <!-- Items dalam Palet -->
             <div class="mt-4 pt-4" style="border-top: 2px solid #e5e7eb;">
+                <div id="boxInputStatus" class="alert mb-3" style="background: #ecfeff; border: 2px solid #67e8f9; color: #155e75; border-radius: 10px; padding: 10px 12px;">
+                    <i class="bi bi-info-circle"></i> Belum ada box yang diinput.
+                </div>
                 <label class="form-label text-muted small d-block mb-3" style="font-size: 13px; font-weight: 600;">Box yang Ter-scan:</label>
                 <div id="itemsList" class="d-grid gap-3">
                     <!-- Box akan tampil di sini -->
