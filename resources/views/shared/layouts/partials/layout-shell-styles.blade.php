@@ -203,6 +203,12 @@
         color: #6b7280;
         font-size: 0.9rem;
     }
+    .modal-backdrop {
+        z-index: 1190 !important;
+    }
+    .modal {
+        z-index: 1200 !important;
+    }
     .topbar-future-slot {
         flex: 0 0 140px;
         min-height: 38px;

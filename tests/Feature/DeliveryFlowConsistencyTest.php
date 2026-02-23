@@ -101,6 +101,79 @@ class DeliveryFlowConsistencyTest extends TestCase
         ]);
     }
 
+    public function test_schedule_stock_check_skips_oversized_oldest_box_and_uses_next_fifo_box(): void
+    {
+        $ppc = User::factory()->create(['role' => 'ppc']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Oversized FIFO',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-OVERSIZE-FIFO',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $pallet = Pallet::create([
+            'pallet_number' => 'PLT-OVERSIZE-FIFO',
+        ]);
+
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        $oversizedOldest = Box::create([
+            'box_number' => 'BOX-OVERSIZE-OLD',
+            'part_number' => 'P-OVERSIZE-FIFO',
+            'part_name' => 'Part Oversize',
+            'pcs_quantity' => 200,
+            'qty_box' => 1,
+            'is_not_full' => false,
+            'qr_code' => 'BOX-OVERSIZE-OLD|P-OVERSIZE-FIFO|200',
+            'user_id' => $ppc->id,
+            'created_at' => now()->subDays(2),
+            'updated_at' => now()->subDays(2),
+        ]);
+
+        $fitNext = Box::create([
+            'box_number' => 'BOX-OVERSIZE-NEXT',
+            'part_number' => 'P-OVERSIZE-FIFO',
+            'part_name' => 'Part Oversize',
+            'pcs_quantity' => 100,
+            'qty_box' => 1,
+            'is_not_full' => false,
+            'qr_code' => 'BOX-OVERSIZE-NEXT|P-OVERSIZE-FIFO|100',
+            'user_id' => $ppc->id,
+            'created_at' => now()->subDay(),
+            'updated_at' => now()->subDay(),
+        ]);
+
+        $pallet->boxes()->attach([$oversizedOldest->id, $fitNext->id]);
+
+        $response = $this->actingAs($ppc)->get(route('delivery.index'));
+
+        $response->assertOk();
+
+        $approvedOrders = $response->viewData('approvedOrders');
+        $this->assertNotNull($approvedOrders);
+
+        $renderedOrder = $approvedOrders->firstWhere('id', $order->id);
+        $this->assertNotNull($renderedOrder);
+
+        $renderedItem = $renderedOrder->items->firstWhere('part_number', 'P-OVERSIZE-FIFO');
+        $this->assertNotNull($renderedItem);
+        $this->assertSame(100, (int) $renderedItem->display_fulfilled);
+        $this->assertTrue((bool) $renderedItem->is_fulfillable);
+    }
+
     public function test_admin_warehouse_can_approve_pending_issue_and_unblock_session(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);

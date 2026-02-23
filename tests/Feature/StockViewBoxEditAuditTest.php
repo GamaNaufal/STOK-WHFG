@@ -103,6 +103,48 @@ class StockViewBoxEditAuditTest extends TestCase
         ]);
     }
 
+    public function test_box_update_is_rejected_when_no_data_changes(): void
+    {
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+
+        $storedAt = now()->startOfMinute();
+
+        $box = Box::create([
+            'box_number' => 'BOX-NO-CHANGE-01',
+            'part_number' => 'P-NO-CHANGE',
+            'pcs_quantity' => 100,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-NO-CHANGE-01|P-NO-CHANGE|100',
+            'user_id' => $adminWarehouse->id,
+            'created_at' => $storedAt,
+            'updated_at' => $storedAt,
+        ]);
+
+        $response = $this->actingAs($adminWarehouse)->postJson(route('stock-view.box-update', $box->id), [
+            'part_number' => 'P-NO-CHANGE',
+            'pcs_quantity' => 100,
+            'stored_at' => $storedAt->format('Y-m-d H:i:s'),
+            'reason' => 'Coba simpan tanpa perubahan',
+        ]);
+
+        $response->assertStatus(422)->assertJson([
+            'success' => false,
+            'message' => 'Tidak ada perubahan data box. Aksi tidak diproses.',
+        ]);
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'part_number' => 'P-NO-CHANGE',
+            'pcs_quantity' => 100,
+        ]);
+
+        $this->assertDatabaseMissing('audit_logs', [
+            'action' => 'box_updated_by_admin_warehouse',
+            'model' => 'Box',
+            'model_id' => $box->id,
+        ]);
+    }
+
     public function test_box_history_endpoint_returns_box_update_logs(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
@@ -124,7 +166,7 @@ class StockViewBoxEditAuditTest extends TestCase
             'model_id' => $box->id,
             'old_values' => json_encode(['part_number' => 'P-HIST', 'pcs_quantity' => 100, 'stored_at' => now()->subDay()->format('Y-m-d H:i:s')]),
             'new_values' => json_encode(['part_number' => 'P-HIST-NEW', 'pcs_quantity' => 90, 'stored_at' => now()->format('Y-m-d H:i:s'), 'reason' => 'Penyesuaian']),
-            'description' => 'Edit detail box oleh admin warehouse. Alasan: Penyesuaian',
+            'description' => 'Penyesuaian',
             'user_id' => $adminWarehouse->id,
             'ip_address' => '127.0.0.1',
         ]);

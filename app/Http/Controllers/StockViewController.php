@@ -341,6 +341,18 @@ class StockViewController extends Controller
         $oldPcsQuantity = (int) $box->pcs_quantity;
         $newPartNumber = (string) $validated['part_number'];
         $newPcsQuantity = (int) $validated['pcs_quantity'];
+        $newStoredAt = Carbon::parse($validated['stored_at']);
+
+        $isSamePart = $oldPartNumber === $newPartNumber;
+        $isSamePcs = $oldPcsQuantity === $newPcsQuantity;
+        $isSameStoredAtMinute = optional($box->created_at)->format('Y-m-d H:i') === $newStoredAt->format('Y-m-d H:i');
+
+        if ($isSamePart && $isSamePcs && $isSameStoredAtMinute) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada perubahan data box. Aksi tidak diproses.',
+            ], 422);
+        }
 
         DB::beginTransaction();
 
@@ -387,7 +399,7 @@ class StockViewController extends Controller
 
             $box->part_number = $newPartNumber;
             $box->pcs_quantity = $newPcsQuantity;
-            $box->created_at = Carbon::parse($validated['stored_at']);
+            $box->created_at = $newStoredAt;
             $box->save();
 
             $newValues = [
@@ -404,7 +416,7 @@ class StockViewController extends Controller
                 $box->id,
                 $oldValues,
                 $newValues,
-                'Edit detail box oleh admin warehouse. Alasan: ' . $validated['reason']
+                $validated['reason']
             );
 
             DB::commit();

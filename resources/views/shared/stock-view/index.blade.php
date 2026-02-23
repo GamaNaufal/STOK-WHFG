@@ -526,6 +526,7 @@
             <form id="editBoxForm">
                 <div class="modal-body" style="padding: 20px;">
                     <input type="hidden" id="editBoxId" name="box_id">
+                    <div id="editBoxInlineAlert" class="alert d-none" role="alert" style="margin-bottom: 12px;"></div>
                     <div class="mb-3">
                         <label class="form-label">ID Box</label>
                         <input type="text" id="editBoxNumber" class="form-control" disabled>
@@ -658,6 +659,7 @@
     const palletDetailModalEl = document.getElementById('palletDetailModal');
     const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
     const palletDetailModal = palletDetailModalEl ? new bootstrap.Modal(palletDetailModalEl) : null;
+    let initialEditBoxState = null;
     let currentPartNumber = null;
     let currentPalletId = null;
 
@@ -681,6 +683,23 @@
     syncModalA11y(palletDetailModalEl);
     syncModalA11y(editBoxModalEl);
     syncModalA11y(boxHistoryModalEl);
+
+    function hideEditBoxInlineAlert() {
+        const alertEl = document.getElementById('editBoxInlineAlert');
+        if (!alertEl) return;
+        alertEl.classList.add('d-none');
+        alertEl.classList.remove('alert-warning', 'alert-danger', 'alert-success', 'alert-info');
+        alertEl.textContent = '';
+    }
+
+    function showEditBoxInlineAlert(message, type = 'warning') {
+        const alertEl = document.getElementById('editBoxInlineAlert');
+        if (!alertEl) return;
+        const resolvedType = ['warning', 'danger', 'success', 'info'].includes(type) ? type : 'warning';
+        alertEl.classList.remove('d-none', 'alert-warning', 'alert-danger', 'alert-success', 'alert-info');
+        alertEl.classList.add(`alert-${resolvedType}`);
+        alertEl.textContent = message || '';
+    }
 
     const hasSearchUi = searchInput && searchDropdown && searchForm;
 
@@ -916,12 +935,20 @@
 
     function openEditBoxModal(dataset) {
         if (!editBoxModal) return;
+        hideEditBoxInlineAlert();
+        const initialStoredAt = parseDisplayDateToInputValue(dataset.storedAt || '');
         document.getElementById('editBoxId').value = dataset.boxId || '';
         document.getElementById('editBoxNumber').value = dataset.boxNumber || '';
         document.getElementById('editPartNumber').value = dataset.partNumber || '';
         document.getElementById('editPcsQuantity').value = dataset.pcsQuantity || '';
-        document.getElementById('editStoredAt').value = parseDisplayDateToInputValue(dataset.storedAt || '');
+        document.getElementById('editStoredAt').value = initialStoredAt;
         document.getElementById('editReason').value = '';
+
+        initialEditBoxState = {
+            partNumber: (dataset.partNumber || '').trim(),
+            pcsQuantity: Number.parseInt(dataset.pcsQuantity || '0', 10) || 0,
+            storedAt: initialStoredAt,
+        };
         editBoxModal.show();
     }
 
@@ -978,10 +1005,26 @@
             event.preventDefault();
 
             const boxId = document.getElementById('editBoxId').value;
+            const currentPartNumber = document.getElementById('editPartNumber').value.trim();
+            const currentPcsQuantity = Number.parseInt(document.getElementById('editPcsQuantity').value || '0', 10) || 0;
+            const currentStoredAt = document.getElementById('editStoredAt').value;
+
+            if (
+                initialEditBoxState
+                && currentPartNumber === initialEditBoxState.partNumber
+                && currentPcsQuantity === initialEditBoxState.pcsQuantity
+                && currentStoredAt === initialEditBoxState.storedAt
+            ) {
+                showEditBoxInlineAlert('Tidak ada perubahan data box. Aksi tidak diproses.', 'warning');
+                return;
+            }
+
+            hideEditBoxInlineAlert();
+
             const payload = {
-                part_number: document.getElementById('editPartNumber').value,
-                pcs_quantity: document.getElementById('editPcsQuantity').value,
-                stored_at: document.getElementById('editStoredAt').value,
+                part_number: currentPartNumber,
+                pcs_quantity: currentPcsQuantity,
+                stored_at: currentStoredAt,
                 reason: document.getElementById('editReason').value,
             };
 
@@ -1014,7 +1057,7 @@
                     window.viewDetail(currentPartNumber);
                 }
             } catch (error) {
-                showToast(error.message || 'Gagal update box', 'danger');
+                showEditBoxInlineAlert(error.message || 'Gagal update box', 'danger');
             }
         });
     }

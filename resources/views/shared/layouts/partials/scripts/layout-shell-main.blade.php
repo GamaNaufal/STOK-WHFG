@@ -4,6 +4,7 @@
         const sidebarEl = document.getElementById('mobileSidebar');
         const topNavbarEl = document.querySelector('.top-navbar');
         const collapseKey = 'sidebarCollapsed';
+        const sidebarMenuStateKey = 'sidebarOpenMenuIds';
         const globalSearchInput = document.getElementById('globalSearchInput');
         const globalSearchDropdown = document.getElementById('globalSearchDropdown');
         const globalSearchForm = document.getElementById('globalSearchForm');
@@ -142,7 +143,62 @@
             document.documentElement.style.setProperty('--top-navbar-height', `${h}px`);
         }
 
+        function loadSidebarOpenMenuIds() {
+            try {
+                const raw = localStorage.getItem(sidebarMenuStateKey);
+                const parsed = JSON.parse(raw || '[]');
+                return new Set(Array.isArray(parsed) ? parsed.filter(Boolean) : []);
+            } catch (error) {
+                return new Set();
+            }
+        }
+
+        function saveSidebarOpenMenuIds(openIdsSet) {
+            try {
+                localStorage.setItem(sidebarMenuStateKey, JSON.stringify(Array.from(openIdsSet)));
+            } catch (error) {
+            }
+        }
+
+        function setupSidebarMenuPersistence() {
+            const toggles = Array.from(document.querySelectorAll('.menu-group-toggle[data-bs-toggle="collapse"]'));
+            if (!toggles.length) return;
+
+            const openIds = loadSidebarOpenMenuIds();
+
+            toggles.forEach((toggle) => {
+                const targetSelector = toggle.getAttribute('data-bs-target') || toggle.getAttribute('href');
+                if (!targetSelector || !targetSelector.startsWith('#')) return;
+
+                const panel = document.querySelector(targetSelector);
+                if (!panel || !panel.id) return;
+
+                if (openIds.has(panel.id)) {
+                    panel.classList.add('show');
+                    toggle.classList.remove('collapsed');
+                    toggle.setAttribute('aria-expanded', 'true');
+                }
+
+                if (panel.classList.contains('show')) {
+                    openIds.add(panel.id);
+                }
+
+                panel.addEventListener('shown.bs.collapse', function () {
+                    openIds.add(panel.id);
+                    saveSidebarOpenMenuIds(openIds);
+                });
+
+                panel.addEventListener('hidden.bs.collapse', function () {
+                    openIds.delete(panel.id);
+                    saveSidebarOpenMenuIds(openIds);
+                });
+            });
+
+            saveSidebarOpenMenuIds(openIds);
+        }
+
         syncTopNavbarHeight();
+        setupSidebarMenuPersistence();
         window.addEventListener('resize', syncTopNavbarHeight);
 
         if (window.innerWidth >= 992 && localStorage.getItem(collapseKey) === '1') {

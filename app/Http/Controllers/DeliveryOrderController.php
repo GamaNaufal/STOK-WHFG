@@ -240,8 +240,9 @@ class DeliveryOrderController extends Controller
                     }
                 }
 
-                while ($remainingNeeded > 0 && count($pool) > 0) {
-                    $box = $pool[0];
+                $poolIndex = 0;
+                while ($remainingNeeded > 0 && isset($pool[$poolIndex])) {
+                    $box = $pool[$poolIndex];
                     $nextBoxQty = is_array($box) ? (int) $box['qty'] : (int) $box;
                     $isNotFull = is_array($box) ? (bool) $box['is_not_full'] : false;
                     
@@ -251,10 +252,10 @@ class DeliveryOrderController extends Controller
                     if ($nextBoxQty <= $remainingNeeded || $isNotFull) {
                         $takenFromFifo += $nextBoxQty;
                         $remainingNeeded -= $nextBoxQty;
-                        array_shift($pool);
+                        array_splice($pool, $poolIndex, 1);
                     } else {
-                        // Box is too large and not marked as not_full, skip it
-                        break;
+                        // Box is too large and not marked as not_full, keep it for later orders
+                        $poolIndex++;
                     }
                 }
 
