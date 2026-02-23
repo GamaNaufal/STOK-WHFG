@@ -55,7 +55,10 @@ class StockInputController extends Controller
                     'pallet_number' => $palletNumber,
                 ]);
 
-                session(['current_pallet_id' => $pallet->id]);
+                session([
+                    'current_pallet_id' => $pallet->id,
+                    'current_pallet_source' => 'new',
+                ]);
 
                 return $pallet;
             } catch (QueryException $e) {
@@ -73,6 +76,125 @@ class StockInputController extends Controller
     public function index()
     {
         return view('operator.stock-input.index');
+    }
+
+    public function searchExistingPallet(Request $request)
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $pallets = Pallet::query()
+            ->with(['stockLocation'])
+            ->whereHas('stockLocation')
+            ->when($query !== '', function ($q) use ($query) {
+                $q->where('pallet_number', 'like', '%' . $query . '%');
+            })
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get()
+            ->map(function (Pallet $pallet) {
+                return [
+                    'id' => $pallet->id,
+                    'pallet_number' => $pallet->pallet_number,
+                    'warehouse_location' => $pallet->stockLocation?->warehouse_location,
+                    'total_boxes' => $pallet->boxes()->count(),
+                ];
+            })
+            ->values();
+
+        return response()->json($pallets);
+    }
+
+    private function moveSessionPalletItems(Pallet $fromPallet, Pallet $toPallet): void
+    {
+        $fromItems = $fromPallet->items()->get();
+
+        foreach ($fromItems as $fromItem) {
+            $targetItem = PalletItem::query()
+                ->where('pallet_id', $toPallet->id)
+                ->where('part_number', $fromItem->part_number)
+                ->first();
+
+            if (!$targetItem) {
+                PalletItem::create([
+                    'pallet_id' => $toPallet->id,
+                    'part_number' => $fromItem->part_number,
+                    'box_quantity' => (int) $fromItem->box_quantity,
+                    'pcs_quantity' => (int) $fromItem->pcs_quantity,
+                ]);
+                continue;
+            }
+
+            $targetItem->increment('box_quantity', (int) $fromItem->box_quantity);
+            $targetItem->increment('pcs_quantity', (int) $fromItem->pcs_quantity);
+        }
+
+        $fromPallet->items()->delete();
+    }
+
+    public function selectExistingPallet(Request $request)
+    {
+        $validated = $request->validate([
+            'pallet_id' => 'required|integer|exists:pallets,id',
+        ]);
+
+        if (session()->has('pending_box')) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Selesaikan scan No Part box yang sedang pending terlebih dahulu.',
+            ], 422);
+        }
+
+        $pallet = Pallet::with('stockLocation')->findOrFail($validated['pallet_id']);
+
+        if (!$pallet->stockLocation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pallet ini belum punya lokasi tersimpan dan tidak bisa dipilih sebagai pallet existing.',
+            ], 422);
+        }
+
+        $currentPalletId = session('current_pallet_id');
+        $currentPalletSource = session('current_pallet_source', 'new');
+
+        if ($currentPalletId && (int) $currentPalletId === (int) $pallet->id) {
+            session([
+                'current_pallet_id' => $pallet->id,
+                'current_pallet_source' => 'existing',
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'pallet_id' => $pallet->id,
+                'pallet_number' => $pallet->pallet_number,
+                'warehouse_location' => $pallet->stockLocation->warehouse_location,
+                'message' => 'Pallet existing sudah aktif.',
+            ]);
+        }
+
+        if ($currentPalletId && (int) $currentPalletId !== (int) $pallet->id) {
+            $currentPallet = Pallet::with(['items', 'stockLocation'])->find($currentPalletId);
+
+            if ($currentPallet) {
+                $this->moveSessionPalletItems($currentPallet, $pallet);
+
+                if ($currentPalletSource === 'new' && $currentPallet->boxes()->count() === 0 && !$currentPallet->stockLocation) {
+                    $currentPallet->delete();
+                }
+            }
+        }
+
+        session([
+            'current_pallet_id' => $pallet->id,
+            'current_pallet_source' => 'existing',
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'pallet_id' => $pallet->id,
+            'pallet_number' => $pallet->pallet_number,
+            'warehouse_location' => $pallet->stockLocation->warehouse_location,
+            'message' => 'Pallet existing berhasil dipilih.',
+        ]);
     }
 
     // API untuk scan Barcode box (dari hardware scanner)
@@ -128,6 +250,8 @@ class StockInputController extends Controller
             'success' => true,
             'pallet_id' => $pallet->id,
             'pallet_number' => $pallet->pallet_number,
+            'has_stock_location' => (bool) $pallet->stockLocation()->exists(),
+            'warehouse_location' => $pallet->stockLocation?->warehouse_location,
             'box_number' => $barcode,
             'message' => 'Scan No Part untuk konfirmasi.'
         ]);
@@ -250,6 +374,8 @@ class StockInputController extends Controller
             'success' => true,
             'pallet_id' => $pallet->id,
             'pallet_number' => $pallet->pallet_number,
+            'has_stock_location' => (bool) $pallet->stockLocation()->exists(),
+            'warehouse_location' => $pallet->stockLocation?->warehouse_location,
             'box_number' => $pendingBox['box_number'],
             'part_number' => $partNumber,
             'qty_box' => $fixedQty,
@@ -361,6 +487,8 @@ class StockInputController extends Controller
             'success' => true,
             'pallet_id' => $pallet->id,
             'pallet_number' => $pallet->pallet_number,
+            'has_stock_location' => (bool) $pallet->stockLocation()->exists(),
+            'warehouse_location' => $pallet->stockLocation?->warehouse_location,
             'box_number' => $box_number,
             'part_number' => $part_number,
             'pcs_quantity' => $pcs_quantity,
@@ -398,6 +526,9 @@ class StockInputController extends Controller
             'pallet' => [
                 'id' => $pallet->id,
                 'pallet_number' => $pallet->pallet_number,
+                'source' => session('current_pallet_source', 'new'),
+                'warehouse_location' => $pallet->stockLocation?->warehouse_location,
+                'has_stock_location' => (bool) $pallet->stockLocation()->exists(),
                 'boxes' => $scannedBoxes,
                 'items' => $pallet->items->map(function ($item) {
                     return [
@@ -416,14 +547,16 @@ class StockInputController extends Controller
     {
         // Delete empty pallet jika tidak ada boxes yang di-attach
         $pallet_id = session('current_pallet_id');
+        $palletSource = session('current_pallet_source');
         if ($pallet_id) {
             $pallet = Pallet::find($pallet_id);
-            if ($pallet && $pallet->boxes->isEmpty()) {
+            if ($pallet && $pallet->boxes->isEmpty() && $palletSource === 'new') {
                 $pallet->delete();
             }
         }
 
         session()->forget('current_pallet_id');
+        session()->forget('current_pallet_source');
         session()->forget('scanned_boxes');
         session()->forget('pending_box');
 
@@ -597,22 +730,18 @@ class StockInputController extends Controller
     {
         session()->forget('scanned_boxes');
         session()->forget('current_pallet_id');
+        session()->forget('current_pallet_source');
     }
 
     public function store(Request $request)
     {
         $validated = $this->validateStoreRequest($request);
-        
-        // Validasi lokasi wajib
-        if (!$this->hasLocationInput($request)) {
-            return response()->json(['message' => 'Lokasi penyimpanan harus diisi!'], 422);
-        }
 
         DB::beginTransaction(); // Start transaction to ensure data integrity
 
         try {
 
-            $pallet = Pallet::with(['items'])->findOrFail($validated['pallet_id']);
+            $pallet = Pallet::with(['items', 'stockLocation'])->findOrFail($validated['pallet_id']);
 
             // Verify pallet has items (scanned QR) (INI KHUSUS UNTUK FLOW SCAN QR BARU - JIKA KITA PAKAI LOGIC DI BAWAH, LOGIC INI MUNGKIN PERLU DISESUAIKAN)
             // KARENA SAAT INI ITEM BELUM DI ATTACH KE PALLET (MASIH DI SESSION)
@@ -631,12 +760,28 @@ class StockInputController extends Controller
                 ], 400);
             }
 
+            $hasLocationInput = $this->hasLocationInput($request);
+            $hasExistingLocation = (bool) $pallet->stockLocation;
+
+            if (!$hasLocationInput && !$hasExistingLocation) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Lokasi penyimpanan harus diisi untuk pallet baru.'
+                ], 422);
+            }
+
             // Attach boxes ke palet sekarang (saat user klik Save)
             $this->attachScannedBoxes($pallet, $scannedBoxes);
 
-            // 2. Simpan lokasi palet
-            $locationCode = $this->resolveLocationCode($request, $pallet);
-            $this->createStockLocationRecord($pallet, $locationCode);
+            // Simpan lokasi bila pallet belum punya lokasi, atau gunakan lokasi existing
+            $locationCode = $pallet->stockLocation?->warehouse_location;
+            if ($hasLocationInput) {
+                $locationCode = $this->resolveLocationCode($request, $pallet);
+                if (!$hasExistingLocation) {
+                    $this->createStockLocationRecord($pallet, $locationCode);
+                }
+            }
 
             // Create StockInput record for audit
             $stockInput = $this->createStockInputRecord($pallet, $scannedBoxes, $locationCode);

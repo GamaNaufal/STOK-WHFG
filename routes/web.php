@@ -46,6 +46,8 @@ Route::middleware('auth')->group(function () {
         Route::post('/stock-input/scan-box', [StockInputController::class, 'scanBox'])->name('stock-input.scan-box');
         Route::post('/stock-input/scan-barcode', [StockInputController::class, 'scanBarcode'])->name('stock-input.scan-barcode');
         Route::post('/stock-input/scan-part', [StockInputController::class, 'scanPartNumber'])->name('stock-input.scan-part');
+        Route::get('/stock-input/search-existing-pallet', [StockInputController::class, 'searchExistingPallet'])->name('stock-input.search-existing-pallet');
+        Route::post('/stock-input/select-existing-pallet', [StockInputController::class, 'selectExistingPallet'])->name('stock-input.select-existing-pallet');
         Route::get('/stock-input/get-pallet-data', [StockInputController::class, 'getCurrentPalletData'])->name('stock-input.get-pallet-data');
         Route::post('/stock-input/clear-session', [StockInputController::class, 'clearSession'])->name('stock-input.clear-session');
         Route::post('/stock-input/store', [StockInputController::class, 'store'])->name('stock-input.store');

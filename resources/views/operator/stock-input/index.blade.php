@@ -32,6 +32,8 @@
         csrfToken: '{{ csrf_token() }}',
         scanBarcodeUrl: '{{ route("stock-input.scan-barcode") }}',
         scanPartUrl: '{{ route("stock-input.scan-part") }}',
+        searchExistingPalletUrl: '{{ route("stock-input.search-existing-pallet") }}',
+        selectExistingPalletUrl: '{{ route("stock-input.select-existing-pallet") }}',
         getPalletDataUrl: '{{ route("stock-input.get-pallet-data") }}',
         clearSessionUrl: '{{ route("stock-input.clear-session") }}',
         storeUrl: '{{ route("stock-input.store") }}',

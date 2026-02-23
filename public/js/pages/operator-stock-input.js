@@ -12,14 +12,85 @@
     const errorText = document.getElementById("error-text");
     const step2 = document.getElementById("step-2");
     const step3 = document.getElementById("step-3");
+    const palletModeNew = document.getElementById("palletModeNew");
+    const palletModeExisting = document.getElementById("palletModeExisting");
+    const existingPalletPicker = document.getElementById(
+        "existingPalletPicker",
+    );
+    const existingPalletSearchInput = document.getElementById(
+        "existingPalletSearchInput",
+    );
+    const existingPalletSearchResults = document.getElementById(
+        "existingPalletSearchResults",
+    );
+    const selectedExistingPalletId = document.getElementById(
+        "selectedExistingPalletId",
+    );
+    const selectedExistingPalletText = document.getElementById(
+        "selectedExistingPalletText",
+    );
 
     if (!barcodeInput || !partInput || !scanForm) {
         return;
     }
 
     let currentPalletId = null;
+    let currentPalletHasStoredLocation = false;
+    let currentPalletLocationCode = null;
+    let currentPalletSource = "new";
     let lastScannedCode = null;
     let lastScanTime = 0;
+    let existingPalletSearchTimeout;
+    let isSelectingExistingPallet = false;
+
+    function setPalletModeUI(mode) {
+        if (existingPalletPicker) {
+            existingPalletPicker.style.display =
+                mode === "existing" ? "block" : "none";
+        }
+
+        const locationPickerSection = document.getElementById(
+            "locationPickerSection",
+        );
+        const locationSearchInput = document.getElementById(
+            "locationSearchInput",
+        );
+        const selectedLocationId =
+            document.getElementById("selectedLocationId");
+        const selectedLocationCode = document.getElementById(
+            "selectedLocationCode",
+        );
+        const locationStatusText =
+            document.getElementById("locationStatusText");
+
+        if (mode === "existing") {
+            if (locationPickerSection) {
+                locationPickerSection.style.display = "none";
+            }
+            if (locationSearchInput) {
+                locationSearchInput.value = "";
+            }
+            if (selectedLocationId) {
+                selectedLocationId.value = "";
+            }
+            if (selectedLocationCode) {
+                selectedLocationCode.value = "";
+            }
+            if (locationStatusText) {
+                locationStatusText.innerHTML =
+                    '<i class="bi bi-info-circle"></i> Mode pallet existing aktif. Lokasi akan mengikuti lokasi pallet yang dipilih.';
+            }
+            return;
+        }
+
+        if (locationPickerSection) {
+            locationPickerSection.style.display = "block";
+        }
+        if (locationStatusText) {
+            locationStatusText.innerHTML =
+                '<i class="bi bi-info-circle"></i> Untuk pallet baru: pilih lokasi kosong dari dropdown. Untuk pallet existing: lokasi boleh dikosongkan (akan pakai lokasi pallet saat ini).';
+        }
+    }
 
     function showBarcodeStatus(text) {
         const statusEl = document.getElementById("barcode-status");
@@ -82,6 +153,11 @@
                 if (data.success) {
                     const pallet = data.pallet;
                     currentPalletId = pallet.id;
+                    currentPalletHasStoredLocation =
+                        !!pallet.has_stock_location;
+                    currentPalletLocationCode =
+                        pallet.warehouse_location || null;
+                    currentPalletSource = pallet.source || "new";
                     document.getElementById(
                         "display_pallet_number",
                     ).textContent = pallet.pallet_number;
@@ -137,6 +213,10 @@
             success: function (response) {
                 if (response.success) {
                     currentPalletId = response.pallet_id;
+                    currentPalletHasStoredLocation =
+                        !!response.has_stock_location;
+                    currentPalletLocationCode =
+                        response.warehouse_location || null;
                     showBarcodeStatus(
                         "✓ Box: " +
                             response.box_number +
@@ -187,6 +267,10 @@
             },
             success: function (response) {
                 if (response.success) {
+                    currentPalletHasStoredLocation =
+                        !!response.has_stock_location;
+                    currentPalletLocationCode =
+                        response.warehouse_location || null;
                     showPartStatus("✓ Part sesuai: " + response.part_number);
                     loadAndDisplayPalletData();
 
@@ -212,8 +296,129 @@
     }
 
     document.addEventListener("DOMContentLoaded", function () {
+        setPalletModeUI("new");
         barcodeInput.focus();
     });
+
+    function searchExistingPallet(query) {
+        if (!existingPalletSearchResults || !config.searchExistingPalletUrl) {
+            return;
+        }
+
+        existingPalletSearchResults.style.display = "block";
+        existingPalletSearchResults.innerHTML =
+            '<div class="list-group-item text-muted">Mencari pallet...</div>';
+
+        fetch(
+            config.searchExistingPalletUrl +
+                "?q=" +
+                encodeURIComponent(query || ""),
+            {
+                headers: {
+                    "X-CSRF-TOKEN": config.csrfToken,
+                },
+            },
+        )
+            .then((response) => response.json())
+            .then((rows) => {
+                existingPalletSearchResults.innerHTML = "";
+
+                if (!rows || rows.length === 0) {
+                    existingPalletSearchResults.innerHTML =
+                        '<div class="list-group-item text-muted">Pallet existing tidak ditemukan.</div>';
+                    return;
+                }
+
+                rows.forEach((row) => {
+                    const item = document.createElement("a");
+                    item.href = "#";
+                    item.className = "list-group-item list-group-item-action";
+                    item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
+                                        <strong>${row.pallet_number}</strong>
+                                        <span class="badge bg-secondary">${row.total_boxes} box</span>
+                                      </div>
+                                      <small class="text-muted">Lokasi: ${row.warehouse_location || "-"}</small>`;
+                    item.onclick = (e) => {
+                        e.preventDefault();
+                        selectedExistingPalletId.value = row.id;
+                        selectedExistingPalletText.value = row.pallet_number;
+                        existingPalletSearchInput.value = `${row.pallet_number} (${row.warehouse_location || "-"})`;
+                        existingPalletSearchResults.style.display = "none";
+                        selectExistingPallet(row.id);
+                    };
+                    existingPalletSearchResults.appendChild(item);
+                });
+            })
+            .catch(() => {
+                existingPalletSearchResults.style.display = "none";
+            });
+    }
+
+    function selectExistingPallet(palletId = null) {
+        const targetPalletId = palletId || selectedExistingPalletId?.value;
+
+        if (!targetPalletId) {
+            showError("Pilih pallet existing terlebih dahulu.");
+            return;
+        }
+
+        if (isSelectingExistingPallet) {
+            return;
+        }
+
+        if (
+            currentPalletSource === "existing" &&
+            Number(currentPalletId) === Number(targetPalletId)
+        ) {
+            return;
+        }
+
+        isSelectingExistingPallet = true;
+        if (existingPalletSearchInput) {
+            existingPalletSearchInput.disabled = true;
+        }
+
+        const form = new FormData();
+        form.append("pallet_id", targetPalletId);
+        form.append("_token", config.csrfToken);
+
+        fetch(config.selectExistingPalletUrl, {
+            method: "POST",
+            headers: {
+                "X-CSRF-TOKEN": config.csrfToken,
+            },
+            body: form,
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (!data.success) {
+                    throw new Error(
+                        data.message || "Gagal memilih pallet existing",
+                    );
+                }
+
+                currentPalletId = data.pallet_id;
+                currentPalletSource = "existing";
+                currentPalletHasStoredLocation = true;
+                currentPalletLocationCode = data.warehouse_location || null;
+                step2.style.display = "block";
+                step3.style.display = "block";
+                loadAndDisplayPalletData();
+
+                showInfo(
+                    `Pallet existing ${data.pallet_number} dipilih. Lokasi aktif: ${data.warehouse_location || "-"}.`,
+                );
+            })
+            .catch((error) => {
+                showError(error.message || "Gagal memilih pallet existing.");
+            })
+            .finally(() => {
+                isSelectingExistingPallet = false;
+                if (existingPalletSearchInput) {
+                    existingPalletSearchInput.disabled = false;
+                }
+            });
+    }
 
     scanForm.addEventListener("submit", function (e) {
         e.preventDefault();
@@ -350,12 +555,23 @@
         });
 
     document.getElementById("save-btn").addEventListener("click", function () {
+        if (
+            palletModeExisting &&
+            palletModeExisting.checked &&
+            !currentPalletHasStoredLocation
+        ) {
+            showError("Pilih pallet existing dari daftar terlebih dahulu.");
+            return;
+        }
+
         const selectedId = document.getElementById("selectedLocationId").value;
         const selectedCode = document.getElementById(
             "selectedLocationCode",
         ).value;
+        const useExistingLocation =
+            currentPalletHasStoredLocation && !selectedId && !selectedCode;
 
-        if (!selectedId || !selectedCode) {
+        if ((!selectedId || !selectedCode) && !useExistingLocation) {
             showError(
                 "Pilih lokasi dari list yang tersedia. Lokasi tidak boleh diketik manual.",
             );
@@ -364,8 +580,10 @@
 
         const form = new FormData();
         form.append("pallet_id", currentPalletId);
-        form.append("location_id", selectedId);
-        form.append("warehouse_location", selectedCode);
+        if (selectedId && selectedCode) {
+            form.append("location_id", selectedId);
+            form.append("warehouse_location", selectedCode);
+        }
         form.append("_token", config.csrfToken);
 
         fetch(config.storeUrl, {
@@ -384,8 +602,12 @@
                 return response.json();
             })
             .then(() => {
+                const savedLocation =
+                    selectedCode ||
+                    currentPalletLocationCode ||
+                    "(tanpa lokasi)";
                 showToast(
-                    "Stok berhasil disimpan di lokasi: " + selectedCode,
+                    "Stok berhasil disimpan di lokasi: " + savedLocation,
                     "success",
                 );
                 window.location.href = config.indexUrl;
@@ -489,6 +711,51 @@
         });
     }
 
+    if (palletModeNew) {
+        palletModeNew.addEventListener("change", function () {
+            if (this.checked) {
+                currentPalletSource = "new";
+                setPalletModeUI("new");
+            }
+        });
+    }
+
+    if (palletModeExisting) {
+        palletModeExisting.addEventListener("change", function () {
+            if (this.checked) {
+                currentPalletSource = "existing";
+                setPalletModeUI("existing");
+            }
+        });
+    }
+
+    if (existingPalletSearchInput) {
+        existingPalletSearchInput.addEventListener("input", function (e) {
+            clearTimeout(existingPalletSearchTimeout);
+            const query = e.target.value.trim();
+            selectedExistingPalletId.value = "";
+            selectedExistingPalletText.value = "";
+
+            existingPalletSearchTimeout = setTimeout(() => {
+                searchExistingPallet(query);
+            }, 300);
+        });
+
+        existingPalletSearchInput.addEventListener("focus", function () {
+            searchExistingPallet(this.value.trim());
+        });
+
+        document.addEventListener("click", function (e) {
+            if (
+                existingPalletSearchResults &&
+                !existingPalletSearchInput.contains(e.target) &&
+                !existingPalletSearchResults.contains(e.target)
+            ) {
+                existingPalletSearchResults.style.display = "none";
+            }
+        });
+    }
+
     document.addEventListener("DOMContentLoaded", function () {
         fetch(config.getPalletDataUrl, {
             headers: {
@@ -499,8 +766,22 @@
             .then((data) => {
                 if (data.success) {
                     currentPalletId = data.pallet.id;
+                    currentPalletHasStoredLocation =
+                        !!data.pallet.has_stock_location;
+                    currentPalletLocationCode =
+                        data.pallet.warehouse_location || null;
+                    currentPalletSource = data.pallet.source || "new";
                     step2.style.display = "block";
                     step3.style.display = "block";
+                    if (
+                        palletModeExisting &&
+                        palletModeNew &&
+                        currentPalletSource === "existing"
+                    ) {
+                        palletModeExisting.checked = true;
+                        palletModeNew.checked = false;
+                        setPalletModeUI("existing");
+                    }
                     loadAndDisplayPalletData();
                     showInfo(
                         "Palet aktif ditemukan. Lanjutkan scan box atau tentukan lokasi.",
