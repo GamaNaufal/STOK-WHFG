@@ -18,6 +18,58 @@ use Illuminate\Support\Str;
 
 class DeliveryPickController extends Controller
 {
+    private function buildVerificationFifoPoolsByPart(): array
+    {
+        $rows = DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->whereNull('boxes.assigned_delivery_order_id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderBy('boxes.created_at', 'asc')
+            ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full')
+            ->get();
+
+        $pools = [];
+        foreach ($rows as $row) {
+            $pools[$row->part_number][] = [
+                'qty' => (int) $row->pcs_quantity,
+                'is_not_full' => (bool) $row->is_not_full,
+            ];
+        }
+
+        return $pools;
+    }
+
+    private function buildVerificationReservedPoolsByOrderPart(): array
+    {
+        $rows = DB::table('boxes')
+            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->whereNotNull('boxes.assigned_delivery_order_id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderBy('boxes.created_at', 'asc')
+            ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full')
+            ->get();
+
+        $pools = [];
+        foreach ($rows as $row) {
+            $orderId = (int) $row->assigned_delivery_order_id;
+            $partNumber = (string) $row->part_number;
+            $pools[$orderId][$partNumber][] = [
+                'qty' => (int) $row->pcs_quantity,
+                'is_not_full' => (bool) $row->is_not_full,
+            ];
+        }
+
+        return $pools;
+    }
+
     public function verificationIndex()
     {
         $user = Auth::user();
@@ -30,6 +82,61 @@ class DeliveryPickController extends Controller
             ->orderBy('delivery_date', 'asc')
             ->limit(100)
             ->get();
+
+        $fifoPools = $this->buildVerificationFifoPoolsByPart();
+        $reservedPools = $this->buildVerificationReservedPoolsByOrderPart();
+
+        $orders->each(function ($order) use (&$fifoPools, $reservedPools) {
+            $totalBoxesToPick = 0;
+            $isReadyToPick = true;
+
+            foreach ($order->items as $item) {
+                $requiredQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
+                if ($requiredQty <= 0) {
+                    continue;
+                }
+
+                $partNumber = (string) $item->part_number;
+                $reservedPool = $reservedPools[$order->id][$partNumber] ?? [];
+                $reservedForOrder = 0;
+                foreach ($reservedPool as $box) {
+                    $reservedForOrder += (int) ($box['qty'] ?? 0);
+                }
+
+                $remainingNeeded = max(0, $requiredQty - $reservedForOrder);
+                $takenFromFifo = 0;
+                $selectedFifoBoxes = 0;
+                $pool = $fifoPools[$partNumber] ?? [];
+
+                $poolIndex = 0;
+                while ($remainingNeeded > 0 && isset($pool[$poolIndex])) {
+                    $box = $pool[$poolIndex];
+                    $nextBoxQty = (int) ($box['qty'] ?? 0);
+                    $isNotFull = (bool) ($box['is_not_full'] ?? false);
+
+                    if ($nextBoxQty <= $remainingNeeded || $isNotFull) {
+                        $takenFromFifo += $nextBoxQty;
+                        $remainingNeeded -= $nextBoxQty;
+                        $selectedFifoBoxes++;
+                        array_splice($pool, $poolIndex, 1);
+                    } else {
+                        $poolIndex++;
+                    }
+                }
+
+                $fifoPools[$partNumber] = $pool;
+
+                $strictFulfillable = min($requiredQty, $reservedForOrder + $takenFromFifo);
+                if ($strictFulfillable < $requiredQty) {
+                    $isReadyToPick = false;
+                }
+
+                $totalBoxesToPick += count($reservedPool) + $selectedFifoBoxes;
+            }
+
+            $order->total_box_to_pick = $totalBoxesToPick;
+            $order->is_ready_to_pick = $isReadyToPick;
+        });
 
         return view('operator.delivery.picking-verification', compact('orders'));
     }

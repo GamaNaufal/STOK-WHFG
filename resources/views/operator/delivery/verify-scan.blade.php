@@ -101,11 +101,10 @@
     const totalCount = document.getElementById('totalCount');
     const btnToFinal = document.getElementById('btnToFinal');
 
-    let audioContext = null;
     let requestQueue = Promise.resolve();
-    let activeOscillators = [];
     const requiredBoxNumberToId = new Map();
     const localVerifiedBoxIds = new Set();
+    let selectedVoice = null;
 
     function normalizeBoxNumber(value) {
         return String(value || '').trim().toUpperCase();
@@ -133,85 +132,68 @@
         }
     });
 
-    function ensureAudioContext() {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    function selectSpeechVoice() {
+        if (!('speechSynthesis' in window)) {
+            return null;
         }
 
-        if (audioContext.state === 'suspended') {
-            audioContext.resume().catch(() => {});
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices || voices.length === 0) {
+            return null;
         }
-    }
 
-    function registerOscillator(oscillator) {
-        activeOscillators.push(oscillator);
-        oscillator.onended = () => {
-            activeOscillators = activeOscillators.filter((item) => item !== oscillator);
-        };
-    }
-
-    function stopAllBeep() {
-        if (!audioContext) return;
-
-        const now = audioContext.currentTime;
-        activeOscillators.forEach((oscillator) => {
-            try {
-                oscillator.stop(now);
-            } catch (e) {}
+        const exactIndonesianLocal = voices.find((voice) => {
+            return String(voice.lang || '').toLowerCase() === 'id-id' && voice.localService;
         });
-        activeOscillators = [];
+        if (exactIndonesianLocal) {
+            return exactIndonesianLocal;
+        }
+
+        const exactIndonesian = voices.find((voice) => String(voice.lang || '').toLowerCase() === 'id-id');
+        if (exactIndonesian) {
+            return exactIndonesian;
+        }
+
+        const anyIndonesianLocal = voices.find((voice) => {
+            return String(voice.lang || '').toLowerCase().startsWith('id') && voice.localService;
+        });
+        if (anyIndonesianLocal) {
+            return anyIndonesianLocal;
+        }
+
+        const anyIndonesian = voices.find((voice) => String(voice.lang || '').toLowerCase().startsWith('id'));
+        if (anyIndonesian) {
+            return anyIndonesian;
+        }
+
+        return voices[0] || null;
     }
 
-    function playSuccessBeep() {
-        try {
-            ensureAudioContext();
-            stopAllBeep();
+    function primeSpeech() {
+        if (!('speechSynthesis' in window)) {
+            return;
+        }
 
-            const now = audioContext.currentTime;
-            const playTone = (frequency, startAt, duration, volume = 0.7) => {
-                const oscillator = audioContext.createOscillator();
-                const gainNode = audioContext.createGain();
-
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(frequency, startAt);
-
-                gainNode.gain.setValueAtTime(0.0001, startAt);
-                gainNode.gain.exponentialRampToValueAtTime(volume, startAt + 0.01);
-                gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-                registerOscillator(oscillator);
-                oscillator.start(startAt);
-                oscillator.stop(startAt + duration + 0.01);
-            };
-
-            playTone(880, now, 0.09, 0.72);
-            playTone(1180, now + 0.10, 0.11, 0.72);
-        } catch (e) {}
+        window.speechSynthesis.getVoices();
+        selectedVoice = selectSpeechVoice();
     }
 
-    function playMismatchBeep() {
+    function playSuccessSpeech() {
         try {
-            ensureAudioContext();
+            if (!('speechSynthesis' in window)) {
+                return;
+            }
 
-            const now = audioContext.currentTime;
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            oscillator.type = 'square';
-            oscillator.frequency.setValueAtTime(520, now);
-            oscillator.frequency.exponentialRampToValueAtTime(320, now + 0.16);
-
-            gainNode.gain.setValueAtTime(0.0001, now);
-            gainNode.gain.exponentialRampToValueAtTime(0.45, now + 0.01);
-            gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
-
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            registerOscillator(oscillator);
-            oscillator.start(now);
-            oscillator.stop(now + 0.19);
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance('Benar');
+            utterance.lang = 'id-ID';
+            utterance.rate = 1.2;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            }
+            window.speechSynthesis.speak(utterance);
         } catch (e) {}
     }
 
@@ -253,23 +235,25 @@
             return;
         }
 
-        scanInput.value = '';
-        scanInput.focus();
-        ensureAudioContext();
-
         const normalized = normalizeBoxNumber(boxNumber);
         const compact = compactBoxNumber(boxNumber);
-        const localBoxId = requiredBoxNumberToId.get(normalized) ?? requiredBoxNumberToId.get(compact);
-        const canPlayOptimisticSuccess = Number.isInteger(localBoxId) && !localVerifiedBoxIds.has(localBoxId);
+        const preMatchedBoxId = requiredBoxNumberToId.get(normalized) ?? requiredBoxNumberToId.get(compact);
 
-        if (canPlayOptimisticSuccess) {
-            playSuccessBeep();
+        if (preMatchedBoxId && localVerifiedBoxIds.has(Number(preMatchedBoxId))) {
+            scanInput.value = '';
+            scanInput.focus();
+            playSuccessSpeech();
+            showMessage('Box ini sudah diverifikasi.', 'warning');
+            return;
         }
 
-        requestQueue = requestQueue.finally(() => processScanRequest(boxNumber, canPlayOptimisticSuccess));
+        scanInput.value = '';
+        scanInput.focus();
+
+        requestQueue = requestQueue.finally(() => processScanRequest(boxNumber));
     }
 
-    function processScanRequest(boxNumber, hasOptimisticSuccess) {
+    function processScanRequest(boxNumber) {
         return fetch("{{ route('delivery.pick.verify.scan', $session->id) }}", {
             method: 'POST',
             headers: {
@@ -282,9 +266,7 @@
             const data = await res.json();
 
             if (data.success) {
-                if (!hasOptimisticSuccess) {
-                    playSuccessBeep();
-                }
+                playSuccessSpeech();
                 showMessage(data.message, 'success');
                 if (data.box_id) {
                     markRowVerified(data.box_id);
@@ -293,7 +275,6 @@
                 return;
             }
 
-            playMismatchBeep();
             showMessage(data.message || 'Scan verifikasi gagal.', 'danger');
         })
         .catch((error) => {
@@ -310,8 +291,10 @@
 
     btnScan.addEventListener('click', submitScan);
 
-    const unlockAudio = () => ensureAudioContext();
-    window.addEventListener('pointerdown', unlockAudio, { once: true });
-    window.addEventListener('keydown', unlockAudio, { once: true });
+    window.addEventListener('pointerdown', primeSpeech, { once: true });
+    window.addEventListener('keydown', primeSpeech, { once: true });
+    window.speechSynthesis?.addEventListener?.('voiceschanged', () => {
+        selectedVoice = selectSpeechVoice();
+    });
 </script>
 @endsection
