@@ -172,6 +172,18 @@ class MergePalletController extends Controller
 
     private function cleanupSourcePallets(array $sourcePallets, Pallet $newPallet): void
     {
+        $locationCodes = collect($sourcePallets)
+            ->map(fn ($sourcePallet) => $sourcePallet?->stockLocation?->warehouse_location)
+            ->filter()
+            ->unique()
+            ->values();
+
+        $oldLocationsByCode = $locationCodes->isEmpty()
+            ? collect()
+            : \App\Models\MasterLocation::whereIn('code', $locationCodes)
+                ->get()
+                ->keyBy('code');
+
         foreach ($sourcePallets as $sourcePallet) {
             \App\Models\StockInput::where('pallet_id', $sourcePallet->id)
                 ->update(['pallet_id' => $newPallet->id]);
@@ -180,7 +192,7 @@ class MergePalletController extends Controller
             $sourcePallet->items()->delete();
 
             if ($sourcePallet->stockLocation) {
-                $oldLocation = \App\Models\MasterLocation::where('code', $sourcePallet->stockLocation->warehouse_location)->first();
+                $oldLocation = $oldLocationsByCode->get($sourcePallet->stockLocation->warehouse_location);
                 if ($oldLocation) {
                     $oldLocation->update([
                         'is_occupied' => false,

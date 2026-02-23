@@ -26,11 +26,13 @@ class StockInputExport implements FromCollection, WithHeadings, WithStyles
         $currentRow = 2;
         
         foreach ($this->stockInputs as $input) {
-            // Load pallet dengan items untuk group by part_number
-            $input->load('pallet.items');
-            
+            $palletItems = collect();
+            if ($input->relationLoaded('pallet') && $input->pallet && $input->pallet->relationLoaded('items')) {
+                $palletItems = $input->pallet->items;
+            }
+
             // Group items by part_number
-            $itemsByPart = $input->pallet->items->groupBy('part_number');
+            $itemsByPart = $palletItems->groupBy('part_number');
             
             if ($itemsByPart->isNotEmpty()) {
                 // Multiple rows jika ada multiple part numbers

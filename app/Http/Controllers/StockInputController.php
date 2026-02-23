@@ -13,6 +13,7 @@ use App\Models\DeliveryOrderItem;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -84,6 +85,7 @@ class StockInputController extends Controller
 
         $pallets = Pallet::query()
             ->with(['stockLocation'])
+            ->withCount('boxes')
             ->whereHas('stockLocation')
             ->when($query !== '', function ($q) use ($query) {
                 $q->where('pallet_number', 'like', '%' . $query . '%');
@@ -96,7 +98,7 @@ class StockInputController extends Controller
                     'id' => $pallet->id,
                     'pallet_number' => $pallet->pallet_number,
                     'warehouse_location' => $pallet->stockLocation?->warehouse_location,
-                    'total_boxes' => $pallet->boxes()->count(),
+                    'total_boxes' => (int) $pallet->boxes_count,
                 ];
             })
             ->values();
@@ -586,8 +588,30 @@ class StockInputController extends Controller
 
     private function attachScannedBoxes(Pallet $pallet, array $scannedBoxes): void
     {
+        $boxNumbers = collect($scannedBoxes)
+            ->pluck('box_number')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $existingBoxesByNumber = $boxNumbers->isEmpty()
+            ? collect()
+            : Box::whereIn('box_number', $boxNumbers)->get()->keyBy('box_number');
+
+        $notFullDeliveryOrderIds = collect($scannedBoxes)
+            ->filter(fn ($box) => !empty($box['is_not_full']) && !empty($box['delivery_order_id']))
+            ->pluck('delivery_order_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $deliveryOrdersById = $notFullDeliveryOrderIds->isEmpty()
+            ? collect()
+            : DeliveryOrder::with('items')->whereIn('id', $notFullDeliveryOrderIds)->get()->keyBy('id');
+
         foreach ($scannedBoxes as $scannedBox) {
-            $box = Box::where('box_number', $scannedBox['box_number'])->first();
+            $boxNumber = (string) ($scannedBox['box_number'] ?? '');
+            $box = $existingBoxesByNumber->get($boxNumber);
             if (!$box) {
                 if (!empty($scannedBox['is_not_full']) && empty($scannedBox['delivery_order_id'])) {
                     throw new \Exception('Box not full wajib disisipkan ke delivery.');
@@ -605,37 +629,40 @@ class StockInputController extends Controller
                     'assigned_delivery_order_id' => $scannedBox['delivery_order_id'] ?? null,
                 ]);
 
-                $this->updateDeliveryOrderForNotFull($scannedBox);
+                $existingBoxesByNumber->put($boxNumber, $box);
+                $this->updateDeliveryOrderForNotFull($scannedBox, $deliveryOrdersById);
             }
 
             $pallet->boxes()->attach($box->id);
         }
     }
 
-    private function updateDeliveryOrderForNotFull(array $scannedBox): void
+    private function updateDeliveryOrderForNotFull(array $scannedBox, Collection $deliveryOrdersById): void
     {
         if (empty($scannedBox['is_not_full']) || empty($scannedBox['delivery_order_id'])) {
             return;
         }
 
-        $order = DeliveryOrder::with('items')->find($scannedBox['delivery_order_id']);
+        $order = $deliveryOrdersById->get((int) $scannedBox['delivery_order_id']);
         if (!$order) {
             return;
         }
 
-        $item = $order->items()->where('part_number', $scannedBox['part_number'])->first();
+        $item = $order->items->firstWhere('part_number', $scannedBox['part_number']);
         if ($item) {
             $item->quantity += (int) ($scannedBox['pcs_quantity'] ?? 0);
             $item->save();
             return;
         }
 
-        DeliveryOrderItem::create([
+        $newItem = DeliveryOrderItem::create([
             'delivery_order_id' => $order->id,
             'part_number' => $scannedBox['part_number'],
             'quantity' => (int) ($scannedBox['pcs_quantity'] ?? 0),
             'fulfilled_quantity' => 0,
         ]);
+
+        $order->setRelation('items', $order->items->push($newItem));
     }
 
     private function resolveLocationCode(Request $request, Pallet $pallet): ?string

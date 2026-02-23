@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * @property int $id
  * @property string $pallet_number
+ * @property int|null $boxes_count
  */
 class Pallet extends Model
 {

@@ -4,6 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int $pallet_id
+ * @property string $part_number
+ * @property int $box_quantity
+ * @property int $pcs_quantity
+ */
 class PalletItem extends Model
 {
     protected $fillable = [

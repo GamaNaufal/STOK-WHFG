@@ -5,6 +5,14 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property int $id
+ * @property int|null $sales_user_id
+ * @property string $customer_name
+ * @property \Illuminate\Support\Carbon|null $delivery_date
+ * @property string $status
+ * @property string|null $notes
+ */
 class DeliveryOrder extends Model
 {
     use SoftDeletes;

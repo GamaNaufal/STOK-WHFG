@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -99,6 +101,27 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (app()->environment('testing')) {
+            Model::preventLazyLoading(true);
+        } elseif (!app()->isProduction()) {
+            Model::preventLazyLoading(false);
+            Model::handleLazyLoadingViolationUsing(function (Model $model, string $relation): void {
+                $request = request();
+                $route = $request?->route();
+
+                Log::warning('Lazy loading detected', [
+                    'model' => $model::class,
+                    'model_id' => $model->getKey(),
+                    'relation' => $relation,
+                    'url' => $request?->fullUrl(),
+                    'method' => $request?->method(),
+                    'route_name' => $route?->getName(),
+                    'route_uri' => $route?->uri(),
+                    'user_id' => Auth::id(),
+                ]);
+            });
+        }
+
         \App\Models\StockLocation::observe(\App\Observers\StockLocationObserver::class);
 
         // Share notification counts for sidebar badges

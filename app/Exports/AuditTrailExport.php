@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Models\StockInput;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -23,6 +24,21 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
     {
         $data = collect();
         $currentRow = 2; // Start from row 2 (after header)
+
+        $stockInputIds = collect($this->auditLogs)
+            ->where('type', 'stock_input')
+            ->pluck('model_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $stockInputsById = $stockInputIds->isEmpty()
+            ? collect()
+            : StockInput::with('pallet.items')
+                ->whereIn('id', $stockInputIds)
+                ->get()
+                ->keyBy('id');
         
         foreach ($this->auditLogs as $log) {
             // Parse new values
@@ -56,7 +72,7 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
                 $partNumbers = $newValues['part_numbers'] ?? [];
                 
                 // Load actual pallet untuk ambil qty per part number
-                $stockInput = \App\Models\StockInput::with('pallet.items')->find($log->model_id);
+                $stockInput = $stockInputsById->get((int) $log->model_id);
                 
                 $partQtys = [];
                 if ($stockInput && $stockInput->pallet && $stockInput->pallet->items->isNotEmpty()) {

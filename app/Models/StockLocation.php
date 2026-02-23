@@ -4,6 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int|null $pallet_id
+ * @property int|null $master_location_id
+ * @property string|null $warehouse_location
+ */
 class StockLocation extends Model
 {
     protected $fillable = [

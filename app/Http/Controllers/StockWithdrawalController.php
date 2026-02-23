@@ -192,6 +192,11 @@ class StockWithdrawalController extends Controller
                     throw new \RuntimeException('Stok tidak cukup untuk pengambilan ini');
                 }
 
+                $masterLocationsByPalletId = MasterLocation::whereIn('current_pallet_id', $palletItems->pluck('pallet_id')->unique()->values())
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('current_pallet_id');
+
                 foreach ($palletItems as $palletItem) {
                     if (!$palletItem instanceof PalletItem) {
                         continue;
@@ -231,10 +236,8 @@ class StockWithdrawalController extends Controller
                     $palletItem->box_quantity = max(0, (int) $palletItem->box_quantity - (int) $boxesToReduce);
                     $palletItem->save();
 
-                    $masterLocation = MasterLocation::where('current_pallet_id', $palletItem->pallet_id)
-                        ->lockForUpdate()
-                        ->first();
-                    if ($masterLocation) {
+                    $masterLocation = $masterLocationsByPalletId->get($palletItem->pallet_id);
+                    if ($masterLocation instanceof MasterLocation) {
                         $masterLocation->autoVacateIfEmpty();
                     }
 
@@ -334,6 +337,11 @@ class StockWithdrawalController extends Controller
                         throw new \RuntimeException("Stok tidak cukup untuk part {$partNumber}! Available: {$totalStock} PCS, Requested: {$requestedQty} PCS");
                     }
 
+                    $masterLocationsByPalletId = MasterLocation::whereIn('current_pallet_id', $palletItems->pluck('pallet_id')->unique()->values())
+                        ->lockForUpdate()
+                        ->get()
+                        ->keyBy('current_pallet_id');
+
                     foreach ($palletItems as $palletItem) {
                         if (!$palletItem instanceof PalletItem) {
                             continue;
@@ -371,10 +379,8 @@ class StockWithdrawalController extends Controller
                         $palletItem->box_quantity = max(0, (int) $palletItem->box_quantity - (int) $boxesToReduce);
                         $palletItem->save();
 
-                        $masterLocation = MasterLocation::where('current_pallet_id', $palletItem->pallet_id)
-                            ->lockForUpdate()
-                            ->first();
-                        if ($masterLocation) {
+                        $masterLocation = $masterLocationsByPalletId->get($palletItem->pallet_id);
+                        if ($masterLocation instanceof MasterLocation) {
                             $masterLocation->autoVacateIfEmpty();
                         }
 
@@ -476,15 +482,27 @@ class StockWithdrawalController extends Controller
                     ->lockForUpdate()
                     ->get();
 
+                $palletItemIds = $batchWithdrawals
+                    ->pluck('pallet_item_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values();
+
+                $palletItemsById = $palletItemIds->isEmpty()
+                    ? collect()
+                    : PalletItem::whereIn('id', $palletItemIds)
+                        ->lockForUpdate()
+                        ->get()
+                        ->keyBy('id');
+
                 foreach ($batchWithdrawals as $batchWithdrawal) {
                     if (!$batchWithdrawal instanceof StockWithdrawal) {
                         continue;
                     }
 
                     if ($batchWithdrawal->pallet_item_id) {
-                        $palletItem = PalletItem::whereKey($batchWithdrawal->pallet_item_id)
-                            ->lockForUpdate()
-                            ->first();
+                        $palletItem = $palletItemsById->get((int) $batchWithdrawal->pallet_item_id);
 
                         if ($palletItem) {
                             $palletItem->pcs_quantity = (int) $palletItem->pcs_quantity + (int) $batchWithdrawal->pcs_quantity;

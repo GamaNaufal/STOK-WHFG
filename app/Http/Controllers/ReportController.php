@@ -151,9 +151,9 @@ class ReportController extends Controller
         $withdrawals = $query->orderBy('withdrawn_at', 'desc')->paginate(50);
 
         // Get statistics
-        $totalWithdrawals = StockWithdrawal::whereStatus('completed')->count();
-        $totalPcsWithdrawn = StockWithdrawal::whereStatus('completed')->sum('pcs_quantity');
-        $totalReversed = StockWithdrawal::whereStatus('reversed')->count();
+        $totalWithdrawals = StockWithdrawal::where('status', 'completed')->count();
+        $totalPcsWithdrawn = StockWithdrawal::where('status', 'completed')->sum('pcs_quantity');
+        $totalReversed = StockWithdrawal::where('status', 'reversed')->count();
 
         // Get all users for filter
         $users = \App\Models\User::whereIn('role', ['warehouse_operator', 'admin'])->get();
@@ -270,7 +270,7 @@ class ReportController extends Controller
      */
     public function exportStockInputCsv(Request $request)
     {
-        $query = StockInput::with(['pallet', 'palletItem', 'user']);
+        $query = StockInput::with(['pallet.items', 'palletItem', 'user']);
 
         if ($request->filled('start_date')) {
             $query->whereDate('stored_at', '>=', $request->input('start_date'));

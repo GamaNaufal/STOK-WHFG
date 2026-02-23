@@ -4,6 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+/**
+ * @property int $id
+ * @property int $delivery_order_id
+ * @property int|null $created_by
+ * @property string $status
+ * @property array<int,int>|null $verification_box_ids
+ * @property \Illuminate\Support\Carbon|null $redo_until
+ */
 class DeliveryPickSession extends Model
 {
     protected $fillable = [
