@@ -17,6 +17,7 @@ class DeliveryPickSession extends Model
         'approval_notes',
         'redo_until',
         'completion_status',
+        'verification_box_ids',
     ];
 
     protected $casts = [
@@ -25,6 +26,7 @@ class DeliveryPickSession extends Model
         'approved_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+        'verification_box_ids' => 'array',
     ];
 
     public function order()

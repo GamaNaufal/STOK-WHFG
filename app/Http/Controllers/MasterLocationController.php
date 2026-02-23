@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MasterLocationController extends Controller
 {
@@ -53,17 +54,27 @@ class MasterLocationController extends Controller
      */
     public function update(Request $request, \App\Models\MasterLocation $location)
     {
-        if ($location->is_occupied) {
-            return redirect()->route('locations.index')->with('error', 'Gagal edit! Lokasi ini sedang terisi.');
-        }
-
         $request->validate([
             'code' => 'required|max:255|unique:master_locations,code,' . $location->id,
         ]);
 
-        $location->update([
-            'code' => strtoupper($request->code),
-        ]);
+        try {
+            DB::transaction(function () use ($request, $location) {
+                $locked = \App\Models\MasterLocation::whereKey($location->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($locked->is_occupied) {
+                    throw new \RuntimeException('Gagal edit! Lokasi ini sedang terisi.');
+                }
+
+                $locked->update([
+                    'code' => strtoupper($request->code),
+                ]);
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('locations.index')->with('error', $e->getMessage());
+        }
 
         return redirect()->route('locations.index')->with('success', 'Lokasi berhasil diperbarui!');
     }
@@ -73,11 +84,21 @@ class MasterLocationController extends Controller
      */
     public function destroy(\App\Models\MasterLocation $location)
     {
-        if ($location->is_occupied && $location->current_pallet_id) {
-             return redirect()->route('locations.index')->with('error', 'Gagal hapus! Lokasi ini sedang terisi.');
+        try {
+            DB::transaction(function () use ($location) {
+                $locked = \App\Models\MasterLocation::whereKey($location->id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
+
+                if ($locked->is_occupied && $locked->current_pallet_id) {
+                    throw new \RuntimeException('Gagal hapus! Lokasi ini sedang terisi.');
+                }
+
+                $locked->delete();
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('locations.index')->with('error', $e->getMessage());
         }
-        
-        $location->delete();
 
         return redirect()->route('locations.index')->with('success', 'Lokasi berhasil dihapus!');
     }

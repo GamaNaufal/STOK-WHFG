@@ -25,6 +25,7 @@ class StockWithdrawal extends Model
 
     protected $fillable = [
         'withdrawal_batch_id',
+        'pick_session_id',
         'user_id',
         'pallet_item_id',
         'box_id',
@@ -42,6 +43,7 @@ class StockWithdrawal extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
+        'pick_session_id' => 'integer',
         'status' => 'string', // completed, reversed, cancelled
     ];
 
@@ -58,6 +60,11 @@ class StockWithdrawal extends Model
     public function box()
     {
         return $this->belongsTo(Box::class);
+    }
+
+    public function pickSession()
+    {
+        return $this->belongsTo(DeliveryPickSession::class, 'pick_session_id');
     }
 
     // Scope untuk query yang sering digunakan

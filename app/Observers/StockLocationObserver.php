@@ -11,14 +11,16 @@ class StockLocationObserver
      */
     public function created(StockLocation $stockLocation): void
     {
-        $masterLocation = \App\Models\MasterLocation::where('code', $stockLocation->warehouse_location)->first();
-
-        if ($masterLocation) {
-            $masterLocation->update([
+        \App\Models\MasterLocation::where('code', $stockLocation->warehouse_location)
+            ->where(function ($query) use ($stockLocation) {
+                $query->where('is_occupied', false)
+                    ->orWhere('current_pallet_id', $stockLocation->pallet_id);
+            })
+            ->update([
                 'is_occupied' => true,
                 'current_pallet_id' => $stockLocation->pallet_id,
+                'updated_at' => now(),
             ]);
-        }
     }
 
     /**
@@ -42,14 +44,16 @@ class StockLocationObserver
 
         $newCode = $stockLocation->warehouse_location;
         if ($newCode) {
-            $newLocation = \App\Models\MasterLocation::where('code', $newCode)->first();
-
-            if ($newLocation) {
-                $newLocation->update([
+            \App\Models\MasterLocation::where('code', $newCode)
+                ->where(function ($query) use ($stockLocation) {
+                    $query->where('is_occupied', false)
+                        ->orWhere('current_pallet_id', $stockLocation->pallet_id);
+                })
+                ->update([
                     'is_occupied' => true,
                     'current_pallet_id' => $stockLocation->pallet_id,
+                    'updated_at' => now(),
                 ]);
-            }
         }
     }
 

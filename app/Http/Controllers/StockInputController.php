@@ -12,11 +12,20 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class StockInputController extends Controller
 {
+    private function isDuplicateKeyException(QueryException $e): bool
+    {
+        $sqlState = (string) ($e->getCode() ?? '');
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        return $sqlState === '23000' || $driverCode === 1062;
+    }
+
     private function resolveActivePallet(): Pallet
     {
         $pallet_id = session('current_pallet_id');
@@ -26,26 +35,39 @@ class StockInputController extends Controller
             return $pallet;
         }
 
-        $maxNumber = Pallet::query()
-            ->where('pallet_number', 'like', 'PLT-%')
-            ->pluck('pallet_number')
-            ->map(function ($palletNumber) {
-                preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
-                return isset($matches[1]) ? (int) $matches[1] : 0;
-            })
-            ->max() ?? 0;
+        $maxAttempts = 5;
 
-        $nextNumber = $maxNumber + 1;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $maxNumber = Pallet::query()
+                ->where('pallet_number', 'like', 'PLT-%')
+                ->pluck('pallet_number')
+                ->map(function ($palletNumber) {
+                    preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+                    return isset($matches[1]) ? (int) $matches[1] : 0;
+                })
+                ->max() ?? 0;
 
-        $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $nextNumber = $maxNumber + 1;
+            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
-        $pallet = Pallet::create([
-            'pallet_number' => $palletNumber,
-        ]);
+            try {
+                $pallet = Pallet::create([
+                    'pallet_number' => $palletNumber,
+                ]);
 
-        session(['current_pallet_id' => $pallet->id]);
+                session(['current_pallet_id' => $pallet->id]);
 
-        return $pallet;
+                return $pallet;
+            } catch (QueryException $e) {
+                if ($this->isDuplicateKeyException($e) && $attempt < $maxAttempts) {
+                    continue;
+                }
+
+                throw $e;
+            }
+        }
+
+        throw new \RuntimeException('Gagal membuat nomor palet unik. Silakan coba lagi.');
     }
 
     public function index()
@@ -490,16 +512,23 @@ class StockInputController extends Controller
 
         if ($locationId) {
             $masterLocation = \App\Models\MasterLocation::find($locationId);
-            if ($masterLocation && !$masterLocation->is_occupied) {
-                $locationCode = $masterLocation->code;
+            if (!$masterLocation) {
+                throw new \Exception('Lokasi yang dipilih tidak ditemukan!');
+            }
 
-                $masterLocation->update([
+            $claimed = \App\Models\MasterLocation::where('id', $masterLocation->id)
+                ->where('is_occupied', false)
+                ->update([
                     'is_occupied' => true,
-                    'current_pallet_id' => $pallet->id
+                    'current_pallet_id' => $pallet->id,
+                    'updated_at' => now(),
                 ]);
-            } else {
+
+            if ($claimed === 0) {
                 throw new \Exception('Lokasi yang dipilih sudah terisi!');
             }
+
+            $locationCode = $masterLocation->code;
 
             return $locationCode;
         }
@@ -512,14 +541,17 @@ class StockInputController extends Controller
         if ($locationCode) {
             $masterLocation = \App\Models\MasterLocation::where('code', $locationCode)->first();
             if ($masterLocation) {
-                if ($masterLocation->is_occupied) {
+                $claimed = \App\Models\MasterLocation::where('id', $masterLocation->id)
+                    ->where('is_occupied', false)
+                    ->update([
+                        'is_occupied' => true,
+                        'current_pallet_id' => $pallet->id,
+                        'updated_at' => now(),
+                    ]);
+
+                if ($claimed === 0) {
                     throw new \Exception("Lokasi {$locationCode} sudah terisi!");
                 }
-
-                $masterLocation->update([
-                    'is_occupied' => true,
-                    'current_pallet_id' => $pallet->id,
-                ]);
             }
         }
 

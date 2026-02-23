@@ -51,38 +51,48 @@ class ExpiredBoxService
 
     public function handleBox(int $boxId, int $userId): void
     {
-        $row = $this->getExpirableBoxesQuery()
-            ->where('boxes.id', $boxId)
-            ->first();
+        DB::transaction(function () use ($boxId, $userId) {
+            $box = Box::whereKey($boxId)->lockForUpdate()->first();
+            if (!$box) {
+                return;
+            }
 
-        if (!$row) {
-            return;
-        }
+            if ($box->expired_status === 'handled') {
+                return;
+            }
 
-        $storedAt = $row->stored_at ? Carbon::parse($row->stored_at) : null;
-        $ageMonths = $storedAt ? $storedAt->diffInMonths(now()) : 0;
+            $row = $this->getExpirableBoxesQuery()
+                ->where('boxes.id', $boxId)
+                ->first();
 
-        Box::where('id', $boxId)->update([
-            'expired_status' => 'handled',
-            'handled_at' => now(),
-            'handled_by' => $userId,
-        ]);
+            $storedAt = $row?->stored_at ? Carbon::parse($row->stored_at) : null;
+            $ageMonths = $storedAt ? $storedAt->diffInMonths(now()) : 0;
 
-        if ($this->canUseExpiredReports()) {
-            ExpiredBoxReport::create([
-                'box_id' => $row->id,
-                'box_number' => $row->box_number,
-                'part_number' => $row->part_number,
-                'pallet_id' => $row->pallet_id,
-                'pallet_number' => $row->pallet_number,
-                'warehouse_location' => $row->warehouse_location,
-                'stored_at' => $row->stored_at,
-                'age_months' => $ageMonths,
-                'status' => 'handled',
-                'handled_by' => $userId,
-                'handled_at' => now(),
-            ]);
-        }
+            $box->expired_status = 'handled';
+            $box->handled_at = now();
+            $box->handled_by = $userId;
+            $box->save();
+
+            if ($this->canUseExpiredReports() && $row) {
+                ExpiredBoxReport::updateOrCreate(
+                    [
+                        'box_id' => $row->id,
+                        'status' => 'handled',
+                    ],
+                    [
+                        'box_number' => $row->box_number,
+                        'part_number' => $row->part_number,
+                        'pallet_id' => $row->pallet_id,
+                        'pallet_number' => $row->pallet_number,
+                        'warehouse_location' => $row->warehouse_location,
+                        'stored_at' => $row->stored_at,
+                        'age_months' => $ageMonths,
+                        'handled_by' => $userId,
+                        'handled_at' => now(),
+                    ]
+                );
+            }
+        });
     }
 
     public function sendDailySummary(): void
@@ -149,26 +159,22 @@ class ExpiredBoxService
             return;
         }
 
-        $exists = ExpiredBoxReport::where('box_id', $row->id)
-            ->where('status', $status)
-            ->exists();
-
-        if ($exists) {
-            return;
-        }
-
-        ExpiredBoxReport::create([
-            'box_id' => $row->id,
-            'box_number' => $row->box_number,
-            'part_number' => $row->part_number,
-            'pallet_id' => $row->pallet_id,
-            'pallet_number' => $row->pallet_number,
-            'warehouse_location' => $row->warehouse_location,
-            'stored_at' => $row->stored_at,
-            'age_months' => $ageMonths,
-            'status' => $status,
-            'handled_by' => null,
-            'handled_at' => null,
-        ]);
+        ExpiredBoxReport::updateOrCreate(
+            [
+                'box_id' => $row->id,
+                'status' => $status,
+            ],
+            [
+                'box_number' => $row->box_number,
+                'part_number' => $row->part_number,
+                'pallet_id' => $row->pallet_id,
+                'pallet_number' => $row->pallet_number,
+                'warehouse_location' => $row->warehouse_location,
+                'stored_at' => $row->stored_at,
+                'age_months' => $ageMonths,
+                'handled_by' => null,
+                'handled_at' => null,
+            ]
+        );
     }
 }

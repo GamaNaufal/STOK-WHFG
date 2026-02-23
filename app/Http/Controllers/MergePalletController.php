@@ -7,11 +7,20 @@ use App\Models\Box;
 use App\Models\PalletItem;
 use App\Models\StockLocation;
 use App\Models\AuditLog;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class MergePalletController extends Controller
 {
+    private function isDuplicateKeyException(QueryException $e): bool
+    {
+        $sqlState = (string) ($e->getCode() ?? '');
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        return $sqlState === '23000' || $driverCode === 1062;
+    }
+
     private function validateStoreRequest(Request $request): array
     {
         return $request->validate([
@@ -23,33 +32,63 @@ class MergePalletController extends Controller
 
     private function generateNewPallet(): Pallet
     {
-        $maxNumber = Pallet::query()
-            ->where('pallet_number', 'like', 'PLT-%')
-            ->pluck('pallet_number')
-            ->map(function ($palletNumber) {
-                preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
-                return isset($matches[1]) ? (int) $matches[1] : 0;
-            })
-            ->max() ?? 0;
+        $maxAttempts = 5;
 
-        $nextNumber = $maxNumber + 1;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $maxNumber = Pallet::query()
+                ->where('pallet_number', 'like', 'PLT-%')
+                ->pluck('pallet_number')
+                ->map(function ($palletNumber) {
+                    preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+                    return isset($matches[1]) ? (int) $matches[1] : 0;
+                })
+                ->max() ?? 0;
 
-        $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $nextNumber = $maxNumber + 1;
+            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
-        return Pallet::create([
-            'pallet_number' => $palletNumber,
-        ]);
+            try {
+                return Pallet::create([
+                    'pallet_number' => $palletNumber,
+                ]);
+            } catch (QueryException $e) {
+                if ($this->isDuplicateKeyException($e) && $attempt < $maxAttempts) {
+                    continue;
+                }
+
+                throw $e;
+            }
+        }
+
+        throw new \RuntimeException('Gagal membuat nomor palet unik. Silakan coba lagi.');
     }
 
     private function collectSourcePallets(array $palletIds): array
     {
+        $normalizedIds = collect($palletIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($normalizedIds)) {
+            return [[], [], [], []];
+        }
+
+        $palletMap = Pallet::with(['boxes', 'stockLocation', 'items'])
+            ->whereIn('id', $normalizedIds)
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
         $palletNumbers = [];
         $boxOrigins = [];
         $allBoxes = [];
         $sourcePallets = [];
 
-        foreach ($palletIds as $id) {
-            $sourcePallet = Pallet::with('boxes', 'stockLocation', 'items')->find($id);
+        foreach ($normalizedIds as $id) {
+            $sourcePallet = $palletMap->get($id);
             if (!$sourcePallet) {
                 continue;
             }
@@ -71,7 +110,7 @@ class MergePalletController extends Controller
 
     private function attachBoxesAndCreateItems(Pallet $newPallet, array $allBoxes, array $boxOrigins, Request $request): void
     {
-        $allBoxIds = array_column($allBoxes, 'id');
+        $allBoxIds = array_values(array_unique(array_map('intval', array_column($allBoxes, 'id'))));
         if (empty($allBoxIds)) {
             return;
         }
@@ -166,14 +205,18 @@ class MergePalletController extends Controller
                 throw new \Exception('Lokasi tujuan tidak ditemukan');
             }
 
-            if ($masterLocation->is_occupied) {
+            $claimed = \App\Models\MasterLocation::whereKey($masterLocation->id)
+                ->where('is_occupied', false)
+                ->update([
+                    'is_occupied' => true,
+                    'current_pallet_id' => $newPallet->id,
+                    'updated_at' => now(),
+                ]);
+
+            if ($claimed === 0) {
                 throw new \Exception('Lokasi tujuan sudah terisi');
             }
 
-            $masterLocation->update([
-                'is_occupied' => true,
-                'current_pallet_id' => $newPallet->id
-            ]);
             $locationCode = $masterLocation->code;
         }
 
@@ -321,6 +364,14 @@ class MergePalletController extends Controller
 
             $palletIds = $request->pallet_ids;
             [$sourcePallets, $palletNumbers, $allBoxes, $boxOrigins] = $this->collectSourcePallets($palletIds);
+
+            if (count($sourcePallets) < 2) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pallet sumber tidak valid atau sudah berubah. Pilih ulang pallet untuk merge.'
+                ], 422);
+            }
 
             if (empty($allBoxes)) {
                 DB::rollBack();

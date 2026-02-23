@@ -587,15 +587,17 @@ class DeliveryOrderController extends Controller
                 ->withInput();
         }
 
-        $order = \App\Models\DeliveryOrder::findOrFail($id);
-        $order->status = $request->status;
+        DB::transaction(function () use ($request, $id) {
+            $order = \App\Models\DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
+            $order->status = $request->status;
 
-        $ppcNotes = trim((string) $request->notes);
-        if ($ppcNotes !== '') {
-            $order->notes = $ppcNotes;
-        }
+            $ppcNotes = trim((string) $request->notes);
+            if ($ppcNotes !== '') {
+                $order->notes = $ppcNotes;
+            }
 
-        $order->save();
+            $order->save();
+        });
 
         $msg = 'Order status updated to ' . ucfirst($request->status);
         if($request->status == 'correction') $msg .= '. Sent back to Sales.';

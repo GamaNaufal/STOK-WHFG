@@ -141,6 +141,86 @@ class DeliveryPickController extends Controller
         return view('operator.delivery.picking-verification', compact('orders'));
     }
 
+    private function createSessionItems(DeliveryOrder $order, DeliveryPickSession $session): void
+    {
+        foreach ($order->items as $item) {
+            $remainingQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
+            if ($remainingQty <= 0) {
+                continue;
+            }
+
+            $reservedBoxes = $this->getReservedBoxesForOrder($order->id, $item->part_number, $order->delivery_date, true);
+            foreach ($reservedBoxes as $box) {
+                DeliveryPickItem::firstOrCreate(
+                    [
+                        'pick_session_id' => $session->id,
+                        'box_id' => $box->id,
+                    ],
+                    [
+                        'part_number' => $box->part_number,
+                        'pcs_quantity' => (int) $box->pcs_quantity,
+                        'status' => 'pending',
+                    ]
+                );
+            }
+
+            $reservedTotal = $reservedBoxes->sum('pcs_quantity');
+            $remainingAfterReserved = max(0, $remainingQty - (int) $reservedTotal);
+
+            $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved, $order->delivery_date, true);
+            $totalPcs = $boxes->sum('pcs_quantity') + (int) $reservedTotal;
+
+            if ($totalPcs < $remainingQty) {
+                throw new \RuntimeException('Stok box tidak cukup untuk part ' . $item->part_number);
+            }
+
+            foreach ($boxes as $box) {
+                DeliveryPickItem::firstOrCreate(
+                    [
+                        'pick_session_id' => $session->id,
+                        'box_id' => $box->id,
+                    ],
+                    [
+                        'part_number' => $box->part_number,
+                        'pcs_quantity' => (int) $box->pcs_quantity,
+                        'status' => 'pending',
+                    ]
+                );
+            }
+        }
+    }
+
+    private function startOrReusePickSession(DeliveryOrder $order, int $userId): DeliveryPickSession
+    {
+        return DB::transaction(function () use ($order, $userId) {
+            DeliveryOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            $existingSession = DeliveryPickSession::where('delivery_order_id', $order->id)
+                ->whereIn('status', ['scanning', 'blocked', 'approved'])
+                ->latest()
+                ->first();
+
+            if ($existingSession) {
+                return $existingSession;
+            }
+
+            $session = DeliveryPickSession::create([
+                'delivery_order_id' => $order->id,
+                'created_by' => $userId,
+                'status' => 'scanning',
+                'started_at' => now(),
+            ]);
+
+            $this->createSessionItems($order, $session);
+
+            if (!$session->items()->exists()) {
+                throw new \RuntimeException('Semua item sudah terpenuhi.');
+            }
+
+            return $session;
+        });
+    }
+
     public function startPick($orderId)
     {
         $user = Auth::user();
@@ -150,75 +230,10 @@ class DeliveryPickController extends Controller
 
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
-        $existingSession = DeliveryPickSession::where('delivery_order_id', $order->id)
-            ->whereIn('status', ['scanning', 'blocked', 'approved'])
-            ->latest()
-            ->first();
-
-        if ($existingSession) {
-            return response()->json([
-                'session_id' => $existingSession->id,
-                'pdf_url' => route('delivery.pick.pdf', [$order->id, $existingSession->id]),
-                'print_preview_url' => route('delivery.pick.print-preview', [$order->id, $existingSession->id]),
-                'scan_url' => route('delivery.pick.scan', [$order->id, $existingSession->id]),
-            ]);
-        }
-
-        $session = DeliveryPickSession::create([
-            'delivery_order_id' => $order->id,
-            'created_by' => $user->id,
-            'status' => 'scanning',
-            'started_at' => now(),
-        ]);
-
         try {
-            DB::transaction(function () use ($order, $session) {
-                foreach ($order->items as $item) {
-                    $remainingQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
-                    if ($remainingQty <= 0) {
-                        continue;
-                    }
-
-                    $reservedBoxes = $this->getReservedBoxesForOrder($order->id, $item->part_number, $order->delivery_date);
-                    foreach ($reservedBoxes as $box) {
-                        DeliveryPickItem::create([
-                            'pick_session_id' => $session->id,
-                            'box_id' => $box->id,
-                            'part_number' => $box->part_number,
-                            'pcs_quantity' => (int) $box->pcs_quantity,
-                            'status' => 'pending',
-                        ]);
-                    }
-
-                    $reservedTotal = $reservedBoxes->sum('pcs_quantity');
-                    $remainingAfterReserved = max(0, $remainingQty - (int) $reservedTotal);
-
-                    $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved, $order->delivery_date);
-                    $totalPcs = $boxes->sum('pcs_quantity') + (int) $reservedTotal;
-
-                    if ($totalPcs < $remainingQty) {
-                        throw new \Exception('Stok box tidak cukup untuk part ' . $item->part_number);
-                    }
-
-                    foreach ($boxes as $box) {
-                        DeliveryPickItem::create([
-                            'pick_session_id' => $session->id,
-                            'box_id' => $box->id,
-                            'part_number' => $box->part_number,
-                            'pcs_quantity' => (int) $box->pcs_quantity,
-                            'status' => 'pending',
-                        ]);
-                    }
-                }
-            });
-        } catch (\Exception $e) {
-            $session->delete();
+            $session = $this->startOrReusePickSession($order, (int) $user->id);
+        } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        if ($session->items()->count() === 0) {
-            $session->delete();
-            return response()->json(['message' => 'Semua item sudah terpenuhi.'], 422);
         }
 
         return response()->json([
@@ -238,74 +253,10 @@ class DeliveryPickController extends Controller
 
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
-        $existingSession = DeliveryPickSession::where('delivery_order_id', $order->id)
-            ->whereIn('status', ['scanning', 'blocked', 'approved'])
-            ->latest()
-            ->first();
-
-        if ($existingSession) {
-            return response()->json([
-                'session_id' => $existingSession->id,
-                'verify_url' => route('delivery.pick.verify', [$order->id, $existingSession->id]),
-                'final_scan_url' => route('delivery.pick.scan', [$order->id, $existingSession->id]),
-            ]);
-        }
-
-        $session = DeliveryPickSession::create([
-            'delivery_order_id' => $order->id,
-            'created_by' => $user->id,
-            'status' => 'scanning',
-            'started_at' => now(),
-        ]);
-
         try {
-            DB::transaction(function () use ($order, $session) {
-                foreach ($order->items as $item) {
-                    $remainingQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
-                    if ($remainingQty <= 0) {
-                        continue;
-                    }
-
-                    $reservedBoxes = $this->getReservedBoxesForOrder($order->id, $item->part_number, $order->delivery_date);
-                    foreach ($reservedBoxes as $box) {
-                        DeliveryPickItem::create([
-                            'pick_session_id' => $session->id,
-                            'box_id' => $box->id,
-                            'part_number' => $box->part_number,
-                            'pcs_quantity' => (int) $box->pcs_quantity,
-                            'status' => 'pending',
-                        ]);
-                    }
-
-                    $reservedTotal = $reservedBoxes->sum('pcs_quantity');
-                    $remainingAfterReserved = max(0, $remainingQty - (int) $reservedTotal);
-
-                    $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved, $order->delivery_date);
-                    $totalPcs = $boxes->sum('pcs_quantity') + (int) $reservedTotal;
-
-                    if ($totalPcs < $remainingQty) {
-                        throw new \Exception('Stok box tidak cukup untuk part ' . $item->part_number);
-                    }
-
-                    foreach ($boxes as $box) {
-                        DeliveryPickItem::create([
-                            'pick_session_id' => $session->id,
-                            'box_id' => $box->id,
-                            'part_number' => $box->part_number,
-                            'pcs_quantity' => (int) $box->pcs_quantity,
-                            'status' => 'pending',
-                        ]);
-                    }
-                }
-            });
-        } catch (\Exception $e) {
-            $session->delete();
+            $session = $this->startOrReusePickSession($order, (int) $user->id);
+        } catch (\Throwable $e) {
             return response()->json(['message' => $e->getMessage()], 422);
-        }
-
-        if ($session->items()->count() === 0) {
-            $session->delete();
-            return response()->json(['message' => 'Semua item sudah terpenuhi.'], 422);
         }
 
         return response()->json([
@@ -343,7 +294,11 @@ class DeliveryPickController extends Controller
 
         $order = DeliveryOrder::findOrFail($orderId);
 
-        $verifiedBoxIds = session('delivery_verification.' . $sessionId . '.box_ids', []);
+        $verifiedBoxIds = collect($session->verification_box_ids ?? [])
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
         return view('operator.delivery.verify-scan', compact('session', 'order', 'verifiedBoxIds'));
     }
@@ -354,63 +309,91 @@ class DeliveryPickController extends Controller
             'box_number' => 'required|string',
         ]);
 
-        $session = DeliveryPickSession::with('items')->findOrFail($sessionId);
+        $result = DB::transaction(function () use ($request, $sessionId) {
+            $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
 
-        if ($session->status === 'blocked') {
-            return response()->json(['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.'], 423);
-        }
+            if ($session->status === 'blocked') {
+                return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423];
+            }
 
-        $box = Box::where('box_number', $request->box_number)->first();
+            if ($session->status === 'completed') {
+                return ['success' => false, 'message' => 'Session sudah completed.', 'status' => 409];
+            }
 
-        if ($box && ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true))) {
-            DeliveryIssue::create([
-                'pick_session_id' => $session->id,
-                'box_id' => $box->id,
-                'scanned_code' => $request->box_number,
-                'issue_type' => $box->is_withdrawn ? 'box_withdrawn' : 'box_expired',
-                'status' => 'pending',
-            ]);
+            $box = Box::where('box_number', $request->box_number)->lockForUpdate()->first();
 
-            $session->status = 'blocked';
-            $session->save();
+            if ($box && ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true))) {
+                DeliveryIssue::create([
+                    'pick_session_id' => $session->id,
+                    'box_id' => $box->id,
+                    'scanned_code' => $request->box_number,
+                    'issue_type' => $box->is_withdrawn ? 'box_withdrawn' : 'box_expired',
+                    'status' => 'pending',
+                ]);
 
-            return response()->json(['success' => false, 'message' => $box->is_withdrawn ? 'Box sudah withdrawn. Menunggu approval admin.' : 'Box sudah expired/handled. Menunggu approval admin.'], 422);
-        }
+                $session->status = 'blocked';
+                $session->save();
 
-        $pickItem = $box ? $session->items()->where('box_id', $box->id)->first() : null;
+                return [
+                    'success' => false,
+                    'message' => $box->is_withdrawn ? 'Box sudah withdrawn. Menunggu approval admin.' : 'Box sudah expired/handled. Menunggu approval admin.',
+                    'status' => 422,
+                ];
+            }
 
-        if (!$pickItem) {
-            DeliveryIssue::create([
-                'pick_session_id' => $session->id,
+            $pickItem = $box
+                ? DeliveryPickItem::where('pick_session_id', $session->id)
+                    ->where('box_id', $box->id)
+                    ->lockForUpdate()
+                    ->first()
+                : null;
+
+            if (!$pickItem) {
+                DeliveryIssue::create([
+                    'pick_session_id' => $session->id,
+                    'box_id' => $box?->id,
+                    'scanned_code' => $request->box_number,
+                    'issue_type' => 'scan_mismatch',
+                    'status' => 'pending',
+                ]);
+
+                $session->status = 'blocked';
+                $session->save();
+
+                return ['success' => false, 'message' => 'Box tidak sesuai. Menunggu approval admin.', 'status' => 422];
+            }
+
+            $updated = DeliveryPickItem::whereKey($pickItem->id)
+                ->where('status', 'pending')
+                ->update([
+                    'status' => 'scanned',
+                    'scanned_at' => now(),
+                    'scanned_by' => Auth::id(),
+                ]);
+
+            if ($updated === 0) {
+                return ['success' => false, 'message' => 'Box sudah discan.', 'status' => 409];
+            }
+
+            $remaining = DeliveryPickItem::where('pick_session_id', $session->id)
+                ->where('status', 'pending')
+                ->count();
+
+            return [
+                'success' => true,
+                'message' => 'Scan berhasil.',
+                'remaining' => $remaining,
                 'box_id' => $box?->id,
-                'scanned_code' => $request->box_number,
-                'issue_type' => 'scan_mismatch',
-                'status' => 'pending',
-            ]);
-
-            $session->status = 'blocked';
-            $session->save();
-
-            return response()->json(['success' => false, 'message' => 'Box tidak sesuai. Menunggu approval admin.'], 422);
-        }
-
-        if ($pickItem->status === 'scanned') {
-            return response()->json(['success' => false, 'message' => 'Box sudah discan.'], 409);
-        }
-
-        $pickItem->status = 'scanned';
-        $pickItem->scanned_at = now();
-        $pickItem->scanned_by = Auth::id();
-        $pickItem->save();
-
-        $remaining = $session->items()->where('status', 'pending')->count();
+                'status' => 200,
+            ];
+        });
 
         return response()->json([
-            'success' => true,
-            'message' => 'Scan berhasil.',
-            'remaining' => $remaining,
-            'box_id' => $box->id,
-        ]);
+            'success' => (bool) ($result['success'] ?? false),
+            'message' => $result['message'] ?? null,
+            'remaining' => $result['remaining'] ?? null,
+            'box_id' => $result['box_id'] ?? null,
+        ], (int) ($result['status'] ?? 200));
     }
 
     public function verifyScanBox(Request $request, $sessionId)
@@ -419,39 +402,65 @@ class DeliveryPickController extends Controller
             'box_number' => 'required|string',
         ]);
 
-        $session = DeliveryPickSession::with('items')->findOrFail($sessionId);
+        $result = DB::transaction(function () use ($request, $sessionId) {
+            $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
 
-        $box = Box::where('box_number', $request->box_number)->first();
-        if (!$box) {
-            return response()->json(['success' => false, 'message' => 'Box tidak sesuai daftar picking.'], 422);
-        }
+            if ($session->status === 'blocked') {
+                return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423];
+            }
 
-        if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
-            return response()->json(['success' => false, 'message' => 'Box tidak sesuai daftar picking.'], 422);
-        }
+            if ($session->status === 'completed') {
+                return ['success' => false, 'message' => 'Session sudah completed.', 'status' => 409];
+            }
 
-        $pickItem = $session->items()->where('box_id', $box->id)->first();
-        if (!$pickItem) {
-            return response()->json(['success' => false, 'message' => 'Box tidak sesuai daftar picking.'], 422);
-        }
+            $box = Box::where('box_number', $request->box_number)->lockForUpdate()->first();
+            if (!$box) {
+                return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
+            }
 
-        $sessionKey = 'delivery_verification.' . $sessionId . '.box_ids';
-        $verifiedBoxIds = session($sessionKey, []);
+            if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
+                return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
+            }
 
-        $already = in_array($box->id, $verifiedBoxIds, true);
-        if (!$already) {
-            $verifiedBoxIds[] = $box->id;
-            session([$sessionKey => array_values(array_unique($verifiedBoxIds))]);
-        }
+            $pickItemExists = DeliveryPickItem::where('pick_session_id', $session->id)
+                ->where('box_id', $box->id)
+                ->exists();
 
-        $remaining = max(0, $session->items()->count() - count(array_unique($verifiedBoxIds)));
+            if (!$pickItemExists) {
+                return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
+            }
+
+            $verifiedBoxIds = collect($session->verification_box_ids ?? [])
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn ($id) => $id > 0)
+                ->unique()
+                ->values();
+
+            $already = $verifiedBoxIds->contains((int) $box->id);
+            if (!$already) {
+                $verifiedBoxIds->push((int) $box->id);
+                $session->verification_box_ids = $verifiedBoxIds->unique()->values()->all();
+                $session->save();
+            }
+
+            $totalItems = DeliveryPickItem::where('pick_session_id', $session->id)->count();
+            $remaining = max(0, $totalItems - $verifiedBoxIds->unique()->count());
+
+            return [
+                'success' => true,
+                'message' => $already ? 'Box sudah diverifikasi.' : 'Scan verifikasi berhasil.',
+                'remaining' => $remaining,
+                'box_id' => $box->id,
+                'status' => 200,
+            ];
+        });
 
         return response()->json([
-            'success' => true,
-            'message' => $already ? 'Box sudah diverifikasi.' : 'Scan verifikasi berhasil.',
-            'remaining' => $remaining,
-            'box_id' => $box->id,
-        ]);
+            'success' => (bool) ($result['success'] ?? false),
+            'message' => $result['message'] ?? null,
+            'remaining' => $result['remaining'] ?? null,
+            'box_id' => $result['box_id'] ?? null,
+        ], (int) ($result['status'] ?? 200));
     }
 
     public function approveIssue(Request $request, $issueId)
@@ -484,100 +493,131 @@ class DeliveryPickController extends Controller
 
     public function complete(Request $request, $sessionId)
     {
-        $session = DeliveryPickSession::with(['items.box.pallets.stockLocation'])->findOrFail($sessionId);
-        $order = DeliveryOrder::with('items')->findOrFail($session->delivery_order_id);
-
-        if ($session->status === 'blocked') {
-            return response()->json(['success' => false, 'message' => 'Session diblokir.'], 423);
-        }
-
-        if ($session->issues()->where('status', 'pending')->exists()) {
-            return response()->json(['success' => false, 'message' => 'Ada issue scan yang belum di-approve.'], 423);
-        }
-
-        if ($session->items()->where('status', 'pending')->count() > 0) {
-            return response()->json(['success' => false, 'message' => 'Masih ada box yang belum discan.'], 422);
-        }
-
-        DB::beginTransaction();
         try {
-            $batchId = (string) Str::uuid();
+            $result = DB::transaction(function () use ($sessionId) {
+                $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
 
-            foreach ($session->items as $pickItem) {
-                $box = $pickItem->box;
-
-                if (!$box) {
-                    continue;
+                if ($session->status === 'completed') {
+                    return ['success' => true, 'message' => 'Session sudah completed.'];
                 }
 
-                $pallet = $box->pallets()->first();
-                $palletItem = null;
+                if ($session->status === 'blocked') {
+                    return ['success' => false, 'message' => 'Session diblokir.', 'status' => 423];
+                }
 
-                if ($pallet) {
-                    $palletItem = PalletItem::where('pallet_id', $pallet->id)
-                        ->where('part_number', $box->part_number)
+                $hasPendingIssue = DeliveryIssue::where('pick_session_id', $session->id)
+                    ->where('status', 'pending')
+                    ->lockForUpdate()
+                    ->exists();
+                if ($hasPendingIssue) {
+                    return ['success' => false, 'message' => 'Ada issue scan yang belum di-approve.', 'status' => 423];
+                }
+
+                $pendingItemsCount = DeliveryPickItem::where('pick_session_id', $session->id)
+                    ->where('status', 'pending')
+                    ->lockForUpdate()
+                    ->count();
+                if ($pendingItemsCount > 0) {
+                    return ['success' => false, 'message' => 'Masih ada box yang belum discan.', 'status' => 422];
+                }
+
+                $order = DeliveryOrder::with('items')->whereKey($session->delivery_order_id)->lockForUpdate()->firstOrFail();
+                $sessionItems = DeliveryPickItem::with(['box.pallets.stockLocation'])
+                    ->where('pick_session_id', $session->id)
+                    ->lockForUpdate()
+                    ->get();
+
+                $batchId = (string) Str::uuid();
+
+                foreach ($sessionItems as $pickItem) {
+                    $box = Box::whereKey($pickItem->box_id)->lockForUpdate()->first();
+
+                    if (!$box) {
+                        continue;
+                    }
+
+                    $pallet = $box->pallets()->first();
+                    $palletItem = null;
+
+                    if ($pallet) {
+                        $palletItem = PalletItem::where('pallet_id', $pallet->id)
+                            ->where('part_number', $box->part_number)
+                            ->lockForUpdate()
+                            ->first();
+                    }
+
+                    $existingWithdrawal = StockWithdrawal::where('pick_session_id', $session->id)
+                        ->where('box_id', $box->id)
                         ->first();
-                }
 
-                $withdrawal = StockWithdrawal::create([
-                    'withdrawal_batch_id' => $batchId,
-                    'user_id' => Auth::id(),
-                    'pallet_item_id' => $palletItem?->id,
-                    'box_id' => $box->id,
-                    'part_number' => $box->part_number,
-                    'pcs_quantity' => (int) $box->pcs_quantity,
-                    'box_quantity' => 1,
-                    'warehouse_location' => $pallet?->stockLocation?->warehouse_location ?? 'Unknown',
-                    'status' => 'completed',
-                    'notes' => 'Delivery fulfillment (scan)',
-                    'withdrawn_at' => now(),
-                ]);
+                    if (!$existingWithdrawal) {
+                        StockWithdrawal::create([
+                            'withdrawal_batch_id' => $batchId,
+                            'pick_session_id' => $session->id,
+                            'user_id' => Auth::id(),
+                            'pallet_item_id' => $palletItem?->id,
+                            'box_id' => $box->id,
+                            'part_number' => $box->part_number,
+                            'pcs_quantity' => (int) $box->pcs_quantity,
+                            'box_quantity' => 1,
+                            'warehouse_location' => $pallet?->stockLocation?->warehouse_location ?? 'Unknown',
+                            'status' => 'completed',
+                            'notes' => 'Delivery fulfillment (scan)',
+                            'withdrawn_at' => now(),
+                        ]);
+                    }
 
-                $box->is_withdrawn = true;
-                $box->withdrawn_at = now();
-                $box->save();
+                    if (!$box->is_withdrawn) {
+                        $box->is_withdrawn = true;
+                        $box->withdrawn_at = now();
+                        $box->save();
 
-                if ($palletItem) {
-                    $palletItem->pcs_quantity = max(0, $palletItem->pcs_quantity - (int) $box->pcs_quantity);
-                    $palletItem->box_quantity = max(0, $palletItem->box_quantity - 1);
-                    $palletItem->save();
-                }
+                        if ($palletItem) {
+                            $palletItem->pcs_quantity = max(0, $palletItem->pcs_quantity - (int) $box->pcs_quantity);
+                            $palletItem->box_quantity = max(0, $palletItem->box_quantity - 1);
+                            $palletItem->save();
+                        }
+                    }
 
-                // Auto-update master location jika pallet kosong
-                if ($pallet) {
-                    $masterLocation = MasterLocation::where('current_pallet_id', $pallet->id)->first();
-                    if ($masterLocation) {
-                        $masterLocation->autoVacateIfEmpty();
+                    if ($pallet) {
+                        $masterLocation = MasterLocation::where('current_pallet_id', $pallet->id)->lockForUpdate()->first();
+                        if ($masterLocation) {
+                            $masterLocation->autoVacateIfEmpty();
+                        }
                     }
                 }
-            }
 
-            // Log batch withdrawal satu kali dengan detail semua boxes
-            AuditService::logBatchStockWithdrawal($session, 'completed');
+                $session = DeliveryPickSession::with('items')->findOrFail($session->id);
 
-            foreach ($order->items as $orderItem) {
-                $pickedPcs = $session->items->where('part_number', $orderItem->part_number)->sum('pcs_quantity');
-                $orderItem->fulfilled_quantity = min(
-                    (int) $orderItem->quantity,
-                    (int) $orderItem->fulfilled_quantity + (int) $pickedPcs
-                );
-                $orderItem->save();
-            }
+                AuditService::logBatchStockWithdrawal($session, 'completed');
 
-            $order->status = 'completed';
-            $order->save();
+                foreach ($order->items as $orderItem) {
+                    $pickedPcs = $session->items->where('part_number', $orderItem->part_number)->sum('pcs_quantity');
+                    $orderItem->fulfilled_quantity = min(
+                        (int) $orderItem->quantity,
+                        (int) $orderItem->fulfilled_quantity + (int) $pickedPcs
+                    );
+                    $orderItem->save();
+                }
 
-            $session->status = 'completed';
-            $session->completed_at = now();
-            $session->completion_status = 'completed';
-            $session->redo_until = now()->addDays(5);
-            $session->save();
+                $order->status = 'completed';
+                $order->save();
 
-            DB::commit();
+                $session->status = 'completed';
+                $session->completed_at = now();
+                $session->completion_status = 'completed';
+                $session->redo_until = now()->addDays(5);
+                $session->save();
 
-            return response()->json(['success' => true]);
-        } catch (\Exception $e) {
-            DB::rollBack();
+                return ['success' => true];
+            });
+
+            $statusCode = (int) ($result['status'] ?? 200);
+            return response()->json([
+                'success' => (bool) ($result['success'] ?? false),
+                'message' => $result['message'] ?? null,
+            ], $statusCode);
+        } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
     }
@@ -604,8 +644,14 @@ class DeliveryPickController extends Controller
             
             if (!empty($boxIds)) {
                 // Then handle withdrawals and pallet items - do this FIRST to get pallet info
-                $withdrawals = StockWithdrawal::whereIn('box_id', $boxIds)
-                    ->where('status', 'completed')
+                $withdrawals = StockWithdrawal::where('status', 'completed')
+                    ->where(function ($query) use ($session, $boxIds) {
+                        $query->where('pick_session_id', $session->id)
+                            ->orWhere(function ($legacy) use ($boxIds) {
+                                $legacy->whereNull('pick_session_id')
+                                    ->whereIn('box_id', $boxIds);
+                            });
+                    })
                     ->get();
 
                 // First, get all boxes from the session with their pallets
@@ -853,7 +899,7 @@ class DeliveryPickController extends Controller
         return view('operator.delivery.scan-issues', compact('issues', 'historyIssues'));
     }
 
-    private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null)
+    private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null, bool $lockRows = false)
     {
         $query = Box::query()
             ->where('part_number', $partNumber)
@@ -880,12 +926,16 @@ class DeliveryPickController extends Controller
                 $q->where('boxes.created_at', '>=', $cutoffDate);
             });
 
+        if ($lockRows) {
+            $query->lockForUpdate();
+        }
+
         return $query->get();
     }
 
-    private function getBoxesByFIFO(string $partNumber, int $requestedPcs, $deliveryDate = null)
+    private function getBoxesByFIFO(string $partNumber, int $requestedPcs, $deliveryDate = null, bool $lockRows = false)
     {
-        $boxes = Box::query()
+        $query = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
             ->whereNotIn('expired_status', ['handled', 'expired'])
@@ -908,8 +958,13 @@ class DeliveryPickController extends Controller
                 $q->where('boxes.created_at', '>=', $cutoffDate);
             })
             ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.*')
-            ->get();
+            ->select('boxes.*');
+
+        if ($lockRows) {
+            $query->lockForUpdate();
+        }
+
+        $boxes = $query->get();
 
         $selected = collect();
         $remaining = $requestedPcs;

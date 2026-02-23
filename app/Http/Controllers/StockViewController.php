@@ -328,7 +328,11 @@ class StockViewController extends Controller
             'reason' => 'required|string|min:3|max:500',
         ]);
 
-        $box = Box::findOrFail($boxId);
+        $newPartNumber = (string) $validated['part_number'];
+        $newPcsQuantity = (int) $validated['pcs_quantity'];
+        $newStoredAt = Carbon::parse($validated['stored_at']);
+
+        $box = Box::with('pallets')->findOrFail($boxId);
 
         if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
             return response()->json([
@@ -339,10 +343,6 @@ class StockViewController extends Controller
 
         $oldPartNumber = (string) $box->part_number;
         $oldPcsQuantity = (int) $box->pcs_quantity;
-        $newPartNumber = (string) $validated['part_number'];
-        $newPcsQuantity = (int) $validated['pcs_quantity'];
-        $newStoredAt = Carbon::parse($validated['stored_at']);
-
         $isSamePart = $oldPartNumber === $newPartNumber;
         $isSamePcs = $oldPcsQuantity === $newPcsQuantity;
         $isSameStoredAtMinute = optional($box->created_at)->format('Y-m-d H:i') === $newStoredAt->format('Y-m-d H:i');
@@ -357,9 +357,18 @@ class StockViewController extends Controller
         DB::beginTransaction();
 
         try {
-            foreach ($box->pallets as $pallet) {
+            $box = Box::whereKey($boxId)->lockForUpdate()->firstOrFail();
+
+            if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
+                throw new \RuntimeException('Box tidak bisa diedit karena statusnya tidak aktif.');
+            }
+
+            $pallets = $box->pallets()->lockForUpdate()->get();
+
+            foreach ($pallets as $pallet) {
                 $oldItem = PalletItem::where('pallet_id', $pallet->id)
                     ->where('part_number', $oldPartNumber)
+                    ->lockForUpdate()
                     ->first();
 
                 if ($oldPartNumber === $newPartNumber) {
@@ -384,6 +393,8 @@ class StockViewController extends Controller
                             'pcs_quantity' => 0,
                         ]
                     );
+
+                    $newItem = PalletItem::whereKey($newItem->id)->lockForUpdate()->firstOrFail();
 
                     $newItem->box_quantity = (int) $newItem->box_quantity + 1;
                     $newItem->pcs_quantity = (int) $newItem->pcs_quantity + $newPcsQuantity;

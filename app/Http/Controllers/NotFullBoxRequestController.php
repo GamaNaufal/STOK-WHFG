@@ -13,12 +13,21 @@ use App\Models\PartSetting;
 use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\AuditService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 
 class NotFullBoxRequestController extends Controller
 {
+    private function isDuplicateKeyException(QueryException $e): bool
+    {
+        $sqlState = (string) ($e->getCode() ?? '');
+        $driverCode = (int) ($e->errorInfo[1] ?? 0);
+
+        return $sqlState === '23000' || $driverCode === 1062;
+    }
+
     public function create()
     {
         $partNumbers = PartSetting::orderBy('part_number', 'asc')->get(['part_number', 'qty_box']);
@@ -89,18 +98,26 @@ class NotFullBoxRequestController extends Controller
             return redirect()->back()->with('error', 'Pilih lokasi tujuan.')->withInput();
         }
 
-        NotFullBoxRequest::create([
-            'box_number' => $request->box_number,
-            'part_number' => $request->part_number,
-            'pcs_quantity' => (int) $request->pcs_quantity,
-            'fixed_qty' => $fixedQty,
-            'reason' => $request->reason,
-            'request_type' => $request->request_type,
-            'delivery_order_id' => $deliveryOrder->id,
-            'requested_by' => Auth::id(),
-            'target_pallet_id' => $request->target_type === 'pallet' ? $request->target_pallet_id : null,
-            'target_location_id' => $request->target_type === 'location' ? $request->target_location_id : null,
-        ]);
+        try {
+            NotFullBoxRequest::create([
+                'box_number' => $request->box_number,
+                'part_number' => $request->part_number,
+                'pcs_quantity' => (int) $request->pcs_quantity,
+                'fixed_qty' => $fixedQty,
+                'reason' => $request->reason,
+                'request_type' => $request->request_type,
+                'delivery_order_id' => $deliveryOrder->id,
+                'requested_by' => Auth::id(),
+                'target_pallet_id' => $request->target_type === 'pallet' ? $request->target_pallet_id : null,
+                'target_location_id' => $request->target_type === 'location' ? $request->target_location_id : null,
+            ]);
+        } catch (QueryException $e) {
+            if ($this->isDuplicateKeyException($e)) {
+                return redirect()->back()->with('error', 'ID Box sudah pernah diajukan.')->withInput();
+            }
+
+            throw $e;
+        }
 
         return redirect()->back()->with('success', 'Permintaan Box Not Full berhasil dikirim ke Supervisi.');
     }
@@ -123,143 +140,178 @@ class NotFullBoxRequestController extends Controller
 
     public function approve($id)
     {
-        $request = NotFullBoxRequest::with(['deliveryOrder', 'targetLocation', 'targetPallet'])->findOrFail($id);
-
-        if ($request->status !== 'pending') {
-            return redirect()->back()->with('error', 'Status permintaan sudah diproses.');
-        }
-
-        DB::beginTransaction();
         try {
-            $pallet = $request->targetPallet;
-            $locationCode = null;
+            DB::transaction(function () use ($id) {
+                $request = NotFullBoxRequest::with(['deliveryOrder', 'targetLocation', 'targetPallet'])
+                    ->whereKey($id)
+                    ->lockForUpdate()
+                    ->firstOrFail();
 
-            if (!$pallet) {
-                $location = $request->targetLocation;
-                if (!$location || $location->is_occupied) {
-                    throw new \Exception('Lokasi tidak tersedia.');
+                if ($request->status !== 'pending') {
+                    throw new \RuntimeException('Status permintaan sudah diproses.');
                 }
 
-                $pallet = $this->createNewPallet();
-                $locationCode = $location->code;
+                $pallet = $request->targetPallet;
+                $locationCode = null;
 
-                $location->update([
-                    'is_occupied' => true,
-                    'current_pallet_id' => $pallet->id,
-                ]);
+                if (!$pallet) {
+                    $location = $request->targetLocation;
+                    if (!$location) {
+                        throw new \RuntimeException('Lokasi tidak tersedia.');
+                    }
 
-                StockLocation::create([
-                    'pallet_id' => $pallet->id,
-                    'warehouse_location' => $locationCode,
-                    'stored_at' => now(),
-                ]);
-            } else {
-                $locationCode = $pallet->stockLocation?->warehouse_location ?? 'Unknown';
-            }
+                    $claimed = MasterLocation::whereKey($location->id)
+                        ->where('is_occupied', false)
+                        ->update([
+                            'is_occupied' => true,
+                            'updated_at' => now(),
+                        ]);
 
-            if (Box::where('box_number', $request->box_number)->exists()) {
-                throw new \Exception('ID Box sudah terdaftar di sistem.');
-            }
+                    if ($claimed === 0) {
+                        throw new \RuntimeException('Lokasi tidak tersedia.');
+                    }
 
-            $box = Box::create([
-                'box_number' => $request->box_number,
-                'part_number' => $request->part_number,
-                'pcs_quantity' => $request->pcs_quantity,
-                'qr_code' => $request->box_number . '|' . $request->part_number . '|' . $request->pcs_quantity,
-                'user_id' => $request->requested_by,
-                'qty_box' => $request->fixed_qty,
-                'is_not_full' => true,
-                'not_full_reason' => $request->reason,
-                'assigned_delivery_order_id' => $request->delivery_order_id,
-            ]);
+                    $pallet = $this->createNewPallet();
+                    $locationCode = $location->code;
 
-            $pallet->boxes()->attach($box->id);
-
-            $palletItem = PalletItem::firstOrCreate(
-                ['pallet_id' => $pallet->id, 'part_number' => $request->part_number],
-                ['box_quantity' => 0, 'pcs_quantity' => 0]
-            );
-            $palletItem->increment('box_quantity');
-            $palletItem->increment('pcs_quantity', $request->pcs_quantity);
-
-            if ($request->request_type === 'additional') {
-                $orderItem = DeliveryOrderItem::where('delivery_order_id', $request->delivery_order_id)
-                    ->where('part_number', $request->part_number)
-                    ->first();
-                if ($orderItem) {
-                    $orderItem->quantity += $request->pcs_quantity;
-                    $orderItem->save();
-                } else {
-                    DeliveryOrderItem::create([
-                        'delivery_order_id' => $request->delivery_order_id,
-                        'part_number' => $request->part_number,
-                        'quantity' => $request->pcs_quantity,
-                        'fulfilled_quantity' => 0,
+                    MasterLocation::whereKey($location->id)->update([
+                        'current_pallet_id' => $pallet->id,
+                        'updated_at' => now(),
                     ]);
+
+                    StockLocation::create([
+                        'pallet_id' => $pallet->id,
+                        'warehouse_location' => $locationCode,
+                        'stored_at' => now(),
+                    ]);
+                } else {
+                    $pallet = Pallet::whereKey($pallet->id)->lockForUpdate()->firstOrFail();
+                    $locationCode = $pallet->stockLocation?->warehouse_location ?? 'Unknown';
                 }
-            }
 
-            $stockInput = StockInput::create([
-                'pallet_id' => $pallet->id,
-                'pallet_item_id' => $palletItem->id,
-                'user_id' => Auth::id(),
-                'warehouse_location' => $locationCode ?? 'Unknown',
-                'pcs_quantity' => $request->pcs_quantity,
-                'box_quantity' => 1,
-                'stored_at' => now(),
-                'part_numbers' => [$request->part_number],
-            ]);
-            AuditService::logStockInput($stockInput, 'created');
+                if (Box::where('box_number', $request->box_number)->lockForUpdate()->exists()) {
+                    throw new \RuntimeException('ID Box sudah terdaftar di sistem.');
+                }
 
-            $request->status = 'approved';
-            $request->approved_by = Auth::id();
-            $request->approved_at = now();
-            $request->box_id = $box->id;
-            $request->target_location_code = $locationCode;
-            $request->save();
+                $box = Box::create([
+                    'box_number' => $request->box_number,
+                    'part_number' => $request->part_number,
+                    'pcs_quantity' => $request->pcs_quantity,
+                    'qr_code' => $request->box_number . '|' . $request->part_number . '|' . $request->pcs_quantity,
+                    'user_id' => $request->requested_by,
+                    'qty_box' => $request->fixed_qty,
+                    'is_not_full' => true,
+                    'not_full_reason' => $request->reason,
+                    'assigned_delivery_order_id' => $request->delivery_order_id,
+                ]);
 
-            DB::commit();
+                $pallet->boxes()->attach($box->id);
+
+                $palletItem = PalletItem::firstOrCreate(
+                    ['pallet_id' => $pallet->id, 'part_number' => $request->part_number],
+                    ['box_quantity' => 0, 'pcs_quantity' => 0]
+                );
+                $palletItem = PalletItem::whereKey($palletItem->id)->lockForUpdate()->firstOrFail();
+                $palletItem->box_quantity = (int) $palletItem->box_quantity + 1;
+                $palletItem->pcs_quantity = (int) $palletItem->pcs_quantity + (int) $request->pcs_quantity;
+                $palletItem->save();
+
+                if ($request->request_type === 'additional') {
+                    $orderItem = DeliveryOrderItem::where('delivery_order_id', $request->delivery_order_id)
+                        ->where('part_number', $request->part_number)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($orderItem) {
+                        $orderItem->quantity = (int) $orderItem->quantity + (int) $request->pcs_quantity;
+                        $orderItem->save();
+                    } else {
+                        DeliveryOrderItem::create([
+                            'delivery_order_id' => $request->delivery_order_id,
+                            'part_number' => $request->part_number,
+                            'quantity' => $request->pcs_quantity,
+                            'fulfilled_quantity' => 0,
+                        ]);
+                    }
+                }
+
+                $stockInput = StockInput::create([
+                    'pallet_id' => $pallet->id,
+                    'pallet_item_id' => $palletItem->id,
+                    'user_id' => Auth::id(),
+                    'warehouse_location' => $locationCode ?? 'Unknown',
+                    'pcs_quantity' => $request->pcs_quantity,
+                    'box_quantity' => 1,
+                    'stored_at' => now(),
+                    'part_numbers' => [$request->part_number],
+                ]);
+                AuditService::logStockInput($stockInput, 'created');
+
+                $request->status = 'approved';
+                $request->approved_by = Auth::id();
+                $request->approved_at = now();
+                $request->box_id = $box->id;
+                $request->target_location_code = $locationCode;
+                $request->save();
+            });
 
             return redirect()->back()->with('success', 'Permintaan berhasil di-approve.');
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (\Throwable $e) {
             return redirect()->back()->with('error', 'Gagal approve: ' . $e->getMessage());
         }
     }
 
     public function reject($id)
     {
-        $request = NotFullBoxRequest::findOrFail($id);
+        try {
+            DB::transaction(function () use ($id) {
+                $request = NotFullBoxRequest::whereKey($id)->lockForUpdate()->firstOrFail();
 
-        if ($request->status !== 'pending') {
-            return redirect()->back()->with('error', 'Status permintaan sudah diproses.');
+                if ($request->status !== 'pending') {
+                    throw new \RuntimeException('Status permintaan sudah diproses.');
+                }
+
+                $request->status = 'rejected';
+                $request->approved_by = Auth::id();
+                $request->approved_at = now();
+                $request->save();
+            });
+
+            return redirect()->back()->with('success', 'Permintaan ditolak.');
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
         }
-
-        $request->status = 'rejected';
-        $request->approved_by = Auth::id();
-        $request->approved_at = now();
-        $request->save();
-
-        return redirect()->back()->with('success', 'Permintaan ditolak.');
     }
 
     private function createNewPallet(): Pallet
     {
-        $maxNumber = Pallet::query()
-            ->where('pallet_number', 'like', 'PLT-%')
-            ->pluck('pallet_number')
-            ->map(function ($palletNumber) {
-                preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
-                return isset($matches[1]) ? (int) $matches[1] : 0;
-            })
-            ->max() ?? 0;
+        $maxAttempts = 5;
 
-        $nextNumber = $maxNumber + 1;
+        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+            $maxNumber = Pallet::query()
+                ->where('pallet_number', 'like', 'PLT-%')
+                ->pluck('pallet_number')
+                ->map(function ($palletNumber) {
+                    preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+                    return isset($matches[1]) ? (int) $matches[1] : 0;
+                })
+                ->max() ?? 0;
 
-        $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $nextNumber = $maxNumber + 1;
+            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
-        return Pallet::create([
-            'pallet_number' => $palletNumber,
-        ]);
+            try {
+                return Pallet::create([
+                    'pallet_number' => $palletNumber,
+                ]);
+            } catch (QueryException $e) {
+                if ($this->isDuplicateKeyException($e) && $attempt < $maxAttempts) {
+                    continue;
+                }
+
+                throw $e;
+            }
+        }
+
+        throw new \RuntimeException('Gagal membuat nomor palet unik. Silakan coba lagi.');
     }
 }

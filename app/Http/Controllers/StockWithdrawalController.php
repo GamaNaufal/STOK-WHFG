@@ -166,135 +166,129 @@ class StockWithdrawalController extends Controller
         ]);
 
         $partNumber = $request->input('part_number');
-        $requestedQty = $request->input('pcs_quantity');
+        $requestedQty = (int) $request->input('pcs_quantity');
         $notes = $request->input('notes');
 
-        // Get total available stock
-        $totalStock = $this->getTotalStockForPart($partNumber);
-
-        if ($totalStock < $requestedQty) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Stok tidak cukup untuk pengambilan ini',
-            ], 422);
-        }
-
         try {
-            DB::beginTransaction();
+            $withdrawals = DB::transaction(function () use ($partNumber, $requestedQty, $notes, $request) {
+                $batchId = Str::uuid();
+                $remainingQty = $requestedQty;
+                $withdrawals = [];
 
-            // Generate unique batch ID for this withdrawal request
-            $batchId = Str::uuid();
+                $palletItems = PalletItem::where('part_number', $partNumber)
+                    ->where('pcs_quantity', '>', 0)
+                    ->whereHas('pallet', function ($q) {
+                        $q->whereHas('stockLocation');
+                    })
+                    ->with(['pallet' => function ($q) {
+                        $q->with('stockLocation');
+                    }])
+                    ->orderBy('created_at', 'asc')
+                    ->lockForUpdate()
+                    ->get();
 
-            $remainingQty = $requestedQty;
-            $withdrawals = [];
-
-            // Get all pallet items with this part number, sorted by FIFO (oldest first)
-            $palletItems = PalletItem::where('part_number', $partNumber)
-                ->whereHas('pallet', function ($q) {
-                    $q->whereHas('stockLocation');
-                })
-                ->with(['pallet' => function ($q) {
-                    $q->with('stockLocation');
-                }])
-                ->orderBy('created_at', 'asc')
-                ->get();
-
-            /** @var \App\Models\PalletItem $palletItem */
-            foreach ($palletItems as $palletItem) {
-                if ($remainingQty <= 0) {
-                    break;
+                $totalStock = (int) $palletItems->sum('pcs_quantity');
+                if ($totalStock < $requestedQty) {
+                    throw new \RuntimeException('Stok tidak cukup untuk pengambilan ini');
                 }
 
-                if ($palletItem->pcs_quantity <= 0) {
-                    continue;
+                foreach ($palletItems as $palletItem) {
+                    if (!$palletItem instanceof PalletItem) {
+                        continue;
+                    }
+
+                    if ($remainingQty <= 0) {
+                        break;
+                    }
+
+                    if ($palletItem->pcs_quantity <= 0) {
+                        continue;
+                    }
+
+                    $takeQty = min($remainingQty, (int) $palletItem->pcs_quantity);
+                    $pcsPerBox = $palletItem->box_quantity > 0 ? $palletItem->pcs_quantity / $palletItem->box_quantity : 0;
+                    $boxesToReduce = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
+
+                    $stockLocation = $palletItem->pallet->stockLocation;
+                    $warehouseLocation = $stockLocation ? $stockLocation->warehouse_location : 'Unknown';
+
+                    $withdrawal = StockWithdrawal::create([
+                        'withdrawal_batch_id' => $batchId,
+                        'user_id' => Auth::id(),
+                        'pallet_item_id' => $palletItem->id,
+                        'part_number' => $partNumber,
+                        'pcs_quantity' => $takeQty,
+                        'box_quantity' => $boxesToReduce,
+                        'warehouse_location' => $warehouseLocation,
+                        'status' => 'completed',
+                        'notes' => $notes,
+                        'withdrawn_at' => now(),
+                    ]);
+
+                    $withdrawals[] = $withdrawal;
+
+                    $palletItem->pcs_quantity = max(0, (int) $palletItem->pcs_quantity - $takeQty);
+                    $palletItem->box_quantity = max(0, (int) $palletItem->box_quantity - (int) $boxesToReduce);
+                    $palletItem->save();
+
+                    $masterLocation = MasterLocation::where('current_pallet_id', $palletItem->pallet_id)
+                        ->lockForUpdate()
+                        ->first();
+                    if ($masterLocation) {
+                        $masterLocation->autoVacateIfEmpty();
+                    }
+
+                    $remainingQty -= $takeQty;
                 }
 
-                // Determine how much to take from this pallet item
-                $takeQty = min($remainingQty, $palletItem->pcs_quantity);
-                
-                // Calculate PCS per box
-                $pcsPerBox = $palletItem->box_quantity > 0 ? $palletItem->pcs_quantity / $palletItem->box_quantity : 0;
-                
-                // Calculate how many boxes to reduce (floor - bulatkan ke bawah)
-                $boxesToReduce = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
-                
-                // Get warehouse location
-                $stockLocation = $palletItem->pallet->stockLocation;
-                $warehouseLocation = $stockLocation ? $stockLocation->warehouse_location : 'Unknown';
-
-                // Create withdrawal record
-                $withdrawal = StockWithdrawal::create([
-                    'withdrawal_batch_id' => $batchId,
-                    'user_id' => Auth::id(),
-                    'pallet_item_id' => $palletItem->id,
-                    'part_number' => $partNumber,
-                    'pcs_quantity' => $takeQty,
-                    'box_quantity' => $boxesToReduce,
-                    'warehouse_location' => $warehouseLocation,
-                    'status' => 'completed',
-                    'notes' => $notes,
-                    'withdrawn_at' => now(),
-                ]);
-
-                $withdrawals[] = $withdrawal;
-
-                // Update pallet item quantity (both PCS and Box)
-                $palletItem->pcs_quantity -= $takeQty;
-                $palletItem->box_quantity -= $boxesToReduce;
-                $palletItem->save();
-
-                // Auto-update master location jika pallet kosong
-                $masterLocation = MasterLocation::where('current_pallet_id', $palletItem->pallet_id)->first();
-                if ($masterLocation) {
-                    $masterLocation->autoVacateIfEmpty();
+                if ($remainingQty > 0) {
+                    throw new \RuntimeException('Stok tidak cukup untuk pengambilan ini');
                 }
 
-                // Don't delete pallet immediately - keep it for undo operations
-                // Just mark items with 0 quantity (logical deletion)
+                $deliveryOrderItemId = (int) $request->input('delivery_order_item_id');
+                if ($deliveryOrderItemId > 0) {
+                    $deliveryItem = \App\Models\DeliveryOrderItem::whereKey($deliveryOrderItemId)
+                        ->lockForUpdate()
+                        ->first();
 
-                $remainingQty -= $takeQty;
-            }
+                    if ($deliveryItem) {
+                        $deliveryItem->fulfilled_quantity = (int) $deliveryItem->fulfilled_quantity + $requestedQty;
+                        $deliveryItem->save();
 
-            // DELIVERY ORDER FULFILLMENT LOGIC
-            // If this withdrawal is linked to a DeliveryOrderItem
-            $deliveryOrderItemId = $request->input('delivery_order_item_id');
-            if ($deliveryOrderItemId) {
-                $deliveryItem = \App\Models\DeliveryOrderItem::find($deliveryOrderItemId);
-                if ($deliveryItem) {
-                    $deliveryItem->fulfilled_quantity += $requestedQty; // Assuming full success of requested
-                    $deliveryItem->save();
+                        $order = \App\Models\DeliveryOrder::whereKey($deliveryItem->delivery_order_id)
+                            ->lockForUpdate()
+                            ->first();
 
-                    // Check if Parent Order is Complete
-                    $order = $deliveryItem->order;
-                    $isComplete = true;
-                    foreach ($order->items as $checkItem) {
-                        if ($checkItem->fulfilled_quantity < $checkItem->quantity) {
-                            $isComplete = false;
-                            break;
+                        if ($order) {
+                            $orderItems = $order->items()->lockForUpdate()->get();
+                            $isComplete = true;
+                            foreach ($orderItems as $checkItem) {
+                                if ((int) $checkItem->fulfilled_quantity < (int) $checkItem->quantity) {
+                                    $isComplete = false;
+                                    break;
+                                }
+                            }
+
+                            if ($isComplete) {
+                                $order->status = 'completed';
+                                $order->save();
+                            } elseif ($order->status !== 'processing') {
+                                $order->status = 'processing';
+                                $order->save();
+                            }
                         }
                     }
-                    if ($isComplete) {
-                        $order->status = 'completed';
-                        $order->save();
-                    } else {
-                        // Mark as processing if not already
-                        if($order->status !== 'processing') {
-                            $order->status = 'processing';
-                            $order->save();
-                        }
-                    }
                 }
-            }
 
-            DB::commit();
+                return $withdrawals;
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => "Pengambilan stok berhasil! {$requestedQty} PCS {$partNumber} telah diambil",
                 'withdrawals' => $withdrawals,
             ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
@@ -314,100 +308,90 @@ class StockWithdrawalController extends Controller
         ]);
 
         $items = $request->input('items');
-        $partNumbers = collect($items)->pluck('part_number')->filter()->values();
-        $totals = $this->getTotalsByPartNumbers($partNumbers->all());
-
         try {
-            DB::beginTransaction();
+            DB::transaction(function () use ($items) {
+                $batchId = Str::uuid();
 
-            $batchId = Str::uuid();
+                foreach ($items as $cartItem) {
+                    $partNumber = (string) $cartItem['part_number'];
+                    $requestedQty = (int) $cartItem['pcs_quantity'];
+                    $remainingQty = $requestedQty;
 
-            // Process each item in the cart
-            foreach ($items as $cartItem) {
-                $partNumber = $cartItem['part_number'];
-                $requestedQty = $cartItem['pcs_quantity'];
+                    $palletItems = PalletItem::where('part_number', $partNumber)
+                        ->where('pcs_quantity', '>', 0)
+                        ->whereHas('pallet', function ($q) {
+                            $q->whereHas('stockLocation');
+                        })
+                        ->with(['pallet' => function ($q) {
+                            $q->with('stockLocation');
+                        }])
+                        ->orderBy('created_at', 'asc')
+                        ->lockForUpdate()
+                        ->get();
 
-                // Get total available stock
-                $totalStock = (int) ($totals[$partNumber] ?? 0);
+                    $totalStock = (int) $palletItems->sum('pcs_quantity');
+                    if ($totalStock < $requestedQty) {
+                        throw new \RuntimeException("Stok tidak cukup untuk part {$partNumber}! Available: {$totalStock} PCS, Requested: {$requestedQty} PCS");
+                    }
 
-                if ($totalStock < $requestedQty) {
-                    throw new \Exception("Stok tidak cukup untuk part {$partNumber}! Available: {$totalStock} PCS, Requested: {$requestedQty} PCS");
+                    foreach ($palletItems as $palletItem) {
+                        if (!$palletItem instanceof PalletItem) {
+                            continue;
+                        }
+
+                        if ($remainingQty <= 0) {
+                            break;
+                        }
+
+                        if ($palletItem->pcs_quantity <= 0) {
+                            continue;
+                        }
+
+                        $takeQty = min($remainingQty, (int) $palletItem->pcs_quantity);
+                        $pcsPerBox = $palletItem->box_quantity > 0 ? $palletItem->pcs_quantity / $palletItem->box_quantity : 0;
+                        $boxesToReduce = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
+
+                        $stockLocation = $palletItem->pallet->stockLocation;
+                        $warehouseLocation = $stockLocation ? $stockLocation->warehouse_location : 'Unknown';
+
+                        StockWithdrawal::create([
+                            'withdrawal_batch_id' => $batchId,
+                            'user_id' => Auth::id(),
+                            'pallet_item_id' => $palletItem->id,
+                            'part_number' => $partNumber,
+                            'pcs_quantity' => $takeQty,
+                            'box_quantity' => $boxesToReduce,
+                            'warehouse_location' => $warehouseLocation,
+                            'status' => 'completed',
+                            'notes' => null,
+                            'withdrawn_at' => now(),
+                        ]);
+
+                        $palletItem->pcs_quantity = max(0, (int) $palletItem->pcs_quantity - $takeQty);
+                        $palletItem->box_quantity = max(0, (int) $palletItem->box_quantity - (int) $boxesToReduce);
+                        $palletItem->save();
+
+                        $masterLocation = MasterLocation::where('current_pallet_id', $palletItem->pallet_id)
+                            ->lockForUpdate()
+                            ->first();
+                        if ($masterLocation) {
+                            $masterLocation->autoVacateIfEmpty();
+                        }
+
+                        $remainingQty -= $takeQty;
+                    }
+
+                    if ($remainingQty > 0) {
+                        throw new \RuntimeException("Stok tidak cukup untuk part {$partNumber}!");
+                    }
                 }
-
-                $remainingQty = $requestedQty;
-
-                // Get all pallet items with this part number, sorted by FIFO
-                $palletItems = PalletItem::where('part_number', $partNumber)
-                    ->where('pcs_quantity', '>', 0)
-                    ->whereHas('pallet', function ($q) {
-                        $q->whereHas('stockLocation');
-                    })
-                    ->with(['pallet' => function ($q) {
-                        $q->with('stockLocation');
-                    }])
-                    ->orderBy('created_at', 'asc')
-                    ->get();
-
-                /** @var \App\Models\PalletItem $palletItem */
-                foreach ($palletItems as $palletItem) {
-                    if ($remainingQty <= 0) {
-                        break;
-                    }
-
-                    if ($palletItem->pcs_quantity <= 0) {
-                        continue;
-                    }
-
-                    // Determine how much to take from this pallet item
-                    $takeQty = min($remainingQty, $palletItem->pcs_quantity);
-                    
-                    // Calculate PCS per box
-                    $pcsPerBox = $palletItem->box_quantity > 0 ? $palletItem->pcs_quantity / $palletItem->box_quantity : 0;
-                    
-                    // Calculate how many boxes to reduce
-                    $boxesToReduce = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
-                    
-                    // Get warehouse location
-                    $stockLocation = $palletItem->pallet->stockLocation;
-                    $warehouseLocation = $stockLocation ? $stockLocation->warehouse_location : 'Unknown';
-
-                    // Create withdrawal record
-                    StockWithdrawal::create([
-                        'withdrawal_batch_id' => $batchId,
-                        'user_id' => Auth::id(),
-                        'pallet_item_id' => $palletItem->id,
-                        'part_number' => $partNumber,
-                        'pcs_quantity' => $takeQty,
-                        'box_quantity' => $boxesToReduce,
-                        'warehouse_location' => $warehouseLocation,
-                        'status' => 'completed',
-                        'notes' => null,
-                        'withdrawn_at' => now(),
-                    ]);
-
-                    // Update pallet item quantity
-                    $palletItem->pcs_quantity -= $takeQty;
-                    $palletItem->box_quantity -= $boxesToReduce;
-                    $palletItem->save();
-
-                    // Auto-update master location jika pallet kosong
-                    $masterLocation = MasterLocation::where('current_pallet_id', $palletItem->pallet_id)->first();
-                    if ($masterLocation) {
-                        $masterLocation->autoVacateIfEmpty();
-                    }
-
-                    $remainingQty -= $takeQty;
-                }
-            }
-
-            DB::commit();
+            });
 
             return response()->json([
                 'success' => true,
                 'message' => 'Pengambilan stok dari ' . count($items) . ' part berhasil diproses',
             ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -475,48 +459,56 @@ class StockWithdrawalController extends Controller
     public function undo($withdrawalId)
     {
         try {
-            DB::beginTransaction();
+            $result = DB::transaction(function () use ($withdrawalId) {
+                $withdrawal = StockWithdrawal::whereKey($withdrawalId)->lockForUpdate()->firstOrFail();
 
-            $withdrawal = StockWithdrawal::findOrFail($withdrawalId);
-
-            if ($withdrawal->status === 'reversed') {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Withdrawal ini sudah di-undo sebelumnya',
-                ], 422);
-            }
-
-            // Get all withdrawals in this batch
-            $batchId = $withdrawal->withdrawal_batch_id;
-            $batchWithdrawals = StockWithdrawal::where('withdrawal_batch_id', $batchId)
-                ->where('status', 'completed')
-                ->get();
-
-            // Undo all withdrawals in the batch
-            /** @var \App\Models\StockWithdrawal $batchWithdrawal */
-            foreach ($batchWithdrawals as $batchWithdrawal) {
-                $palletItem = $batchWithdrawal->palletItem;
-
-                if ($palletItem) {
-                    // Restore both PCS and Box quantity
-                    $palletItem->pcs_quantity += $batchWithdrawal->pcs_quantity;
-                    $palletItem->box_quantity += $batchWithdrawal->box_quantity;
-                    $palletItem->save();
+                if ($withdrawal->status === 'reversed') {
+                    return [
+                        'success' => false,
+                        'message' => 'Withdrawal ini sudah di-undo sebelumnya',
+                        'status' => 422,
+                    ];
                 }
 
-                // Mark withdrawal as reversed
-                $batchWithdrawal->status = 'reversed';
-                $batchWithdrawal->save();
-            }
+                $batchId = $withdrawal->withdrawal_batch_id;
+                $batchWithdrawals = StockWithdrawal::where('withdrawal_batch_id', $batchId)
+                    ->where('status', 'completed')
+                    ->lockForUpdate()
+                    ->get();
 
-            DB::commit();
+                foreach ($batchWithdrawals as $batchWithdrawal) {
+                    if (!$batchWithdrawal instanceof StockWithdrawal) {
+                        continue;
+                    }
+
+                    if ($batchWithdrawal->pallet_item_id) {
+                        $palletItem = PalletItem::whereKey($batchWithdrawal->pallet_item_id)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if ($palletItem) {
+                            $palletItem->pcs_quantity = (int) $palletItem->pcs_quantity + (int) $batchWithdrawal->pcs_quantity;
+                            $palletItem->box_quantity = (int) $palletItem->box_quantity + (int) $batchWithdrawal->box_quantity;
+                            $palletItem->save();
+                        }
+                    }
+
+                    $batchWithdrawal->status = 'reversed';
+                    $batchWithdrawal->save();
+                }
+
+                return [
+                    'success' => true,
+                    'message' => 'Withdrawal berhasil di-undo',
+                    'status' => 200,
+                ];
+            });
 
             return response()->json([
-                'success' => true,
-                'message' => 'Withdrawal berhasil di-undo',
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
+                'success' => (bool) ($result['success'] ?? false),
+                'message' => $result['message'] ?? null,
+            ], (int) ($result['status'] ?? 200));
+        } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
