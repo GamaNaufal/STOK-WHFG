@@ -478,6 +478,13 @@
                                     <i class="bi bi-clock"></i> H-{{ $order->days_remaining }}
                                 </span>
                             @endif
+                            @if(!empty($order->has_pending_additional_approval))
+                                <div class="mt-1">
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="bi bi-hourglass-split"></i> Pending Approval Not Full
+                                    </span>
+                                </div>
+                            @endif
                         </td>
                         @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
                         <td class="text-end">
@@ -486,6 +493,10 @@
                                     <span class="btn-completed">
                                         <i class="bi bi-check-circle"></i> Selesai
                                     </span>
+                                @elseif(!empty($order->has_pending_additional_approval))
+                                    <button class="btn-insufficient" disabled title="{{ $order->readiness_reason ?? 'Pending approval not full tambahan' }}">
+                                        <i class="bi bi-hourglass-split"></i> Pending Approval
+                                    </button>
                                 @elseif($order->has_sufficient_stock)
                                     <button class="btn-process" onclick="openFulfillModal('{{ $order->id }}')">
                                         <i class="bi bi-box-seam"></i> Process
@@ -641,9 +652,11 @@
     const fulfillModal = new bootstrap.Modal(document.getElementById('fulfillModal'));
     const picklistModal = new bootstrap.Modal(document.getElementById('picklistModal'));
     let currentOrderId = null;
+    let fulfillGateBlockedReason = null;
 
     function openFulfillModal(orderId) {
         currentOrderId = orderId;
+        fulfillGateBlockedReason = null;
         document.getElementById('fulfillItems').innerHTML = '';
         document.getElementById('fulfillInfo').innerHTML = 'Loading...';
         fulfillModal.show();
@@ -651,6 +664,18 @@
         fetch(`/delivery-stock/${orderId}/fulfill-data`)
             .then(res => res.json())
             .then(data => {
+                if (data.is_blocked) {
+                    fulfillGateBlockedReason = data.blocked_reason || 'Delivery masih menunggu approval supervisi.';
+                    document.getElementById('fulfillInfo').innerHTML = `
+                        <div class="small text-muted mb-2">Order #${data.order_id} | ${data.customer_name} | ${data.delivery_date}</div>
+                        <div class="alert alert-warning mb-0"><i class="bi bi-hourglass-split"></i> ${fulfillGateBlockedReason}</div>
+                    `;
+                    document.getElementById('fulfillItems').innerHTML = '';
+                    pendingProcessItems = [];
+                    updateProcessButton();
+                    return;
+                }
+
                 document.getElementById('fulfillInfo').innerHTML = `
                     <div class="small text-muted">Order #${data.order_id} | ${data.customer_name} | ${data.delivery_date}</div>
                 `;
@@ -666,10 +691,12 @@
 
     function updateProcessButton() {
         const hasError = pendingProcessItems.some(item => item.hasFifoError);
+        const isBlocked = !!fulfillGateBlockedReason;
         if (processBtn) {
-            processBtn.disabled = hasError;
-            processBtn.style.opacity = hasError ? '0.6' : '1';
-            processBtn.style.pointerEvents = hasError ? 'none' : 'auto';
+            processBtn.disabled = hasError || isBlocked;
+            processBtn.style.opacity = (hasError || isBlocked) ? '0.6' : '1';
+            processBtn.style.pointerEvents = (hasError || isBlocked) ? 'none' : 'auto';
+            processBtn.title = isBlocked ? fulfillGateBlockedReason : '';
         }
     }
 
@@ -798,6 +825,11 @@
     }
 
     document.getElementById('btnProcessAll').addEventListener('click', function() {
+        if (fulfillGateBlockedReason) {
+            showToast(fulfillGateBlockedReason, 'warning');
+            return;
+        }
+
         if (pendingProcessItems.length === 0) {
             showToast('Tidak ada item untuk diproses.', 'warning');
             return;

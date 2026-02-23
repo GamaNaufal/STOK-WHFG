@@ -120,6 +120,9 @@
                                 <span class="badge {{ !empty($order->is_ready_to_pick) ? 'badge-ready' : 'badge-not-ready' }}">
                                     {{ !empty($order->is_ready_to_pick) ? 'READY' : 'NOT READY' }}
                                 </span>
+                                @if(!empty($order->readiness_reason))
+                                    <div class="small text-danger mt-1">{{ $order->readiness_reason }}</div>
+                                @endif
                             </td>
                             <td class="text-end pe-3">
                                 <button class="btn btn-sm btn-verify js-start-verification" data-order-id="{{ $order->id }}" {{ !empty($order->is_ready_to_pick) ? '' : 'disabled' }}>

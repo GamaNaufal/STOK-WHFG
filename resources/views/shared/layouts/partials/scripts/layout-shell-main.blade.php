@@ -1,5 +1,19 @@
 <script>
     (function () {
+        function cleanupOrphanBackdrops() {
+            const hasOpenModal = !!document.querySelector('.modal.show');
+            const hasOpenOffcanvas = !!document.querySelector('.offcanvas.show');
+
+            if (hasOpenModal || hasOpenOffcanvas) {
+                return;
+            }
+
+            document.querySelectorAll('.modal-backdrop, .offcanvas-backdrop').forEach((el) => el.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+        }
+
         const toggleBtn = document.getElementById('sidebarToggleBtn');
         const sidebarEl = document.getElementById('mobileSidebar');
         const topNavbarEl = document.querySelector('.top-navbar');
@@ -198,8 +212,11 @@
         }
 
         syncTopNavbarHeight();
+        cleanupOrphanBackdrops();
         setupSidebarMenuPersistence();
         window.addEventListener('resize', syncTopNavbarHeight);
+        window.addEventListener('pageshow', cleanupOrphanBackdrops);
+        window.addEventListener('load', cleanupOrphanBackdrops);
 
         if (window.innerWidth >= 992 && localStorage.getItem(collapseKey) === '1') {
             document.body.classList.add('sidebar-collapsed');

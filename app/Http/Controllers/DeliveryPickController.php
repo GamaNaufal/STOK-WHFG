@@ -8,6 +8,7 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
+use App\Models\NotFullBoxRequest;
 use App\Models\PalletItem;
 use App\Models\StockWithdrawal;
 use App\Services\AuditService;
@@ -18,6 +19,28 @@ use Illuminate\Support\Str;
 
 class DeliveryPickController extends Controller
 {
+    private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
+
+    private function hasPendingAdditionalNotFullRequestForOrder(int $orderId, bool $lockRows = false): bool
+    {
+        $query = NotFullBoxRequest::where('delivery_order_id', $orderId)
+            ->where('request_type', 'additional')
+            ->where('status', 'pending');
+
+        if ($lockRows) {
+            $query->lockForUpdate();
+        }
+
+        return $query->exists();
+    }
+
+    private function assertOrderDeliveryGateOpenOrFail(int $orderId, bool $lockRows = false): void
+    {
+        if ($this->hasPendingAdditionalNotFullRequestForOrder($orderId, $lockRows)) {
+            throw new \RuntimeException(self::DELIVERY_APPROVAL_PENDING_MESSAGE);
+        }
+    }
+
     private function buildVerificationFifoPoolsByPart(): array
     {
         $rows = DB::table('boxes')
@@ -89,6 +112,7 @@ class DeliveryPickController extends Controller
         $orders->each(function ($order) use (&$fifoPools, $reservedPools) {
             $totalBoxesToPick = 0;
             $isReadyToPick = true;
+            $hasPendingAdditionalApproval = $this->hasPendingAdditionalNotFullRequestForOrder((int) $order->id);
 
             foreach ($order->items as $item) {
                 $requiredQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
@@ -135,7 +159,11 @@ class DeliveryPickController extends Controller
             }
 
             $order->total_box_to_pick = $totalBoxesToPick;
-            $order->is_ready_to_pick = $isReadyToPick;
+            $order->has_pending_additional_approval = $hasPendingAdditionalApproval;
+            $order->is_ready_to_pick = $isReadyToPick && !$hasPendingAdditionalApproval;
+            $order->readiness_reason = $hasPendingAdditionalApproval
+                ? 'Pending approval not full tambahan'
+                : null;
         });
 
         return view('operator.delivery.picking-verification', compact('orders'));
@@ -194,6 +222,7 @@ class DeliveryPickController extends Controller
     {
         return DB::transaction(function () use ($order, $userId) {
             DeliveryOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
+            $this->assertOrderDeliveryGateOpenOrFail((int) $order->id, true);
 
             $existingSession = DeliveryPickSession::where('delivery_order_id', $order->id)
                 ->whereIn('status', ['scanning', 'blocked', 'approved'])
@@ -233,7 +262,8 @@ class DeliveryPickController extends Controller
         try {
             $session = $this->startOrReusePickSession($order, (int) $user->id);
         } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            $statusCode = $e->getMessage() === self::DELIVERY_APPROVAL_PENDING_MESSAGE ? 423 : 422;
+            return response()->json(['message' => $e->getMessage()], $statusCode);
         }
 
         return response()->json([
@@ -256,7 +286,8 @@ class DeliveryPickController extends Controller
         try {
             $session = $this->startOrReusePickSession($order, (int) $user->id);
         } catch (\Throwable $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            $statusCode = $e->getMessage() === self::DELIVERY_APPROVAL_PENDING_MESSAGE ? 423 : 422;
+            return response()->json(['message' => $e->getMessage()], $statusCode);
         }
 
         return response()->json([
@@ -311,6 +342,9 @@ class DeliveryPickController extends Controller
 
         $result = DB::transaction(function () use ($request, $sessionId) {
             $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+            if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id, true)) {
+                return ['success' => false, 'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE, 'status' => 423];
+            }
 
             if ($session->status === 'blocked') {
                 return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423];
@@ -404,6 +438,9 @@ class DeliveryPickController extends Controller
 
         $result = DB::transaction(function () use ($request, $sessionId) {
             $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+            if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id, true)) {
+                return ['success' => false, 'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE, 'status' => 423];
+            }
 
             if ($session->status === 'blocked') {
                 return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423];
@@ -496,6 +533,9 @@ class DeliveryPickController extends Controller
         try {
             $result = DB::transaction(function () use ($sessionId) {
                 $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+                if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id, true)) {
+                    return ['success' => false, 'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE, 'status' => 423];
+                }
 
                 if ($session->status === 'completed') {
                     return ['success' => true, 'message' => 'Session sudah completed.'];

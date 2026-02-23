@@ -8,6 +8,7 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
+use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\StockInput;
@@ -532,5 +533,211 @@ class DeliveryFlowConsistencyTest extends TestCase
 
         $this->assertEquals(0, DeliveryIssue::where('pick_session_id', $session->id)->count());
         $this->assertEquals(1, StockWithdrawal::where('box_id', $box->id)->where('status', 'reversed')->count());
+    }
+
+    public function test_start_verification_is_blocked_when_additional_not_full_request_pending(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Pending Approval Gate',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        NotFullBoxRequest::create([
+            'box_number' => 'NF-PENDING-START-001',
+            'part_number' => 'P-GATE-START',
+            'pcs_quantity' => 10,
+            'fixed_qty' => 20,
+            'reason' => 'Need additional pending approval',
+            'request_type' => 'additional',
+            'delivery_order_id' => $order->id,
+            'requested_by' => $operator->id,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.start-verification', $order->id));
+
+        $response->assertStatus(423)
+            ->assertJson([
+                'message' => 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
+            ]);
+    }
+
+    public function test_verify_scan_is_blocked_when_additional_not_full_request_pending(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Pending Verify Gate',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        NotFullBoxRequest::create([
+            'box_number' => 'NF-PENDING-VERIFY-001',
+            'part_number' => 'P-GATE-VERIFY',
+            'pcs_quantity' => 10,
+            'fixed_qty' => 20,
+            'reason' => 'Need additional pending approval',
+            'request_type' => 'additional',
+            'delivery_order_id' => $order->id,
+            'requested_by' => $operator->id,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.verify.scan', $session->id), [
+                'box_number' => 'BOX-ANY',
+            ]);
+
+        $response->assertStatus(423)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
+            ]);
+    }
+
+    public function test_legacy_fulfill_and_confirm_are_blocked_when_additional_not_full_request_pending(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Pending Legacy Gate',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+
+        NotFullBoxRequest::create([
+            'box_number' => 'NF-PENDING-LEGACY-001',
+            'part_number' => 'P-GATE-LEGACY',
+            'pcs_quantity' => 5,
+            'fixed_qty' => 10,
+            'reason' => 'Need additional pending approval',
+            'request_type' => 'additional',
+            'delivery_order_id' => $order->id,
+            'requested_by' => $operator->id,
+            'status' => 'pending',
+        ]);
+
+        $fulfillResponse = $this->actingAs($operator)
+            ->get(route('delivery.fulfill', $order->id));
+
+        $fulfillResponse->assertRedirect(route('delivery.index'));
+        $fulfillResponse->assertSessionHas('error', 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.');
+
+        $confirmResponse = $this->actingAs($operator)
+            ->postJson(route('stock-withdrawal.confirm'), [
+                'part_number' => 'P-GATE-LEGACY',
+                'pcs_quantity' => 1,
+                'delivery_order_id' => $order->id,
+            ]);
+
+        $confirmResponse->assertStatus(423)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Terjadi kesalahan: Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
+            ]);
+    }
+
+    public function test_delivery_schedule_marks_order_not_ready_when_additional_not_full_request_pending(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Schedule Pending Gate',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-SCHEDULE-GATE',
+            'quantity' => 10,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        NotFullBoxRequest::create([
+            'box_number' => 'NF-PENDING-SCHEDULE-001',
+            'part_number' => 'P-SCHEDULE-GATE',
+            'pcs_quantity' => 5,
+            'fixed_qty' => 10,
+            'reason' => 'Need additional pending approval',
+            'request_type' => 'additional',
+            'delivery_order_id' => $order->id,
+            'requested_by' => $operator->id,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($operator)->get(route('delivery.index'));
+
+        $response->assertOk();
+        $approvedOrders = $response->viewData('approvedOrders');
+        $this->assertNotNull($approvedOrders);
+
+        $renderedOrder = $approvedOrders->firstWhere('id', $order->id);
+        $this->assertNotNull($renderedOrder);
+        $this->assertTrue((bool) ($renderedOrder->has_pending_additional_approval ?? false));
+        $this->assertFalse((bool) ($renderedOrder->has_sufficient_stock ?? true));
+        $this->assertSame('Pending approval not full tambahan', (string) ($renderedOrder->readiness_reason ?? ''));
+    }
+
+    public function test_fulfill_data_marks_order_blocked_when_additional_not_full_request_pending(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Fulfill Data Pending Gate',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-FULFILL-DATA-GATE',
+            'quantity' => 10,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        NotFullBoxRequest::create([
+            'box_number' => 'NF-PENDING-FULFILL-DATA-001',
+            'part_number' => 'P-FULFILL-DATA-GATE',
+            'pcs_quantity' => 5,
+            'fixed_qty' => 10,
+            'reason' => 'Need additional pending approval',
+            'request_type' => 'additional',
+            'delivery_order_id' => $order->id,
+            'requested_by' => $operator->id,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($operator)
+            ->getJson(route('delivery.fulfill-data', $order->id));
+
+        $response->assertOk()
+            ->assertJson([
+                'order_id' => $order->id,
+                'is_blocked' => true,
+                'blocked_reason' => 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
+            ]);
     }
 }

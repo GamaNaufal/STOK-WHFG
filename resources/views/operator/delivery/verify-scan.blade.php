@@ -105,6 +105,8 @@
     const requiredBoxNumberToId = new Map();
     const localVerifiedBoxIds = new Set();
     let selectedVoice = null;
+    let speechPrimed = false;
+    let speechPrimePromise = Promise.resolve();
 
     function normalizeBoxNumber(value) {
         return String(value || '').trim().toUpperCase();
@@ -176,6 +178,53 @@
 
         window.speechSynthesis.getVoices();
         selectedVoice = selectSpeechVoice();
+        if (speechPrimed) {
+            return;
+        }
+
+        speechPrimePromise = new Promise((resolve) => {
+            try {
+                const warmup = new SpeechSynthesisUtterance('.');
+                warmup.lang = 'id-ID';
+                warmup.rate = 1;
+                warmup.pitch = 1;
+                warmup.volume = 0;
+                if (selectedVoice) {
+                    warmup.voice = selectedVoice;
+                }
+
+                let finished = false;
+                const finish = () => {
+                    if (finished) {
+                        return;
+                    }
+                    finished = true;
+                    speechPrimed = true;
+                    resolve();
+                };
+
+                warmup.onend = finish;
+                warmup.onerror = finish;
+                window.speechSynthesis.cancel();
+                window.speechSynthesis.speak(warmup);
+                setTimeout(finish, 180);
+            } catch (error) {
+                resolve();
+            }
+        });
+    }
+
+    function speakSuccessNow() {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance('Benar');
+        utterance.lang = 'id-ID';
+        utterance.rate = 1.2;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+        if (selectedVoice) {
+            utterance.voice = selectedVoice;
+        }
+        window.speechSynthesis.speak(utterance);
     }
 
     function playSuccessSpeech() {
@@ -184,16 +233,15 @@
                 return;
             }
 
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance('Benar');
-            utterance.lang = 'id-ID';
-            utterance.rate = 1.2;
-            utterance.pitch = 1;
-            utterance.volume = 1;
-            if (selectedVoice) {
-                utterance.voice = selectedVoice;
+            if (!speechPrimed) {
+                primeSpeech();
+                speechPrimePromise.finally(() => {
+                    speakSuccessNow();
+                });
+                return;
             }
-            window.speechSynthesis.speak(utterance);
+
+            speakSuccessNow();
         } catch (e) {}
     }
 
@@ -229,6 +277,8 @@
     }
 
     function submitScan() {
+        primeSpeech();
+
         const boxNumber = scanInput.value.trim();
         if (!boxNumber) {
             showMessage('ID Box wajib diisi.', 'danger');
@@ -291,8 +341,11 @@
 
     btnScan.addEventListener('click', submitScan);
 
+    primeSpeech();
     window.addEventListener('pointerdown', primeSpeech, { once: true });
     window.addEventListener('keydown', primeSpeech, { once: true });
+    scanInput.addEventListener('focus', primeSpeech, { once: true });
+    scanInput.addEventListener('click', primeSpeech, { once: true });
     window.speechSynthesis?.addEventListener?.('voiceschanged', () => {
         selectedVoice = selectSpeechVoice();
     });

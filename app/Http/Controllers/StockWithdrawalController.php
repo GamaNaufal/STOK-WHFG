@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterLocation;
+use App\Models\NotFullBoxRequest;
 use App\Models\PalletItem;
 use App\Models\StockWithdrawal;
 use Illuminate\Http\Request;
@@ -12,12 +13,32 @@ use Illuminate\Support\Str;
 
 class StockWithdrawalController extends Controller
 {
+    private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
+
+    private function hasPendingAdditionalNotFullRequestForOrder(int $orderId, bool $lockRows = false): bool
+    {
+        $query = NotFullBoxRequest::where('delivery_order_id', $orderId)
+            ->where('request_type', 'additional')
+            ->where('status', 'pending');
+
+        if ($lockRows) {
+            $query->lockForUpdate();
+        }
+
+        return $query->exists();
+    }
+
     /**
      * Show the fulfillment page for a delivery order
      */
     public function fulfillOrder($id)
     {
         $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+
+        if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $order->id)) {
+            return redirect()->route('delivery.index')->with('error', self::DELIVERY_APPROVAL_PENDING_MESSAGE);
+        }
+
         return view('operator.delivery.fulfill', compact('order'));
     }
 
@@ -174,6 +195,21 @@ class StockWithdrawalController extends Controller
                 $batchId = Str::uuid();
                 $remainingQty = $requestedQty;
                 $withdrawals = [];
+                $deliveryItem = null;
+                $deliveryOrderItemId = (int) $request->input('delivery_order_item_id');
+                if ($deliveryOrderItemId > 0) {
+                    $deliveryItem = \App\Models\DeliveryOrderItem::whereKey($deliveryOrderItemId)
+                        ->lockForUpdate()
+                        ->first();
+                }
+
+                $deliveryOrderId = (int) $request->input('delivery_order_id');
+                if ($deliveryOrderId <= 0 && $deliveryItem) {
+                    $deliveryOrderId = (int) $deliveryItem->delivery_order_id;
+                }
+                if ($deliveryOrderId > 0 && $this->hasPendingAdditionalNotFullRequestForOrder($deliveryOrderId, true)) {
+                    throw new \RuntimeException(self::DELIVERY_APPROVAL_PENDING_MESSAGE);
+                }
 
                 $palletItems = PalletItem::where('part_number', $partNumber)
                     ->where('pcs_quantity', '>', 0)
@@ -248,37 +284,30 @@ class StockWithdrawalController extends Controller
                     throw new \RuntimeException('Stok tidak cukup untuk pengambilan ini');
                 }
 
-                $deliveryOrderItemId = (int) $request->input('delivery_order_item_id');
-                if ($deliveryOrderItemId > 0) {
-                    $deliveryItem = \App\Models\DeliveryOrderItem::whereKey($deliveryOrderItemId)
+                if ($deliveryItem) {
+                    $deliveryItem->fulfilled_quantity = (int) $deliveryItem->fulfilled_quantity + $requestedQty;
+                    $deliveryItem->save();
+
+                    $order = \App\Models\DeliveryOrder::whereKey($deliveryItem->delivery_order_id)
                         ->lockForUpdate()
                         ->first();
 
-                    if ($deliveryItem) {
-                        $deliveryItem->fulfilled_quantity = (int) $deliveryItem->fulfilled_quantity + $requestedQty;
-                        $deliveryItem->save();
-
-                        $order = \App\Models\DeliveryOrder::whereKey($deliveryItem->delivery_order_id)
-                            ->lockForUpdate()
-                            ->first();
-
-                        if ($order) {
-                            $orderItems = $order->items()->lockForUpdate()->get();
-                            $isComplete = true;
-                            foreach ($orderItems as $checkItem) {
-                                if ((int) $checkItem->fulfilled_quantity < (int) $checkItem->quantity) {
-                                    $isComplete = false;
-                                    break;
-                                }
+                    if ($order) {
+                        $orderItems = $order->items()->lockForUpdate()->get();
+                        $isComplete = true;
+                        foreach ($orderItems as $checkItem) {
+                            if ((int) $checkItem->fulfilled_quantity < (int) $checkItem->quantity) {
+                                $isComplete = false;
+                                break;
                             }
+                        }
 
-                            if ($isComplete) {
-                                $order->status = 'completed';
-                                $order->save();
-                            } elseif ($order->status !== 'processing') {
-                                $order->status = 'processing';
-                                $order->save();
-                            }
+                        if ($isComplete) {
+                            $order->status = 'completed';
+                            $order->save();
+                        } elseif ($order->status !== 'processing') {
+                            $order->status = 'processing';
+                            $order->save();
                         }
                     }
                 }
@@ -292,10 +321,11 @@ class StockWithdrawalController extends Controller
                 'withdrawals' => $withdrawals,
             ]);
         } catch (\Throwable $e) {
+            $statusCode = str_contains((string) $e->getMessage(), self::DELIVERY_APPROVAL_PENDING_MESSAGE) ? 423 : 500;
             return response()->json([
                 'success' => false,
                 'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
-            ], 500);
+            ], $statusCode);
         }
     }
 

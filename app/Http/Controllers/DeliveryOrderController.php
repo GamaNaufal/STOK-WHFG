@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Box;
+use App\Models\NotFullBoxRequest;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
 use Illuminate\Support\Facades\DB;
@@ -187,6 +188,17 @@ class DeliveryOrderController extends Controller
             ->orderBy('delivery_date', 'asc')
             ->get();
 
+        $pendingAdditionalApprovalOrderIds = NotFullBoxRequest::query()
+            ->where('request_type', 'additional')
+            ->where('status', 'pending')
+            ->whereIn('delivery_order_id', $approvedOrders->pluck('id')->all())
+            ->pluck('delivery_order_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+
+        $pendingAdditionalApprovalByOrderId = array_fill_keys($pendingAdditionalApprovalOrderIds, true);
+
         // Precompute available stock per part (PCS)
         $availableByPart = $this->getAvailableStockByPart();
         $reservedByOrder = $this->getReservedStockByOrder();
@@ -195,8 +207,9 @@ class DeliveryOrderController extends Controller
 
         $partSettings = PartSetting::pluck('qty_box', 'part_number');
 
-        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $partSettings, &$fifoPools) {
+        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId) {
             $allAvailable = true;
+            $hasPendingAdditionalApproval = !empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
 
             $today = now()->timezone(config('app.timezone'))->startOfDay();
             $deliveryDate = \Carbon\Carbon::parse($order->delivery_date)->timezone(config('app.timezone'))->startOfDay();
@@ -271,7 +284,11 @@ class DeliveryOrderController extends Controller
                 }
             });
 
-            $order->has_sufficient_stock = $allAvailable;
+            $order->has_pending_additional_approval = $hasPendingAdditionalApproval;
+            $order->readiness_reason = $hasPendingAdditionalApproval
+                ? 'Pending approval not full tambahan'
+                : null;
+            $order->has_sufficient_stock = $allAvailable && !$hasPendingAdditionalApproval;
         });
 
         $completedOrders = \App\Models\DeliveryPickSession::with('order')
@@ -428,6 +445,14 @@ class DeliveryOrderController extends Controller
         }
 
         $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+        $hasPendingAdditionalApproval = NotFullBoxRequest::query()
+            ->where('delivery_order_id', (int) $order->id)
+            ->where('request_type', 'additional')
+            ->where('status', 'pending')
+            ->exists();
+        $blockedReason = $hasPendingAdditionalApproval
+            ? 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.'
+            : null;
 
         $items = $order->items->map(function ($item) {
             $remaining = max(0, $item->quantity - $item->fulfilled_quantity);
@@ -445,6 +470,8 @@ class DeliveryOrderController extends Controller
             'customer_name' => $order->customer_name,
             'delivery_date' => \Carbon\Carbon::parse($order->delivery_date)->format('d M Y'),
             'items' => $items,
+            'is_blocked' => $hasPendingAdditionalApproval,
+            'blocked_reason' => $blockedReason,
         ]);
     }
 
