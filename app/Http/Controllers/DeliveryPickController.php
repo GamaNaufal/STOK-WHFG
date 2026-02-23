@@ -741,7 +741,8 @@ class DeliveryPickController extends Controller
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $q->whereRaw('DATE_ADD(boxes.created_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
+                $cutoffDate = \Carbon\Carbon::parse($deliveryDate)->subMonths(12);
+                $q->where('boxes.created_at', '>=', $cutoffDate);
             });
 
         return $query->get();
@@ -768,7 +769,8 @@ class DeliveryPickController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $q->whereRaw('DATE_ADD(boxes.created_at, INTERVAL 12 MONTH) >= ?', [$deliveryDate]);
+                $cutoffDate = \Carbon\Carbon::parse($deliveryDate)->subMonths(12);
+                $q->where('boxes.created_at', '>=', $cutoffDate);
             })
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')

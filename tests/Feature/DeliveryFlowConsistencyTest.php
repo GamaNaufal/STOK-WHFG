@@ -10,6 +10,7 @@ use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
 use App\Models\Pallet;
 use App\Models\PalletItem;
+use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
 use App\Models\User;
@@ -19,6 +20,86 @@ use Tests\TestCase;
 class DeliveryFlowConsistencyTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_start_pick_uses_box_created_at_even_if_stock_input_stored_at_is_old(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust FIFO CreatedAt',
+            'delivery_date' => now()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-FIFO-CREATED-AT',
+            'quantity' => 50,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $pallet = Pallet::create([
+            'pallet_number' => 'PLT-FIFO-OLD-STOCKINPUT',
+        ]);
+
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        $palletItem = PalletItem::create([
+            'pallet_id' => $pallet->id,
+            'part_number' => 'P-FIFO-CREATED-AT',
+            'box_quantity' => 1,
+            'pcs_quantity' => 50,
+        ]);
+
+        StockInput::create([
+            'pallet_id' => $pallet->id,
+            'pallet_item_id' => $palletItem->id,
+            'user_id' => $operator->id,
+            'warehouse_location' => 'A1',
+            'pcs_quantity' => 50,
+            'box_quantity' => 1,
+            'stored_at' => now()->subMonths(13),
+            'part_numbers' => ['P-FIFO-CREATED-AT'],
+        ]);
+
+        $box = Box::create([
+            'box_number' => 'BOX-FIFO-CREATED-AT-01',
+            'part_number' => 'P-FIFO-CREATED-AT',
+            'part_name' => 'Part FIFO Date Source',
+            'pcs_quantity' => 50,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-FIFO-CREATED-AT-01|P-FIFO-CREATED-AT|50',
+            'user_id' => $operator->id,
+            'created_at' => now()->subMonths(1),
+            'updated_at' => now()->subMonths(1),
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.start', $order->id));
+
+        $response->assertOk()->assertJsonStructure([
+            'session_id',
+            'pdf_url',
+            'scan_url',
+        ]);
+
+        $sessionId = (int) $response->json('session_id');
+
+        $this->assertDatabaseHas('delivery_pick_items', [
+            'pick_session_id' => $sessionId,
+            'box_id' => $box->id,
+            'part_number' => 'P-FIFO-CREATED-AT',
+            'pcs_quantity' => 50,
+            'status' => 'pending',
+        ]);
+    }
 
     public function test_admin_warehouse_can_approve_pending_issue_and_unblock_session(): void
     {

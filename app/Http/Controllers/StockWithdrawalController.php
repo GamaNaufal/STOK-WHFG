@@ -199,33 +199,34 @@ class StockWithdrawalController extends Controller
                 ->orderBy('created_at', 'asc')
                 ->get();
 
-            foreach ($palletItems as $item) {
+            /** @var \App\Models\PalletItem $palletItem */
+            foreach ($palletItems as $palletItem) {
                 if ($remainingQty <= 0) {
                     break;
                 }
 
-                if ($item->pcs_quantity <= 0) {
+                if ($palletItem->pcs_quantity <= 0) {
                     continue;
                 }
 
                 // Determine how much to take from this pallet item
-                $takeQty = min($remainingQty, $item->pcs_quantity);
+                $takeQty = min($remainingQty, $palletItem->pcs_quantity);
                 
                 // Calculate PCS per box
-                $pcsPerBox = $item->box_quantity > 0 ? $item->pcs_quantity / $item->box_quantity : 0;
+                $pcsPerBox = $palletItem->box_quantity > 0 ? $palletItem->pcs_quantity / $palletItem->box_quantity : 0;
                 
                 // Calculate how many boxes to reduce (floor - bulatkan ke bawah)
                 $boxesToReduce = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
                 
                 // Get warehouse location
-                $stockLocation = $item->pallet->stockLocation;
+                $stockLocation = $palletItem->pallet->stockLocation;
                 $warehouseLocation = $stockLocation ? $stockLocation->warehouse_location : 'Unknown';
 
                 // Create withdrawal record
                 $withdrawal = StockWithdrawal::create([
                     'withdrawal_batch_id' => $batchId,
                     'user_id' => Auth::id(),
-                    'pallet_item_id' => $item->id,
+                    'pallet_item_id' => $palletItem->id,
                     'part_number' => $partNumber,
                     'pcs_quantity' => $takeQty,
                     'box_quantity' => $boxesToReduce,
@@ -238,12 +239,12 @@ class StockWithdrawalController extends Controller
                 $withdrawals[] = $withdrawal;
 
                 // Update pallet item quantity (both PCS and Box)
-                $item->pcs_quantity -= $takeQty;
-                $item->box_quantity -= $boxesToReduce;
-                $item->save();
+                $palletItem->pcs_quantity -= $takeQty;
+                $palletItem->box_quantity -= $boxesToReduce;
+                $palletItem->save();
 
                 // Auto-update master location jika pallet kosong
-                $masterLocation = MasterLocation::where('current_pallet_id', $item->pallet_id)->first();
+                $masterLocation = MasterLocation::where('current_pallet_id', $palletItem->pallet_id)->first();
                 if ($masterLocation) {
                     $masterLocation->autoVacateIfEmpty();
                 }
@@ -347,33 +348,34 @@ class StockWithdrawalController extends Controller
                     ->orderBy('created_at', 'asc')
                     ->get();
 
-                foreach ($palletItems as $item) {
+                /** @var \App\Models\PalletItem $palletItem */
+                foreach ($palletItems as $palletItem) {
                     if ($remainingQty <= 0) {
                         break;
                     }
 
-                    if ($item->pcs_quantity <= 0) {
+                    if ($palletItem->pcs_quantity <= 0) {
                         continue;
                     }
 
                     // Determine how much to take from this pallet item
-                    $takeQty = min($remainingQty, $item->pcs_quantity);
+                    $takeQty = min($remainingQty, $palletItem->pcs_quantity);
                     
                     // Calculate PCS per box
-                    $pcsPerBox = $item->box_quantity > 0 ? $item->pcs_quantity / $item->box_quantity : 0;
+                    $pcsPerBox = $palletItem->box_quantity > 0 ? $palletItem->pcs_quantity / $palletItem->box_quantity : 0;
                     
                     // Calculate how many boxes to reduce
                     $boxesToReduce = $pcsPerBox > 0 ? floor($takeQty / $pcsPerBox) : 0;
                     
                     // Get warehouse location
-                    $stockLocation = $item->pallet->stockLocation;
+                    $stockLocation = $palletItem->pallet->stockLocation;
                     $warehouseLocation = $stockLocation ? $stockLocation->warehouse_location : 'Unknown';
 
                     // Create withdrawal record
                     StockWithdrawal::create([
                         'withdrawal_batch_id' => $batchId,
                         'user_id' => Auth::id(),
-                        'pallet_item_id' => $item->id,
+                        'pallet_item_id' => $palletItem->id,
                         'part_number' => $partNumber,
                         'pcs_quantity' => $takeQty,
                         'box_quantity' => $boxesToReduce,
@@ -384,12 +386,12 @@ class StockWithdrawalController extends Controller
                     ]);
 
                     // Update pallet item quantity
-                    $item->pcs_quantity -= $takeQty;
-                    $item->box_quantity -= $boxesToReduce;
-                    $item->save();
+                    $palletItem->pcs_quantity -= $takeQty;
+                    $palletItem->box_quantity -= $boxesToReduce;
+                    $palletItem->save();
 
                     // Auto-update master location jika pallet kosong
-                    $masterLocation = MasterLocation::where('current_pallet_id', $item->pallet_id)->first();
+                    $masterLocation = MasterLocation::where('current_pallet_id', $palletItem->pallet_id)->first();
                     if ($masterLocation) {
                         $masterLocation->autoVacateIfEmpty();
                     }
@@ -491,19 +493,20 @@ class StockWithdrawalController extends Controller
                 ->get();
 
             // Undo all withdrawals in the batch
-            foreach ($batchWithdrawals as $w) {
-                $palletItem = $w->palletItem;
+            /** @var \App\Models\StockWithdrawal $batchWithdrawal */
+            foreach ($batchWithdrawals as $batchWithdrawal) {
+                $palletItem = $batchWithdrawal->palletItem;
 
                 if ($palletItem) {
                     // Restore both PCS and Box quantity
-                    $palletItem->pcs_quantity += $w->pcs_quantity;
-                    $palletItem->box_quantity += $w->box_quantity;
+                    $palletItem->pcs_quantity += $batchWithdrawal->pcs_quantity;
+                    $palletItem->box_quantity += $batchWithdrawal->box_quantity;
                     $palletItem->save();
                 }
 
                 // Mark withdrawal as reversed
-                $w->status = 'reversed';
-                $w->save();
+                $batchWithdrawal->status = 'reversed';
+                $batchWithdrawal->save();
             }
 
             DB::commit();
@@ -627,10 +630,10 @@ class StockWithdrawalController extends Controller
                 'boxes.box_number',
                 'boxes.pcs_quantity',
                 'boxes.is_not_full',
+                'boxes.created_at as stored_at',
                 'pallets.id as pallet_id',
                 'pallets.pallet_number',
                 'stock_locations.warehouse_location',
-                'stock_locations.stored_at',
             ])
             ->get();
 
@@ -728,10 +731,10 @@ class StockWithdrawalController extends Controller
                 'boxes.box_number',
                 'boxes.pcs_quantity',
                 'boxes.is_not_full',
+                'boxes.created_at as stored_at',
                 'pallets.id as pallet_id',
                 'pallets.pallet_number',
                 'stock_locations.warehouse_location',
-                'stock_locations.stored_at',
             ])
             ->get();
     }
