@@ -491,8 +491,7 @@ class DeliveryOrderController extends Controller
             'delivery_date' => 'required|date',
             'items' => 'required|array|min:1',
             'items.*.part_number' => 'required|string',
-            'items.*.quantity' => 'required|integer|min:1',
-            'notes' => 'nullable|string'
+            'items.*.quantity' => 'required|integer|min:1'
         ]);
 
         DB::beginTransaction();
@@ -500,10 +499,7 @@ class DeliveryOrderController extends Controller
             $order->customer_name = $request->customer_name;
             $order->delivery_date = $request->delivery_date;
             $order->status = 'pending';
-
-            if ($request->notes) {
-                $order->notes = ($order->notes ? $order->notes . "\n[Sales]: " : "[Sales]: ") . $request->notes;
-            }
+            $order->notes = null;
 
             $order->save();
 
@@ -553,7 +549,7 @@ class DeliveryOrderController extends Controller
                 'customer_name' => $request->customer_name,
                 'delivery_date' => $request->delivery_date,
                 'status' => 'pending',
-                'notes' => $request->notes ?? null
+                'notes' => null
             ]);
 
             foreach ($request->items as $item) {
@@ -593,10 +589,10 @@ class DeliveryOrderController extends Controller
 
         $order = \App\Models\DeliveryOrder::findOrFail($id);
         $order->status = $request->status;
-        
-        // Append PPC notes if provided
-        if($request->notes) {
-            $order->notes = ($order->notes ? $order->notes . "\n[PPC]: " : "[PPC]: ") . $request->notes;
+
+        $ppcNotes = trim((string) $request->notes);
+        if ($ppcNotes !== '') {
+            $order->notes = $ppcNotes;
         }
 
         $order->save();

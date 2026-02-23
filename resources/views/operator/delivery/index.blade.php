@@ -594,14 +594,11 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" style="padding: 1.5rem;">
-                <p>Silakan download atau print pick list sebelum scan.</p>
+                <p>Silakan klik tombol print untuk mencetak atau pilih <strong>Save as PDF</strong> dari dialog browser sebelum scan.</p>
             </div>
             <div class="modal-footer" style="border-top: 1px solid #e9ecef; padding: 1.5rem;">
-                <a href="#" class="btn" id="btnDownloadPdf" target="_blank" style="background: #f0f8f7; color: #0C7779; border: 1px solid #b3e5db; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; text-decoration: none;">
-                    <i class="bi bi-download"></i> Download PDF
-                </a>
-                <a href="#" class="btn" id="btnPrintPdf" target="_blank" style="background: #f0f8f7; color: #0C7779; border: 1px solid #b3e5db; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; text-decoration: none;">
-                    <i class="bi bi-printer"></i> Print
+                <a href="#" class="btn" id="btnPrintOrPdf" target="_blank" style="background: #f0f8f7; color: #0C7779; border: 1px solid #b3e5db; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; text-decoration: none;">
+                    <i class="bi bi-printer"></i> Print / Download PDF
                 </a>
                 <a href="#" class="btn" id="btnStartScan" style="background: linear-gradient(135deg, #0C7779 0%, #005461 100%); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; text-decoration: none;">
                     <i class="bi bi-upc-scan"></i> Mulai Scan
@@ -816,19 +813,12 @@
         .then(res => res.json())
         .then(data => {
             if (data.session_id) {
-                // Set download button
-                document.getElementById('btnDownloadPdf').href = data.pdf_url;
-                document.getElementById('btnDownloadPdf').download = 'picklist-order-' + currentOrderId + '.pdf';
-                
-                // Set print button - open PDF and trigger print immediately
-                const printBtn = document.getElementById('btnPrintPdf');
+                const printBtn = document.getElementById('btnPrintOrPdf');
+                const printPreviewUrl = data.print_preview_url || data.pdf_url;
+                printBtn.href = printPreviewUrl;
                 printBtn.onclick = function(e) {
                     e.preventDefault();
-                    const printWindow = window.open(data.pdf_url, '_blank');
-                    // Trigger print dialog saat PDF selesai load
-                    printWindow.onload = function() {
-                        printWindow.print();
-                    };
+                    window.open(printPreviewUrl, '_blank');
                 };
                 
                 document.getElementById('btnStartScan').href = data.scan_url;

@@ -72,7 +72,7 @@ class DeliverySalesPpcWorkflowTest extends TestCase
         ]);
 
         $updated = DeliveryOrder::findOrFail($order->id);
-        $this->assertStringContainsString('[PPC]: Gate 2 ready', (string) $updated->notes);
+        $this->assertSame('Gate 2 ready', (string) $updated->notes);
 
         $schedule = $this->actingAs($ppc)->get(route('delivery.index'));
         $schedule->assertOk();
@@ -233,7 +233,7 @@ class DeliverySalesPpcWorkflowTest extends TestCase
         ]);
 
         $updatedA = DeliveryOrder::findOrFail($orderA->id);
-        $this->assertStringContainsString('[PPC]: Need change qty', (string) $updatedA->notes);
+        $this->assertSame('Need change qty', (string) $updatedA->notes);
 
         // Ensure other pending order is untouched (no status/notes contamination)
         $this->assertDatabaseHas('delivery_orders', [

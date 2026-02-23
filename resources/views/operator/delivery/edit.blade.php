@@ -110,11 +110,6 @@
                             </div>
                         </div>
     
-                        <div class="mb-3">
-                            <label class="form-label">Notes (optional)</label>
-                            <textarea name="notes" class="form-control" rows="2">{{ old('notes') }}</textarea>
-                        </div>
-    
                         <button type="submit" class="btn btn-warning w-100">Submit Correction</button>
                     </form>
                 </div>

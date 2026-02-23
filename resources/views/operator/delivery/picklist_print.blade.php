@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Pick List Order #{{ $order->id }}</title>
+    <title>Print Pick List Order #{{ $order->id }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 11px; margin: 10px; }
         .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -29,6 +29,9 @@
         .part-number { font-family: monospace; font-weight: bold; }
         .instructions { background: #fff; padding: 10px; margin: 15px 0; border-radius: 4px; border-left: 4px solid #000; }
         .footer { margin-top: 30px; text-align: center; font-size: 10px; border-top: 1px solid #000; padding-top: 10px; }
+        @media print {
+            body { margin: 8mm; }
+        }
     </style>
 </head>
 <body>
@@ -112,28 +115,19 @@
                 @php
                     $pallet = $item->box->pallets->first();
                     $locationCode = 'NO-LOC';
-                    
+
                     if ($pallet) {
-                        // First try: stockLocation warehouse_location directly
                         if ($pallet->stockLocation && $pallet->stockLocation->warehouse_location) {
                             $locationCode = $pallet->stockLocation->warehouse_location;
-                        }
-                        // Second try: stockLocation -> masterLocation
-                        elseif ($pallet->stockLocation && $pallet->stockLocation->masterLocation) {
+                        } elseif ($pallet->stockLocation && $pallet->stockLocation->masterLocation) {
                             $locationCode = $pallet->stockLocation->masterLocation->code;
-                        }
-                        // Third try: currentLocation direct
-                        elseif ($pallet->currentLocation) {
+                        } elseif ($pallet->currentLocation) {
                             $locationCode = $pallet->currentLocation->code;
-                        }
-                        // Fourth try: direct query to master_locations
-                        else {
+                        } else {
                             $masterLoc = \App\Models\MasterLocation::where('current_pallet_id', $pallet->id)->first();
                             if ($masterLoc) {
                                 $locationCode = $masterLoc->code;
-                            }
-                            // Last resort: check stockLocation again for any warehouse_location
-                            else if ($pallet->stockLocation) {
+                            } else if ($pallet->stockLocation) {
                                 $locationCode = $pallet->stockLocation->warehouse_location ?: 'NO-LOC';
                             }
                         }
@@ -155,5 +149,14 @@
         Dokumen ini untuk panduan operator warehouse dalam pengambilan part.<br>
         Cetak dan bawa saat melakukan picking process.
     </div>
+
+    <script>
+        window.addEventListener('load', function () {
+            setTimeout(function () {
+                window.focus();
+                window.print();
+            }, 250);
+        });
+    </script>
 </body>
 </html>

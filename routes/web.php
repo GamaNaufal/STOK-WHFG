@@ -92,6 +92,7 @@ Route::middleware('auth')->group(function () {
         Route::post('/delivery-stock/{id}/start-verification', [\App\Http\Controllers\DeliveryPickController::class, 'startVerification'])->name('delivery.pick.start-verification');
         Route::post('/delivery-stock/{id}/start-pick', [\App\Http\Controllers\DeliveryPickController::class, 'startPick'])->name('delivery.pick.start');
         Route::get('/delivery-stock/{order}/pick/{session}/pdf', [\App\Http\Controllers\DeliveryPickController::class, 'pdf'])->name('delivery.pick.pdf');
+        Route::get('/delivery-stock/{order}/pick/{session}/print-preview', [\App\Http\Controllers\DeliveryPickController::class, 'printPreview'])->name('delivery.pick.print-preview');
         Route::get('/delivery-stock/{order}/pick/{session}/verify', [\App\Http\Controllers\DeliveryPickController::class, 'showVerificationScan'])->name('delivery.pick.verify');
         Route::get('/delivery-stock/{order}/pick/{session}/scan', [\App\Http\Controllers\DeliveryPickController::class, 'showScan'])->name('delivery.pick.scan');
         Route::post('/delivery-pick/{session}/verify-scan', [\App\Http\Controllers\DeliveryPickController::class, 'verifyScanBox'])->name('delivery.pick.verify.scan');

@@ -319,12 +319,6 @@
                             </div>
                         </div>
 
-                        <!-- Notes -->
-                        <div class="mb-4">
-                            <label class="form-label">Catatan / Keterangan</label>
-                            <textarea name="notes" class="form-control" rows="3" placeholder="Tambahkan catatan khusus jika ada..."></textarea>
-                        </div>
-
                         <!-- Submit Button -->
                         <button type="submit" class="btn btn-submit">
                             <i class="bi bi-check-circle"></i> Submit Pesanan

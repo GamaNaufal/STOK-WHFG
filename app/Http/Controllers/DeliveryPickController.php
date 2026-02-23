@@ -52,6 +52,7 @@ class DeliveryPickController extends Controller
             return response()->json([
                 'session_id' => $existingSession->id,
                 'pdf_url' => route('delivery.pick.pdf', [$order->id, $existingSession->id]),
+                'print_preview_url' => route('delivery.pick.print-preview', [$order->id, $existingSession->id]),
                 'scan_url' => route('delivery.pick.scan', [$order->id, $existingSession->id]),
             ]);
         }
@@ -116,6 +117,7 @@ class DeliveryPickController extends Controller
         return response()->json([
             'session_id' => $session->id,
             'pdf_url' => route('delivery.pick.pdf', [$order->id, $session->id]),
+            'print_preview_url' => route('delivery.pick.print-preview', [$order->id, $session->id]),
             'scan_url' => route('delivery.pick.scan', [$order->id, $session->id]),
         ]);
     }
@@ -694,6 +696,32 @@ class DeliveryPickController extends Controller
 
         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('operator.delivery.picklist_pdf', compact('order', 'session'));
         return $pdf->stream('picklist-order-' . $order->id . '.pdf');
+    }
+
+    public function printPreview($orderId, $sessionId)
+    {
+        $session = DeliveryPickSession::with([
+            'items' => function($q) {
+                $q->with([
+                    'box' => function($q) {
+                        $q->with([
+                            'pallets' => function($q) {
+                                $q->with([
+                                    'stockLocation' => function($q) {
+                                        $q->with('masterLocation');
+                                    },
+                                    'currentLocation'
+                                ]);
+                            }
+                        ]);
+                    }
+                ]);
+            }
+        ])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
+
+        $order = DeliveryOrder::with('items')->findOrFail($orderId);
+
+        return view('operator.delivery.picklist_print', compact('order', 'session'));
     }
 
     public function issues()
