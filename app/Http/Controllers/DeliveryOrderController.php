@@ -188,6 +188,15 @@ class DeliveryOrderController extends Controller
             ->orderBy('delivery_date', 'asc')
             ->get();
 
+        $currentUserId = (int) \Illuminate\Support\Facades\Auth::id();
+
+        $globalActiveSession = \App\Models\DeliveryPickSession::query()
+            ->with('creator')
+            ->withCount('items')
+            ->whereIn('status', ['scanning', 'blocked', 'approved'])
+            ->orderByDesc('id')
+            ->first();
+
         $pendingAdditionalApprovalOrderIds = NotFullBoxRequest::query()
             ->where('request_type', 'additional')
             ->where('status', 'pending')
@@ -207,7 +216,7 @@ class DeliveryOrderController extends Controller
 
         $partSettings = PartSetting::pluck('qty_box', 'part_number');
 
-        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId) {
+        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId, $globalActiveSession, $currentUserId) {
             $allAvailable = true;
             $hasPendingAdditionalApproval = !empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
 
@@ -289,6 +298,29 @@ class DeliveryOrderController extends Controller
                 ? 'Pending approval not full tambahan'
                 : null;
             $order->has_sufficient_stock = $allAvailable && !$hasPendingAdditionalApproval;
+
+            $hasGlobalLock = $globalActiveSession !== null;
+            $isActiveOrder = $hasGlobalLock && (int) $globalActiveSession->delivery_order_id === (int) $order->id;
+            $isOwner = $isActiveOrder && (int) $globalActiveSession->created_by === $currentUserId;
+            $ownerName = $hasGlobalLock ? trim((string) optional($globalActiveSession->creator)->name) : '';
+
+            $order->has_active_pick_session = $isActiveOrder;
+            $order->active_pick_owned_by_current_user = $isOwner;
+            $order->active_pick_owner_name = $ownerName !== '' ? $ownerName : '-';
+            $order->global_pick_lock_active = $hasGlobalLock;
+            $order->global_pick_lock_order_id = $hasGlobalLock ? (int) $globalActiveSession->delivery_order_id : null;
+
+            if ($isOwner) {
+                $verifiedCount = collect($globalActiveSession->verification_box_ids ?? [])->filter(fn ($id) => (int) $id > 0)->unique()->count();
+                $totalItems = (int) ($globalActiveSession->items_count ?? 0);
+                $isVerificationDone = $totalItems > 0 && $verifiedCount >= $totalItems;
+
+                $order->active_pick_resume_url = $isVerificationDone
+                    ? route('delivery.pick.scan', [$order->id, $globalActiveSession->id])
+                    : route('delivery.pick.verify', [$order->id, $globalActiveSession->id]);
+            } else {
+                $order->active_pick_resume_url = null;
+            }
         });
 
         $completedOrders = \App\Models\DeliveryPickSession::with('order')

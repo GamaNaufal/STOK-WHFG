@@ -41,6 +41,9 @@
                 <button class="btn btn-success" id="btnComplete" {{ ($session->status === 'blocked' || $session->items->where('status','pending')->count() > 0) ? 'disabled' : '' }}>
                     <i class="bi bi-check2"></i> Selesaikan Pengiriman
                 </button>
+                <button class="btn btn-outline-danger mt-2" id="btnCancelScan">
+                    <i class="bi bi-x-circle"></i> Batalkan Scan
+                </button>
             </div>
         </div>
     </div>
@@ -100,6 +103,7 @@
     const scanMessage = document.getElementById('scanMessage');
     const remainingCount = document.getElementById('remainingCount');
     const btnComplete = document.getElementById('btnComplete');
+    const btnCancelScan = document.getElementById('btnCancelScan');
     const sessionStatus = document.getElementById('sessionStatus');
 
     function markRowScanned(boxId) {
@@ -154,6 +158,13 @@
                 if (res.status === 423) {
                     sessionStatus.textContent = 'BLOCKED';
                 }
+
+                if (res.status === 409) {
+                    sessionStatus.textContent = 'CANCELLED';
+                    setTimeout(() => {
+                        window.location.href = "{{ route('delivery.index') }}";
+                    }, 900);
+                }
             }
         })
         .catch(() => showMessage('Gagal koneksi.', 'danger'));
@@ -184,6 +195,31 @@
                 window.location.href = "{{ route('delivery.index') }}";
             } else {
                 showToast(data.message || 'Tidak bisa menyelesaikan.', 'danger');
+            }
+        })
+        .catch(() => showToast('Gagal koneksi.', 'danger'));
+    });
+
+    btnCancelScan.addEventListener('click', function () {
+        const confirmed = confirm('Batalkan proses scan ini? Box yang terkunci akan dilepas.');
+        if (!confirmed) {
+            return;
+        }
+
+        fetch("{{ route('delivery.pick.cancel', $session->id) }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showToast(data.message || 'Proses scan dibatalkan.', 'success');
+                window.location.href = "{{ route('delivery.index') }}";
+            } else {
+                showToast(data.message || 'Gagal membatalkan scan.', 'danger');
             }
         })
         .catch(() => showToast('Gagal koneksi.', 'danger'));

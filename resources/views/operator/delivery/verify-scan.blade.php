@@ -326,6 +326,12 @@
             }
 
             showMessage(data.message || 'Scan verifikasi gagal.', 'danger');
+
+            if (res.status === 409) {
+                setTimeout(() => {
+                    window.location.href = "{{ route('delivery.index') }}";
+                }, 900);
+            }
         })
         .catch((error) => {
             showMessage('Gagal koneksi.', 'danger');

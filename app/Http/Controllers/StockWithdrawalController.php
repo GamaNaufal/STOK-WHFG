@@ -660,6 +660,15 @@ class StockWithdrawalController extends Controller
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->whereNotIn('boxes.id', function ($q) {
+                $q->select('box_id')
+                    ->from('delivery_pick_items')
+                    ->whereIn('pick_session_id', function ($q2) {
+                        $q2->select('id')
+                            ->from('delivery_pick_sessions')
+                            ->whereIn('status', ['scanning', 'blocked', 'approved']);
+                    });
+            })
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
             })
@@ -765,6 +774,15 @@ class StockWithdrawalController extends Controller
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->where('boxes.assigned_delivery_order_id', $orderId)
+            ->whereNotIn('boxes.id', function ($q) {
+                $q->select('box_id')
+                    ->from('delivery_pick_items')
+                    ->whereIn('pick_session_id', function ($q2) {
+                        $q2->select('id')
+                            ->from('delivery_pick_sessions')
+                            ->whereIn('status', ['scanning', 'blocked', 'approved']);
+                    });
+            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select([

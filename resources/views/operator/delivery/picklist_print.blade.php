@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Print Pick List Order #{{ $order->id }}</title>
+    <title>Persiapan Delivery #{{ $order->id }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 11px; margin: 10px; }
         .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -12,6 +12,9 @@
         .info-block strong { font-weight: bold; }
         .summary { background: #fff; padding: 10px; margin: 15px 0; border-left: 4px solid #000; }
         .summary-row { display: flex; justify-content: space-between; margin: 5px 0; }
+        .summary-row.wrap { gap: 12px; align-items: flex-start; }
+        .summary-item { flex: 1; min-width: 0; }
+        .highlight-note { background: #fff59d; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
         table { width: 100%; border-collapse: collapse; margin: 15px 0; }
         th {
             background: #fff;
@@ -36,7 +39,7 @@
 </head>
 <body>
     <div class="header">
-        <div class="title">📋 PICK LIST - ORDER #{{ $order->id }}</div>
+        <div class="title">📋 PERSIAPAN DELIVERY - ORDER #{{ $order->id }}</div>
         <div class="order-info">
             <div class="info-block">
                 <strong>Customer:</strong> {{ $order->customer_name }}
@@ -45,7 +48,7 @@
                 <strong>Delivery Date:</strong> {{ $order->delivery_date->format('d M Y') }}
             </div>
             <div class="info-block">
-                <strong>Generated:</strong> {{ now()->format('d M Y H:i') }}
+                <strong>PIC:</strong> {{ trim((string) optional($session->creator)->name) !== '' ? trim((string) optional($session->creator)->name) : '-' }}
             </div>
         </div>
     </div>
@@ -84,8 +87,19 @@
     @endphp
 
     <div class="summary">
-        <div class="summary-row">
-            <div><strong>Keterangan Pengambilan (PPC):</strong> {{ $ppcOnlyNotes !== '' ? $ppcOnlyNotes : '-' }}</div>
+        @php
+            $noteText = $ppcOnlyNotes !== '' ? $ppcOnlyNotes : '-';
+            $shouldHighlightNote = $ppcOnlyNotes !== '' && strlen($ppcOnlyNotes) > 3;
+        @endphp
+        <div class="summary-row wrap">
+            <div class="summary-item">
+                <strong>Keterangan Pengambilan:</strong>
+                @if($shouldHighlightNote)
+                    <span class="highlight-note">{{ $noteText }}</span>
+                @else
+                    <span>{{ $noteText }}</span>
+                @endif
+            </div>
         </div>
     </div>
 

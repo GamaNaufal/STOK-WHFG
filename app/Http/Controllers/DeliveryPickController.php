@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 class DeliveryPickController extends Controller
 {
     private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
+    private const SESSION_RECALC_MESSAGE = 'Sesi picking ini perlu dihitung ulang karena ada order dengan prioritas tanggal lebih awal.';
 
     private function hasPendingAdditionalNotFullRequestForOrder(int $orderId, bool $lockRows = false): bool
     {
@@ -224,13 +225,30 @@ class DeliveryPickController extends Controller
             DeliveryOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
             $this->assertOrderDeliveryGateOpenOrFail((int) $order->id, true);
 
-            $existingSession = DeliveryPickSession::where('delivery_order_id', $order->id)
+            $activeSession = DeliveryPickSession::with('creator')
                 ->whereIn('status', ['scanning', 'blocked', 'approved'])
                 ->latest()
                 ->first();
 
-            if ($existingSession) {
-                return $existingSession;
+            if ($activeSession) {
+                $activeOrderId = (int) $activeSession->delivery_order_id;
+                $isOwner = (int) $activeSession->created_by === $userId;
+
+                if ($activeOrderId === (int) $order->id) {
+                    if (!$isOwner) {
+                        $ownerName = trim((string) optional($activeSession->creator)->name);
+                        throw new \RuntimeException('Order ini sedang diproses oleh ' . ($ownerName !== '' ? $ownerName : 'operator lain') . '.');
+                    }
+
+                    return $activeSession;
+                }
+
+                if ($isOwner) {
+                    throw new \RuntimeException('Anda masih memiliki proses delivery aktif di order #' . $activeOrderId . '. Lanjutkan atau batalkan dulu.');
+                }
+
+                $ownerName = trim((string) optional($activeSession->creator)->name);
+                throw new \RuntimeException('Delivery sedang diproses oleh ' . ($ownerName !== '' ? $ownerName : 'operator lain') . '.');
             }
 
             $session = DeliveryPickSession::create([
@@ -262,7 +280,10 @@ class DeliveryPickController extends Controller
         try {
             $session = $this->startOrReusePickSession($order, (int) $user->id);
         } catch (\Throwable $e) {
-            $statusCode = $e->getMessage() === self::DELIVERY_APPROVAL_PENDING_MESSAGE ? 423 : 422;
+            $message = (string) $e->getMessage();
+            $statusCode = $message === self::DELIVERY_APPROVAL_PENDING_MESSAGE || str_contains($message, 'diproses') || str_contains($message, 'aktif')
+                ? 423
+                : 422;
             return response()->json(['message' => $e->getMessage()], $statusCode);
         }
 
@@ -286,7 +307,10 @@ class DeliveryPickController extends Controller
         try {
             $session = $this->startOrReusePickSession($order, (int) $user->id);
         } catch (\Throwable $e) {
-            $statusCode = $e->getMessage() === self::DELIVERY_APPROVAL_PENDING_MESSAGE ? 423 : 422;
+            $message = (string) $e->getMessage();
+            $statusCode = $message === self::DELIVERY_APPROVAL_PENDING_MESSAGE || str_contains($message, 'diproses') || str_contains($message, 'aktif')
+                ? 423
+                : 422;
             return response()->json(['message' => $e->getMessage()], $statusCode);
         }
 
@@ -307,6 +331,14 @@ class DeliveryPickController extends Controller
         $session = DeliveryPickSession::with(['items.box.pallets.stockLocation', 'issues'])
             ->where('delivery_order_id', $orderId)
             ->findOrFail($sessionId);
+
+        if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
+            return redirect()->route('delivery.index')->with('error', 'Sesi ini dimiliki operator lain.');
+        }
+
+        if (in_array((string) $session->status, ['stale', 'cancelled'], true)) {
+            return redirect()->route('delivery.index')->with('error', self::SESSION_RECALC_MESSAGE);
+        }
         $order = DeliveryOrder::findOrFail($orderId);
 
         return view('operator.delivery.scan', compact('session', 'order'));
@@ -323,6 +355,14 @@ class DeliveryPickController extends Controller
             ->where('delivery_order_id', $orderId)
             ->findOrFail($sessionId);
 
+        if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
+            return redirect()->route('delivery.index')->with('error', 'Sesi ini dimiliki operator lain.');
+        }
+
+        if (in_array((string) $session->status, ['stale', 'cancelled'], true)) {
+            return redirect()->route('delivery.index')->with('error', self::SESSION_RECALC_MESSAGE);
+        }
+
         $order = DeliveryOrder::findOrFail($orderId);
 
         $verifiedBoxIds = collect($session->verification_box_ids ?? [])
@@ -334,20 +374,72 @@ class DeliveryPickController extends Controller
         return view('operator.delivery.verify-scan', compact('session', 'order', 'verifiedBoxIds'));
     }
 
+    public function cancel($sessionId)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $result = DB::transaction(function () use ($sessionId, $user) {
+            $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+
+            if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
+                return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
+            }
+
+            if (!in_array((string) $session->status, ['scanning', 'blocked', 'approved'], true)) {
+                return ['success' => false, 'message' => 'Sesi tidak dapat dibatalkan.', 'status' => 409];
+            }
+
+            DeliveryPickItem::where('pick_session_id', (int) $session->id)->lockForUpdate()->delete();
+            DeliveryIssue::where('pick_session_id', (int) $session->id)->where('status', 'pending')->delete();
+
+            $notes = trim((string) $session->approval_notes);
+            $cancelNote = 'Sesi dibatalkan oleh ' . ($user->name ?? ('user #' . $user->id)) . '.';
+
+            $session->status = 'cancelled';
+            $session->verification_box_ids = null;
+            $session->approval_notes = $notes !== '' ? ($notes . ' | ' . $cancelNote) : $cancelNote;
+            $session->save();
+
+            return ['success' => true, 'message' => 'Proses scan dibatalkan dan lock box telah dilepas.', 'status' => 200];
+        });
+
+        return response()->json([
+            'success' => (bool) ($result['success'] ?? false),
+            'message' => $result['message'] ?? null,
+        ], (int) ($result['status'] ?? 200));
+    }
+
     public function scanBox(Request $request, $sessionId)
     {
+        $user = Auth::user();
+        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         $request->validate([
             'box_number' => 'required|string',
         ]);
 
-        $result = DB::transaction(function () use ($request, $sessionId) {
+        $result = DB::transaction(function () use ($request, $sessionId, $user) {
             $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+
+            if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
+                return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
+            }
+
             if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id, true)) {
                 return ['success' => false, 'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE, 'status' => 423];
             }
 
             if ($session->status === 'blocked') {
                 return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423];
+            }
+
+            if ($session->status === 'stale') {
+                return ['success' => false, 'message' => self::SESSION_RECALC_MESSAGE, 'status' => 409];
             }
 
             if ($session->status === 'completed') {
@@ -432,18 +524,32 @@ class DeliveryPickController extends Controller
 
     public function verifyScanBox(Request $request, $sessionId)
     {
+        $user = Auth::user();
+        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         $request->validate([
             'box_number' => 'required|string',
         ]);
 
-        $result = DB::transaction(function () use ($request, $sessionId) {
+        $result = DB::transaction(function () use ($request, $sessionId, $user) {
             $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+
+            if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
+                return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
+            }
+
             if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id, true)) {
                 return ['success' => false, 'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE, 'status' => 423];
             }
 
             if ($session->status === 'blocked') {
                 return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423];
+            }
+
+            if ($session->status === 'stale') {
+                return ['success' => false, 'message' => self::SESSION_RECALC_MESSAGE, 'status' => 409];
             }
 
             if ($session->status === 'completed') {
@@ -530,15 +636,29 @@ class DeliveryPickController extends Controller
 
     public function complete(Request $request, $sessionId)
     {
+        $user = Auth::user();
+        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
         try {
-            $result = DB::transaction(function () use ($sessionId) {
+            $result = DB::transaction(function () use ($sessionId, $user) {
                 $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+
+                if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
+                    return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
+                }
+
                 if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id, true)) {
                     return ['success' => false, 'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE, 'status' => 423];
                 }
 
                 if ($session->status === 'completed') {
                     return ['success' => true, 'message' => 'Session sudah completed.'];
+                }
+
+                if ($session->status === 'stale') {
+                    return ['success' => false, 'message' => self::SESSION_RECALC_MESSAGE, 'status' => 409];
                 }
 
                 if ($session->status === 'blocked') {
@@ -939,6 +1059,7 @@ class DeliveryPickController extends Controller
     public function printPreview($orderId, $sessionId)
     {
         $session = DeliveryPickSession::with([
+            'creator',
             'items' => function($q) {
                 $q->with([
                     'box' => function($q) {

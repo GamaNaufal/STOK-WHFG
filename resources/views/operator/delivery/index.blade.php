@@ -497,6 +497,18 @@
                                     <button class="btn-insufficient" disabled title="{{ $order->readiness_reason ?? 'Pending approval not full tambahan' }}">
                                         <i class="bi bi-hourglass-split"></i> Pending Approval
                                     </button>
+                                @elseif(!empty($order->has_active_pick_session) && !empty($order->active_pick_owned_by_current_user) && !empty($order->active_pick_resume_url))
+                                    <a class="btn-process" href="{{ $order->active_pick_resume_url }}">
+                                        <i class="bi bi-arrow-repeat"></i> Lanjutkan Proses
+                                    </a>
+                                @elseif(!empty($order->has_active_pick_session) && empty($order->active_pick_owned_by_current_user))
+                                    <button class="btn-insufficient" disabled title="Sedang diproses oleh {{ $order->active_pick_owner_name ?? 'operator lain' }}">
+                                        <i class="bi bi-lock"></i> Sedang Diproses
+                                    </button>
+                                @elseif(!empty($order->global_pick_lock_active))
+                                    <button class="btn-insufficient" disabled title="Order #{{ $order->global_pick_lock_order_id }} sedang diproses oleh {{ $order->active_pick_owner_name ?? 'operator lain' }}">
+                                        <i class="bi bi-lock"></i> Terkunci
+                                    </button>
                                 @elseif($order->has_sufficient_stock)
                                     <button class="btn-process" onclick="openFulfillModal('{{ $order->id }}')">
                                         <i class="bi bi-box-seam"></i> Process
@@ -835,6 +847,11 @@
             return;
         }
 
+        const button = this;
+        button.disabled = true;
+        button.style.opacity = '0.6';
+        button.style.pointerEvents = 'none';
+
         fetch(`/delivery-stock/${currentOrderId}/start-pick`, {
             method: 'POST',
             headers: {
@@ -857,10 +874,18 @@
                 fulfillModal.hide();
                 picklistModal.show();
             } else {
+                button.disabled = false;
+                button.style.opacity = '1';
+                button.style.pointerEvents = 'auto';
                 showToast(data.message || 'Gagal membuat pick session.', 'danger');
             }
         })
-        .catch(() => showToast('Gagal proses.', 'danger'));
+        .catch(() => {
+            button.disabled = false;
+            button.style.opacity = '1';
+            button.style.pointerEvents = 'auto';
+            showToast('Gagal proses.', 'danger');
+        });
     });
 
     document.querySelectorAll('.js-delete-delivery').forEach((btn) => {
