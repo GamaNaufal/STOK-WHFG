@@ -11,8 +11,41 @@ use Illuminate\Support\Facades\DB;
 
 class DeliveryOrderController extends Controller
 {
+    private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
+
+    private function getActivePickLockedBoxIds(): array
+    {
+        return DB::table('delivery_pick_items')
+            ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+            ->whereIn('delivery_pick_sessions.status', self::ACTIVE_LOCK_STATUSES)
+            ->pluck('delivery_pick_items.box_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function getActivePickLockedStockByOrderPart(): array
+    {
+        $rows = DB::table('delivery_pick_items')
+            ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+            ->whereIn('delivery_pick_sessions.status', self::ACTIVE_LOCK_STATUSES)
+            ->select('delivery_pick_sessions.delivery_order_id', 'delivery_pick_items.part_number', DB::raw('SUM(delivery_pick_items.pcs_quantity) as total'))
+            ->groupBy('delivery_pick_sessions.delivery_order_id', 'delivery_pick_items.part_number')
+            ->get();
+
+        $locked = [];
+        foreach ($rows as $row) {
+            $locked[(int) $row->delivery_order_id][(string) $row->part_number] = (int) $row->total;
+        }
+
+        return $locked;
+    }
+
     private function buildFifoPoolsByPart(): array
     {
+        $lockedBoxIds = $this->getActivePickLockedBoxIds();
+
         $boxRows = DB::table('boxes')
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
@@ -20,6 +53,9 @@ class DeliveryOrderController extends Controller
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNull('boxes.assigned_delivery_order_id')
+            ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
+                $q->whereNotIn('boxes.id', $lockedBoxIds);
+            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full', 'boxes.created_at')
             ->get();
@@ -117,6 +153,8 @@ class DeliveryOrderController extends Controller
     }
     private function getAvailableStockByPart(): array
     {
+        $lockedBoxIds = $this->getActivePickLockedBoxIds();
+
         $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
@@ -125,6 +163,9 @@ class DeliveryOrderController extends Controller
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNull('boxes.assigned_delivery_order_id')
+            ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
+                $q->whereNotIn('boxes.id', $lockedBoxIds);
+            })
             ->groupBy('boxes.part_number')
             ->pluck('total', 'boxes.part_number');
 
@@ -193,7 +234,8 @@ class DeliveryOrderController extends Controller
         $globalActiveSession = \App\Models\DeliveryPickSession::query()
             ->with('creator')
             ->withCount('items')
-            ->whereIn('status', ['scanning', 'blocked', 'approved'])
+            ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+            ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->first();
 
@@ -211,12 +253,13 @@ class DeliveryOrderController extends Controller
         // Precompute available stock per part (PCS)
         $availableByPart = $this->getAvailableStockByPart();
         $reservedByOrder = $this->getReservedStockByOrder();
+        $activeLockedByOrderPart = $this->getActivePickLockedStockByOrderPart();
 
         $fifoPools = $this->buildFifoPoolsByPart();
 
         $partSettings = PartSetting::pluck('qty_box', 'part_number');
 
-        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId, $globalActiveSession, $currentUserId) {
+        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $activeLockedByOrderPart, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId, $globalActiveSession, $currentUserId) {
             $allAvailable = true;
             $hasPendingAdditionalApproval = !empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
 
@@ -224,9 +267,11 @@ class DeliveryOrderController extends Controller
             $deliveryDate = \Carbon\Carbon::parse($order->delivery_date)->timezone(config('app.timezone'))->startOfDay();
             $order->days_remaining = $today->diffInDays($deliveryDate, false);
 
-            $order->items->each(function ($item) use ($availableByPart, $reservedByOrder, $order, $partSettings, &$fifoPools, &$allAvailable) {
+            $order->items->each(function ($item) use ($availableByPart, $reservedByOrder, $activeLockedByOrderPart, $order, $partSettings, &$fifoPools, &$allAvailable) {
                 $partNumber = $item->part_number;
                 $reservedForOrder = (int) ($reservedByOrder[$order->id][$partNumber] ?? 0);
+                $lockedForOrder = (int) ($activeLockedByOrderPart[$order->id][$partNumber] ?? 0);
+                $reservedForOrder += $lockedForOrder;
                 $available = (int) ($availableByPart[$partNumber] ?? 0) + $reservedForOrder;
 
                 $item->available_total = $available;
@@ -311,13 +356,7 @@ class DeliveryOrderController extends Controller
             $order->global_pick_lock_order_id = $hasGlobalLock ? (int) $globalActiveSession->delivery_order_id : null;
 
             if ($isOwner) {
-                $verifiedCount = collect($globalActiveSession->verification_box_ids ?? [])->filter(fn ($id) => (int) $id > 0)->unique()->count();
-                $totalItems = (int) ($globalActiveSession->items_count ?? 0);
-                $isVerificationDone = $totalItems > 0 && $verifiedCount >= $totalItems;
-
-                $order->active_pick_resume_url = $isVerificationDone
-                    ? route('delivery.pick.scan', [$order->id, $globalActiveSession->id])
-                    : route('delivery.pick.verify', [$order->id, $globalActiveSession->id]);
+                $order->active_pick_resume_url = route('delivery.pick.verify', [$order->id, $globalActiveSession->id]);
             } else {
                 $order->active_pick_resume_url = null;
             }

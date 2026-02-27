@@ -21,6 +21,46 @@ class DeliveryPickController extends Controller
 {
     private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
     private const SESSION_RECALC_MESSAGE = 'Sesi picking ini perlu dihitung ulang karena ada order dengan prioritas tanggal lebih awal.';
+    private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
+
+    private function getVerificationActiveLockedBoxIds(): array
+    {
+        return DB::table('delivery_pick_items')
+            ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+            ->whereIn('delivery_pick_sessions.status', self::ACTIVE_LOCK_STATUSES)
+            ->pluck('delivery_pick_items.box_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function buildVerificationActiveLockedPoolsByOrderPart(): array
+    {
+        $rows = DB::table('delivery_pick_items')
+            ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+            ->whereIn('delivery_pick_sessions.status', self::ACTIVE_LOCK_STATUSES)
+            ->select(
+                'delivery_pick_sessions.delivery_order_id',
+                'delivery_pick_items.part_number',
+                DB::raw('SUM(delivery_pick_items.pcs_quantity) as total_qty'),
+                DB::raw('COUNT(delivery_pick_items.id) as total_boxes')
+            )
+            ->groupBy('delivery_pick_sessions.delivery_order_id', 'delivery_pick_items.part_number')
+            ->get();
+
+        $pools = [];
+        foreach ($rows as $row) {
+            $orderId = (int) $row->delivery_order_id;
+            $partNumber = (string) $row->part_number;
+            $pools[$orderId][$partNumber] = [
+                'qty' => (int) $row->total_qty,
+                'boxes' => (int) $row->total_boxes,
+            ];
+        }
+
+        return $pools;
+    }
 
     private function hasPendingAdditionalNotFullRequestForOrder(int $orderId, bool $lockRows = false): bool
     {
@@ -44,6 +84,8 @@ class DeliveryPickController extends Controller
 
     private function buildVerificationFifoPoolsByPart(): array
     {
+        $lockedBoxIds = $this->getVerificationActiveLockedBoxIds();
+
         $rows = DB::table('boxes')
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
@@ -51,6 +93,9 @@ class DeliveryPickController extends Controller
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNull('boxes.assigned_delivery_order_id')
+            ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
+                $q->whereNotIn('boxes.id', $lockedBoxIds);
+            })
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full')
@@ -107,13 +152,26 @@ class DeliveryPickController extends Controller
             ->limit(100)
             ->get();
 
+        $currentUserId = (int) Auth::id();
+        $globalActiveSession = DeliveryPickSession::with('creator')
+            ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
+
         $fifoPools = $this->buildVerificationFifoPoolsByPart();
         $reservedPools = $this->buildVerificationReservedPoolsByOrderPart();
+        $lockedPools = $this->buildVerificationActiveLockedPoolsByOrderPart();
 
-        $orders->each(function ($order) use (&$fifoPools, $reservedPools) {
+        $orders->each(function ($order) use (&$fifoPools, $reservedPools, $lockedPools, $globalActiveSession, $currentUserId) {
             $totalBoxesToPick = 0;
             $isReadyToPick = true;
             $hasPendingAdditionalApproval = $this->hasPendingAdditionalNotFullRequestForOrder((int) $order->id);
+
+            $hasGlobalLock = $globalActiveSession !== null;
+            $isActiveOrder = $hasGlobalLock && (int) $globalActiveSession->delivery_order_id === (int) $order->id;
+            $isOwner = $isActiveOrder && (int) $globalActiveSession->created_by === $currentUserId;
+            $ownerName = $hasGlobalLock ? trim((string) optional($globalActiveSession->creator)->name) : '';
 
             foreach ($order->items as $item) {
                 $requiredQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
@@ -127,6 +185,11 @@ class DeliveryPickController extends Controller
                 foreach ($reservedPool as $box) {
                     $reservedForOrder += (int) ($box['qty'] ?? 0);
                 }
+
+                $lockedData = $lockedPools[$order->id][$partNumber] ?? ['qty' => 0, 'boxes' => 0];
+                $lockedQty = (int) ($lockedData['qty'] ?? 0);
+                $lockedBoxes = (int) ($lockedData['boxes'] ?? 0);
+                $reservedForOrder += $lockedQty;
 
                 $remainingNeeded = max(0, $requiredQty - $reservedForOrder);
                 $takenFromFifo = 0;
@@ -156,15 +219,25 @@ class DeliveryPickController extends Controller
                     $isReadyToPick = false;
                 }
 
-                $totalBoxesToPick += count($reservedPool) + $selectedFifoBoxes;
+                $totalBoxesToPick += count($reservedPool) + $lockedBoxes + $selectedFifoBoxes;
             }
 
             $order->total_box_to_pick = $totalBoxesToPick;
             $order->has_pending_additional_approval = $hasPendingAdditionalApproval;
-            $order->is_ready_to_pick = $isReadyToPick && !$hasPendingAdditionalApproval;
-            $order->readiness_reason = $hasPendingAdditionalApproval
-                ? 'Pending approval not full tambahan'
-                : null;
+
+            if ($hasPendingAdditionalApproval) {
+                $order->is_ready_to_pick = false;
+                $order->readiness_reason = 'Pending approval not full tambahan';
+            } elseif ($hasGlobalLock && !$isOwner) {
+                $order->is_ready_to_pick = false;
+                $order->readiness_reason = 'Terkunci: order #' . (int) $globalActiveSession->delivery_order_id . ' sedang diproses oleh ' . ($ownerName !== '' ? $ownerName : 'operator lain');
+            } else {
+                $order->is_ready_to_pick = $isReadyToPick || $isOwner;
+                $order->readiness_reason = null;
+            }
+
+            $order->has_active_pick_session = $isActiveOrder;
+            $order->active_pick_owned_by_current_user = $isOwner;
         });
 
         return view('operator.delivery.picking-verification', compact('orders'));
@@ -226,8 +299,9 @@ class DeliveryPickController extends Controller
             $this->assertOrderDeliveryGateOpenOrFail((int) $order->id, true);
 
             $activeSession = DeliveryPickSession::with('creator')
-                ->whereIn('status', ['scanning', 'blocked', 'approved'])
-                ->latest()
+                ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
                 ->first();
 
             if ($activeSession) {
@@ -388,7 +462,7 @@ class DeliveryPickController extends Controller
                 return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
             }
 
-            if (!in_array((string) $session->status, ['scanning', 'blocked', 'approved'], true)) {
+            if (!in_array((string) $session->status, self::ACTIVE_LOCK_STATUSES, true)) {
                 return ['success' => false, 'message' => 'Sesi tidak dapat dibatalkan.', 'status' => 409];
             }
 

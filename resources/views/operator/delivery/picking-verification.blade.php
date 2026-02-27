@@ -126,7 +126,8 @@
                             </td>
                             <td class="text-end pe-3">
                                 <button class="btn btn-sm btn-verify js-start-verification" data-order-id="{{ $order->id }}" {{ !empty($order->is_ready_to_pick) ? '' : 'disabled' }}>
-                                    <i class="bi bi-play-circle"></i> Mulai Verifikasi
+                                    <i class="bi {{ !empty($order->has_active_pick_session) && !empty($order->active_pick_owned_by_current_user) ? 'bi-arrow-repeat' : 'bi-play-circle' }}"></i>
+                                    {{ !empty($order->has_active_pick_session) && !empty($order->active_pick_owned_by_current_user) ? 'Lanjutkan Verifikasi' : 'Mulai Verifikasi' }}
                                 </button>
                             </td>
                         </tr>
