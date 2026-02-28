@@ -356,7 +356,7 @@ class DeliveryOrderController extends Controller
             $order->global_pick_lock_order_id = $hasGlobalLock ? (int) $globalActiveSession->delivery_order_id : null;
 
             if ($isOwner) {
-                $order->active_pick_resume_url = route('delivery.pick.verify', [$order->id, $globalActiveSession->id]);
+                $order->active_pick_resume_url = route('delivery.pick.scan', [$order->id, $globalActiveSession->id]);
             } else {
                 $order->active_pick_resume_url = null;
             }

@@ -29,7 +29,7 @@
                     <i class="bi bi-file-earmark-text"></i> Form Edit Data No Part
                 </div>
                 <div class="card-body p-4">
-                    <form method="POST" action="{{ route('part-settings.update', $partSetting) }}">
+                    <form id="partSettingForm" method="POST" action="{{ route('part-settings.update', $partSetting) }}">
                         @csrf
                         @method('PUT')
                         <div class="mb-4">
@@ -38,9 +38,11 @@
                             </label>
                             <input type="text" 
                                    name="part_number" 
+                                              id="partNumberInput"
                                    class="form-control form-control-lg @error('part_number') is-invalid @enderror" 
                                    value="{{ old('part_number', $partSetting->part_number) }}" 
                                    placeholder="Contoh: ABC123XYZ" 
+                                title="No Part tidak boleh mengandung huruf. Angka dan simbol diperbolehkan."
                                    style="border: 2px solid #e5e7eb; border-radius: 8px;"
                                    required>
                             @error('part_number')
@@ -49,7 +51,7 @@
                                 </div>
                             @enderror
                             <small class="form-text text-muted d-block mt-2">
-                                <i class="bi bi-info-circle"></i> Nomor part harus tetap unik
+                                <i class="bi bi-info-circle"></i> Nomor part harus unik dan tidak boleh mengandung huruf
                             </small>
                         </div>
 
@@ -98,4 +100,27 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const form = document.getElementById('partSettingForm');
+        const partInput = document.getElementById('partNumberInput');
+        if (!form || !partInput) return;
+
+        const stripLetters = (value) => String(value || '').replace(/[A-Za-z]/g, '');
+
+        partInput.addEventListener('input', function () {
+            this.value = stripLetters(this.value);
+            this.classList.remove('is-invalid');
+            this.setCustomValidity('');
+        });
+
+        form.addEventListener('submit', function () {
+            partInput.value = stripLetters(partInput.value);
+            partInput.setCustomValidity('');
+        });
+    });
+</script>
 @endsection

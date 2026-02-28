@@ -43,6 +43,27 @@
     let existingPalletSearchTimeout;
     let isSelectingExistingPallet = false;
 
+    function normalizeBarcodeInput(rawValue) {
+        return String(rawValue || "").trim();
+    }
+
+    function validateBarcodeInput(rawValue) {
+        const barcode = normalizeBarcodeInput(rawValue);
+
+        if (!barcode) {
+            return null;
+        }
+
+        if (!/^\d+$/.test(barcode)) {
+            showBarcodeError("ID Box hanya boleh berisi angka.");
+            barcodeInput.value = barcode.replace(/\D/g, "");
+            barcodeInput.focus();
+            return null;
+        }
+
+        return barcode;
+    }
+
     function showPostSaveBannerIfAny() {
         const popup = document.getElementById("postSavePopup");
         const popupText = document.getElementById("postSavePopupText");
@@ -479,7 +500,7 @@
     scanForm.addEventListener("submit", function (e) {
         e.preventDefault();
         if (!barcodeInput.disabled) {
-            const barcode = barcodeInput.value.trim();
+            const barcode = validateBarcodeInput(barcodeInput.value);
             if (barcode) {
                 scanBarcodeHardware(barcode);
                 barcodeInput.value = "";
@@ -499,7 +520,7 @@
     if (barcodeSubmitBtn) {
         barcodeSubmitBtn.addEventListener("click", function () {
             if (barcodeInput.disabled) return;
-            const barcode = barcodeInput.value.trim();
+            const barcode = validateBarcodeInput(barcodeInput.value);
             if (barcode) {
                 scanBarcodeHardware(barcode);
                 barcodeInput.value = "";
@@ -521,10 +542,24 @@
     barcodeInput.addEventListener("keydown", function (e) {
         if (e.key === "Enter" || e.keyCode === 13) {
             e.preventDefault();
-            const barcode = this.value.trim();
+            const barcode = validateBarcodeInput(this.value);
             if (barcode) {
                 scanBarcodeHardware(barcode);
                 this.value = "";
+            }
+        }
+    });
+
+    barcodeInput.addEventListener("input", function () {
+        const sanitized = this.value.replace(/\D/g, "");
+        if (this.value !== sanitized) {
+            this.value = sanitized;
+        }
+
+        if (sanitized.length > 0) {
+            const errorEl = document.getElementById("barcode-error");
+            if (errorEl) {
+                errorEl.style.display = "none";
             }
         }
     });
@@ -545,7 +580,7 @@
             const active = document.activeElement;
             if (active === barcodeInput && !barcodeInput.disabled) {
                 e.preventDefault();
-                const barcode = barcodeInput.value.trim();
+                const barcode = validateBarcodeInput(barcodeInput.value);
                 if (barcode) {
                     scanBarcodeHardware(barcode);
                     barcodeInput.value = "";

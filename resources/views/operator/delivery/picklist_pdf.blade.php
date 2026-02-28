@@ -12,6 +12,16 @@
         .info-block strong { font-weight: bold; }
         .summary { background: #fff; padding: 10px; margin: 15px 0; border-left: 4px solid #000; }
         .summary-row { display: flex; justify-content: space-between; margin: 5px 0; }
+        .highlight-note {
+            background: #fff59d;
+            border: 1px solid #d1b100;
+            color: #111;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
         table { width: 100%; border-collapse: collapse; margin: 15px 0; }
         th {
             background: #fff;
@@ -81,8 +91,19 @@
     @endphp
 
     <div class="summary">
+        @php
+            $noteText = $ppcOnlyNotes !== '' ? $ppcOnlyNotes : '-';
+            $shouldHighlightNote = $ppcOnlyNotes !== '' && strlen($ppcOnlyNotes) > 3;
+        @endphp
         <div class="summary-row">
-            <div><strong>Keterangan Pengambilan (PPC):</strong> {{ $ppcOnlyNotes !== '' ? $ppcOnlyNotes : '-' }}</div>
+            <div>
+                <strong>Keterangan Pengambilan:</strong>
+                @if($shouldHighlightNote)
+                    <span class="highlight-note">{{ $noteText }}</span>
+                @else
+                    <span>{{ $noteText }}</span>
+                @endif
+            </div>
         </div>
     </div>
 

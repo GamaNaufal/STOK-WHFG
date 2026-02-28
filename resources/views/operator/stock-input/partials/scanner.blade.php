@@ -28,6 +28,9 @@
                    id="barcodeInput"
                    class="form-control"
                    placeholder="Scan/ketik ID Box..."
+                     inputmode="numeric"
+                     pattern="[0-9]*"
+                     autocomplete="off"
                    style="font-size: 16px;
                           border: 2px solid #0C7779;
                           border-radius: 0;
@@ -41,7 +44,7 @@
         </div>
 
         <small class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
-            <i class="bi bi-info-circle"></i> Scan ID Box terlebih dahulu, lalu scan No Part
+            <i class="bi bi-info-circle"></i> ID Box wajib angka (tanpa huruf). Scan ID Box terlebih dahulu, lalu scan No Part
         </small>
 
         <div class="mt-4">

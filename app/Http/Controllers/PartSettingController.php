@@ -38,8 +38,10 @@ class PartSettingController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'part_number' => 'required|string|max:100|unique:part_settings,part_number',
+            'part_number' => ['required', 'string', 'max:100', 'not_regex:/\p{L}/u', 'unique:part_settings,part_number'],
             'qty_box' => 'required|integer|min:1|max:4294967295',
+        ], [
+            'part_number.not_regex' => 'No Part tidak boleh mengandung huruf. Angka dan simbol diperbolehkan.',
         ]);
 
         PartSetting::create($validated);
@@ -55,8 +57,10 @@ class PartSettingController extends Controller
     public function update(Request $request, PartSetting $partSetting)
     {
         $validated = $request->validate([
-            'part_number' => 'required|string|max:100|unique:part_settings,part_number,' . $partSetting->id,
+            'part_number' => ['required', 'string', 'max:100', 'not_regex:/\p{L}/u', 'unique:part_settings,part_number,' . $partSetting->id],
             'qty_box' => 'required|integer|min:1|max:4294967295',
+        ], [
+            'part_number.not_regex' => 'No Part tidak boleh mengandung huruf. Angka dan simbol diperbolehkan.',
         ]);
 
         $partSetting->update($validated);

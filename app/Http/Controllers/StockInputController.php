@@ -203,7 +203,9 @@ class StockInputController extends Controller
     public function scanBarcode(Request $request)
     {
         $validated = $request->validate([
-            'barcode' => 'required|string',
+            'barcode' => ['required', 'string', 'regex:/^\d+$/'],
+        ], [
+            'barcode.regex' => 'ID Box hanya boleh berisi angka.',
         ]);
 
         $barcode = $validated['barcode'];

@@ -11,9 +11,17 @@
             </h1>
             <p class="text-muted">Order #{{ $order->id }} | {{ $order->customer_name }} | {{ $order->delivery_date->format('d M Y') }}</p>
         </div>
-        <a href="{{ route('delivery.index') }}" class="btn btn-outline-secondary">
-            <i class="bi bi-arrow-left"></i> Kembali
-        </a>
+        <div class="d-flex gap-2 flex-wrap justify-content-end">
+            <a href="{{ route('delivery.pick.print-preview', [$order->id, $session->id]) }}" target="_blank" class="btn btn-outline-primary">
+                <i class="bi bi-printer"></i> Print Keterangan Pengambilan
+            </a>
+            <a href="{{ route('delivery.pick.verification') }}" class="btn btn-outline-info">
+                <i class="bi bi-arrow-left-circle"></i> Kembali ke Picking Verification
+            </a>
+            <a href="{{ route('delivery.index') }}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left"></i> Kembali ke Delivery
+            </a>
+        </div>
     </div>
 </div>
 

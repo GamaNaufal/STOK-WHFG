@@ -14,7 +14,16 @@
         .summary-row { display: flex; justify-content: space-between; margin: 5px 0; }
         .summary-row.wrap { gap: 12px; align-items: flex-start; }
         .summary-item { flex: 1; min-width: 0; }
-        .highlight-note { background: #fff59d; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+        .highlight-note {
+            background: #fff59d;
+            border: 1px solid #d1b100;
+            color: #111;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
         table { width: 100%; border-collapse: collapse; margin: 15px 0; }
         th {
             background: #fff;
@@ -34,6 +43,11 @@
         .footer { margin-top: 30px; text-align: center; font-size: 10px; border-top: 1px solid #000; padding-top: 10px; }
         @media print {
             body { margin: 8mm; }
+            .highlight-note {
+                background: #fff59d !important;
+                border: 1px solid #d1b100 !important;
+                color: #111 !important;
+            }
         }
     </style>
 </head>
