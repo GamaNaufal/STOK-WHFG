@@ -412,6 +412,13 @@ class StockInputController extends Controller
         $part_number = $parts[1];
         $pcs_quantity = (int) $parts[2];
 
+        if (!preg_match('/^\d+$/', $box_number)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ID Box hanya boleh berisi angka.'
+            ], 422);
+        }
+
         // Verify box exists in database
         $box = Box::where('box_number', $box_number)->first();
 

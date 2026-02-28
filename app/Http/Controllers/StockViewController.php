@@ -116,7 +116,9 @@ class StockViewController extends Controller
                     'total_pcs' => $totalPcs,
                     'items' => $itemGroup->sortBy('created_at'),
                 ];
-            });
+            })->sortBy(function ($row) {
+                return mb_strtolower((string) ($row['part_number'] ?? ''));
+            }, SORT_STRING);
         }
 
         // Data for "By Pallet" view
@@ -203,7 +205,9 @@ class StockViewController extends Controller
                 'total_box' => (int) $totalBox,
                 'total_pcs' => $totalPcs,
             ];
-        })->values();
+        })->sortBy(function ($row) {
+            return mb_strtolower((string) ($row['part_number'] ?? ''));
+        }, SORT_STRING)->values();
 
         return response()->json($groupedByPart);
     }

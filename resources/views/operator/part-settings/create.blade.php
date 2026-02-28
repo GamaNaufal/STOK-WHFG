@@ -41,7 +41,6 @@
                                    class="form-control form-control-lg @error('part_number') is-invalid @enderror" 
                                    value="{{ old('part_number') }}" 
                                    placeholder="Masukkan No Part Baru" 
-                                title="No Part tidak boleh mengandung huruf. Angka dan simbol diperbolehkan."
                                    style="border: 2px solid #e5e7eb; border-radius: 8px;"
                                    required>
                             @error('part_number')
@@ -50,7 +49,7 @@
                                 </div>
                             @enderror
                             <small class="form-text text-muted d-block mt-2">
-                                <i class="bi bi-info-circle"></i> Masukkan nomor part unik tanpa huruf (angka dan simbol boleh)
+                                <i class="bi bi-info-circle"></i> Masukkan nomor part unik
                             </small>
                         </div>
 
@@ -104,21 +103,12 @@
 @section('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const form = document.getElementById('partSettingForm');
         const partInput = document.getElementById('partNumberInput');
-        if (!form || !partInput) return;
-
-        const stripLetters = (value) => String(value || '').replace(/[A-Za-z]/g, '');
+        if (!partInput) return;
 
         partInput.addEventListener('input', function () {
-            this.value = stripLetters(this.value);
             this.classList.remove('is-invalid');
             this.setCustomValidity('');
-        });
-
-        form.addEventListener('submit', function () {
-            partInput.value = stripLetters(partInput.value);
-            partInput.setCustomValidity('');
         });
     });
 </script>

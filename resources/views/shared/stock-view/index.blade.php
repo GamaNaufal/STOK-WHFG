@@ -696,6 +696,17 @@
     let currentPalletId = null;
     let editPartSelectEnhanced = false;
 
+    function sortLabelsAscending(items) {
+        return [...new Set((items || []).filter(Boolean))].sort((left, right) =>
+            String(left).localeCompare(String(right), undefined, {
+                sensitivity: 'base'
+            })
+        );
+    }
+
+    const sortedAllParts = sortLabelsAscending(allParts);
+    const sortedAllPallets = sortLabelsAscending(allPallets);
+
     function syncModalA11y(modalEl) {
         if (!modalEl) return;
         modalEl.addEventListener('hide.bs.modal', () => {
@@ -755,7 +766,7 @@
 
     function loadSearchSuggestions(searchTerm) {
         if (!hasSearchUi) return;
-        const dataSource = viewMode === 'pallet' ? allPallets : allParts;
+        const dataSource = viewMode === 'pallet' ? sortedAllPallets : sortedAllParts;
         let filtered = dataSource;
         
         if (searchTerm.trim()) {
