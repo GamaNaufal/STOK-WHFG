@@ -10,6 +10,7 @@ use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
 use App\Models\NotFullBoxRequest;
 use App\Models\PalletItem;
+use App\Models\PartSetting;
 use App\Models\StockWithdrawal;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
@@ -39,23 +40,24 @@ class DeliveryPickController extends Controller
     {
         $rows = DB::table('delivery_pick_items')
             ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+            ->join('boxes', 'boxes.id', '=', 'delivery_pick_items.box_id')
             ->whereIn('delivery_pick_sessions.status', self::ACTIVE_LOCK_STATUSES)
             ->select(
                 'delivery_pick_sessions.delivery_order_id',
                 'delivery_pick_items.part_number',
-                DB::raw('SUM(delivery_pick_items.pcs_quantity) as total_qty'),
-                DB::raw('COUNT(delivery_pick_items.id) as total_boxes')
+                'delivery_pick_items.pcs_quantity',
+                'boxes.is_not_full'
             )
-            ->groupBy('delivery_pick_sessions.delivery_order_id', 'delivery_pick_items.part_number')
+            ->orderBy('delivery_pick_items.id', 'asc')
             ->get();
 
         $pools = [];
         foreach ($rows as $row) {
             $orderId = (int) $row->delivery_order_id;
             $partNumber = (string) $row->part_number;
-            $pools[$orderId][$partNumber] = [
-                'qty' => (int) $row->total_qty,
-                'boxes' => (int) $row->total_boxes,
+            $pools[$orderId][$partNumber][] = [
+                'qty' => (int) $row->pcs_quantity,
+                'is_not_full' => (bool) $row->is_not_full,
             ];
         }
 
@@ -162,8 +164,9 @@ class DeliveryPickController extends Controller
         $fifoPools = $this->buildVerificationFifoPoolsByPart();
         $reservedPools = $this->buildVerificationReservedPoolsByOrderPart();
         $lockedPools = $this->buildVerificationActiveLockedPoolsByOrderPart();
+        $partSettings = PartSetting::pluck('qty_box', 'part_number');
 
-        $orders->each(function ($order) use (&$fifoPools, $reservedPools, $lockedPools, $globalActiveSession, $currentUserId) {
+        $orders->each(function ($order) use (&$fifoPools, $reservedPools, $lockedPools, $partSettings, $globalActiveSession, $currentUserId) {
             $totalBoxesToPick = 0;
             $isReadyToPick = true;
             $hasPendingAdditionalApproval = $this->hasPendingAdditionalNotFullRequestForOrder((int) $order->id);
@@ -181,20 +184,67 @@ class DeliveryPickController extends Controller
 
                 $partNumber = (string) $item->part_number;
                 $reservedPool = $reservedPools[$order->id][$partNumber] ?? [];
-                $reservedForOrder = 0;
-                foreach ($reservedPool as $box) {
-                    $reservedForOrder += (int) ($box['qty'] ?? 0);
+                $lockedPool = $lockedPools[$order->id][$partNumber] ?? [];
+                $pool = $fifoPools[$partNumber] ?? [];
+
+                $qtyPerBox = (int) ($partSettings[$partNumber] ?? 0);
+                if ($qtyPerBox > 0) {
+                    $fullBoxNeeded = intdiv($requiredQty, $qtyPerBox);
+                    $needsNotFull = ($requiredQty % $qtyPerBox) > 0;
+                    $totalBoxesToPick += $fullBoxNeeded + ($needsNotFull ? 1 : 0);
+
+                    $fullAvailable = 0;
+                    $hasNotFull = false;
+
+                    foreach (array_merge($reservedPool, $lockedPool) as $entry) {
+                        $entryQty = (int) ($entry['qty'] ?? 0);
+                        $entryIsNotFull = (bool) ($entry['is_not_full'] ?? false) || $entryQty < $qtyPerBox;
+
+                        if ($entryIsNotFull) {
+                            $hasNotFull = true;
+                        } elseif ($entryQty === $qtyPerBox) {
+                            $fullAvailable++;
+                        }
+                    }
+
+                    $fullMissing = max(0, $fullBoxNeeded - $fullAvailable);
+                    $poolIndex = 0;
+                    while (($fullMissing > 0 || ($needsNotFull && !$hasNotFull)) && isset($pool[$poolIndex])) {
+                        $entry = $pool[$poolIndex];
+                        $entryQty = (int) ($entry['qty'] ?? 0);
+                        $entryIsNotFull = (bool) ($entry['is_not_full'] ?? false) || $entryQty < $qtyPerBox;
+
+                        if ($fullMissing > 0 && !$entryIsNotFull && $entryQty === $qtyPerBox) {
+                            $fullMissing--;
+                            array_splice($pool, $poolIndex, 1);
+                            continue;
+                        }
+
+                        if ($needsNotFull && !$hasNotFull && $entryIsNotFull) {
+                            $hasNotFull = true;
+                            array_splice($pool, $poolIndex, 1);
+                            continue;
+                        }
+
+                        $poolIndex++;
+                    }
+
+                    if ($fullMissing > 0 || ($needsNotFull && !$hasNotFull)) {
+                        $isReadyToPick = false;
+                    }
+
+                    $fifoPools[$partNumber] = $pool;
+                    continue;
                 }
 
-                $lockedData = $lockedPools[$order->id][$partNumber] ?? ['qty' => 0, 'boxes' => 0];
-                $lockedQty = (int) ($lockedData['qty'] ?? 0);
-                $lockedBoxes = (int) ($lockedData['boxes'] ?? 0);
-                $reservedForOrder += $lockedQty;
+                $reservedForOrder = 0;
+                foreach (array_merge($reservedPool, $lockedPool) as $box) {
+                    $reservedForOrder += (int) ($box['qty'] ?? 0);
+                }
 
                 $remainingNeeded = max(0, $requiredQty - $reservedForOrder);
                 $takenFromFifo = 0;
                 $selectedFifoBoxes = 0;
-                $pool = $fifoPools[$partNumber] ?? [];
 
                 $poolIndex = 0;
                 while ($remainingNeeded > 0 && isset($pool[$poolIndex])) {
@@ -219,7 +269,7 @@ class DeliveryPickController extends Controller
                     $isReadyToPick = false;
                 }
 
-                $totalBoxesToPick += count($reservedPool) + $lockedBoxes + $selectedFifoBoxes;
+                $totalBoxesToPick += count($reservedPool) + count($lockedPool) + $selectedFifoBoxes;
             }
 
             $order->total_box_to_pick = $totalBoxesToPick;
@@ -230,7 +280,7 @@ class DeliveryPickController extends Controller
                 $order->readiness_reason = 'Pending approval not full tambahan';
             } elseif ($hasGlobalLock && !$isOwner) {
                 $order->is_ready_to_pick = false;
-                $order->readiness_reason = 'Terkunci: order #' . (int) $globalActiveSession->delivery_order_id . ' sedang diproses oleh ' . ($ownerName !== '' ? $ownerName : 'operator lain');
+                $order->readiness_reason = null;
             } else {
                 $order->is_ready_to_pick = $isReadyToPick || $isOwner;
                 $order->readiness_reason = null;
