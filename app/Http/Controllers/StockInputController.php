@@ -518,7 +518,7 @@ class StockInputController extends Controller
             ]);
         }
 
-        $pallet = Pallet::with(['items'])->find($pallet_id);
+        $pallet = Pallet::with(['items', 'stockLocation'])->find($pallet_id);
 
         if (!$pallet) {
             session()->forget('current_pallet_id');
@@ -528,9 +528,50 @@ class StockInputController extends Controller
             ]);
         }
 
-        // Ambil boxes dari session, bukan dari database
         $scannedBoxes = session('scanned_boxes', []);
-        $totalPcs = array_sum(array_column($scannedBoxes, 'pcs_quantity'));
+
+        $existingBoxes = $pallet->boxes()
+            ->select('boxes.id', 'boxes.box_number', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.qty_box', 'boxes.is_not_full')
+            ->get()
+            ->map(function ($box) {
+                return [
+                    'box_id' => $box->id,
+                    'box_number' => $box->box_number,
+                    'part_number' => $box->part_number,
+                    'pcs_quantity' => (int) $box->pcs_quantity,
+                    'qty_box' => $box->qty_box !== null ? (int) $box->qty_box : null,
+                    'is_not_full' => (bool) $box->is_not_full,
+                    'source' => 'existing',
+                ];
+            })
+            ->values()
+            ->all();
+
+        $pendingBoxes = collect($scannedBoxes)
+            ->map(function ($box) {
+                return [
+                    'box_id' => $box['box_id'] ?? null,
+                    'box_number' => $box['box_number'] ?? null,
+                    'part_number' => $box['part_number'] ?? null,
+                    'pcs_quantity' => (int) ($box['pcs_quantity'] ?? 0),
+                    'qty_box' => isset($box['qty_box']) ? (int) $box['qty_box'] : null,
+                    'is_not_full' => (bool) ($box['is_not_full'] ?? false),
+                    'source' => 'pending',
+                ];
+            })
+            ->values();
+
+        $boxesForPrint = collect($existingBoxes)
+            ->concat($pendingBoxes)
+            ->unique(function ($box) {
+                return $box['box_id'] ?? $box['box_number'] ?? spl_object_id((object) $box);
+            })
+            ->values()
+            ->all();
+
+        $totalPcs = collect($boxesForPrint)->sum(function ($box) {
+            return (int) ($box['pcs_quantity'] ?? 0);
+        });
 
         return response()->json([
             'success' => true,
@@ -541,6 +582,9 @@ class StockInputController extends Controller
                 'warehouse_location' => $pallet->stockLocation?->warehouse_location,
                 'has_stock_location' => (bool) $pallet->stockLocation()->exists(),
                 'boxes' => $scannedBoxes,
+                'boxes_existing' => $existingBoxes,
+                'boxes_pending' => $pendingBoxes,
+                'boxes_for_print' => $boxesForPrint,
                 'items' => $pallet->items->map(function ($item) {
                     return [
                         'part_number' => $item->part_number,
@@ -549,6 +593,9 @@ class StockInputController extends Controller
                     ];
                 }),
                 'total_boxes' => count($scannedBoxes),
+                'total_boxes_existing' => count($existingBoxes),
+                'total_boxes_pending' => $pendingBoxes->count(),
+                'total_boxes_combined' => count($boxesForPrint),
                 'total_pcs' => $totalPcs,
             ]
         ]);

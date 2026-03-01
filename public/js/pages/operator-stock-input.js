@@ -29,6 +29,7 @@
     const selectedExistingPalletText = document.getElementById(
         "selectedExistingPalletText",
     );
+    const printPalletBtn = document.getElementById("print-pallet-btn");
 
     if (!barcodeInput || !partInput || !scanForm) {
         return;
@@ -172,6 +173,124 @@
         infoText.textContent = message;
         infoBox.style.display = "block";
         errorMessage.style.display = "none";
+    }
+
+    function escapeHtml(input) {
+        return String(input ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function renderAndPrintPalletInfo(pallet) {
+        const boxes = Array.isArray(pallet?.boxes_for_print)
+            ? pallet.boxes_for_print
+            : Array.isArray(pallet?.boxes)
+              ? pallet.boxes
+              : [];
+        const totalBoxesCombined = Number(
+            pallet?.total_boxes_combined ?? boxes.length,
+        );
+        const totalBoxesExisting = Number(pallet?.total_boxes_existing ?? 0);
+        const totalBoxesPending = Number(pallet?.total_boxes_pending ?? 0);
+        const rowsHtml = boxes.length
+            ? boxes
+                  .map(
+                      (box) => `
+                <tr>
+                    <td>${escapeHtml(box.box_number || "-")}</td>
+                    <td>${escapeHtml(box.part_number || "-")}</td>
+                    <td>${escapeHtml(box.pcs_quantity ?? "-")}</td>
+                    <td>${escapeHtml(box.qty_box ?? "-")}${box.is_not_full ? " (Not Full)" : ""}</td>
+                </tr>
+            `,
+                  )
+                  .join("")
+            : '<tr><td colspan="4" style="text-align:center;">Belum ada box yang diinput.</td></tr>';
+
+        const printWindow = window.open("", "_blank");
+        if (!printWindow) {
+            showError("Popup diblokir browser. Izinkan popup untuk mencetak.");
+            return;
+        }
+
+        const printedAt = new Date().toLocaleString("id-ID");
+        const documentHtml = `
+            <!doctype html>
+            <html>
+            <head>
+                <meta charset="utf-8" />
+                <title>Keterangan Pallet ${escapeHtml(pallet?.pallet_number || "")}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+                    h1 { margin: 0 0 14px 0; font-size: 20px; }
+                    .meta { margin-bottom: 14px; line-height: 1.7; }
+                    .meta strong { display: inline-block; min-width: 130px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                    th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
+                    thead th { background: #f3f4f6; }
+                    .footer { margin-top: 12px; color: #6b7280; font-size: 11px; }
+                </style>
+            </head>
+            <body>
+                <h1>Keterangan Pallet</h1>
+                <div class="meta">
+                    <div><strong>No Pallet</strong>: ${escapeHtml(pallet?.pallet_number || "-")}</div>
+                    <div><strong>Lokasi</strong>: ${escapeHtml(pallet?.warehouse_location || "-")}</div>
+                    <div><strong>Total Box (Gabungan)</strong>: ${escapeHtml(totalBoxesCombined)}</div>
+                    <div><strong>Box Existing</strong>: ${escapeHtml(totalBoxesExisting)}</div>
+                    <div><strong>Box Tambahan (Pending)</strong>: ${escapeHtml(totalBoxesPending)}</div>
+                    <div><strong>Sumber Pallet</strong>: ${escapeHtml(pallet?.source || "new")}</div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>No Box</th>
+                            <th>No Part</th>
+                            <th>PCS</th>
+                            <th>Qty Box</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHtml}
+                    </tbody>
+                </table>
+                <div class="footer">Dicetak pada: ${escapeHtml(printedAt)}</div>
+                <script>
+                    window.onload = function() { window.print(); };
+                <\/script>
+            </body>
+            </html>
+        `;
+
+        printWindow.document.open();
+        printWindow.document.write(documentHtml);
+        printWindow.document.close();
+    }
+
+    function printCurrentPalletInfo() {
+        if (!currentPalletId) {
+            showError("Belum ada pallet aktif untuk dicetak.");
+            return;
+        }
+
+        fetch(config.getPalletDataUrl, {
+            headers: {
+                "X-CSRF-TOKEN": config.csrfToken,
+            },
+        })
+            .then((response) => response.json())
+            .then((data) => {
+                if (!data.success || !data.pallet) {
+                    throw new Error(data.message || "Data pallet tidak ditemukan.");
+                }
+                renderAndPrintPalletInfo(data.pallet);
+            })
+            .catch((error) => {
+                showError("Gagal menyiapkan data print: " + error.message);
+            });
     }
 
     const showConfirm = ({ title, message, confirmText, onConfirm }) => {
@@ -644,6 +763,12 @@
                 },
             });
         });
+
+    if (printPalletBtn) {
+        printPalletBtn.addEventListener("click", function () {
+            printCurrentPalletInfo();
+        });
+    }
 
     document.getElementById("save-btn").addEventListener("click", function () {
         if (

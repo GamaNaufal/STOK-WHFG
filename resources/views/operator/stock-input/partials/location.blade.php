@@ -86,6 +86,18 @@
                                transition: all 0.3s ease;">
                     <i class="bi bi-x-circle"></i> Batal
                 </button>
+                <button type="button" class="btn btn-lg" id="print-pallet-btn"
+                       style="background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
+                           color: white;
+                           border: none;
+                               padding: 14px 28px;
+                               border-radius: 10px;
+                               font-weight: 600;
+                               font-size: 15px;
+                           transition: all 0.3s ease;
+                           box-shadow: 0 4px 12px rgba(245, 158, 11, 0.22);">
+                    <i class="bi bi-printer"></i> Print Keterangan Pallet
+                </button>
                 <button type="button" class="btn btn-lg" id="save-btn"
                         style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                                color: white;
