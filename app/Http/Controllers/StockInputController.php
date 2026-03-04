@@ -202,8 +202,12 @@ class StockInputController extends Controller
     // API untuk scan Barcode box (dari hardware scanner)
     public function scanBarcode(Request $request)
     {
+        $request->merge([
+            'barcode' => preg_replace('/[[:cntrl:][:space:]]+/', '', (string) $request->input('barcode', '')),
+        ]);
+
         $validated = $request->validate([
-            'barcode' => ['required', 'string', 'regex:/^\d+$/'],
+            'barcode' => ['bail', 'required', 'string', 'regex:/^[0-9]+$/'],
         ], [
             'barcode.regex' => 'ID Box hanya boleh berisi angka.',
         ]);

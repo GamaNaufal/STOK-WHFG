@@ -45,7 +45,9 @@
     let isSelectingExistingPallet = false;
 
     function normalizeBarcodeInput(rawValue) {
-        return String(rawValue || "").trim();
+        return String(rawValue || "")
+            .replace(/[\u0000-\u001F\u007F\s]+/g, "")
+            .trim();
     }
 
     function validateBarcodeInput(rawValue) {
@@ -284,7 +286,9 @@
             .then((response) => response.json())
             .then((data) => {
                 if (!data.success || !data.pallet) {
-                    throw new Error(data.message || "Data pallet tidak ditemukan.");
+                    throw new Error(
+                        data.message || "Data pallet tidak ditemukan.",
+                    );
                 }
                 renderAndPrintPalletInfo(data.pallet);
             })
@@ -670,12 +674,22 @@
     });
 
     barcodeInput.addEventListener("input", function () {
-        const sanitized = this.value.replace(/\D/g, "");
-        if (this.value !== sanitized) {
-            this.value = sanitized;
+        const currentValue = normalizeBarcodeInput(this.value);
+
+        if (!currentValue) {
+            const errorEl = document.getElementById("barcode-error");
+            if (errorEl) {
+                errorEl.style.display = "none";
+            }
+            return;
         }
 
-        if (sanitized.length > 0) {
+        if (!/^[0-9]+$/.test(currentValue)) {
+            showBarcodeError("ID Box hanya boleh berisi angka.");
+            return;
+        }
+
+        if (currentValue.length > 0) {
             const errorEl = document.getElementById("barcode-error");
             if (errorEl) {
                 errorEl.style.display = "none";

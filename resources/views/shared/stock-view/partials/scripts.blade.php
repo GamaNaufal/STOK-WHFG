@@ -98,6 +98,8 @@
                     h1 { margin: 0 0 16px 0; font-size: 20px; }
                     .meta { margin-bottom: 16px; line-height: 1.6; }
                     .meta strong { display: inline-block; min-width: 120px; }
+                    .pallet-label { font-size: 24px; font-weight: 700; }
+                    .pallet-number { font-size: 24px; font-weight: 700; }
                     table { width: 100%; border-collapse: collapse; font-size: 12px; }
                     th, td { border: 1px solid #d1d5db; padding: 8px; text-align: left; }
                     thead th { background: #f3f4f6; }
@@ -107,7 +109,7 @@
             <body>
                 <h1>Detail Isi Pallet</h1>
                 <div class="meta">
-                    <div><strong>No Pallet</strong>: ${palletNumber}</div>
+                    <div><strong class="pallet-label">No Pallet</strong>: <span class="pallet-number">${palletNumber}</span></div>
                     <div><strong>Lokasi</strong>: ${location}</div>
                     <div><strong>Total Item</strong>: ${items.length}</div>
                 </div>
