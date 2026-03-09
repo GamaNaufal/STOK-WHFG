@@ -13,6 +13,8 @@ use App\Models\PalletItem;
 use App\Models\PartSetting;
 use App\Models\StockWithdrawal;
 use App\Services\AuditService;
+use Barryvdh\DomPDF\Facade\Pdf;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -1121,7 +1123,7 @@ class DeliveryPickController extends Controller
 
     private function cancelNotFullRequestsForOrder(int $orderId): int
     {
-        $notFullRequestQuery = \App\Models\NotFullBoxRequest::where('delivery_order_id', $orderId)
+        $notFullRequestQuery = NotFullBoxRequest::where('delivery_order_id', $orderId)
             ->whereIn('status', ['approved', 'pending']);
 
         $notFullRequestsCount = (clone $notFullRequestQuery)->count();
@@ -1184,7 +1186,7 @@ class DeliveryPickController extends Controller
         
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('operator.delivery.picklist_pdf', compact('order', 'session'));
+        $pdf = Pdf::loadView('operator.delivery.picklist_pdf', compact('order', 'session'));
         return $pdf->stream('picklist-order-' . $order->id . '.pdf');
     }
 
@@ -1329,7 +1331,7 @@ class DeliveryPickController extends Controller
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $cutoffDate = \Carbon\Carbon::parse($deliveryDate)->subMonths(12);
+                $cutoffDate = Carbon::parse($deliveryDate)->subMonths(12);
                 $q->where('boxes.created_at', '>=', $cutoffDate);
             });
 
@@ -1361,7 +1363,7 @@ class DeliveryPickController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $cutoffDate = \Carbon\Carbon::parse($deliveryDate)->subMonths(12);
+                $cutoffDate = Carbon::parse($deliveryDate)->subMonths(12);
                 $q->where('boxes.created_at', '>=', $cutoffDate);
             })
             ->orderBy('boxes.created_at', 'asc')

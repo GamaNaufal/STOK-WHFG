@@ -40,7 +40,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         ]);
 
         $requestCreate = $this->actingAs($adminWarehouse)->post(route('box-not-full.store'), [
-            'box_number' => 'BOX-NF-LOC-01',
+            'box_number' => '910001',
             'part_number' => 'P-NF-LOC',
             'pcs_quantity' => 75,
             'delivery_order_id' => $order->id,
@@ -69,7 +69,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('boxes', [
             'id' => $approvedRequest->box_id,
-            'box_number' => 'BOX-NF-LOC-01',
+            'box_number' => '910001',
             'is_not_full' => 1,
             'assigned_delivery_order_id' => $order->id,
         ]);
@@ -109,7 +109,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         $targetPallet = Pallet::create(['pallet_number' => 'PLT-REJ-01']);
 
         $create = $this->actingAs($adminWarehouse)->post(route('box-not-full.store'), [
-            'box_number' => 'BOX-NF-REJ-01',
+            'box_number' => '910002',
             'part_number' => 'P-NF-REJ',
             'pcs_quantity' => 80,
             'delivery_order_id' => $order->id,
@@ -132,7 +132,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         ]);
 
         $this->assertDatabaseMissing('boxes', [
-            'box_number' => 'BOX-NF-REJ-01',
+            'box_number' => '910002',
         ]);
     }
 
@@ -157,7 +157,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         $targetPallet = Pallet::create(['pallet_number' => 'PLT-GUARD-01']);
 
         $create = $this->actingAs($adminWarehouse)->post(route('box-not-full.store'), [
-            'box_number' => 'BOX-NF-GUARD-01',
+            'box_number' => '910003',
             'part_number' => 'P-NF-GUARD',
             'pcs_quantity' => 80,
             'delivery_order_id' => $order->id,
@@ -223,7 +223,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         $scanBox = $this->actingAs($operator)->withSession([
             'current_pallet_id' => $activePallet->id,
         ])->postJson(route('stock-input.scan-barcode'), [
-            'barcode' => 'BOX-NF-01',
+            'barcode' => '910004',
         ]);
         $scanBox->assertOk()->assertJson(['success' => true]);
 
@@ -260,7 +260,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         $store->assertOk();
 
         $this->assertDatabaseHas('boxes', [
-            'box_number' => 'BOX-NF-01',
+            'box_number' => '910004',
             'part_number' => 'P-NF-01',
             'pcs_quantity' => 90,
             'is_not_full' => 1,
@@ -328,7 +328,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         ]);
 
         $create = $this->actingAs($adminWarehouse)->post(route('box-not-full.store'), [
-            'box_number' => 'BOX-NF-APP-01',
+            'box_number' => '910005',
             'part_number' => 'P-NF-02',
             'pcs_quantity' => 80,
             'delivery_order_id' => $order->id,
@@ -365,7 +365,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('boxes', [
             'id' => $boxId,
-            'box_number' => 'BOX-NF-APP-01',
+            'box_number' => '910005',
             'part_number' => 'P-NF-02',
             'pcs_quantity' => 80,
             'is_not_full' => 1,

@@ -6,6 +6,7 @@ use App\Models\Box;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
+use App\Models\MasterLocation;
 use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Models\DeliveryOrder;
@@ -731,12 +732,12 @@ class StockInputController extends Controller
         $locationCode = null;
 
         if ($locationId) {
-            $masterLocation = \App\Models\MasterLocation::find($locationId);
+            $masterLocation = MasterLocation::find($locationId);
             if (!$masterLocation) {
                 throw new \Exception('Lokasi yang dipilih tidak ditemukan!');
             }
 
-            $claimed = \App\Models\MasterLocation::where('id', $masterLocation->id)
+            $claimed = MasterLocation::where('id', $masterLocation->id)
                 ->where('is_occupied', false)
                 ->update([
                     'is_occupied' => true,
@@ -759,9 +760,9 @@ class StockInputController extends Controller
         }
 
         if ($locationCode) {
-            $masterLocation = \App\Models\MasterLocation::where('code', $locationCode)->first();
+            $masterLocation = MasterLocation::where('code', $locationCode)->first();
             if ($masterLocation) {
-                $claimed = \App\Models\MasterLocation::where('id', $masterLocation->id)
+                $claimed = MasterLocation::where('id', $masterLocation->id)
                     ->where('is_occupied', false)
                     ->update([
                         'is_occupied' => true,

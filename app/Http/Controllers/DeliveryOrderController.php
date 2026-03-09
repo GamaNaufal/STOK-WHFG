@@ -4,9 +4,16 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Box;
+use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
+use App\Models\DeliveryIssue;
+use App\Models\DeliveryPickItem;
+use App\Models\DeliveryPickSession;
 use App\Models\NotFullBoxRequest;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class DeliveryOrderController extends Controller
@@ -101,56 +108,6 @@ class DeliveryOrderController extends Controller
 
         return $pools;
     }
-    private function getStrictFulfillableForOrder(int $orderId, string $partNumber, int $requiredQty): int
-    {
-        $reservedBoxes = Box::query()
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('boxes.part_number', $partNumber)
-            ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
-            ->where('boxes.assigned_delivery_order_id', $orderId)
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
-            ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.pcs_quantity')
-            ->get();
-
-        $reservedTotal = (int) $reservedBoxes->sum('pcs_quantity');
-        $remaining = max(0, $requiredQty - $reservedTotal);
-
-        if ($remaining <= 0) {
-            return $reservedTotal;
-        }
-
-        $fifoBoxes = Box::query()
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('boxes.part_number', $partNumber)
-            ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
-            ->whereNull('boxes.assigned_delivery_order_id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
-            ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.pcs_quantity')
-            ->get();
-
-        $fifoTotal = 0;
-        foreach ($fifoBoxes as $box) {
-            if ($remaining <= 0) {
-                break;
-            }
-            $boxQty = (int) $box->pcs_quantity;
-            if ($boxQty > $remaining) {
-                continue;
-            }
-            $fifoTotal += $boxQty;
-            $remaining -= $boxQty;
-        }
-
-        return $reservedTotal + $fifoTotal;
-    }
     private function getAvailableStockByPart(): array
     {
         $lockedBoxIds = $this->getActivePickLockedBoxIds();
@@ -216,7 +173,7 @@ class DeliveryOrderController extends Controller
     // Dashboard: Only Approved Schedule (Visible to Admin & Warehouse)
     public function index()
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         
            // Strict Role Check: Admin & Warehouse Operator only
                  if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse', 'ppc'], true)) {
@@ -224,14 +181,14 @@ class DeliveryOrderController extends Controller
              return redirect('/')->with('error', 'Unauthorized access to Schedule.');
         }
 
-        $approvedOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
+        $approvedOrders = DeliveryOrder::with(['items', 'salesUser'])
             ->whereIn('status', ['approved', 'processing']) 
             ->orderBy('delivery_date', 'asc')
             ->get();
 
-        $currentUserId = (int) \Illuminate\Support\Facades\Auth::id();
+        $currentUserId = (int) Auth::id();
 
-        $globalActiveSession = \App\Models\DeliveryPickSession::query()
+        $globalActiveSession = DeliveryPickSession::query()
             ->with('creator')
             ->withCount('items')
             ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
@@ -264,7 +221,7 @@ class DeliveryOrderController extends Controller
             $hasPendingAdditionalApproval = !empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
 
             $today = now()->timezone(config('app.timezone'))->startOfDay();
-            $deliveryDate = \Carbon\Carbon::parse($order->delivery_date)->timezone(config('app.timezone'))->startOfDay();
+            $deliveryDate = Carbon::parse($order->delivery_date)->timezone(config('app.timezone'))->startOfDay();
             $order->days_remaining = $today->diffInDays($deliveryDate, false);
 
             $order->items->each(function ($item) use ($availableByPart, $reservedByOrder, $activeLockedByOrderPart, $order, $partSettings, &$fifoPools, &$allAvailable) {
@@ -362,14 +319,14 @@ class DeliveryOrderController extends Controller
             }
         });
 
-        $completedOrders = \App\Models\DeliveryPickSession::with('order')
+        $completedOrders = DeliveryPickSession::with('order')
             ->where('completion_status', 'completed')
             ->where('redo_until', '>=', now())
             ->orderBy('completed_at', 'desc')
             ->limit(20)
             ->get();
 
-        $historyOrders = \App\Models\DeliveryPickSession::with('order.items')
+        $historyOrders = DeliveryPickSession::with('order.items')
             ->where(function ($q) {
                 $q->where('completion_status', 'redone')
                   ->orWhere(function ($q2) {
@@ -381,7 +338,7 @@ class DeliveryOrderController extends Controller
             ->limit(50)
             ->get();
 
-        $deletedOrders = \App\Models\DeliveryOrder::withTrashed()
+        $deletedOrders = DeliveryOrder::withTrashed()
             ->with('items')
             ->where('status', 'deleted')
             ->orderBy('deleted_at', 'desc')
@@ -414,7 +371,7 @@ class DeliveryOrderController extends Controller
     // Sales Page: Input Form & History
     public function createOrder()
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         if (!in_array($user->role, ['sales', 'admin', 'ppc'])) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
         }
@@ -424,13 +381,13 @@ class DeliveryOrderController extends Controller
         }
 
         if (in_array($user->role, ['sales', 'admin'])) {
-            $myOrders = \App\Models\DeliveryOrder::with(['items'])
+            $myOrders = DeliveryOrder::with(['items'])
                 ->where('sales_user_id', $user->id)
                 ->orderBy('created_at', 'desc')
                 ->limit(50)
                 ->get();
         } else {
-            $myOrders = \App\Models\DeliveryOrder::with(['items'])
+            $myOrders = DeliveryOrder::with(['items'])
                 ->orderBy('created_at', 'desc')
                 ->limit(100)
                 ->get();
@@ -445,18 +402,18 @@ class DeliveryOrderController extends Controller
     // PPC Page: Pending Approvals
     public function pendingApprovals()
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         if ($user->role !== 'ppc' && $user->role !== 'admin') {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
         }
 
-        $pendingOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
+        $pendingOrders = DeliveryOrder::with(['items', 'salesUser'])
             ->where('status', 'pending')
             ->orderBy('delivery_date', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
 
-        $approvedOrders = \App\Models\DeliveryOrder::with('items')
+        $approvedOrders = DeliveryOrder::with('items')
             ->whereIn('status', ['approved', 'processing'])
             ->orderBy('delivery_date', 'asc')
             ->orderBy('created_at', 'desc')
@@ -467,8 +424,8 @@ class DeliveryOrderController extends Controller
         $reservedByOrder = $this->getReservedStockByOrder();
 
         $sequenceOrders = $approvedOrders->concat($pendingOrders)->sort(function ($a, $b) {
-            $dateA = \Carbon\Carbon::parse($a->delivery_date)->startOfDay();
-            $dateB = \Carbon\Carbon::parse($b->delivery_date)->startOfDay();
+            $dateA = Carbon::parse($a->delivery_date)->startOfDay();
+            $dateB = Carbon::parse($b->delivery_date)->startOfDay();
 
             if ($dateA->equalTo($dateB)) {
                 return $a->created_at < $b->created_at ? 1 : -1;
@@ -498,7 +455,7 @@ class DeliveryOrderController extends Controller
             });
         });
 
-        $historyOrders = \App\Models\DeliveryOrder::with(['items', 'salesUser'])
+        $historyOrders = DeliveryOrder::with(['items', 'salesUser'])
             ->whereIn('status', ['approved', 'rejected', 'correction', 'processing', 'completed'])
             ->orderBy('updated_at', 'desc')
             ->limit(15)
@@ -510,12 +467,12 @@ class DeliveryOrderController extends Controller
     // Fetch order items for fulfill modal
     public function fulfillData($id)
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+        $order = DeliveryOrder::with('items')->findOrFail($id);
         $hasPendingAdditionalApproval = NotFullBoxRequest::query()
             ->where('delivery_order_id', (int) $order->id)
             ->where('request_type', 'additional')
@@ -539,7 +496,7 @@ class DeliveryOrderController extends Controller
         return response()->json([
             'order_id' => $order->id,
             'customer_name' => $order->customer_name,
-            'delivery_date' => \Carbon\Carbon::parse($order->delivery_date)->format('d M Y'),
+            'delivery_date' => Carbon::parse($order->delivery_date)->format('d M Y'),
             'items' => $items,
             'is_blocked' => $hasPendingAdditionalApproval,
             'blocked_reason' => $blockedReason,
@@ -549,8 +506,8 @@ class DeliveryOrderController extends Controller
     // Sales: Edit correction request
     public function edit($id)
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
-        $order = \App\Models\DeliveryOrder::with(['items'])->findOrFail($id);
+        $user = Auth::user();
+        $order = DeliveryOrder::with(['items'])->findOrFail($id);
 
         if ($user->role !== 'sales' && $user->role !== 'admin') {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
@@ -573,8 +530,8 @@ class DeliveryOrderController extends Controller
     // Sales: Update correction request
     public function update(Request $request, $id)
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
-        $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+        $user = Auth::user();
+        $order = DeliveryOrder::with('items')->findOrFail($id);
 
         if ($user->role !== 'sales' && $user->role !== 'admin') {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
@@ -604,7 +561,7 @@ class DeliveryOrderController extends Controller
             // Replace items
             $order->items()->delete();
             foreach ($request->items as $item) {
-                \App\Models\DeliveryOrderItem::create([
+                DeliveryOrderItem::create([
                     'delivery_order_id' => $order->id,
                     'part_number' => $item['part_number'],
                     'quantity' => $item['quantity'],
@@ -623,7 +580,7 @@ class DeliveryOrderController extends Controller
     // Sales: Store new Delivery Order
     public function store(Request $request)
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         if ($user->role !== 'sales' && $user->role !== 'admin') {
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
@@ -642,8 +599,8 @@ class DeliveryOrderController extends Controller
             // Implementation note: User didn't ask for edit/resubmit UI yet, just status flow.
             // For now, assume this creates NEW. Editing requires ID.
             
-            $order = \App\Models\DeliveryOrder::create([
-                'sales_user_id' => \Illuminate\Support\Facades\Auth::id(),
+            $order = DeliveryOrder::create([
+                'sales_user_id' => Auth::id(),
                 'customer_name' => $request->customer_name,
                 'delivery_date' => $request->delivery_date,
                 'status' => 'pending',
@@ -651,7 +608,7 @@ class DeliveryOrderController extends Controller
             ]);
 
             foreach ($request->items as $item) {
-                \App\Models\DeliveryOrderItem::create([
+                DeliveryOrderItem::create([
                     'delivery_order_id' => $order->id,
                     'part_number' => $item['part_number'],
                     'quantity' => $item['quantity'],
@@ -669,7 +626,7 @@ class DeliveryOrderController extends Controller
     // PPC: Approve, Reject, or Correction
     public function updateStatus(Request $request, $id)
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         if ($user->role !== 'ppc' && $user->role !== 'admin') {
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
@@ -686,7 +643,7 @@ class DeliveryOrderController extends Controller
         }
 
         DB::transaction(function () use ($request, $id) {
-            $order = \App\Models\DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
+            $order = DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
             $order->status = $request->status;
 
             $ppcNotes = trim((string) $request->notes);
@@ -705,31 +662,71 @@ class DeliveryOrderController extends Controller
 
     public function destroy($id)
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         if ($user->role !== 'admin') {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
-        $order = \App\Models\DeliveryOrder::findOrFail($id);
-        $order->status = 'deleted';
-        $order->save();
-        $order->delete();
+        DB::transaction(function () use ($id, $user) {
+            $order = DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
+
+            Box::where('assigned_delivery_order_id', (int) $order->id)
+                ->lockForUpdate()
+                ->update([
+                    'assigned_delivery_order_id' => null,
+                    'updated_at' => now(),
+                ]);
+
+            /** @var \Illuminate\Database\Eloquent\Collection<int, DeliveryPickSession> $sessions */
+            $sessions = DeliveryPickSession::where('delivery_order_id', (int) $order->id)
+                ->lockForUpdate()
+                ->get();
+
+            if ($sessions->isNotEmpty()) {
+                $sessionIds = $sessions->pluck('id')->map(fn ($sessionId) => (int) $sessionId)->all();
+
+                DeliveryPickItem::whereIn('pick_session_id', $sessionIds)
+                    ->lockForUpdate()
+                    ->delete();
+
+                DeliveryIssue::whereIn('pick_session_id', $sessionIds)
+                    ->where('status', 'pending')
+                    ->delete();
+
+                foreach ($sessions as $session) {
+                    /** @var DeliveryPickSession $session */
+                    if (!in_array((string) $session->status, ['completed', 'cancelled'], true)) {
+                        $notes = trim((string) $session->approval_notes);
+                        $cancelNote = 'Sesi dibatalkan otomatis karena schedule dihapus oleh ' . ($user->name ?? ('user #' . $user->id)) . '.';
+
+                        $session->status = 'cancelled';
+                        $session->verification_box_ids = null;
+                        $session->approval_notes = $notes !== '' ? ($notes . ' | ' . $cancelNote) : $cancelNote;
+                        $session->save();
+                    }
+                }
+            }
+
+            $order->status = 'deleted';
+            $order->save();
+            $order->delete();
+        });
 
         return redirect()->back()->with('success', 'Delivery schedule deleted.');
     }
 
     public function approvalImpact($id)
     {
-        $user = \Illuminate\Support\Facades\Auth::user();
+        $user = Auth::user();
         if (!in_array($user->role, ['ppc', 'admin'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+        $order = DeliveryOrder::with('items')->findOrFail($id);
 
         $availableByPart = $this->getAvailableStockByPart();
 
-        $approvedOrders = \App\Models\DeliveryOrder::with('items')
+        $approvedOrders = DeliveryOrder::with('items')
             ->whereIn('status', ['approved', 'processing'])
             ->orderBy('delivery_date', 'asc')
             ->orderBy('created_at', 'desc')
@@ -775,8 +772,8 @@ class DeliveryOrderController extends Controller
         $baseline = $compute($approvedOrders);
 
         $sequenceOrders = $approvedOrders->concat(collect([$order]))->sort(function ($a, $b) {
-            $dateA = \Carbon\Carbon::parse($a->delivery_date)->startOfDay();
-            $dateB = \Carbon\Carbon::parse($b->delivery_date)->startOfDay();
+            $dateA = Carbon::parse($a->delivery_date)->startOfDay();
+            $dateB = Carbon::parse($b->delivery_date)->startOfDay();
 
             if ($dateA->equalTo($dateB)) {
                 return $a->created_at < $b->created_at ? 1 : -1;

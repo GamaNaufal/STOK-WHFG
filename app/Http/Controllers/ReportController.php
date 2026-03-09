@@ -3,10 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Exports\OperationalReportsExport;
+use App\Exports\StockInputExport;
+use App\Exports\StockWithdrawalExport;
 use App\Models\StockInput;
 use App\Models\StockWithdrawal;
+use App\Models\User;
 use App\Services\OperationalReportService;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Excel as ExcelFormat;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
@@ -113,7 +117,7 @@ class ReportController extends Controller
         return Excel::download(
             new OperationalReportsExport($exportData),
             'operational_reports_' . now()->format('Ymd_His') . '.xlsx',
-            \Maatwebsite\Excel\Excel::XLSX,
+            ExcelFormat::XLSX,
             ['includeCharts' => true]
         );
     }
@@ -156,7 +160,7 @@ class ReportController extends Controller
         $totalReversed = StockWithdrawal::where('status', 'reversed')->count();
 
         // Get all users for filter
-        $users = \App\Models\User::whereIn('role', ['warehouse_operator', 'admin'])->get();
+        $users = User::whereIn('role', ['warehouse_operator', 'admin'])->get();
 
         return view('operator.reports.withdrawal', [
             'withdrawals' => $withdrawals,
@@ -260,7 +264,7 @@ class ReportController extends Controller
         $withdrawals = $query->orderBy('withdrawn_at', 'desc')->get();
 
         return Excel::download(
-            new \App\Exports\StockWithdrawalExport($withdrawals),
+            new StockWithdrawalExport($withdrawals),
             'stock_withdrawal_report_' . now()->format('Ymd_His') . '.xlsx'
         );
     }
@@ -283,7 +287,7 @@ class ReportController extends Controller
         $stockInputs = $query->orderBy('stored_at', 'desc')->get();
 
         return Excel::download(
-            new \App\Exports\StockInputExport($stockInputs),
+            new StockInputExport($stockInputs),
             'stock_input_report_' . now()->format('Ymd_His') . '.xlsx'
         );
     }

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\StockViewByPalletExport;
+use App\Exports\StockViewByPartExport;
 use App\Models\AuditLog;
 use App\Models\Box;
 use App\Models\Pallet;
@@ -12,6 +14,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Maatwebsite\Excel\Facades\Excel;
 
 class StockViewController extends Controller
 {
@@ -517,8 +520,8 @@ class StockViewController extends Controller
             ];
         })->values();
 
-        return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Exports\StockViewByPartExport($groupedByPart),
+        return Excel::download(
+            new StockViewByPartExport($groupedByPart),
             'stock_by_part_' . now()->format('Ymd_His') . '.xlsx'
         );
     }
@@ -541,8 +544,8 @@ class StockViewController extends Controller
             ];
         })->values();
 
-        return \Maatwebsite\Excel\Facades\Excel::download(
-            new \App\Exports\StockViewByPalletExport($groupedByPallet),
+        return Excel::download(
+            new StockViewByPalletExport($groupedByPallet),
             'stock_by_pallet_' . now()->format('Ymd_His') . '.xlsx'
         );
     }

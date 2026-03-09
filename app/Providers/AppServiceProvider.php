@@ -2,9 +2,15 @@
 
 namespace App\Providers;
 
+use App\Models\DeliveryIssue;
+use App\Models\DeliveryOrder;
+use App\Models\StockLocation;
+use App\Observers\StockLocationObserver;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -122,10 +128,10 @@ class AppServiceProvider extends ServiceProvider
             });
         }
 
-        \App\Models\StockLocation::observe(\App\Observers\StockLocationObserver::class);
+        StockLocation::observe(StockLocationObserver::class);
 
         // Share notification counts for sidebar badges
-        \Illuminate\Support\Facades\View::composer('shared.layouts.app', function ($view) {
+        View::composer('shared.layouts.app', function ($view) {
             $avatarInitials = 'UU';
             $globalSearchFeatures = [];
 
@@ -142,24 +148,24 @@ class AppServiceProvider extends ServiceProvider
                 
                 // Delivery count for Warehouse Operator
                 if ($userRole === 'warehouse_operator') {
-                    $deliveryCount = \Illuminate\Support\Facades\Cache::remember('sidebar_delivery_count', $cacheTtlSeconds, function () {
-                        return \App\Models\DeliveryOrder::where('status', 'approved')->count();
+                    $deliveryCount = Cache::remember('sidebar_delivery_count', $cacheTtlSeconds, function () {
+                        return DeliveryOrder::where('status', 'approved')->count();
                     });
                     $view->with('pendingDeliveryCount', $deliveryCount);
                 }
                 
                 // Pending Approval count for PPC
                 if ($userRole === 'ppc') {
-                    $approvalCount = \Illuminate\Support\Facades\Cache::remember('sidebar_approval_count', $cacheTtlSeconds, function () {
-                        return \App\Models\DeliveryOrder::where('status', 'pending')->count();
+                    $approvalCount = Cache::remember('sidebar_approval_count', $cacheTtlSeconds, function () {
+                        return DeliveryOrder::where('status', 'pending')->count();
                     });
                     $view->with('pendingDeliveryCount', $approvalCount);
                 }
                 
                 // Scan Issues count for Admin Warehouse
                 if ($userRole === 'admin_warehouse' || $userRole === 'admin') {
-                    $scanIssueCount = \Illuminate\Support\Facades\Cache::remember('sidebar_scan_issue_count', $cacheTtlSeconds, function () {
-                        return \App\Models\DeliveryIssue::where('status', 'pending')->count();
+                    $scanIssueCount = Cache::remember('sidebar_scan_issue_count', $cacheTtlSeconds, function () {
+                        return DeliveryIssue::where('status', 'pending')->count();
                     });
                     $view->with('pendingScanIssueCount', $scanIssueCount);
                 }

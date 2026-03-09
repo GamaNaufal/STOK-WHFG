@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Models\MasterLocation;
 use App\Models\StockLocation;
 
 class StockLocationObserver
@@ -11,7 +12,7 @@ class StockLocationObserver
      */
     public function created(StockLocation $stockLocation): void
     {
-        \App\Models\MasterLocation::where('code', $stockLocation->warehouse_location)
+        MasterLocation::where('code', $stockLocation->warehouse_location)
             ->where(function ($query) use ($stockLocation) {
                 $query->where('is_occupied', false)
                     ->orWhere('current_pallet_id', $stockLocation->pallet_id);
@@ -32,7 +33,7 @@ class StockLocationObserver
         $originalPalletId = $stockLocation->getOriginal('pallet_id');
 
         if ($originalCode && $originalCode !== $stockLocation->warehouse_location) {
-            $oldLocation = \App\Models\MasterLocation::where('code', $originalCode)->first();
+            $oldLocation = MasterLocation::where('code', $originalCode)->first();
 
             if ($oldLocation && $oldLocation->current_pallet_id == $originalPalletId) {
                 $oldLocation->update([
@@ -44,7 +45,7 @@ class StockLocationObserver
 
         $newCode = $stockLocation->warehouse_location;
         if ($newCode) {
-            \App\Models\MasterLocation::where('code', $newCode)
+            MasterLocation::where('code', $newCode)
                 ->where(function ($query) use ($stockLocation) {
                     $query->where('is_occupied', false)
                         ->orWhere('current_pallet_id', $stockLocation->pallet_id);
@@ -63,7 +64,7 @@ class StockLocationObserver
     public function deleted(StockLocation $stockLocation): void
     {
         // Cari MasterLocation berdasarkan kode
-        $masterLocation = \App\Models\MasterLocation::where('code', $stockLocation->warehouse_location)->first();
+        $masterLocation = MasterLocation::where('code', $stockLocation->warehouse_location)->first();
 
         if ($masterLocation) {
              // Cek apakah lokasi ini masih dipakai oleh pallet lain? (Seharusnya 1:1, tapi untuk safety)

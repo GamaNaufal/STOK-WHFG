@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Pallet;
 use App\Models\Box;
 use App\Models\PalletItem;
+use App\Models\MasterLocation;
+use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Models\AuditLog;
 use Illuminate\Database\QueryException;
@@ -180,12 +182,12 @@ class MergePalletController extends Controller
 
         $oldLocationsByCode = $locationCodes->isEmpty()
             ? collect()
-            : \App\Models\MasterLocation::whereIn('code', $locationCodes)
+            : MasterLocation::whereIn('code', $locationCodes)
                 ->get()
                 ->keyBy('code');
 
         foreach ($sourcePallets as $sourcePallet) {
-            \App\Models\StockInput::where('pallet_id', $sourcePallet->id)
+            StockInput::where('pallet_id', $sourcePallet->id)
                 ->update(['pallet_id' => $newPallet->id]);
 
             $sourcePallet->boxes()->detach();
@@ -212,12 +214,12 @@ class MergePalletController extends Controller
         $locationCode = $request->input('warehouse_location');
 
         if ($locationId) {
-            $masterLocation = \App\Models\MasterLocation::find($locationId);
+            $masterLocation = MasterLocation::find($locationId);
             if (!$masterLocation) {
                 throw new \Exception('Lokasi tujuan tidak ditemukan');
             }
 
-            $claimed = \App\Models\MasterLocation::whereKey($masterLocation->id)
+            $claimed = MasterLocation::whereKey($masterLocation->id)
                 ->where('is_occupied', false)
                 ->update([
                     'is_occupied' => true,

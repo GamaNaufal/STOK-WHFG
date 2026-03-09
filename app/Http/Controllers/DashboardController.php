@@ -6,6 +6,7 @@ use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\StockLocation;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryIssue;
 use App\Models\DeliveryPickSession;
 use App\Services\OperationalReportService;
 use App\Services\ExpiredBoxService;
@@ -139,7 +140,7 @@ class DashboardController extends Controller
                 'total_pallets' => Pallet::count(),
                 'pallets_with_location' => $palletsWithActiveStock,
                 'total_pcs' => $stockSummaryTotals['total_pcs'],
-                'pending_scan_issues' => \App\Models\DeliveryIssue::where('status', 'pending')->count(),
+                'pending_scan_issues' => DeliveryIssue::where('status', 'pending')->count(),
                 'total_items' => PalletItem::where(function ($q) {
                     $q->where('pcs_quantity', '>', 0)
                       ->orWhere('box_quantity', '>', 0);

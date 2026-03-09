@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\MasterLocation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -12,7 +13,7 @@ class MasterLocationController extends Controller
      */
     public function index()
     {
-        $locations = \App\Models\MasterLocation::with('currentPallet')->orderBy('code', 'asc')->paginate(10);
+        $locations = MasterLocation::with('currentPallet')->orderBy('code', 'asc')->paginate(10);
         return view('admin.locations.index', compact('locations'));
     }
 
@@ -27,7 +28,7 @@ class MasterLocationController extends Controller
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(\App\Models\MasterLocation $location)
+    public function edit(MasterLocation $location)
     {
         return view('admin.locations.edit', compact('location'));
     }
@@ -41,7 +42,7 @@ class MasterLocationController extends Controller
             'code' => 'required|unique:master_locations|max:255',
         ]);
 
-        \App\Models\MasterLocation::create([
+        MasterLocation::create([
             'code' => strtoupper($request->code),
             'is_occupied' => false
         ]);
@@ -52,7 +53,7 @@ class MasterLocationController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, \App\Models\MasterLocation $location)
+    public function update(Request $request, MasterLocation $location)
     {
         $request->validate([
             'code' => 'required|max:255|unique:master_locations,code,' . $location->id,
@@ -60,7 +61,7 @@ class MasterLocationController extends Controller
 
         try {
             DB::transaction(function () use ($request, $location) {
-                $locked = \App\Models\MasterLocation::whereKey($location->id)
+                $locked = MasterLocation::whereKey($location->id)
                     ->lockForUpdate()
                     ->firstOrFail();
 
@@ -82,11 +83,11 @@ class MasterLocationController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(\App\Models\MasterLocation $location)
+    public function destroy(MasterLocation $location)
     {
         try {
             DB::transaction(function () use ($location) {
-                $locked = \App\Models\MasterLocation::whereKey($location->id)
+                $locked = MasterLocation::whereKey($location->id)
                     ->lockForUpdate()
                     ->firstOrFail();
 
@@ -108,7 +109,7 @@ class MasterLocationController extends Controller
     {
         $search = $request->query('q');
         
-        $query = \App\Models\MasterLocation::where('is_occupied', false);
+        $query = MasterLocation::where('is_occupied', false);
         
         if ($search) {
             $query->where('code', 'like', "%{$search}%");

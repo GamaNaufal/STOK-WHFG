@@ -22,6 +22,90 @@ class DeliveryFlowConsistencyTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_deleting_delivery_schedule_releases_assigned_boxes_and_pick_locks(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Delete Schedule Stock Release',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-DEL-REL',
+            'quantity' => 50,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $pallet = Pallet::create([
+            'pallet_number' => 'PLT-DEL-REL-01',
+        ]);
+
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        $box = Box::create([
+            'box_number' => 'BOX-DEL-REL-01',
+            'part_number' => 'P-DEL-REL',
+            'part_name' => 'Part Delete Release',
+            'pcs_quantity' => 50,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-DEL-REL-01|P-DEL-REL|50',
+            'user_id' => $admin->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        DeliveryPickItem::create([
+            'pick_session_id' => $session->id,
+            'box_id' => $box->id,
+            'part_number' => 'P-DEL-REL',
+            'pcs_quantity' => 50,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($admin)
+            ->delete(route('delivery.destroy', $order->id));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $this->assertSoftDeleted('delivery_orders', [
+            'id' => $order->id,
+            'status' => 'deleted',
+        ]);
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'assigned_delivery_order_id' => null,
+        ]);
+
+        $this->assertDatabaseMissing('delivery_pick_items', [
+            'pick_session_id' => $session->id,
+            'box_id' => $box->id,
+        ]);
+
+        $this->assertDatabaseHas('delivery_pick_sessions', [
+            'id' => $session->id,
+            'status' => 'cancelled',
+        ]);
+    }
+
     public function test_start_pick_uses_box_created_at_even_if_stock_input_stored_at_is_old(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);

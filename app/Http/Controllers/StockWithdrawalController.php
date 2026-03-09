@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Models\MasterLocation;
 use App\Models\NotFullBoxRequest;
 use App\Models\PalletItem;
 use App\Models\StockWithdrawal;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -33,7 +36,7 @@ class StockWithdrawalController extends Controller
      */
     public function fulfillOrder($id)
     {
-        $order = \App\Models\DeliveryOrder::with('items')->findOrFail($id);
+        $order = DeliveryOrder::with('items')->findOrFail($id);
 
         if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $order->id)) {
             return redirect()->route('delivery.index')->with('error', self::DELIVERY_APPROVAL_PENDING_MESSAGE);
@@ -118,7 +121,7 @@ class StockWithdrawalController extends Controller
                     'pallet_id' => $box->pallet_id,
                     'pallet_number' => $box->pallet_number,
                     'warehouse_location' => $box->warehouse_location,
-                    'stored_date' => $box->stored_at ? \Carbon\Carbon::parse($box->stored_at)->format('d/m/Y H:i') : '-',
+                    'stored_date' => $box->stored_at ? Carbon::parse($box->stored_at)->format('d/m/Y H:i') : '-',
                     'available_pcs' => (int) $box->pcs_quantity,
                     'available_box' => 1,
                     'pcs_per_box' => (int) $box->pcs_quantity,
@@ -198,7 +201,7 @@ class StockWithdrawalController extends Controller
                 $deliveryItem = null;
                 $deliveryOrderItemId = (int) $request->input('delivery_order_item_id');
                 if ($deliveryOrderItemId > 0) {
-                    $deliveryItem = \App\Models\DeliveryOrderItem::whereKey($deliveryOrderItemId)
+                    $deliveryItem = DeliveryOrderItem::whereKey($deliveryOrderItemId)
                         ->lockForUpdate()
                         ->first();
                 }
@@ -288,7 +291,7 @@ class StockWithdrawalController extends Controller
                     $deliveryItem->fulfilled_quantity = (int) $deliveryItem->fulfilled_quantity + $requestedQty;
                     $deliveryItem->save();
 
-                    $order = \App\Models\DeliveryOrder::whereKey($deliveryItem->delivery_order_id)
+                    $order = DeliveryOrder::whereKey($deliveryItem->delivery_order_id)
                         ->lockForUpdate()
                         ->first();
 
@@ -594,18 +597,6 @@ class StockWithdrawalController extends Controller
     }
 
     /**
-     * Get total box for a part number
-     */
-    private function getTotalBoxForPart($partNumber)
-    {
-        return PalletItem::where('part_number', $partNumber)
-            ->whereHas('pallet', function ($q) {
-                $q->whereHas('stockLocation');
-            })
-            ->sum('box_quantity');
-    }
-
-    /**
      * Get total stock for multiple part numbers
      */
     private function getTotalsByPartNumbers(array $partNumbers): array
@@ -701,7 +692,7 @@ class StockWithdrawalController extends Controller
                 'pallet_id' => $box->pallet_id,
                 'pallet_number' => $box->pallet_number,
                 'warehouse_location' => $box->warehouse_location,
-                'stored_date' => $box->stored_at ? \Carbon\Carbon::parse($box->stored_at)->format('d/m/Y H:i') : '-',
+                'stored_date' => $box->stored_at ? Carbon::parse($box->stored_at)->format('d/m/Y H:i') : '-',
                 'available_pcs' => (int) $box->pcs_quantity,
                 'available_box' => 1,
                 'pcs_per_box' => (int) $box->pcs_quantity,

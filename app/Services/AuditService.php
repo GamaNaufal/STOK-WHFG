@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\AuditLog;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Request;
 
 class AuditService
@@ -28,7 +30,7 @@ class AuditService
         $description = null
     ) {
         try {
-            $userId = auth()->id();
+            $userId = Auth::id();
             
             AuditLog::create([
                 'type' => $type,
@@ -43,7 +45,7 @@ class AuditService
                 'user_agent' => Request::header('User-Agent'),
             ]);
         } catch (\Exception $e) {
-            \Log::error('Audit log failed: ' . $e->getMessage());
+            Log::error('Audit log failed: ' . $e->getMessage());
         }
     }
 
