@@ -516,6 +516,14 @@ class DeliveryPickController extends Controller
                 return ['success' => false, 'message' => 'Sesi tidak dapat dibatalkan.', 'status' => 409];
             }
 
+            if ($session->status === 'blocked' && $user->role !== 'admin') {
+                return [
+                    'success' => false,
+                    'message' => 'Sesi sedang diblokir karena issue scan. Tunggu approval admin, operator tidak dapat membatalkan sesi ini.',
+                    'status' => 423,
+                ];
+            }
+
             DeliveryPickItem::where('pick_session_id', (int) $session->id)->lockForUpdate()->delete();
             DeliveryIssue::where('pick_session_id', (int) $session->id)->where('status', 'pending')->delete();
 
@@ -1227,6 +1235,75 @@ class DeliveryPickController extends Controller
             ->get();
 
         return view('operator.delivery.scan-issues', compact('issues', 'historyIssues'));
+    }
+
+    public function lockManagement()
+    {
+        $user = Auth::user();
+        if ($user->role !== 'admin') {
+            return redirect()->route('dashboard')->with('error', 'Unauthorized.');
+        }
+
+        $activeLocks = DeliveryPickSession::with(['creator:id,name', 'order:id,customer_name,delivery_date,status'])
+            ->withCount([
+                'items',
+                'issues as pending_issue_count' => function ($q) {
+                    $q->where('status', 'pending');
+                },
+            ])
+            ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get();
+
+        return view('operator.delivery.lock-management', compact('activeLocks'));
+    }
+
+    public function terminateLock(Request $request, $sessionId)
+    {
+        $user = Auth::user();
+        if ($user->role !== 'admin') {
+            return redirect()->route('dashboard')->with('error', 'Unauthorized.');
+        }
+
+        $validated = $request->validate([
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        try {
+            $result = DB::transaction(function () use ($sessionId, $user, $validated) {
+                $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+
+                if (!in_array((string) $session->status, self::ACTIVE_LOCK_STATUSES, true)) {
+                    return ['success' => false, 'message' => 'Sesi tidak aktif atau sudah tidak terkunci.'];
+                }
+
+                DeliveryPickItem::where('pick_session_id', (int) $session->id)->lockForUpdate()->delete();
+                DeliveryIssue::where('pick_session_id', (int) $session->id)->where('status', 'pending')->delete();
+
+                $notes = trim((string) $session->approval_notes);
+                $reason = trim((string) ($validated['reason'] ?? ''));
+                $terminateNote = 'Force terminate oleh ' . ($user->name ?? ('user #' . $user->id)) . ': ' . $reason;
+
+                $session->status = 'cancelled';
+                $session->verification_box_ids = null;
+                $session->approval_notes = $notes !== '' ? ($notes . ' | ' . $terminateNote) : $terminateNote;
+                $session->save();
+
+                return [
+                    'success' => true,
+                    'message' => 'Lock berhasil dilepas untuk order #' . (int) $session->delivery_order_id . '.',
+                ];
+            });
+        } catch (\Throwable $e) {
+            return redirect()->route('delivery.pick.locks')->with('error', 'Gagal terminate lock: ' . $e->getMessage());
+        }
+
+        if (!($result['success'] ?? false)) {
+            return redirect()->route('delivery.pick.locks')->with('error', (string) ($result['message'] ?? 'Terminate lock gagal.'));
+        }
+
+        return redirect()->route('delivery.pick.locks')->with('success', (string) $result['message']);
     }
 
     private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null, bool $lockRows = false)

@@ -151,6 +151,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/delivery-completions/{completion}/redo', [\App\Http\Controllers\DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');
     });
 
+    Route::middleware('role:admin')->group(function () {
+        Route::get('/delivery-locks', [\App\Http\Controllers\DeliveryPickController::class, 'lockManagement'])->name('delivery.pick.locks');
+        Route::post('/delivery-locks/{session}/terminate', [\App\Http\Controllers\DeliveryPickController::class, 'terminateLock'])->name('delivery.pick.lock.terminate');
+    });
+
     // API Routes (Accessible by auth users, usually consumed by frontend scripts on allowed pages)
     Route::get('/api/stock/by-part', [StockViewController::class, 'apiGetStockByPart']);
     Route::get('/api/stock/part-detail/{partNumber}', [StockViewController::class, 'apiGetPartDetail']);

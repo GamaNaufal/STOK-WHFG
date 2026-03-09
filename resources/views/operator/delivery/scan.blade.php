@@ -49,7 +49,7 @@
                 <button class="btn btn-success" id="btnComplete" {{ ($session->status === 'blocked' || $session->items->where('status','pending')->count() > 0) ? 'disabled' : '' }}>
                     <i class="bi bi-check2"></i> Selesaikan Pengiriman
                 </button>
-                <button class="btn btn-outline-danger mt-2" id="btnCancelScan">
+                <button class="btn btn-outline-danger mt-2" id="btnCancelScan" {{ ($session->status === 'blocked' && Auth::user()->role !== 'admin') ? 'disabled title=\"Menunggu approval admin. Operator tidak dapat membatalkan sesi blocked.\"' : '' }}>
                     <i class="bi bi-x-circle"></i> Batalkan Scan
                 </button>
             </div>
@@ -209,6 +209,11 @@
     });
 
     btnCancelScan.addEventListener('click', function () {
+        if (btnCancelScan.disabled) {
+            showToast('Sesi blocked hanya bisa dibuka oleh admin.', 'warning');
+            return;
+        }
+
         const confirmed = confirm('Batalkan proses scan ini? Box yang terkunci akan dilepas.');
         if (!confirmed) {
             return;

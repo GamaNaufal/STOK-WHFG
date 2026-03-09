@@ -107,6 +107,7 @@
     let selectedVoice = null;
     let speechPrimed = false;
     let speechPrimePromise = Promise.resolve();
+    let beepAudioContext = null;
 
     function normalizeBoxNumber(value) {
         return String(value || '').trim().toUpperCase();
@@ -214,13 +215,66 @@
         });
     }
 
+    function ensureBeepAudioContext() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+            return null;
+        }
+
+        if (!beepAudioContext) {
+            beepAudioContext = new AudioContextClass();
+        }
+
+        if (beepAudioContext.state === 'suspended') {
+            beepAudioContext.resume().catch(() => {});
+        }
+
+        return beepAudioContext;
+    }
+
+    function scheduleBeepPulse(audioContext, startAt, durationSeconds, frequency) {
+        const oscillator = audioContext.createOscillator();
+        oscillator.type = 'square';
+        oscillator.frequency.setValueAtTime(frequency, startAt);
+
+        const gainNode = audioContext.createGain();
+        gainNode.gain.setValueAtTime(0.0001, startAt);
+        gainNode.gain.exponentialRampToValueAtTime(2.2, startAt + 0.01);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + durationSeconds);
+
+        const compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-16, startAt);
+        compressor.knee.setValueAtTime(8, startAt);
+        compressor.ratio.setValueAtTime(8, startAt);
+
+        oscillator.connect(gainNode);
+        gainNode.connect(compressor);
+        compressor.connect(audioContext.destination);
+
+        oscillator.start(startAt);
+        oscillator.stop(startAt + durationSeconds + 0.02);
+    }
+
+    function playSuccessBeep() {
+        try {
+            const audioContext = ensureBeepAudioContext();
+            if (!audioContext) {
+                return;
+            }
+
+            const initialStart = audioContext.currentTime + 0.01;
+            scheduleBeepPulse(audioContext, initialStart, 0.11, 1500);
+            scheduleBeepPulse(audioContext, initialStart + 0.14, 0.11, 1700);
+        } catch (error) {}
+    }
+
     function speakSuccessNow() {
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance('Benar');
-        utterance.lang = 'id-ID';
+        const utterance = new SpeechSynthesisUtterance('OK');
+        utterance.lang = 'en-US';
         utterance.rate = 1.2;
         utterance.pitch = 1;
-        utterance.volume = 1;
+        utterance.volume = 100000000000;
         if (selectedVoice) {
             utterance.voice = selectedVoice;
         }
@@ -229,6 +283,8 @@
 
     function playSuccessSpeech() {
         try {
+            playSuccessBeep();
+
             if (!('speechSynthesis' in window)) {
                 return;
             }

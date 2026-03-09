@@ -12,7 +12,8 @@
         || request()->routeIs('delivery.pick.verification')
         || request()->routeIs('delivery.create')
         || request()->routeIs('delivery.approvals')
-        || request()->routeIs('delivery.pick.issues');
+        || request()->routeIs('delivery.pick.issues')
+        || request()->routeIs('delivery.pick.locks');
 
     $adminMasterActive = request()->routeIs('locations*')
         || request()->routeIs('part-settings*')
@@ -102,6 +103,11 @@
             <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('delivery.pick.issues') ? 'active' : '' }}" href="{{ route('delivery.pick.issues') }}">
                     <i class="bi bi-bell"></i> Scan Issues
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('delivery.pick.locks') ? 'active' : '' }}" href="{{ route('delivery.pick.locks') }}">
+                    <i class="bi bi-shield-lock"></i> Lock Management
                 </a>
             </li>
         </ul>
