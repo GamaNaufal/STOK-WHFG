@@ -28,8 +28,6 @@
                    id="barcodeInput"
                    class="form-control"
                    placeholder="Scan/ketik ID Box..."
-                     inputmode="numeric"
-                     pattern="[0-9]*"
                      autocomplete="off"
                    style="font-size: 16px;
                           border: 2px solid #0C7779;

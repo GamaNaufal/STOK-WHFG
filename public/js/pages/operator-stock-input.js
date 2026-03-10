@@ -58,8 +58,8 @@
         }
 
         if (!/^\d+$/.test(barcode)) {
-            showBarcodeError("ID Box hanya boleh berisi angka.");
-            barcodeInput.value = barcode.replace(/\D/g, "");
+            const message = "Input ID Box tidak boleh karakter, harus angka.";
+            showBarcodeError(message);
             barcodeInput.focus();
             return null;
         }
@@ -681,11 +681,6 @@
             if (errorEl) {
                 errorEl.style.display = "none";
             }
-            return;
-        }
-
-        if (!/^[0-9]+$/.test(currentValue)) {
-            showBarcodeError("ID Box hanya boleh berisi angka.");
             return;
         }
 
