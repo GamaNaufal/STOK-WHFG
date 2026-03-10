@@ -136,6 +136,17 @@
                 <title>Detail Pallet ${palletNumber}</title>
                 <style>
                     body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+                    .company-letterhead {
+                        display: flex;
+                        align-items: center;
+                        gap: 16px;
+                        border-bottom: 2px solid #111827;
+                        padding-bottom: 10px;
+                        margin-bottom: 12px;
+                    }
+                    .letterhead-logo img { width: 82px; max-height: 82px; object-fit: contain; }
+                    .letterhead-info { flex: 1; text-align: center; line-height: 1.35; font-size: 12px; color: #111827; }
+                    .letterhead-info .company-name { font-size: 24px; font-weight: 700; letter-spacing: 0.3px; }
                     h1 { margin: 0 0 16px 0; font-size: 20px; }
                     .meta { margin-bottom: 16px; line-height: 1.6; }
                     .meta strong { display: inline-block; min-width: 120px; }
@@ -148,6 +159,18 @@
                 </style>
             </head>
             <body>
+                <div class="company-letterhead">
+                    <div class="letterhead-logo">
+                        <img src="${window.location.origin}/logo.png" alt="Company Logo" />
+                    </div>
+                    <div class="letterhead-info">
+                        <div class="company-name">PT. YAMATOGOMU INDONESIA</div>
+                        <div>Kawasan Industri Indotaisei</div>
+                        <div>Blok K - 6, Cikampek</div>
+                        <div>Jawa Barat - Indonesia 41373</div>
+                        <div>Phone : 0264 - 351216, 351217&nbsp;&nbsp;Fax : 0264 - 351137</div>
+                    </div>
+                </div>
                 <h1>Detail Isi Pallet</h1>
                 <div class="meta">
                     <div><strong class="pallet-label">No Pallet</strong>: <span class="pallet-number">${palletNumber}</span></div>

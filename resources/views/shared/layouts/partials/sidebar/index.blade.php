@@ -1,7 +1,7 @@
 <!-- Sidebar (Offcanvas on Mobile) -->
 <nav class="col-md-2 sidebar offcanvas offcanvas-start offcanvas-lg" tabindex="-1" id="mobileSidebar">
     <div class="offcanvas-header d-lg-none">
-        <h5 class="offcanvas-title"><i class="bi bi-box2"></i> Warehouse FG</h5>
+        <h5 class="offcanvas-title"><img src="{{ asset('logo.png') }}" alt="Logo" class="brand-logo"> Warehouse FG</h5>
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
     </div>
     <div class="offcanvas-body p-0">

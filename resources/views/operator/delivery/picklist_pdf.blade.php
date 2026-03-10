@@ -5,6 +5,19 @@
     <title>Pick List Order #{{ $order->id }}</title>
     <style>
         body { font-family: DejaVu Sans, sans-serif; font-size: 11px; margin: 10px; }
+        .company-letterhead {
+            display: table;
+            width: 100%;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+            margin-bottom: 12px;
+        }
+        .letterhead-logo,
+        .letterhead-info { display: table-cell; vertical-align: middle; }
+        .letterhead-logo { width: 90px; }
+        .letterhead-logo img { width: 82px; max-height: 82px; object-fit: contain; }
+        .letterhead-info { text-align: center; line-height: 1.35; font-size: 11px; }
+        .letterhead-info .company-name { font-size: 23px; font-weight: 700; letter-spacing: .3px; }
         .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
         .title { font-size: 20px; font-weight: bold; }
         .order-info { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; }
@@ -42,8 +55,10 @@
     </style>
 </head>
 <body>
+    @include('shared.partials.print-letterhead', ['isPdf' => true])
+
     <div class="header">
-        <div class="title">📋 PICK LIST - ORDER #{{ $order->id }}</div>
+        <div class="title">PICK LIST - ORDER #{{ $order->id }}</div>
         <div class="order-info">
             <div class="info-block">
                 <strong>Customer:</strong> {{ $order->customer_name }}
@@ -108,7 +123,7 @@
     </div>
 
     <div class="instructions">
-        <strong>📌 PETUNJUK PENGAMBILAN:</strong>
+        <strong>PETUNJUK PENGAMBILAN:</strong>
         <br>
         1. Ikuti urutan nomor box sesuai tabel di bawah<br>
         2. Cek lokasi pallet di kolom "LOKASI PALLET"<br>
@@ -116,7 +131,7 @@
         4. Scan setiap box setelah diambil<br>
     </div>
 
-    <div class="section-title">📦 DAFTAR BOX YANG HARUS DIAMBIL</div>
+    <div class="section-title">DAFTAR BOX YANG HARUS DIAMBIL</div>
     <table>
         <thead>
             <tr>

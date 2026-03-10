@@ -145,6 +145,11 @@
             position: relative;
             z-index: 1;
         }
+        .icon-box .login-brand-logo {
+            width: 44px;
+            height: 44px;
+            object-fit: contain;
+        }
 
         .login-header h1 {
             font-size: 1.75rem;
@@ -269,14 +274,29 @@
             margin-top: 0.1rem;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 991.98px) {
+            body {
+                padding: 0.75rem;
+            }
+
             .login-wrapper {
                 grid-template-columns: 1fr;
-                gap: 1rem;
+                gap: 0;
+                max-width: 520px;
+                width: 100%;
+                min-height: calc(100svh - 1.5rem);
+                padding: 0;
+                place-items: center;
             }
 
             .login-info {
                 display: none;
+            }
+
+            .login-container {
+                width: 100%;
+                max-width: 420px;
+                margin: 0 auto;
             }
 
             .login-header h1 {
@@ -285,6 +305,39 @@
 
             .login-body {
                 padding: 2rem 1.5rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 0.5rem;
+            }
+
+            .login-wrapper {
+                min-height: calc(100svh - 1rem);
+            }
+
+            .login-container {
+                max-width: 100%;
+            }
+
+            .login-header {
+                padding: 2rem 1.25rem 1.75rem;
+            }
+
+            .icon-box {
+                width: 62px;
+                height: 62px;
+                margin-bottom: 1rem;
+            }
+
+            .icon-box .login-brand-logo {
+                width: 38px;
+                height: 38px;
+            }
+
+            .login-body {
+                padding: 1.4rem 1rem;
             }
         }
     </style>
@@ -325,7 +378,7 @@
             <!-- Header -->
             <div class="login-header">
                 <div class="icon-box">
-                    <i class="bi bi-box2-fill"></i>
+                    <img src="{{ asset('logo.png') }}" alt="Logo" class="login-brand-logo">
                 </div>
                 <h1>Login</h1>
                 <p class="subtitle">PT. Yamatogomu Indonesia</p>
