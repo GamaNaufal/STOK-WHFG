@@ -30,6 +30,18 @@
 
 @section('content')
 <div class="container-fluid">
+    @if($errors->any() && !session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <strong>Gagal mengirim request:</strong>
+            <ul class="mb-0 mt-2">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="row mb-4">
         <div class="col-12">
             <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
@@ -57,14 +69,14 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">ID Box (Scan)</label>
-                                <input type="text" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" required autofocus>
+                                <input type="text" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" value="{{ old('box_number') }}" required autofocus>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">No Part</label>
                                 <select name="part_number" id="partNumberSelect" class="form-select" required>
                                     <option value="">Pilih No Part</option>
                                     @foreach($partNumbers as $part)
-                                        <option value="{{ $part->part_number }}" data-fixed="{{ $part->qty_box }}">
+                                        <option value="{{ $part->part_number }}" data-fixed="{{ $part->qty_box }}" {{ old('part_number') === $part->part_number ? 'selected' : '' }}>
                                             {{ $part->part_number }} (Fixed: {{ $part->qty_box }})
                                         </option>
                                     @endforeach
@@ -73,7 +85,7 @@
 
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">PCS Aktual</label>
-                                <input type="number" name="pcs_quantity" class="form-control" min="1" required>
+                                <input type="number" id="pcsQuantityInput" name="pcs_quantity" class="form-control" min="1" value="{{ old('pcs_quantity') }}" required>
                                 <small class="text-muted">Wajib lebih kecil dari fixed qty.</small>
                             </div>
                             <div class="col-md-6">
@@ -81,7 +93,7 @@
                                 <select name="delivery_order_id" class="form-select" required>
                                     <option value="">Pilih jadwal delivery</option>
                                     @foreach($deliveryOrders as $order)
-                                        <option value="{{ $order->id }}">
+                                        <option value="{{ $order->id }}" {{ (string) old('delivery_order_id') === (string) $order->id ? 'selected' : '' }}>
                                             #{{ $order->id }} - {{ $order->customer_name }} ({{ $order->delivery_date->format('d M Y') }})
                                         </option>
                                     @endforeach
@@ -91,14 +103,14 @@
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">Tipe Permintaan</label>
                                 <select name="request_type" class="form-select" required>
-                                    <option value="supplement">Pelengkap (tidak ubah qty order)</option>
-                                    <option value="additional">Tambahan Order (tambah qty)</option>
+                                    <option value="supplement" {{ old('request_type', 'supplement') === 'supplement' ? 'selected' : '' }}>Pelengkap (tidak ubah qty order)</option>
+                                    <option value="additional" {{ old('request_type') === 'additional' ? 'selected' : '' }}>Tambahan Order (tambah qty)</option>
                                 </select>
                             </div>
 
                             <div class="col-md-12">
                                 <label class="form-label fw-bold">Alasan Not Full</label>
-                                <textarea name="reason" class="form-control" rows="2" required></textarea>
+                                <textarea name="reason" class="form-control" rows="2" required>{{ old('reason') }}</textarea>
                             </div>
                         </div>
 
@@ -108,11 +120,11 @@
                             <label class="form-label fw-bold">Masukkan ke</label>
                             <div class="d-flex gap-3">
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="target_type" id="targetPallet" value="pallet" checked>
+                                    <input class="form-check-input" type="radio" name="target_type" id="targetPallet" value="pallet" {{ old('target_type', 'pallet') === 'pallet' ? 'checked' : '' }}>
                                     <label class="form-check-label" for="targetPallet">Pallet Existing</label>
                                 </div>
                                 <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="target_type" id="targetLocation" value="location">
+                                    <input class="form-check-input" type="radio" name="target_type" id="targetLocation" value="location" {{ old('target_type') === 'location' ? 'checked' : '' }}>
                                     <label class="form-check-label" for="targetLocation">Lokasi Baru</label>
                                 </div>
                             </div>
@@ -124,7 +136,7 @@
                                 <select name="target_pallet_id" class="form-select">
                                     <option value="">Pilih pallet</option>
                                     @foreach($pallets as $pallet)
-                                        <option value="{{ $pallet->id }}">
+                                        <option value="{{ $pallet->id }}" {{ (string) old('target_pallet_id') === (string) $pallet->id ? 'selected' : '' }}>
                                             {{ $pallet->pallet_number }} ({{ $pallet->stockLocation?->warehouse_location ?? 'Unknown' }})
                                         </option>
                                     @endforeach
@@ -138,7 +150,7 @@
                                 <select name="target_location_id" class="form-select">
                                     <option value="">Pilih lokasi kosong</option>
                                     @foreach($locations as $location)
-                                        <option value="{{ $location->id }}">
+                                        <option value="{{ $location->id }}" {{ (string) old('target_location_id') === (string) $location->id ? 'selected' : '' }}>
                                             {{ $location->code }}
                                         </option>
                                     @endforeach
@@ -238,10 +250,10 @@
         e.preventDefault();
         const form = this;
         const partNumber = document.getElementById('partNumberSelect').value;
-        const boxQty = document.getElementById('boxQty').value;
+        const pcsQty = document.getElementById('pcsQuantityInput')?.value || '';
         const targetType = document.getElementById('targetLocation').checked ? 'Lokasi' : 'Pallet';
         
-        if (!partNumber || !boxQty) {
+        if (!partNumber || !pcsQty) {
             WarehouseAlert.error({
                 title: 'Data Tidak Lengkap',
                 message: 'Harap isi semua field yang diperlukan'
@@ -254,7 +266,7 @@
             message: 'Request box not full akan dikirim ke <strong style="color: #0C7779;">Supervisor</strong> untuk approval.',
             details: {
                 'Part Number': partNumber,
-                'Jumlah Box': `${boxQty} box`,
+                'PCS Aktual': `${pcsQty} PCS`,
                 'Tujuan': targetType
             },
             infoText: 'Pastikan data sudah benar sebelum mengirim.',

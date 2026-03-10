@@ -6,6 +6,7 @@ use App\Exports\StockViewByPalletExport;
 use App\Exports\StockViewByPartExport;
 use App\Models\AuditLog;
 use App\Models\Box;
+use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
@@ -18,6 +19,11 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class StockViewController extends Controller
 {
+    private function canDeleteStock(?object $user): bool
+    {
+        return $user && in_array($user->role, ['admin_warehouse', 'supervisi', 'admin'], true);
+    }
+
     private function buildStockItems(?string $search = null)
     {
         $palletQuery = Pallet::with(['stockLocation', 'items', 'boxes'])
@@ -234,6 +240,7 @@ class StockViewController extends Controller
         $palletDetails = $items->map(function ($item) {
             return [
                 'box_id' => $item['box_id'] ?? null,
+                'pallet_id' => $item['pallet_id'] ?? null,
                 'part_number' => $item['part_number'] ?? null,
                 'box_number' => $item['box_number'] ?? null,
                 'pallet_number' => $item['pallet_number'],
@@ -500,6 +507,246 @@ class StockViewController extends Controller
             'box_id' => $box->id,
             'box_number' => $box->box_number,
             'history' => $logs,
+        ]);
+    }
+
+    public function deleteBox(Request $request, $boxId)
+    {
+        $user = Auth::user();
+        if (!$this->canDeleteStock($user)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $box = Box::whereKey($boxId)->lockForUpdate()->firstOrFail();
+            $pallets = $box->pallets()->lockForUpdate()->get();
+            $affectedPalletIds = $pallets->pluck('id')->map(fn ($id) => (int) $id)->values();
+
+            $oldValues = [
+                'box_id' => $box->id,
+                'box_number' => $box->box_number,
+                'part_number' => $box->part_number,
+                'pcs_quantity' => (int) $box->pcs_quantity,
+                'stored_at' => optional($box->created_at)->format('Y-m-d H:i:s'),
+                'pallets' => $pallets->map(fn ($p) => [
+                    'id' => $p->id,
+                    'pallet_number' => $p->pallet_number,
+                ])->values()->all(),
+            ];
+
+            foreach ($pallets as $pallet) {
+                $item = PalletItem::where('pallet_id', $pallet->id)
+                    ->where('part_number', $box->part_number)
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($item) {
+                    $item->box_quantity = max(0, (int) $item->box_quantity - 1);
+                    $item->pcs_quantity = max(0, (int) $item->pcs_quantity - (int) $box->pcs_quantity);
+
+                    if ((int) $item->box_quantity === 0 && (int) $item->pcs_quantity === 0) {
+                        $item->delete();
+                    } else {
+                        $item->save();
+                    }
+                }
+            }
+
+            $box->forceDelete();
+
+            $autoDeletedPallets = collect();
+
+            foreach ($affectedPalletIds as $palletId) {
+                $pallet = Pallet::whereKey($palletId)->lockForUpdate()->first();
+                if (!$pallet) {
+                    continue;
+                }
+
+                $remainingActiveBoxes = (int) DB::table('pallet_boxes')
+                    ->join('boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+                    ->where('pallet_boxes.pallet_id', $palletId)
+                    ->whereNull('boxes.deleted_at')
+                    ->where('boxes.is_withdrawn', false)
+                    ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+                    ->lockForUpdate()
+                    ->count();
+
+                PalletItem::where('pallet_id', $palletId)->delete();
+
+                if ($remainingActiveBoxes === 0) {
+                    $palletNumber = (string) $pallet->pallet_number;
+
+                    MasterLocation::where('current_pallet_id', $palletId)
+                        ->update([
+                            'is_occupied' => false,
+                            'current_pallet_id' => null,
+                            'updated_at' => now(),
+                        ]);
+
+                    $pallet->delete();
+                    $autoDeletedPallets->push([
+                        'id' => $palletId,
+                        'pallet_number' => $palletNumber,
+                    ]);
+
+                    AuditService::log(
+                        'other',
+                        'pallet_deleted_by_stock_view',
+                        'Pallet',
+                        $palletId,
+                        [
+                            'pallet_id' => $palletId,
+                            'pallet_number' => $palletNumber,
+                            'reason' => 'auto_deleted_after_last_box_removed',
+                        ],
+                        [
+                            'deleted' => true,
+                            'deleted_by_role' => $user->role,
+                            'trigger' => 'delete_box',
+                        ],
+                        sprintf('Pallet %s terhapus otomatis karena box terakhir dihapus', $palletNumber)
+                    );
+                    continue;
+                }
+
+                $remainingBoxes = DB::table('pallet_boxes')
+                    ->join('boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+                    ->where('pallet_boxes.pallet_id', $palletId)
+                    ->whereNull('boxes.deleted_at')
+                    ->where('boxes.is_withdrawn', false)
+                    ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+                    ->select('boxes.part_number', DB::raw('COUNT(*) as box_count'), DB::raw('SUM(boxes.pcs_quantity) as pcs_total'))
+                    ->groupBy('boxes.part_number')
+                    ->get();
+
+                foreach ($remainingBoxes as $row) {
+                    PalletItem::create([
+                        'pallet_id' => $palletId,
+                        'part_number' => (string) $row->part_number,
+                        'box_quantity' => (int) $row->box_count,
+                        'pcs_quantity' => (int) $row->pcs_total,
+                    ]);
+                }
+            }
+
+            AuditService::log(
+                'other',
+                'box_deleted_by_stock_view',
+                'Box',
+                (int) $boxId,
+                $oldValues,
+                [
+                    'deleted' => true,
+                    'deleted_by_role' => $user->role,
+                    'auto_deleted_pallets' => $autoDeletedPallets->all(),
+                ],
+                sprintf('Box %s dihapus permanen dari stock view', $oldValues['box_number'] ?? (string) $boxId)
+            );
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus box: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Box berhasil dihapus permanen dan stok telah diperbarui.',
+        ]);
+    }
+
+    public function deletePallet(Request $request, $palletId)
+    {
+        $user = Auth::user();
+        if (!$this->canDeleteStock($user)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        DB::beginTransaction();
+
+        try {
+            $pallet = Pallet::with(['stockLocation', 'boxes', 'items'])->whereKey($palletId)->lockForUpdate()->firstOrFail();
+            $attachedBoxes = $pallet->boxes;
+
+            $oldValues = [
+                'pallet_id' => $pallet->id,
+                'pallet_number' => $pallet->pallet_number,
+                'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
+                'items' => $attachedBoxes->map(fn ($box) => [
+                    'box_id' => $box->id,
+                    'box_number' => $box->box_number,
+                    'part_number' => $box->part_number,
+                    'pcs_quantity' => (int) $box->pcs_quantity,
+                ])->values()->all(),
+            ];
+
+            $hardDeletedBoxCount = 0;
+            $detachedSharedBoxCount = 0;
+
+            foreach ($attachedBoxes as $box) {
+                $box = Box::whereKey($box->id)->lockForUpdate()->first();
+                if (!$box) {
+                    continue;
+                }
+
+                $linkedPalletCount = (int) DB::table('pallet_boxes')
+                    ->where('box_id', $box->id)
+                    ->lockForUpdate()
+                    ->count();
+
+                if ($linkedPalletCount <= 1) {
+                    $box->forceDelete();
+                    $hardDeletedBoxCount++;
+                } else {
+                    DB::table('pallet_boxes')
+                        ->where('pallet_id', $pallet->id)
+                        ->where('box_id', $box->id)
+                        ->delete();
+                    $detachedSharedBoxCount++;
+                }
+            }
+
+            MasterLocation::where('current_pallet_id', $pallet->id)
+                ->update([
+                    'is_occupied' => false,
+                    'current_pallet_id' => null,
+                    'updated_at' => now(),
+                ]);
+
+            $pallet->delete();
+
+            AuditService::log(
+                'other',
+                'pallet_deleted_by_stock_view',
+                'Pallet',
+                (int) $palletId,
+                $oldValues,
+                [
+                    'deleted' => true,
+                    'hard_deleted_box_count' => $hardDeletedBoxCount,
+                    'detached_shared_box_count' => $detachedSharedBoxCount,
+                    'deleted_by_role' => $user->role,
+                ],
+                sprintf('Pallet %s dihapus permanen dari stock view', $oldValues['pallet_number'] ?? (string) $palletId)
+            );
+
+            DB::commit();
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghapus pallet: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pallet berhasil dihapus permanen.',
         ]);
     }
 

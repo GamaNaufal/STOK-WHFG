@@ -66,11 +66,12 @@
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">PCS</th>
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Lokasi</th>
                                             <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Tanggal</th>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 12px 8px;">Aksi</th>
                                         </tr>
                                     </thead>
                                     <tbody id="palletDetailsTable">
                                         <tr>
-                                            <td colspan="5" class="text-center text-muted py-4">Loading...</td>
+                                            <td colspan="6" class="text-center text-muted py-4">Loading...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -230,6 +231,45 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
+            <div style="background: linear-gradient(135deg, #b42318 0%, #dc2626 100%); color: white; padding: 18px 20px;">
+                <h5 class="modal-title fw-bold" id="deleteConfirmTitle" style="margin:0; font-size:16px;">Konfirmasi Penghapusan</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="padding: 20px;">
+                <div class="alert alert-warning" style="margin-bottom: 14px;">
+                    Data yang dihapus tidak dapat dikembalikan. Pastikan data berikut sudah benar.
+                </div>
+                <div id="deleteConfirmSummary" class="mb-3 text-muted"></div>
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover" style="margin:0;">
+                        <thead style="background:#f9fafb;">
+                            <tr>
+                                <th>ID/No</th>
+                                <th>Part Number</th>
+                                <th>PCS</th>
+                                <th>Catatan</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deleteConfirmItemsBody">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">Belum ada data</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <small class="text-muted d-block mt-2">Aksi hapus akan dicatat ke audit trail.</small>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-danger" id="deleteConfirmSubmitBtn">Ya, Hapus Permanen</button>
             </div>
         </div>
     </div>

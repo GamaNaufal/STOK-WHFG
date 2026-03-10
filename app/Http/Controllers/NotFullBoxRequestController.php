@@ -30,6 +30,23 @@ class NotFullBoxRequestController extends Controller
 
     public function create()
     {
+        MasterLocation::query()
+            ->where('is_occupied', true)
+            ->whereNull('current_pallet_id')
+            ->update([
+                'is_occupied' => false,
+                'updated_at' => now(),
+            ]);
+
+        MasterLocation::query()
+            ->whereNotNull('current_pallet_id')
+            ->whereDoesntHave('currentPallet')
+            ->update([
+                'is_occupied' => false,
+                'current_pallet_id' => null,
+                'updated_at' => now(),
+            ]);
+
         $partNumbers = PartSetting::orderBy('part_number', 'asc')->get(['part_number', 'qty_box']);
         $deliveryOrders = DeliveryOrder::whereIn('status', ['approved', 'processing'])
             ->orderBy('delivery_date', 'asc')

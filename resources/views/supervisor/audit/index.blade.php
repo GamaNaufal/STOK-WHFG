@@ -118,6 +118,8 @@
                     <option value="completed" {{ $filters['action'] === 'completed' ? 'selected' : '' }}>Completed</option>
                     <option value="reversed" {{ $filters['action'] === 'reversed' ? 'selected' : '' }}>Reversed</option>
                     <option value="box_updated_by_admin_warehouse" {{ $filters['action'] === 'box_updated_by_admin_warehouse' ? 'selected' : '' }}>Edit Box (Admin Warehouse)</option>
+                    <option value="box_deleted_by_stock_view" {{ $filters['action'] === 'box_deleted_by_stock_view' ? 'selected' : '' }}>Hapus Box (Stock View)</option>
+                    <option value="pallet_deleted_by_stock_view" {{ $filters['action'] === 'pallet_deleted_by_stock_view' ? 'selected' : '' }}>Hapus Pallet (Stock View)</option>
                 </select>
             </div>
             <div class="col-md-2">
@@ -139,6 +141,12 @@
         </form>
         <a href="{{ route('audit.index', ['quick_filter' => 'box_edit']) }}" class="btn btn-sm mt-2" style="background: #dbeafe; color: #1e40af; border: none; border-radius: 8px;">
             <i class="bi bi-funnel-fill"></i> Filter Perubahan Box
+        </a>
+        <a href="{{ route('audit.index', ['type' => 'other', 'action' => 'box_deleted_by_stock_view']) }}" class="btn btn-sm mt-2" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 8px;">
+            <i class="bi bi-trash"></i> Filter Hapus Box
+        </a>
+        <a href="{{ route('audit.index', ['type' => 'other', 'action' => 'pallet_deleted_by_stock_view']) }}" class="btn btn-sm mt-2" style="background: #fecaca; color: #7f1d1d; border: none; border-radius: 8px;">
+            <i class="bi bi-trash3"></i> Filter Hapus Pallet
         </a>
         <a href="{{ route('audit.index') }}" class="btn btn-sm mt-2" style="background: #f3f4f6; color: #6b7280; border: none; border-radius: 8px;">
             <i class="bi bi-arrow-clockwise"></i> Atur Ulang
@@ -192,6 +200,10 @@
                                         @case('other')
                                             @if($log->action === 'box_updated_by_admin_warehouse')
                                                 <span class="badge" style="background-color: #dbeafe; color: #1e40af;">Perubahan Box</span>
+                                            @elseif($log->action === 'box_deleted_by_stock_view')
+                                                <span class="badge" style="background-color: #fee2e2; color: #991b1b;">Hapus Box</span>
+                                            @elseif($log->action === 'pallet_deleted_by_stock_view')
+                                                <span class="badge" style="background-color: #fecaca; color: #7f1d1d;">Hapus Pallet</span>
                                             @else
                                                 <span class="badge" style="background-color: #e5e7eb; color: #374151;">Lainnya</span>
                                             @endif
@@ -202,7 +214,12 @@
                                 </td>
                                 <td style="padding: 16px 20px;">
                                     <small style="color: #6b7280; font-weight: 600;">
-                                        {{ $log->action === 'box_updated_by_admin_warehouse' ? 'Edit Box (Admin Warehouse)' : ucfirst($log->action) }}
+                                        {{
+                                            $log->action === 'box_updated_by_admin_warehouse' ? 'Edit Box (Admin Warehouse)'
+                                            : ($log->action === 'box_deleted_by_stock_view' ? 'Hapus Box (Stock View)'
+                                            : ($log->action === 'pallet_deleted_by_stock_view' ? 'Hapus Pallet (Stock View)'
+                                            : ucfirst($log->action)))
+                                        }}
                                     </small>
                                 </td>
                                 <td style="padding: 16px 20px;">

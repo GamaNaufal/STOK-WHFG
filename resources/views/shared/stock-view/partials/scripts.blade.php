@@ -11,11 +11,14 @@
 
     const currentUserRole = bootstrapData.currentUserRole ?? null;
     const canEditBox = currentUserRole === 'admin_warehouse' || currentUserRole === 'admin';
+    const canDeleteStock = ['admin_warehouse', 'supervisi', 'admin'].includes(currentUserRole);
     const csrfToken = bootstrapData.csrfToken || '';
     const editBoxModalEl = document.getElementById('editBoxModal');
     const boxHistoryModalEl = document.getElementById('boxHistoryModal');
+    const deleteConfirmModalEl = document.getElementById('deleteConfirmModal');
     const editBoxModal = editBoxModalEl ? new bootstrap.Modal(editBoxModalEl) : null;
     const boxHistoryModal = boxHistoryModalEl ? new bootstrap.Modal(boxHistoryModalEl) : null;
+    const deleteConfirmModal = deleteConfirmModalEl ? new bootstrap.Modal(deleteConfirmModalEl) : null;
     const allParts = Array.isArray(bootstrapData.allParts) ? bootstrapData.allParts : [];
     const masterParts = Array.isArray(bootstrapData.masterParts) ? bootstrapData.masterParts : [];
     const allPallets = Array.isArray(bootstrapData.allPallets) ? bootstrapData.allPallets : [];
@@ -32,6 +35,7 @@
     let currentPalletId = null;
     let currentPalletDetailData = null;
     let editPartSelectEnhanced = false;
+    let pendingDeleteAction = null;
 
     function sortLabelsAscending(items) {
         return [...new Set((items || []).filter(Boolean))].sort((left, right) =>
@@ -54,6 +58,43 @@
         const printBtn = document.getElementById('printPalletDetailBtn');
         if (!printBtn) return;
         printBtn.disabled = !enabled;
+    }
+
+    function showAutoPopup(message, type = 'success', duration = 1800) {
+        const popup = document.createElement('div');
+        const isSuccess = type === 'success';
+
+        popup.style.position = 'fixed';
+        popup.style.top = '24px';
+        popup.style.right = '24px';
+        popup.style.zIndex = '3000';
+        popup.style.maxWidth = '380px';
+        popup.style.padding = '12px 16px';
+        popup.style.borderRadius = '10px';
+        popup.style.boxShadow = '0 8px 24px rgba(0,0,0,0.18)';
+        popup.style.color = isSuccess ? '#065f46' : '#7f1d1d';
+        popup.style.background = isSuccess ? '#d1fae5' : '#fee2e2';
+        popup.style.border = isSuccess ? '1px solid #86efac' : '1px solid #fca5a5';
+        popup.style.fontWeight = '600';
+        popup.style.fontSize = '14px';
+        popup.style.opacity = '0';
+        popup.style.transform = 'translateY(-8px)';
+        popup.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+        popup.textContent = message || (isSuccess ? 'Berhasil.' : 'Terjadi kesalahan.');
+
+        document.body.appendChild(popup);
+        requestAnimationFrame(() => {
+            popup.style.opacity = '1';
+            popup.style.transform = 'translateY(0)';
+        });
+
+        setTimeout(() => {
+            popup.style.opacity = '0';
+            popup.style.transform = 'translateY(-8px)';
+            setTimeout(() => {
+                popup.remove();
+            }, 220);
+        }, duration);
     }
 
     function printCurrentPalletDetail() {
@@ -167,6 +208,158 @@
     syncModalA11y(palletDetailModalEl);
     syncModalA11y(editBoxModalEl);
     syncModalA11y(boxHistoryModalEl);
+    syncModalA11y(deleteConfirmModalEl);
+
+    function renderDeleteConfirmation(config) {
+        const titleEl = document.getElementById('deleteConfirmTitle');
+        const summaryEl = document.getElementById('deleteConfirmSummary');
+        const bodyEl = document.getElementById('deleteConfirmItemsBody');
+        const submitBtn = document.getElementById('deleteConfirmSubmitBtn');
+
+        if (!titleEl || !summaryEl || !bodyEl || !submitBtn || !deleteConfirmModal) {
+            return;
+        }
+
+        titleEl.textContent = config.title || 'Konfirmasi Penghapusan';
+        summaryEl.innerHTML = config.summary || '';
+
+        const rows = Array.isArray(config.items) ? config.items : [];
+        if (rows.length === 0) {
+            bodyEl.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Tidak ada data</td></tr>';
+        } else {
+            bodyEl.innerHTML = rows.map((row) => `
+                <tr>
+                    <td>${escapeHtml(row.id || '-')}</td>
+                    <td>${escapeHtml(row.part_number || '-')}</td>
+                    <td>${escapeHtml(row.pcs_quantity ?? '-')}</td>
+                    <td>${escapeHtml(row.note || '-')}</td>
+                </tr>
+            `).join('');
+        }
+
+        pendingDeleteAction = config.action || null;
+        submitBtn.disabled = !pendingDeleteAction;
+        deleteConfirmModal.show();
+    }
+
+    function openDeleteBoxConfirm(dataset) {
+        if (!canDeleteStock || !deleteConfirmModal) {
+            return;
+        }
+
+        const boxId = dataset.boxId || dataset.box_id;
+        if (!boxId) {
+            showToast('ID box tidak valid untuk dihapus.', 'danger');
+            return;
+        }
+
+        renderDeleteConfirmation({
+            title: `Konfirmasi Hapus Box ${dataset.boxNumber || ''}`.trim(),
+            summary: `
+                <div><strong>Box:</strong> ${escapeHtml(dataset.boxNumber || '-')}</div>
+                <div><strong>Pallet:</strong> ${escapeHtml(dataset.palletNumber || '-')}</div>
+                <div><strong>Lokasi:</strong> ${escapeHtml(dataset.location || '-')}</div>
+            `,
+            items: [{
+                id: dataset.boxNumber || boxId,
+                part_number: dataset.partNumber || '-',
+                pcs_quantity: dataset.pcsQuantity || 0,
+                note: 'Box ini akan dihapus permanen',
+            }],
+            action: {
+                type: 'box',
+                id: boxId,
+            },
+        });
+    }
+
+    async function openDeletePalletConfirm(dataset) {
+        if (!canDeleteStock || !deleteConfirmModal) {
+            return;
+        }
+
+        const palletId = dataset.palletId || dataset.pallet_id;
+        if (!palletId) {
+            showToast('ID pallet tidak valid untuk dihapus.', 'danger');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/stock/pallet-detail/${palletId}`);
+            const data = await response.json();
+            if (!response.ok || data.error) {
+                throw new Error(data.error || 'Gagal mengambil detail pallet.');
+            }
+
+            const items = Array.isArray(data.items) ? data.items : [];
+            renderDeleteConfirmation({
+                title: `Konfirmasi Hapus Pallet ${data.pallet_number || dataset.palletNumber || ''}`.trim(),
+                summary: `
+                    <div><strong>Pallet:</strong> ${escapeHtml(data.pallet_number || dataset.palletNumber || '-')}</div>
+                    <div><strong>Lokasi:</strong> ${escapeHtml(data.location || '-')}</div>
+                    <div><strong>Total Item:</strong> ${items.length}</div>
+                `,
+                items: items.map((item) => ({
+                    id: item.box_number || item.box_id || '-',
+                    part_number: item.part_number || '-',
+                    pcs_quantity: item.pcs_quantity || 0,
+                    note: item.is_not_full ? 'Not Full' : 'OK',
+                })),
+                action: {
+                    type: 'pallet',
+                    id: palletId,
+                },
+            });
+        } catch (error) {
+            showToast(error.message || 'Gagal membuka konfirmasi hapus pallet.', 'danger');
+        }
+    }
+
+    async function executePendingDelete() {
+        if (!pendingDeleteAction) {
+            return;
+        }
+
+        const submitBtn = document.getElementById('deleteConfirmSubmitBtn');
+        if (submitBtn) submitBtn.disabled = true;
+        const deleteType = pendingDeleteAction.type;
+
+        try {
+            const endpoint = pendingDeleteAction.type === 'pallet'
+                ? `/stock-view/pallets/${pendingDeleteAction.id}`
+                : `/stock-view/boxes/${pendingDeleteAction.id}`;
+
+            const response = await fetch(endpoint, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Accept': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'Gagal menghapus data');
+            }
+
+            if (deleteConfirmModal) {
+                deleteConfirmModal.hide();
+            }
+
+            pendingDeleteAction = null;
+            const successMessage = data.message || 'Data berhasil dihapus.';
+            if (deleteType === 'box') {
+                showAutoPopup(successMessage, 'success', 1800);
+            } else {
+                showToast(successMessage, 'success');
+            }
+            setTimeout(() => window.location.reload(), deleteType === 'box' ? 1900 : 450);
+        } catch (error) {
+            showToast(error.message || 'Gagal menghapus data.', 'danger');
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
+        }
+    }
 
     function hideEditBoxInlineAlert() {
         const alertEl = document.getElementById('editBoxInlineAlert');
@@ -338,8 +531,22 @@
                                         data-box-number="${pallet.box_number || ''}"
                                         data-part-number="${pallet.part_number || ''}"
                                         data-pcs-quantity="${pallet.pcs_quantity || 0}"
-                                        data-stored-at="${pallet.stored_at_raw || ''}">Edit</button>` : ''}
+                                        data-stored-at="${pallet.stored_at_raw || ''}"
+                                        data-pallet-id="${pallet.pallet_id || ''}"
+                                        data-pallet-number="${pallet.pallet_number || ''}"
+                                        data-location="${pallet.location || ''}">Edit</button>` : ''}
                                     <button type="button" class="btn btn-sm btn-outline-secondary js-box-history" data-box-id="${pallet.box_id}">History</button>
+                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                        data-box-id="${pallet.box_id}"
+                                        data-box-number="${pallet.box_number || ''}"
+                                        data-part-number="${pallet.part_number || ''}"
+                                        data-pcs-quantity="${pallet.pcs_quantity || 0}"
+                                        data-pallet-id="${pallet.pallet_id || ''}"
+                                        data-pallet-number="${pallet.pallet_number || ''}"
+                                        data-location="${pallet.location || ''}">Hapus Box</button>` : ''}
+                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-danger js-delete-pallet"
+                                        data-pallet-id="${pallet.pallet_id || ''}"
+                                        data-pallet-number="${pallet.pallet_number || ''}">Hapus Pallet</button>` : ''}
                                 ` : '<span class="text-muted">-</span>'}
                             </td>
                         </tr>
@@ -408,8 +615,19 @@
                                         data-box-number="${item.box_number || ''}" 
                                         data-part-number="${item.part_number || ''}" 
                                         data-pcs-quantity="${item.pcs_quantity || 0}" 
-                                        data-stored-at="${item.stored_at_raw || ''}">Edit</button>` : ''}
+                                        data-stored-at="${item.stored_at_raw || ''}"
+                                        data-pallet-id="${palletId || ''}"
+                                        data-pallet-number="${data.pallet_number || ''}"
+                                        data-location="${data.location || ''}">Edit</button>` : ''}
                                     <button type="button" class="btn btn-sm btn-outline-secondary js-box-history" data-box-id="${item.box_id}">History</button>
+                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                        data-box-id="${item.box_id}"
+                                        data-box-number="${item.box_number || ''}"
+                                        data-part-number="${item.part_number || ''}"
+                                        data-pcs-quantity="${item.pcs_quantity || 0}"
+                                        data-pallet-id="${palletId || ''}"
+                                        data-pallet-number="${data.pallet_number || ''}"
+                                        data-location="${data.location || ''}">Hapus</button>` : ''}
                                 ` : '<span class="text-muted">-</span>'}
                             </td>
                         </tr>
@@ -588,6 +806,14 @@
         });
     }
 
+    const deleteConfirmSubmitBtn = document.getElementById('deleteConfirmSubmitBtn');
+    if (deleteConfirmSubmitBtn) {
+        deleteConfirmSubmitBtn.addEventListener('click', function (event) {
+            event.preventDefault();
+            executePendingDelete();
+        });
+    }
+
     document.addEventListener('click', function(event) {
         const printPalletBtn = event.target.closest('#printPalletDetailBtn');
         if (printPalletBtn) {
@@ -627,6 +853,20 @@
         if (historyBtn) {
             event.preventDefault();
             openBoxHistoryModal(historyBtn.dataset.boxId);
+            return;
+        }
+
+        const deleteBoxBtn = event.target.closest('.js-delete-box');
+        if (deleteBoxBtn) {
+            event.preventDefault();
+            openDeleteBoxConfirm(deleteBoxBtn.dataset);
+            return;
+        }
+
+        const deletePalletBtn = event.target.closest('.js-delete-pallet');
+        if (deletePalletBtn) {
+            event.preventDefault();
+            openDeletePalletConfirm(deletePalletBtn.dataset);
         }
     }, true);
 

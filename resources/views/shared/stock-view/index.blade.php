@@ -325,21 +325,6 @@
                                                           font-size: 12px;">
                                                     <i class="bi bi-eye"></i> Detail
                                                 </button>
-                                                @if(!empty($box['box_id']))
-                                                    @if(in_array(Auth::user()->role, ['admin_warehouse', 'admin']))
-                                                        <button type="button" class="btn btn-sm btn-outline-primary js-edit-box"
-                                                                data-box-id="{{ $box['box_id'] }}"
-                                                                data-box-number="{{ $box['box_number'] }}"
-                                                                data-part-number="{{ $box['part_number'] }}"
-                                                                data-pcs-quantity="{{ $box['pcs_quantity'] }}"
-                                                                data-stored-at="{{ $box['created_at']->format('Y-m-d H:i:s') }}">
-                                                            Edit
-                                                        </button>
-                                                    @endif
-                                                    <button type="button" class="btn btn-sm btn-outline-secondary js-box-history" data-box-id="{{ $box['box_id'] }}">
-                                                        History
-                                                    </button>
-                                                @endif
                                             </div>
                                         </td>
                                     </tr>

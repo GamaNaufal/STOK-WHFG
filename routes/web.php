@@ -126,6 +126,11 @@ Route::middleware('auth')->group(function () {
         Route::post('/stock-view/boxes/{boxId}/update', [StockViewController::class, 'updateBox'])->name('stock-view.box-update');
     });
 
+    Route::middleware('role:admin_warehouse,supervisi,admin')->group(function () {
+        Route::delete('/stock-view/boxes/{boxId}', [StockViewController::class, 'deleteBox'])->name('stock-view.box-delete');
+        Route::delete('/stock-view/pallets/{palletId}', [StockViewController::class, 'deletePallet'])->name('stock-view.pallet-delete');
+    });
+
     // Reports - Supervisi + Admin IT
     Route::middleware('role:supervisi,admin')->group(function () {
         Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');

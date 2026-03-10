@@ -34,6 +34,8 @@ class AuditController extends Controller
         if ($quickFilter === 'box_edit') {
             $filters['type'] = 'other';
             $filters['action'] = 'box_updated_by_admin_warehouse';
+        } elseif ($quickFilter === 'stock_delete') {
+            $filters['type'] = 'other';
         }
 
         // Get audit logs dengan filters
@@ -72,6 +74,8 @@ class AuditController extends Controller
         if ($quickFilter === 'box_edit') {
             $filters['type'] = 'other';
             $filters['action'] = 'box_updated_by_admin_warehouse';
+        } elseif ($quickFilter === 'stock_delete') {
+            $filters['type'] = 'other';
         }
 
         // Get all audit logs (no pagination for export)
