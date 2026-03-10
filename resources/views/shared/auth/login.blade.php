@@ -196,6 +196,31 @@
             color: #9ca3af;
         }
 
+        .password-wrapper {
+            position: relative;
+        }
+
+        .password-input {
+            padding-right: 2.8rem;
+        }
+
+        .password-toggle {
+            position: absolute;
+            top: 50%;
+            right: 0.75rem;
+            transform: translateY(-50%);
+            border: none;
+            background: transparent;
+            color: #6b7280;
+            padding: 0;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .password-toggle:hover {
+            color: #0C7779;
+        }
+
         .btn-login {
             width: 100%;
             padding: 0.85rem 1.5rem;
@@ -334,8 +359,13 @@
                         <label class="form-label">
                             <i class="bi bi-lock-fill"></i> Password
                         </label>
-                        <input type="password" class="form-control @error('password') is-invalid @enderror" 
-                               name="password" placeholder="Masukkan password" required>
+                        <div class="password-wrapper">
+                            <input id="password" type="password" class="form-control password-input @error('password') is-invalid @enderror" 
+                                   name="password" placeholder="Masukkan password" required>
+                            <button type="button" class="password-toggle" id="togglePassword" aria-label="Tampilkan password">
+                                <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Submit -->
@@ -349,5 +379,28 @@
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const passwordInput = document.getElementById('password');
+        const togglePasswordButton = document.getElementById('togglePassword');
+        const togglePasswordIcon = document.getElementById('togglePasswordIcon');
+
+        if (passwordInput && togglePasswordButton && togglePasswordIcon) {
+            togglePasswordButton.addEventListener('click', function () {
+                const cursorStart = passwordInput.selectionStart;
+                const cursorEnd = passwordInput.selectionEnd;
+                const isPassword = passwordInput.getAttribute('type') === 'password';
+
+                passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
+                togglePasswordIcon.classList.toggle('bi-eye', !isPassword);
+                togglePasswordIcon.classList.toggle('bi-eye-slash', isPassword);
+                togglePasswordButton.setAttribute('aria-label', isPassword ? 'Sembunyikan password' : 'Tampilkan password');
+
+                passwordInput.focus();
+                if (cursorStart !== null && cursorEnd !== null) {
+                    passwordInput.setSelectionRange(cursorStart, cursorEnd);
+                }
+            });
+        }
+    </script>
 </body>
 </html>
