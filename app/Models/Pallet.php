@@ -31,6 +31,15 @@ class Pallet extends Model
         return $this->belongsToMany(Box::class, 'pallet_boxes');
     }
 
+    // Relationship box aktif (belum withdrawn/expired/deleted)
+    public function activeBoxes()
+    {
+        return $this->belongsToMany(Box::class, 'pallet_boxes')
+            ->whereNull('boxes.deleted_at')
+            ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired']);
+    }
+
     // Relationship ke stock inputs
     public function stockInputs()
     {

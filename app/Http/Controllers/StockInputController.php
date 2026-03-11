@@ -86,8 +86,9 @@ class StockInputController extends Controller
 
         $pallets = Pallet::query()
             ->with(['stockLocation'])
-            ->withCount('boxes')
+            ->withCount('activeBoxes')
             ->whereHas('stockLocation')
+            ->whereHas('activeBoxes')
             ->when($query !== '', function ($q) use ($query) {
                 $q->where('pallet_number', 'like', '%' . $query . '%');
             })
@@ -99,7 +100,7 @@ class StockInputController extends Controller
                     'id' => $pallet->id,
                     'pallet_number' => $pallet->pallet_number,
                     'warehouse_location' => $pallet->stockLocation?->warehouse_location,
-                    'total_boxes' => (int) $pallet->boxes_count,
+                    'total_boxes' => (int) $pallet->active_boxes_count,
                 ];
             })
             ->values();
@@ -153,6 +154,13 @@ class StockInputController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Pallet ini belum punya lokasi tersimpan dan tidak bisa dipilih sebagai pallet existing.',
+            ], 422);
+        }
+
+        if (!$pallet->activeBoxes()->exists()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pallet ini sudah kosong dan tidak bisa dipilih sebagai pallet existing.',
             ], 422);
         }
 
@@ -535,7 +543,7 @@ class StockInputController extends Controller
 
         $scannedBoxes = session('scanned_boxes', []);
 
-        $existingBoxes = $pallet->boxes()
+        $existingBoxes = $pallet->activeBoxes()
             ->select('boxes.id', 'boxes.box_number', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.qty_box', 'boxes.is_not_full')
             ->get()
             ->map(function ($box) {
@@ -647,7 +655,7 @@ class StockInputController extends Controller
         return session('scanned_boxes', []);
     }
 
-    private function attachScannedBoxes(Pallet $pallet, array $scannedBoxes): void
+    private function attachScannedBoxes(Pallet $pallet, array $scannedBoxes): array
     {
         $boxNumbers = collect($scannedBoxes)
             ->pluck('box_number')
@@ -669,6 +677,8 @@ class StockInputController extends Controller
         $deliveryOrdersById = $notFullDeliveryOrderIds->isEmpty()
             ? collect()
             : DeliveryOrder::with('items')->whereIn('id', $notFullDeliveryOrderIds)->get()->keyBy('id');
+
+        $attachedBoxIds = [];
 
         foreach ($scannedBoxes as $scannedBox) {
             $boxNumber = (string) ($scannedBox['box_number'] ?? '');
@@ -694,8 +704,33 @@ class StockInputController extends Controller
                 $this->updateDeliveryOrderForNotFull($scannedBox, $deliveryOrdersById);
             }
 
-            $pallet->boxes()->attach($box->id);
+            $pallet->boxes()->syncWithoutDetaching([$box->id]);
+            $attachedBoxIds[] = (int) $box->id;
         }
+
+        return array_values(array_unique(array_filter($attachedBoxIds)));
+    }
+
+    private function createStockInputBoxRecords(StockInput $stockInput, array $boxIds): void
+    {
+        $rows = collect($boxIds)
+            ->map(fn ($boxId) => (int) $boxId)
+            ->filter(fn ($boxId) => $boxId > 0)
+            ->unique()
+            ->values()
+            ->map(fn ($boxId) => [
+                'stock_input_id' => $stockInput->id,
+                'box_id' => $boxId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])
+            ->all();
+
+        if (empty($rows)) {
+            throw new \RuntimeException('Tidak ada ID box valid untuk disimpan ke transaksi input stok.');
+        }
+
+        DB::table('stock_input_boxes')->insert($rows);
     }
 
     private function updateDeliveryOrderForNotFull(array $scannedBox, Collection $deliveryOrdersById): void
@@ -860,7 +895,7 @@ class StockInputController extends Controller
             }
 
             // Attach boxes ke palet sekarang (saat user klik Save)
-            $this->attachScannedBoxes($pallet, $scannedBoxes);
+            $attachedBoxIds = $this->attachScannedBoxes($pallet, $scannedBoxes);
 
             // Simpan lokasi bila pallet belum punya lokasi, atau gunakan lokasi existing
             $locationCode = $pallet->stockLocation?->warehouse_location;
@@ -873,6 +908,9 @@ class StockInputController extends Controller
 
             // Create StockInput record for audit
             $stockInput = $this->createStockInputRecord($pallet, $scannedBoxes, $locationCode);
+
+            // Persist exact box mapping per stock input transaction for 100% audit accuracy.
+            $this->createStockInputBoxRecords($stockInput, $attachedBoxIds);
 
             // Log audit trail
             AuditService::logStockInput($stockInput, 'created');

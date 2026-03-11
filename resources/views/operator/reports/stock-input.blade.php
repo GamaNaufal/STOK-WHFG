@@ -129,6 +129,7 @@
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Tanggal Input</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Pallet Number</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Part Number</th>
+                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">ID Box</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Box</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">PCS</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Lokasi</th>
@@ -155,6 +156,9 @@
                                     <span class="badge" style="background-color: #f0f4f8; color: #0C7779;">
                                         {{ $input->palletItem?->part_number ?? $input->pallet?->items?->first()?->part_number ?? '-' }}
                                     </span>
+                                </td>
+                                <td style="padding: 16px 20px;">
+                                    <small style="color: #6b7280;">{{ !empty($input->box_ids) ? implode(', ', $input->box_ids) : '-' }}</small>
                                 </td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">{{ (int) $input->box_quantity }}</td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">{{ $input->pcs_quantity }} PCS</td>

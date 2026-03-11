@@ -88,6 +88,11 @@ class Box extends Model
         return $this->hasMany(DeliveryPickItem::class);
     }
 
+    public function stockInputs()
+    {
+        return $this->belongsToMany(StockInput::class, 'stock_input_boxes');
+    }
+
     public function assignedDeliveryOrder()
     {
         return $this->belongsTo(DeliveryOrder::class, 'assigned_delivery_order_id');

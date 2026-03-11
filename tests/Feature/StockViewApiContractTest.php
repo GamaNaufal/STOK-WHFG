@@ -172,4 +172,44 @@ class StockViewApiContractTest extends TestCase
             'pcs_quantity' => 40,
         ]);
     }
+
+    public function test_api_stock_by_part_ignores_legacy_items_when_pallet_has_only_withdrawn_box_history(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+
+        $pallet = Pallet::create(['pallet_number' => 'PLT-API-WITHDRAWN-ONLY']);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A5',
+            'stored_at' => now(),
+        ]);
+
+        $withdrawnBox = Box::create([
+            'box_number' => 'BOX-WITHDRAWN-ONLY-1',
+            'part_number' => 'P-WITHDRAWN-ONLY',
+            'pcs_quantity' => 100,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-WITHDRAWN-ONLY-1|P-WITHDRAWN-ONLY|100',
+            'user_id' => $user->id,
+            'is_withdrawn' => true,
+            'withdrawn_at' => now(),
+            'expired_status' => 'active',
+        ]);
+        $pallet->boxes()->attach($withdrawnBox->id);
+
+        // Stale pallet_items can remain after delivery, but must not be shown while box history exists.
+        PalletItem::create([
+            'pallet_id' => $pallet->id,
+            'part_number' => 'P-WITHDRAWN-ONLY',
+            'box_quantity' => 2,
+            'pcs_quantity' => 200,
+        ]);
+
+        $response = $this->actingAs($user)->getJson('/api/stock/by-part');
+
+        $response->assertOk();
+        $response->assertJsonMissing([
+            'part_number' => 'P-WITHDRAWN-ONLY',
+        ]);
+    }
 }

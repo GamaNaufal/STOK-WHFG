@@ -400,9 +400,10 @@
                             <td>{{ is_object($completion->redo_until) ? $completion->redo_until->format('d M Y H:i') : \Carbon\Carbon::parse($completion->redo_until)->format('d M Y H:i') }}</td>
                             <td class="text-end">
                                 @if(Auth::user()->role === 'admin_warehouse' || Auth::user()->role === 'admin')
-                                    <form method="POST" action="{{ route('delivery.pick.redo', $completion->id) }}" class="d-inline">
+                                    <form method="POST" action="{{ route('delivery.pick.redo', $completion->id) }}" class="d-inline js-redo-form" data-redo-options-url="{{ route('delivery.pick.redo-options', $completion->id) }}">
                                         @csrf
-                                        <button class="btn-redo" {{ $completion->completion_status !== 'completed' || now()->greaterThan($completion->redo_until) ? 'disabled' : '' }}>
+                                        <input type="hidden" name="relocation_location" value="">
+                                        <button type="button" class="btn-redo js-redo-btn" {{ $completion->completion_status !== 'completed' || now()->greaterThan($completion->redo_until) ? 'disabled' : '' }}>
                                             <i class="bi bi-arrow-counterclockwise"></i> Redo
                                         </button>
                                     </form>
@@ -913,6 +914,210 @@
                 form.submit();
                 }
             });
+        });
+    });
+
+    async function fetchRedoOptions(optionsUrl, query = '') {
+        const url = new URL(optionsUrl, window.location.origin);
+        if (query) {
+            url.searchParams.set('q', query);
+        }
+
+        const response = await fetch(url.toString(), {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+
+        const payload = await response.json();
+        if (!response.ok || !payload.success) {
+            throw new Error(payload.message || 'Gagal mengambil data redo.');
+        }
+
+        return payload;
+    }
+
+    function mergeLocationOptions(defaultCode, availableLocations = []) {
+        const seen = new Set();
+        const options = [];
+
+        const normalizedDefault = (defaultCode || '').trim().toUpperCase();
+        if (normalizedDefault !== '') {
+            options.push({ code: normalizedDefault, label: `${normalizedDefault} (Lokasi Saat Ini)` });
+            seen.add(normalizedDefault);
+        }
+
+        (availableLocations || []).forEach((loc) => {
+            const code = (loc.code || '').trim().toUpperCase();
+            if (!code || seen.has(code)) {
+                return;
+            }
+
+            options.push({ code, label: code });
+            seen.add(code);
+        });
+
+        return options;
+    }
+
+    function renderLocationDropdown(container, options, selectedCode, query = '') {
+        if (!container) return;
+
+        const q = (query || '').trim().toUpperCase();
+        const filtered = options.filter((opt) => !q || opt.code.includes(q));
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="small text-muted">Tidak ada lokasi yang cocok.</div>';
+            return;
+        }
+
+        container.innerHTML = filtered.map((opt) => {
+            const activeClass = opt.code === selectedCode ? 'style="background:#e6f7f4;border-color:#0C7779;color:#0C7779;"' : '';
+            return `<button type="button" class="btn btn-sm btn-outline-secondary me-2 mb-2 js-redo-location-option" data-code="${opt.code}" ${activeClass}>${opt.label}</button>`;
+        }).join('');
+    }
+
+    async function openRedoDialog(form) {
+        const optionsUrl = form.getAttribute('data-redo-options-url');
+        if (!optionsUrl) {
+            WarehouseAlert.error({
+                title: 'Redo Gagal',
+                message: 'Endpoint opsi redo tidak ditemukan.'
+            });
+            return;
+        }
+
+        let optionsPayload;
+        try {
+            optionsPayload = await fetchRedoOptions(optionsUrl);
+        } catch (error) {
+            WarehouseAlert.error({
+                title: 'Redo Gagal',
+                message: error.message || 'Gagal memuat data redo.'
+            });
+            return;
+        }
+
+        const targets = Array.isArray(optionsPayload.targets) ? optionsPayload.targets : [];
+        if (targets.length > 1) {
+            WarehouseAlert.error({
+                title: 'Redo Gagal',
+                message: 'Redo ini melibatkan lebih dari satu pallet. Gunakan relokasi per pallet melalui proses admin lanjutan.'
+            });
+            return;
+        }
+
+        const conflictRows = targets.filter((target) => !!target.conflict);
+
+        const conflictHtml = conflictRows.length > 0
+            ? `
+                <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; border-radius: 8px; padding: 12px; margin-bottom: 12px; text-align: left;">
+                    <strong style="color: #92400E;">Lokasi bentrok terdeteksi</strong>
+                    <ul style="margin: 8px 0 0 18px; color: #78350F;">
+                        ${conflictRows.map((row) => `<li>${row.pallet_number} bentrok di ${row.conflict.location_code} dengan pallet ${row.conflict.occupying_pallet_number}</li>`).join('')}
+                    </ul>
+                </div>
+            `
+            : '<div class="small text-muted text-start mb-2">Tidak ada bentrok lokasi. Anda bisa lanjutkan redo tanpa isi relokasi.</div>';
+
+        const firstDefaultLocation = targets.length > 0 ? (targets[0].default_location || '') : '';
+        let selectedLocation = conflictRows.length === 0 ? firstDefaultLocation : '';
+        let locationOptions = mergeLocationOptions(firstDefaultLocation, optionsPayload.available_locations || []);
+
+        await Swal.fire({
+            title: '<strong style="font-size: 1.4rem; color: #374151;">Konfirmasi Redo Delivery</strong>',
+            html: `
+                <div style="text-align: left; padding: 8px 6px;">
+                    ${conflictHtml}
+                    <div class="mb-2">
+                        <label for="redo-location-search" class="form-label" style="font-weight: 600; color: #374151;">Pilih Lokasi Tujuan</label>
+                        <input id="redo-location-search" class="form-control" type="text" placeholder="Cari kode lokasi..." value="${selectedLocation || ''}" autocomplete="off">
+                        <div class="form-text">Satu field ini dipakai untuk lokasi sebelumnya maupun relokasi.</div>
+                    </div>
+                    <div id="redo-location-suggestions" style="max-height: 180px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #f9fafb;"></div>
+                    <div class="small text-muted mt-2">Default lokasi pallet: ${firstDefaultLocation || '-'}</div>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Lanjutkan Redo',
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#0C7779',
+            cancelButtonColor: '#6B7280',
+            reverseButtons: true,
+            width: '640px',
+            didOpen: async () => {
+                const searchInput = document.getElementById('redo-location-search');
+                const suggestions = document.getElementById('redo-location-suggestions');
+
+                renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput?.value || '');
+
+                suggestions?.addEventListener('click', (event) => {
+                    const btn = event.target.closest('.js-redo-location-option');
+                    if (!btn) return;
+                    const code = (btn.getAttribute('data-code') || '').trim().toUpperCase();
+                    selectedLocation = code;
+                    if (searchInput) {
+                        searchInput.value = code;
+                    }
+                    renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput?.value || '');
+                });
+
+                let searchTimeout = null;
+                searchInput?.addEventListener('input', () => {
+                    selectedLocation = (searchInput.value || '').trim().toUpperCase();
+                    renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput.value || '');
+
+                    if (searchTimeout) {
+                        clearTimeout(searchTimeout);
+                    }
+
+                    searchTimeout = setTimeout(async () => {
+                        try {
+                            const payload = await fetchRedoOptions(optionsUrl, (searchInput.value || '').trim());
+                            locationOptions = mergeLocationOptions(firstDefaultLocation, payload.available_locations || []);
+                            renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput.value || '');
+                        } catch (error) {
+                            renderLocationDropdown(suggestions, mergeLocationOptions(firstDefaultLocation, []), selectedLocation, searchInput.value || '');
+                        }
+                    }, 250);
+                });
+            },
+            preConfirm: () => {
+                const searchInput = document.getElementById('redo-location-search');
+                const candidate = (selectedLocation || searchInput?.value || '').trim().toUpperCase();
+
+                if (conflictRows.length > 0 && candidate === '') {
+                    Swal.showValidationMessage('Lokasi bentrok. Pilih lokasi tujuan dari dropdown.');
+                    return false;
+                }
+
+                return {
+                    relocationLocation: candidate,
+                };
+            }
+        }).then((result) => {
+            if (!result.isConfirmed) {
+                return;
+            }
+
+            const hiddenInput = form.querySelector('input[name="relocation_location"]');
+            if (hiddenInput) {
+                hiddenInput.value = (result.value?.relocationLocation || '');
+            }
+
+            form.submit();
+        });
+    }
+
+    document.querySelectorAll('.js-redo-form .js-redo-btn').forEach((button) => {
+        button.addEventListener('click', (event) => {
+            event.preventDefault();
+            const form = button.closest('.js-redo-form');
+            if (!form) {
+                return;
+            }
+
+            openRedoDialog(form);
         });
     });
 </script>

@@ -8,6 +8,7 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
+use App\Models\MasterLocation;
 use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
 use App\Models\PalletItem;
@@ -650,6 +651,478 @@ class DeliveryFlowConsistencyTest extends TestCase
             ->assertJson([
                 'message' => 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
             ]);
+    }
+
+    public function test_redo_is_blocked_when_original_location_is_now_occupied_by_other_pallet(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Redo Location Conflict',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+
+        $orderItem = DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-REDO-CONFLICT',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $oldPallet = Pallet::create(['pallet_number' => 'PLT-REDO-CONFLICT-OLD']);
+        StockLocation::create([
+            'pallet_id' => $oldPallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now()->subDays(2),
+        ]);
+
+        MasterLocation::create([
+            'code' => 'A1',
+            'is_occupied' => true,
+            'current_pallet_id' => $oldPallet->id,
+        ]);
+
+        $palletItem = PalletItem::create([
+            'pallet_id' => $oldPallet->id,
+            'part_number' => 'P-REDO-CONFLICT',
+            'box_quantity' => 1,
+            'pcs_quantity' => 100,
+        ]);
+
+        $box = Box::create([
+            'box_number' => 'BOX-REDO-CONFLICT-1',
+            'part_number' => 'P-REDO-CONFLICT',
+            'pcs_quantity' => 100,
+            'qr_code' => 'BOX-REDO-CONFLICT-1|P-REDO-CONFLICT|100',
+            'user_id' => $operator->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $oldPallet->boxes()->attach($box->id);
+
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        DeliveryPickItem::create([
+            'pick_session_id' => $session->id,
+            'box_id' => $box->id,
+            'part_number' => $box->part_number,
+            'pcs_quantity' => $box->pcs_quantity,
+            'status' => 'scanned',
+            'scanned_at' => now(),
+            'scanned_by' => $operator->id,
+        ]);
+
+        $complete = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.complete', $session->id));
+        $complete->assertOk()->assertJson(['success' => true]);
+
+        $newPallet = Pallet::create(['pallet_number' => 'PLT-REDO-CONFLICT-NEW']);
+        StockLocation::create([
+            'pallet_id' => $newPallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        PalletItem::create([
+            'pallet_id' => $newPallet->id,
+            'part_number' => 'P-CONFLICT-KEEP',
+            'box_quantity' => 1,
+            'pcs_quantity' => 10,
+        ]);
+
+        MasterLocation::where('code', 'A1')->update([
+            'is_occupied' => true,
+            'current_pallet_id' => $newPallet->id,
+        ]);
+
+        $redo = $this->actingAs($adminWarehouse)
+            ->post(route('delivery.pick.redo', $session->id));
+
+        $redo->assertRedirect();
+        $redo->assertSessionHas('error');
+
+        $this->assertDatabaseHas('stock_withdrawals', [
+            'box_id' => $box->id,
+            'status' => 'completed',
+        ]);
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'is_withdrawn' => 1,
+        ]);
+
+        $this->assertDatabaseHas('pallet_items', [
+            'id' => $palletItem->id,
+            'box_quantity' => 0,
+            'pcs_quantity' => 0,
+        ]);
+
+        $this->assertDatabaseHas('delivery_order_items', [
+            'id' => $orderItem->id,
+            'fulfilled_quantity' => 100,
+        ]);
+
+        $this->assertDatabaseHas('delivery_pick_sessions', [
+            'id' => $session->id,
+            'completion_status' => 'completed',
+        ]);
+    }
+
+    public function test_redo_can_relocate_pallet_when_original_location_is_occupied(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Redo Relocate',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+
+        $orderItem = DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-REDO-RELOCATE',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $oldPallet = Pallet::create(['pallet_number' => 'PLT-REDO-REL-OLD']);
+        StockLocation::create([
+            'pallet_id' => $oldPallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now()->subDays(2),
+        ]);
+
+        MasterLocation::create([
+            'code' => 'A1',
+            'is_occupied' => true,
+            'current_pallet_id' => $oldPallet->id,
+        ]);
+
+        MasterLocation::create([
+            'code' => 'B1',
+            'is_occupied' => false,
+            'current_pallet_id' => null,
+        ]);
+
+        $palletItem = PalletItem::create([
+            'pallet_id' => $oldPallet->id,
+            'part_number' => 'P-REDO-RELOCATE',
+            'box_quantity' => 1,
+            'pcs_quantity' => 100,
+        ]);
+
+        $box = Box::create([
+            'box_number' => 'BOX-REDO-RELOCATE-1',
+            'part_number' => 'P-REDO-RELOCATE',
+            'pcs_quantity' => 100,
+            'qr_code' => 'BOX-REDO-RELOCATE-1|P-REDO-RELOCATE|100',
+            'user_id' => $operator->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $oldPallet->boxes()->attach($box->id);
+
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        DeliveryPickItem::create([
+            'pick_session_id' => $session->id,
+            'box_id' => $box->id,
+            'part_number' => $box->part_number,
+            'pcs_quantity' => $box->pcs_quantity,
+            'status' => 'scanned',
+            'scanned_at' => now(),
+            'scanned_by' => $operator->id,
+        ]);
+
+        $complete = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.complete', $session->id));
+        $complete->assertOk()->assertJson(['success' => true]);
+
+        $newPallet = Pallet::create(['pallet_number' => 'PLT-REDO-REL-NEW']);
+        StockLocation::create([
+            'pallet_id' => $newPallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        MasterLocation::where('code', 'A1')->update([
+            'is_occupied' => true,
+            'current_pallet_id' => $newPallet->id,
+        ]);
+
+        $redo = $this->actingAs($adminWarehouse)
+            ->post(route('delivery.pick.redo', $session->id), [
+                'relocation_locations' => [
+                    $oldPallet->id => 'B1',
+                ],
+            ]);
+
+        $redo->assertRedirect();
+        $redo->assertSessionHas('success');
+
+        $this->assertDatabaseHas('stock_withdrawals', [
+            'box_id' => $box->id,
+            'status' => 'reversed',
+        ]);
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'is_withdrawn' => 0,
+            'assigned_delivery_order_id' => null,
+        ]);
+
+        $this->assertDatabaseHas('pallet_items', [
+            'id' => $palletItem->id,
+            'box_quantity' => 1,
+            'pcs_quantity' => 100,
+        ]);
+
+        $this->assertDatabaseHas('delivery_order_items', [
+            'id' => $orderItem->id,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $this->assertDatabaseHas('delivery_pick_sessions', [
+            'id' => $session->id,
+            'completion_status' => 'redone',
+        ]);
+
+        $this->assertDatabaseHas('master_locations', [
+            'code' => 'A1',
+            'current_pallet_id' => $newPallet->id,
+            'is_occupied' => 1,
+        ]);
+
+        $this->assertDatabaseHas('master_locations', [
+            'code' => 'B1',
+            'current_pallet_id' => $oldPallet->id,
+            'is_occupied' => 1,
+        ]);
+
+        $this->assertDatabaseHas('stock_locations', [
+            'pallet_id' => $oldPallet->id,
+            'warehouse_location' => 'B1',
+        ]);
+    }
+
+    public function test_redo_ignores_stale_occupied_location_and_still_executes(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Redo Stale Occupancy',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-REDO-STALE',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $sourcePallet = Pallet::create(['pallet_number' => 'PLT-REDO-STALE-SOURCE']);
+        StockLocation::create([
+            'pallet_id' => $sourcePallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now()->subDays(2),
+        ]);
+
+        MasterLocation::create([
+            'code' => 'A1',
+            'is_occupied' => true,
+            'current_pallet_id' => $sourcePallet->id,
+        ]);
+
+        PalletItem::create([
+            'pallet_id' => $sourcePallet->id,
+            'part_number' => 'P-REDO-STALE',
+            'box_quantity' => 1,
+            'pcs_quantity' => 100,
+        ]);
+
+        $box = Box::create([
+            'box_number' => 'BOX-REDO-STALE-1',
+            'part_number' => 'P-REDO-STALE',
+            'pcs_quantity' => 100,
+            'qr_code' => 'BOX-REDO-STALE-1|P-REDO-STALE|100',
+            'user_id' => $operator->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $sourcePallet->boxes()->attach($box->id);
+
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        DeliveryPickItem::create([
+            'pick_session_id' => $session->id,
+            'box_id' => $box->id,
+            'part_number' => $box->part_number,
+            'pcs_quantity' => $box->pcs_quantity,
+            'status' => 'scanned',
+            'scanned_at' => now(),
+            'scanned_by' => $operator->id,
+        ]);
+
+        $complete = $this->actingAs($operator)->postJson(route('delivery.pick.complete', $session->id));
+        $complete->assertOk()->assertJson(['success' => true]);
+
+        // Stale occupancy: location points to another pallet without active inventory.
+        $stalePallet = Pallet::create(['pallet_number' => 'PLT-REDO-STALE-TARGET']);
+        StockLocation::create([
+            'pallet_id' => $stalePallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        MasterLocation::where('code', 'A1')->update([
+            'is_occupied' => true,
+            'current_pallet_id' => $stalePallet->id,
+        ]);
+
+        $redo = $this->actingAs($adminWarehouse)->post(route('delivery.pick.redo', $session->id));
+        $redo->assertRedirect();
+        $redo->assertSessionHas('success');
+
+        $this->assertDatabaseHas('stock_withdrawals', [
+            'box_id' => $box->id,
+            'status' => 'reversed',
+        ]);
+    }
+
+    public function test_redo_options_includes_conflict_with_occupying_pallet_and_available_locations(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Redo Options',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-REDO-OPTIONS',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $sourcePallet = Pallet::create(['pallet_number' => 'PLT-REDO-OPT-SOURCE']);
+        StockLocation::create([
+            'pallet_id' => $sourcePallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now()->subDays(2),
+        ]);
+
+        MasterLocation::create([
+            'code' => 'A1',
+            'is_occupied' => true,
+            'current_pallet_id' => $sourcePallet->id,
+        ]);
+
+        MasterLocation::create([
+            'code' => 'B1',
+            'is_occupied' => false,
+            'current_pallet_id' => null,
+        ]);
+
+        PalletItem::create([
+            'pallet_id' => $sourcePallet->id,
+            'part_number' => 'P-REDO-OPTIONS',
+            'box_quantity' => 1,
+            'pcs_quantity' => 100,
+        ]);
+
+        $box = Box::create([
+            'box_number' => 'BOX-REDO-OPTIONS-1',
+            'part_number' => 'P-REDO-OPTIONS',
+            'pcs_quantity' => 100,
+            'qr_code' => 'BOX-REDO-OPTIONS-1|P-REDO-OPTIONS|100',
+            'user_id' => $operator->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $sourcePallet->boxes()->attach($box->id);
+
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        DeliveryPickItem::create([
+            'pick_session_id' => $session->id,
+            'box_id' => $box->id,
+            'part_number' => $box->part_number,
+            'pcs_quantity' => $box->pcs_quantity,
+            'status' => 'scanned',
+            'scanned_at' => now(),
+            'scanned_by' => $operator->id,
+        ]);
+
+        $complete = $this->actingAs($operator)->postJson(route('delivery.pick.complete', $session->id));
+        $complete->assertOk();
+
+        $occupyingPallet = Pallet::create(['pallet_number' => 'PLT-REDO-OPT-OCCUPY']);
+        StockLocation::create([
+            'pallet_id' => $occupyingPallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        PalletItem::create([
+            'pallet_id' => $occupyingPallet->id,
+            'part_number' => 'P-KEEP-OCCUPIED',
+            'box_quantity' => 1,
+            'pcs_quantity' => 50,
+        ]);
+
+        MasterLocation::where('code', 'A1')->update([
+            'is_occupied' => true,
+            'current_pallet_id' => $occupyingPallet->id,
+        ]);
+
+        $response = $this->actingAs($adminWarehouse)
+            ->getJson(route('delivery.pick.redo-options', $session->id));
+
+        $response->assertOk()->assertJson(['success' => true]);
+
+        $targets = collect($response->json('targets'));
+        $sourceTarget = $targets->firstWhere('pallet_id', $sourcePallet->id);
+
+        $this->assertNotNull($sourceTarget);
+        $this->assertSame('A1', $sourceTarget['default_location']);
+        $this->assertSame($occupyingPallet->id, $sourceTarget['conflict']['occupying_pallet_id']);
+        $this->assertSame($occupyingPallet->pallet_number, $sourceTarget['conflict']['occupying_pallet_number']);
+
+        $availableCodes = collect($response->json('available_locations'))->pluck('code')->all();
+        $this->assertContains('B1', $availableCodes);
     }
 
     public function test_verify_scan_is_blocked_when_additional_not_full_request_pending(): void

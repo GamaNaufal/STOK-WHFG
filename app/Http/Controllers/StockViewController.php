@@ -36,6 +36,7 @@ class StockViewController extends Controller
         $palletQuery->chunkById(200, function ($pallets) use (&$items, $search) {
             foreach ($pallets as $pallet) {
                 $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
+                $hasAnyBoxHistory = $pallet->boxes->isNotEmpty();
 
                 // Prefer active boxes as source of truth
                 $activeBoxes = $pallet->boxes
@@ -65,8 +66,8 @@ class StockViewController extends Controller
                             'not_full_reason' => $box->not_full_reason,
                         ]);
                     }
-                } else {
-                    // Fallback to pallet items (legacy / no box data)
+                } elseif (!$hasAnyBoxHistory) {
+                    // Fallback only for legacy pallets that truly have no box history.
                     $legacyItems = $pallet->items->filter(function ($item) {
                         return $item->pcs_quantity > 0 || $item->box_quantity > 0;
                     });

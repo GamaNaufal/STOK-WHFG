@@ -153,6 +153,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:admin_warehouse,admin')->group(function () {
         Route::get('/delivery-scan-issues', [\App\Http\Controllers\DeliveryPickController::class, 'issues'])->name('delivery.pick.issues');
         Route::post('/delivery-scan-issues/{issue}/approve', [\App\Http\Controllers\DeliveryPickController::class, 'approveIssue'])->name('delivery.pick.issue.approve');
+        Route::get('/delivery-completions/{completion}/redo-options', [\App\Http\Controllers\DeliveryPickController::class, 'redoOptions'])->name('delivery.pick.redo-options');
         Route::post('/delivery-completions/{completion}/redo', [\App\Http\Controllers\DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');
     });
 

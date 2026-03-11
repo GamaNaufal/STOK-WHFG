@@ -136,6 +136,7 @@
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">No</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Tanggal</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Part Number</th>
+                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">ID Box</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Box Diambil</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">PCS Diambil</th>
                             <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Lokasi</th>
@@ -158,6 +159,9 @@
                                     <span class="badge" style="background-color: #f0f4f8; color: #0C7779;">
                                         {{ $withdrawal->part_number }}
                                     </span>
+                                </td>
+                                <td style="padding: 16px 20px;">
+                                    <small style="color: #6b7280;">{{ $withdrawal->box_id ?? '-' }}</small>
                                 </td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">{{ (int) $withdrawal->box_quantity }} Box</td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">{{ $withdrawal->pcs_quantity }} PCS</td>

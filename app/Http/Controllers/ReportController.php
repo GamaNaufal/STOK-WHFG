@@ -15,6 +15,7 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
+
     public function operationalReports(Request $request)
     {
         $data = app(OperationalReportService::class)->build($request);
@@ -126,7 +127,7 @@ class ReportController extends Controller
      */
     public function withdrawalReport(Request $request)
     {
-        $query = StockWithdrawal::with(['user', 'palletItem']);
+        $query = StockWithdrawal::with(['user', 'palletItem', 'box']);
 
         // Date range filter
         if ($request->filled('start_date')) {
@@ -184,7 +185,7 @@ class ReportController extends Controller
     public function stockInputReport(Request $request)
     {
         // Get stock inputs from stock_inputs table
-        $query = StockInput::with(['pallet.items', 'palletItem', 'user']);
+        $query = StockInput::with(['pallet.items', 'palletItem', 'user', 'boxes:id']);
 
         // Date range filter
         if ($request->filled('start_date')) {
@@ -210,6 +211,11 @@ class ReportController extends Controller
         }
 
         $stockInputs = $query->orderBy('stored_at', 'desc')->paginate(50);
+
+        $stockInputs->getCollection()->transform(function (StockInput $input) {
+            $input->setAttribute('box_ids', $input->boxes->pluck('id')->map(fn ($id) => (int) $id)->values()->all());
+            return $input;
+        });
 
         // Get statistics from stock_inputs table
         $totalRecords = StockInput::count();
@@ -247,7 +253,7 @@ class ReportController extends Controller
      */
     public function exportWithdrawalCsv(Request $request)
     {
-        $query = StockWithdrawal::with(['user', 'palletItem']);
+        $query = StockWithdrawal::with(['user', 'palletItem', 'box']);
 
         if ($request->filled('start_date')) {
             $query->whereDate('withdrawn_at', '>=', $request->input('start_date'));
@@ -274,7 +280,7 @@ class ReportController extends Controller
      */
     public function exportStockInputCsv(Request $request)
     {
-        $query = StockInput::with(['pallet.items', 'palletItem', 'user']);
+        $query = StockInput::with(['pallet.items', 'palletItem', 'user', 'boxes:id']);
 
         if ($request->filled('start_date')) {
             $query->whereDate('stored_at', '>=', $request->input('start_date'));
@@ -285,6 +291,11 @@ class ReportController extends Controller
         }
 
         $stockInputs = $query->orderBy('stored_at', 'desc')->get();
+
+        $stockInputs->transform(function (StockInput $input) {
+            $input->setAttribute('box_ids', $input->boxes->pluck('id')->map(fn ($id) => (int) $id)->values()->all());
+            return $input;
+        });
 
         return Excel::download(
             new StockInputExport($stockInputs),

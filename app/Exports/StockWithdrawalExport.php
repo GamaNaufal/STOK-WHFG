@@ -35,6 +35,7 @@ class StockWithdrawalExport implements FromCollection, WithHeadings, WithStyles
                 'Qty (PCS)' => (int)$withdrawal->pcs_quantity,
                 'Qty (Box)' => (int)ceil($withdrawal->box_quantity),
                 'Part Number' => $withdrawal->part_number ?? '-',
+                'ID Box' => $withdrawal->box_id ?? '-',
                 'Keterangan' => $withdrawal->notes ?? '-',
                 'Lokasi Simpan' => $withdrawal->warehouse_location ?? '-',
             ]);
@@ -56,6 +57,7 @@ class StockWithdrawalExport implements FromCollection, WithHeadings, WithStyles
             'Qty (PCS)',
             'Qty (Box)',
             'Part Number',
+            'ID Box',
             'Keterangan',
             'Lokasi Simpan',
         ];
@@ -66,7 +68,7 @@ class StockWithdrawalExport implements FromCollection, WithHeadings, WithStyles
         $lastRow = $this->withdrawals->count() + 1;
 
         // Apply borders to all cells
-        $sheet->getStyle('A1:J' . $lastRow)->applyFromArray([
+        $sheet->getStyle('A1:K' . $lastRow)->applyFromArray([
             'border' => [
                 'allBorders' => [
                     'borderStyle' => Border::BORDER_THIN,
@@ -110,12 +112,13 @@ class StockWithdrawalExport implements FromCollection, WithHeadings, WithStyles
         $sheet->getColumnDimension('F')->setWidth(10);  // Qty (PCS)
         $sheet->getColumnDimension('G')->setWidth(10);  // Qty (Box)
         $sheet->getColumnDimension('H')->setWidth(15);  // Part Number
-        $sheet->getColumnDimension('I')->setWidth(25);  // Keterangan
-        $sheet->getColumnDimension('J')->setWidth(20);  // Lokasi Simpan
+        $sheet->getColumnDimension('I')->setWidth(14);  // ID Box
+        $sheet->getColumnDimension('J')->setWidth(25);  // Keterangan
+        $sheet->getColumnDimension('K')->setWidth(20);  // Lokasi Simpan
 
         // Apply thicker border di akhir setiap group
         foreach ($this->groupEndRows as $row) {
-            $sheet->getStyle('A' . $row . ':J' . $row)->applyFromArray([
+            $sheet->getStyle('A' . $row . ':K' . $row)->applyFromArray([
                 'border' => [
                     'bottom' => [
                         'borderStyle' => Border::BORDER_MEDIUM,

@@ -43,6 +43,16 @@ class StockInput extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function stockInputBoxes()
+    {
+        return $this->hasMany(StockInputBox::class);
+    }
+
+    public function boxes()
+    {
+        return $this->belongsToMany(Box::class, 'stock_input_boxes');
+    }
+
     /**
      * Scope untuk query by date range
      */
