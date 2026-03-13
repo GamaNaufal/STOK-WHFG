@@ -35,9 +35,8 @@ return new class extends Migration
                 );
             }
 
-            Schema::table('delivery_pick_items', function (Blueprint $table) {
-                $table->unique(['pick_session_id', 'box_id'], 'delivery_pick_items_session_box_unique');
-            });
+            // Unique index delivery_pick_items_session_box_unique is defined
+            // in base migration 2026_01_26_000005_create_delivery_pick_items_table.
         }
 
         if (Schema::hasTable('stock_withdrawals')) {
@@ -68,10 +67,7 @@ return new class extends Migration
             });
         }
 
-        if (Schema::hasTable('delivery_pick_items')) {
-            Schema::table('delivery_pick_items', function (Blueprint $table) {
-                $table->dropUnique('delivery_pick_items_session_box_unique');
-            });
-        }
+        // No rollback needed for delivery_pick_items unique index here,
+        // because it belongs to the base create migration.
     }
 };

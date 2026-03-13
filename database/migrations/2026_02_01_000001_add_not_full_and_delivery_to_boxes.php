@@ -16,18 +16,9 @@ return new class extends Migration
         }
 
         Schema::table('boxes', function (Blueprint $table) {
-            if (!Schema::hasColumn('boxes', 'is_not_full')) {
-                $table->boolean('is_not_full')->default(false)->after('is_withdrawn');
-            }
-
-            if (!Schema::hasColumn('boxes', 'not_full_reason')) {
-                $table->text('not_full_reason')->nullable()->after('is_not_full');
-            }
-
             if (!Schema::hasColumn('boxes', 'assigned_delivery_order_id')) {
                 $table->foreignId('assigned_delivery_order_id')
                     ->nullable()
-                    ->after('not_full_reason')
                     ->constrained('delivery_orders')
                     ->nullOnDelete();
 
@@ -58,14 +49,6 @@ return new class extends Migration
                 }
 
                 $table->dropColumn('assigned_delivery_order_id');
-            }
-
-            if (Schema::hasColumn('boxes', 'not_full_reason')) {
-                $table->dropColumn('not_full_reason');
-            }
-
-            if (Schema::hasColumn('boxes', 'is_not_full')) {
-                $table->dropColumn('is_not_full');
             }
         });
     }

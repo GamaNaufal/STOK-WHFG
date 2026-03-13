@@ -18,6 +18,7 @@ return new class extends Migration
             $table->integer('pcs_quantity');
             $table->integer('fixed_qty');
             $table->text('reason');
+            $table->string('request_type')->default('supplement');
 
             $table->foreignId('delivery_order_id')->constrained('delivery_orders')->cascadeOnDelete();
             $table->foreignId('requested_by')->constrained('users')->cascadeOnDelete();

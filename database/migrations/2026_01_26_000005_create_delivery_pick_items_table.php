@@ -22,6 +22,7 @@ return new class extends Migration
             $table->index('pick_session_id');
             $table->index('status');
             $table->index('part_number');
+            $table->unique(['pick_session_id', 'box_id'], 'delivery_pick_items_session_box_unique');
         });
     }
 

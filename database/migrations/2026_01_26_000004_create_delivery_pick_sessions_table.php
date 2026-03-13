@@ -20,6 +20,7 @@ return new class extends Migration
             $table->dateTime('completed_at')->nullable();
             $table->dateTime('redo_until')->nullable();
             $table->enum('completion_status', ['pending', 'completed', 'redone'])->default('pending');
+            $table->json('verification_box_ids')->nullable();
             $table->timestamps();
 
             $table->index('status');

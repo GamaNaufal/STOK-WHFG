@@ -23,26 +23,28 @@ class StockInputExport implements FromCollection, WithHeadings, WithStyles
     public function collection()
     {
         $data = collect();
+        $this->groupEndRows = [];
         $currentRow = 2;
         
         foreach ($this->stockInputs as $input) {
             $resolvedBoxIds = collect((array) ($input->box_ids ?? []))->filter()->values();
+            if ($resolvedBoxIds->isEmpty() && $input->relationLoaded('boxes')) {
+                $resolvedBoxIds = $input->boxes->pluck('id')->filter()->values();
+            }
             $boxIdDisplay = $resolvedBoxIds->isNotEmpty() ? $resolvedBoxIds->implode(', ') : '-';
 
-            $palletItems = collect();
-            if ($input->relationLoaded('pallet') && $input->pallet && $input->pallet->relationLoaded('items')) {
-                $palletItems = $input->pallet->items;
+            $boxes = collect();
+            if ($input->relationLoaded('boxes')) {
+                $boxes = $input->boxes;
             }
 
-            // Group items by part_number
-            $itemsByPart = $palletItems->groupBy('part_number');
+            $itemsByPart = $boxes->groupBy('part_number');
             
             if ($itemsByPart->isNotEmpty()) {
-                // Multiple rows jika ada multiple part numbers
                 $isFirstRow = true;
                 foreach ($itemsByPart as $partNumber => $items) {
                     $totalPcsForPart = $items->sum('pcs_quantity');
-                    $totalBoxForPart = $items->sum('box_quantity');
+                    $totalBoxForPart = $items->count();
                     
                     $data->push([
                         'Tanggal' => $isFirstRow ? $input->stored_at->format('d/m/Y') : '',
@@ -61,7 +63,7 @@ class StockInputExport implements FromCollection, WithHeadings, WithStyles
                     $isFirstRow = false;
                 }
             } else {
-                // Fallback jika tidak ada items
+                $fallbackPart = collect((array) ($input->part_numbers ?? []))->filter()->implode(', ');
                 $data->push([
                     'Tanggal' => $input->stored_at->format('d/m/Y'),
                     'Waktu' => $input->stored_at->format('H:i:s'),
@@ -70,7 +72,7 @@ class StockInputExport implements FromCollection, WithHeadings, WithStyles
                     'Operator' => $input->user?->name ?? 'System',
                     'Qty (PCS)' => (int)$input->pcs_quantity,
                     'Qty (Box)' => (int)$input->box_quantity,
-                    'Part Number' => '-',
+                    'Part Number' => $fallbackPart !== '' ? $fallbackPart : '-',
                     'ID Box' => $boxIdDisplay,
                     'Keterangan' => '-',
                     'Lokasi Simpan' => $input->warehouse_location ?? '-',
@@ -104,7 +106,7 @@ class StockInputExport implements FromCollection, WithHeadings, WithStyles
 
     public function styles(Worksheet $sheet)
     {
-        $lastRow = $this->stockInputs->count() + 1;
+        $lastRow = max(2, max($this->groupEndRows ?: [1]));
 
         // Apply borders to all cells
         $sheet->getStyle('A1:K' . $lastRow)->applyFromArray([

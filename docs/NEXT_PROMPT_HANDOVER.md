@@ -15,45 +15,50 @@ Perubahan yang sudah selesai:
 
 Perubahan yang masih perlu dieksekusi agar akurasi benar-benar konsisten end-to-end:
 
+## Update 2026-03-13
+
+Semua pending kritis pada dokumen ini sudah dieksekusi:
+
+- `StockWithdrawalController::undo()` sekarang mengembalikan status box (`is_withdrawn=false`, `withdrawn_at=null`) dan re-occupy lokasi terkait.
+- `StockInputController::createStockInputRecord()` sekarang menghitung `pcs_quantity`, `box_quantity`, dan `part_numbers` dari box transaksi yang benar-benar di-attach.
+- Filter `part_number` di report input stock sekarang memakai relasi `stock_input_boxes -> boxes.part_number`.
+- Tabel report dan export input stock sekarang derive part number dari `stockInput->boxes` (group by `part_number`), bukan dari state `pallet_items` saat ini.
+
+Regression yang ditambahkan/diupdate:
+
+- `tests/Feature/StockWithdrawalUndoConsistencyTest.php`
+- `tests/Feature/ReportFilterMatrixTest.php`
+
+Hasil test terkait: pass.
+
+## Update 2026-03-13 (Migration Cleanup)
+
+Migration sudah dirapikan agar schema final lebih banyak berada di migration create awal:
+
+- `boxes` create migration sekarang sudah memuat kolom not-full + expired tracking.
+- `not_full_box_requests` create migration sekarang sudah memuat `request_type`.
+- `delivery_pick_sessions` create migration sekarang sudah memuat `verification_box_ids`.
+- `delivery_pick_items` create migration sekarang sudah memuat unique `(pick_session_id, box_id)`.
+- Unique `(box_id, status)` untuk `expired_box_reports` sekarang didefinisikan saat create table.
+
+Migration patch yang sudah terserap dijadikan no-op agar chain migrasi tetap aman:
+
+- `2026_02_01_000003_add_request_type_to_not_full_box_requests.php`
+- `2026_02_24_130000_add_verification_box_ids_to_delivery_pick_sessions.php`
+- `2026_02_24_140000_add_unique_box_status_to_expired_box_reports.php`
+
+Catatan penting:
+
+- `2026_02_01_000001_add_not_full_and_delivery_to_boxes.php` tetap dipakai untuk `assigned_delivery_order_id` karena urutan dependency (`delivery_orders` dibuat setelah `boxes`).
+- `2026_02_24_120000_add_concurrency_guards_to_delivery_pick_and_withdrawals.php` tetap dipakai untuk guard di `stock_withdrawals`; bagian unique `delivery_pick_items` sudah dipindahkan ke base create migration.
+
+Validasi:
+
+- `php artisan migrate:fresh --force` sukses tanpa error.
+
 ## Pending Kritis (Harus Dikerjakan)
 
-1. Sinkronkan `undo withdrawal` ke status box
-
-- File: `app/Http/Controllers/StockWithdrawalController.php`
-- Method: `undo($withdrawalId)`
-- Masalah:
-    - Undo saat ini mengembalikan `pallet_items` dan ubah status withdrawal ke `reversed`.
-    - Belum mengembalikan status box (`is_withdrawn = false`, `withdrawn_at = null`) berdasarkan `box_id`.
-- Dampak:
-    - Potensi mismatch stok: item kembali, tapi box tetap withdrawn.
-
-2. Akurasi snapshot `part_numbers` pada `StockInput`
-
-- File: `app/Http/Controllers/StockInputController.php`
-- Method: `createStockInputRecord(...)`
-- Masalah:
-    - `part_numbers` masih disusun dari `pallet->items()` (state pallet saat ini), bukan murni dari box transaksi baru.
-- Target:
-    - Isi `part_numbers` dari box yang benar-benar terekam di `stock_input_boxes` untuk transaksi tersebut.
-
-3. Filter `part_number` report Input Stock harus berbasis `stock_input_boxes`
-
-- File: `app/Http/Controllers/ReportController.php`
-- Method: `stockInputReport(Request $request)`
-- Masalah:
-    - Filter `part_number` masih berbasis `pallet_items`.
-- Target:
-    - Filter lewat relasi box transaksi (`stock_input_boxes -> boxes.part_number`).
-
-4. Part number pada tabel/export Input Stock harus dari box transaksi
-
-- File:
-    - `resources/views/operator/reports/stock-input.blade.php`
-    - `app/Exports/StockInputExport.php`
-- Masalah:
-    - Tampilan part masih fallback ke `palletItem/pallet->items`.
-- Target:
-    - Derive part dan agregat qty dari `stockInput->boxes` (group by `part_number`) agar historis tidak berubah saat pallet berubah.
+Tidak ada pending kritis tersisa dari batch ini.
 
 ## Rekomendasi Eksekusi Prompt Berikutnya
 

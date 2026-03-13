@@ -185,7 +185,7 @@ class ReportController extends Controller
     public function stockInputReport(Request $request)
     {
         // Get stock inputs from stock_inputs table
-        $query = StockInput::with(['pallet.items', 'palletItem', 'user', 'boxes:id']);
+        $query = StockInput::with(['pallet', 'user', 'boxes:id,part_number,pcs_quantity']);
 
         // Date range filter
         if ($request->filled('start_date')) {
@@ -198,10 +198,10 @@ class ReportController extends Controller
 
         // Part number filter
         if ($request->filled('part_number')) {
-            $query->whereIn('pallet_item_id', function ($q) {
-                $q->select('id')
-                  ->from('pallet_items')
-                  ->where('part_number', 'like', '%' . request()->input('part_number') . '%');
+            $partNumber = (string) $request->input('part_number');
+
+            $query->whereHas('boxes', function ($q) use ($partNumber) {
+                $q->where('boxes.part_number', 'like', '%' . $partNumber . '%');
             });
         }
 
@@ -213,7 +213,21 @@ class ReportController extends Controller
         $stockInputs = $query->orderBy('stored_at', 'desc')->paginate(50);
 
         $stockInputs->getCollection()->transform(function (StockInput $input) {
-            $input->setAttribute('box_ids', $input->boxes->pluck('id')->map(fn ($id) => (int) $id)->values()->all());
+            $boxIds = $input->boxes->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            $partSummaries = $input->boxes
+                ->groupBy('part_number')
+                ->map(function ($boxes, $partNumber) {
+                    return [
+                        'part_number' => (string) $partNumber,
+                        'box_quantity' => (int) $boxes->count(),
+                        'pcs_quantity' => (int) $boxes->sum('pcs_quantity'),
+                    ];
+                })
+                ->values()
+                ->all();
+
+            $input->setAttribute('box_ids', $boxIds);
+            $input->setAttribute('part_summaries', $partSummaries);
             return $input;
         });
 
@@ -280,7 +294,7 @@ class ReportController extends Controller
      */
     public function exportStockInputCsv(Request $request)
     {
-        $query = StockInput::with(['pallet.items', 'palletItem', 'user', 'boxes:id']);
+        $query = StockInput::with(['pallet', 'user', 'boxes:id,part_number,pcs_quantity']);
 
         if ($request->filled('start_date')) {
             $query->whereDate('stored_at', '>=', $request->input('start_date'));
@@ -288,6 +302,17 @@ class ReportController extends Controller
 
         if ($request->filled('end_date')) {
             $query->whereDate('stored_at', '<=', $request->input('end_date'));
+        }
+
+        if ($request->filled('part_number')) {
+            $partNumber = (string) $request->input('part_number');
+            $query->whereHas('boxes', function ($q) use ($partNumber) {
+                $q->where('boxes.part_number', 'like', '%' . $partNumber . '%');
+            });
+        }
+
+        if ($request->filled('warehouse_location')) {
+            $query->where('warehouse_location', 'like', '%' . request()->input('warehouse_location') . '%');
         }
 
         $stockInputs = $query->orderBy('stored_at', 'desc')->get();

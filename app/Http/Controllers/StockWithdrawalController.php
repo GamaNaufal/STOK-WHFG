@@ -567,6 +567,20 @@ class StockWithdrawalController extends Controller
                         ->get()
                         ->keyBy('id');
 
+                $boxIds = $batchWithdrawals
+                    ->pluck('box_id')
+                    ->filter()
+                    ->map(fn ($id) => (int) $id)
+                    ->unique()
+                    ->values();
+
+                $boxesById = $boxIds->isEmpty()
+                    ? collect()
+                    : Box::whereIn('id', $boxIds)
+                        ->lockForUpdate()
+                        ->get()
+                        ->keyBy('id');
+
                 foreach ($batchWithdrawals as $batchWithdrawal) {
                     if (!$batchWithdrawal instanceof StockWithdrawal) {
                         continue;
@@ -579,6 +593,41 @@ class StockWithdrawalController extends Controller
                             $palletItem->pcs_quantity = (int) $palletItem->pcs_quantity + (int) $batchWithdrawal->pcs_quantity;
                             $palletItem->box_quantity = (int) $palletItem->box_quantity + (int) $batchWithdrawal->box_quantity;
                             $palletItem->save();
+                        }
+                    }
+
+                    $restoredPalletId = null;
+
+                    if ($batchWithdrawal->pallet_item_id) {
+                        $palletItem = $palletItemsById->get((int) $batchWithdrawal->pallet_item_id);
+                        if ($palletItem) {
+                            $restoredPalletId = (int) $palletItem->pallet_id;
+                        }
+                    }
+
+                    if ($batchWithdrawal->box_id) {
+                        $box = $boxesById->get((int) $batchWithdrawal->box_id);
+                        if ($box) {
+                            $box->is_withdrawn = false;
+                            $box->withdrawn_at = null;
+                            $box->save();
+
+                            if (!$restoredPalletId) {
+                                $pallet = $box->pallets()->select('pallets.id')->first();
+                                $restoredPalletId = $pallet ? (int) $pallet->id : null;
+                            }
+                        }
+                    }
+
+                    if ($restoredPalletId && !empty($batchWithdrawal->warehouse_location) && $batchWithdrawal->warehouse_location !== 'Unknown') {
+                        $masterLocation = MasterLocation::where('code', $batchWithdrawal->warehouse_location)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if ($masterLocation) {
+                            $masterLocation->is_occupied = true;
+                            $masterLocation->current_pallet_id = $restoredPalletId;
+                            $masterLocation->save();
                         }
                     }
 

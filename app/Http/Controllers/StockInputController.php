@@ -823,19 +823,27 @@ class StockInputController extends Controller
         ]);
     }
 
-    private function createStockInputRecord(Pallet $pallet, array $scannedBoxes, ?string $locationCode): StockInput
+    private function createStockInputRecord(Pallet $pallet, array $attachedBoxIds, ?string $locationCode): StockInput
     {
-        $totalPcs = 0;
-        foreach ($scannedBoxes as $box) {
-            $totalPcs += (int) ($box['pcs_quantity'] ?? $box['qty_box'] ?? 0);
+        $attachedBoxes = Box::query()
+            ->whereIn('id', $attachedBoxIds)
+            ->get(['id', 'part_number', 'pcs_quantity']);
+
+        if ($attachedBoxes->isEmpty()) {
+            throw new \RuntimeException('Tidak ada box transaksi valid untuk membuat stock input.');
         }
 
-        $palletItem = $pallet->items()->first();
-        $partNumbers = $pallet->items()
+        $totalPcs = (int) $attachedBoxes->sum('pcs_quantity');
+        $partNumbers = $attachedBoxes
             ->pluck('part_number')
+            ->filter()
             ->unique()
             ->values()
             ->toArray();
+
+        $palletItem = !empty($partNumbers)
+            ? $pallet->items()->whereIn('part_number', $partNumbers)->orderBy('id')->first()
+            : null;
 
         return StockInput::create([
             'pallet_id' => $pallet->id,
@@ -843,7 +851,7 @@ class StockInputController extends Controller
             'user_id' => Auth::id(),
             'warehouse_location' => $locationCode ?? 'Unknown',
             'pcs_quantity' => $totalPcs,
-            'box_quantity' => count($scannedBoxes),
+            'box_quantity' => $attachedBoxes->count(),
             'stored_at' => now(),
             'part_numbers' => $partNumbers,
         ]);
@@ -907,7 +915,7 @@ class StockInputController extends Controller
             }
 
             // Create StockInput record for audit
-            $stockInput = $this->createStockInputRecord($pallet, $scannedBoxes, $locationCode);
+            $stockInput = $this->createStockInputRecord($pallet, $attachedBoxIds, $locationCode);
 
             // Persist exact box mapping per stock input transaction for 100% audit accuracy.
             $this->createStockInputBoxRecords($stockInput, $attachedBoxIds);

@@ -8,22 +8,6 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('boxes')) {
-            Schema::table('boxes', function (Blueprint $table) {
-                if (!Schema::hasColumn('boxes', 'expired_status')) {
-                    $table->string('expired_status')->default('active')->index();
-                }
-
-                if (!Schema::hasColumn('boxes', 'handled_at')) {
-                    $table->dateTime('handled_at')->nullable();
-                }
-
-                if (!Schema::hasColumn('boxes', 'handled_by')) {
-                    $table->foreignId('handled_by')->nullable()->constrained('users')->nullOnDelete();
-                }
-            });
-        }
-
         if (!Schema::hasTable('expired_box_reports')) {
             Schema::create('expired_box_reports', function (Blueprint $table) {
                 $table->id();
@@ -39,6 +23,8 @@ return new class extends Migration
                 $table->foreignId('handled_by')->nullable()->constrained('users')->nullOnDelete();
                 $table->dateTime('handled_at')->nullable();
                 $table->timestamps();
+
+                $table->unique(['box_id', 'status'], 'expired_box_reports_box_status_unique');
             });
         }
     }
@@ -46,25 +32,5 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('expired_box_reports');
-
-        if (Schema::hasTable('boxes')) {
-            Schema::table('boxes', function (Blueprint $table) {
-                if (Schema::hasColumn('boxes', 'handled_by')) {
-                    try {
-                        $table->dropForeign(['handled_by']);
-                    } catch (\Throwable $e) {
-                    }
-                    $table->dropColumn('handled_by');
-                }
-
-                if (Schema::hasColumn('boxes', 'handled_at')) {
-                    $table->dropColumn('handled_at');
-                }
-
-                if (Schema::hasColumn('boxes', 'expired_status')) {
-                    $table->dropColumn('expired_status');
-                }
-            });
-        }
     }
 };

@@ -153,8 +153,16 @@
                                     <strong style="color: #1f2937;">{{ $input->pallet?->pallet_number ?? '-' }}</strong>
                                 </td>
                                 <td style="padding: 16px 20px;">
-                                    <span class="badge" style="background-color: #f0f4f8; color: #0C7779;">
-                                        {{ $input->palletItem?->part_number ?? $input->pallet?->items?->first()?->part_number ?? '-' }}
+                                    @php
+                                        $partSummaries = collect($input->part_summaries ?? []);
+                                        $partText = $partSummaries->isNotEmpty()
+                                            ? $partSummaries->map(function ($summary) {
+                                                return ($summary['part_number'] ?? '-') . ' (' . ((int) ($summary['box_quantity'] ?? 0)) . ' box)';
+                                            })->implode(', ')
+                                            : '-';
+                                    @endphp
+                                    <span class="badge" style="background-color: #f0f4f8; color: #0C7779; white-space: normal; text-align: left; max-width: 360px;">
+                                        {{ $partText }}
                                     </span>
                                 </td>
                                 <td style="padding: 16px 20px;">

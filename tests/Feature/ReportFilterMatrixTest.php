@@ -4,11 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Pallet;
 use App\Models\PalletItem;
+use App\Models\Box;
 use App\Models\StockInput;
 use App\Models\StockWithdrawal;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class ReportFilterMatrixTest extends TestCase
@@ -84,16 +86,40 @@ class ReportFilterMatrixTest extends TestCase
 
         $itemA = PalletItem::create([
             'pallet_id' => $palletA->id,
-            'part_number' => 'P-SI-RPT-01',
+            'part_number' => 'LEGACY-A',
             'box_quantity' => 1,
             'pcs_quantity' => 50,
         ]);
 
         $itemB = PalletItem::create([
             'pallet_id' => $palletB->id,
-            'part_number' => 'P-SI-RPT-02',
+            'part_number' => 'LEGACY-B',
             'box_quantity' => 1,
             'pcs_quantity' => 60,
+        ]);
+
+        $boxTarget = Box::create([
+            'box_number' => 'RPT-MAP-001',
+            'part_number' => 'P-SI-RPT-01',
+            'pcs_quantity' => 50,
+            'qr_code' => 'RPT-MAP-001|P-SI-RPT-01|50',
+            'user_id' => $operator->id,
+        ]);
+
+        $boxOther = Box::create([
+            'box_number' => 'RPT-MAP-002',
+            'part_number' => 'P-SI-RPT-02',
+            'pcs_quantity' => 60,
+            'qr_code' => 'RPT-MAP-002|P-SI-RPT-02|60',
+            'user_id' => $operator->id,
+        ]);
+
+        $boxTargetOutOfRange = Box::create([
+            'box_number' => 'RPT-MAP-003',
+            'part_number' => 'P-SI-RPT-01',
+            'pcs_quantity' => 50,
+            'qr_code' => 'RPT-MAP-003|P-SI-RPT-01|50',
+            'user_id' => $operator->id,
         ]);
 
         $target = StockInput::create([
@@ -107,7 +133,7 @@ class ReportFilterMatrixTest extends TestCase
             'part_numbers' => ['P-SI-RPT-01'],
         ]);
 
-        StockInput::create([
+        $outOfDateRange = StockInput::create([
             'pallet_id' => $palletA->id,
             'pallet_item_id' => $itemA->id,
             'user_id' => $operator->id,
@@ -118,7 +144,7 @@ class ReportFilterMatrixTest extends TestCase
             'part_numbers' => ['P-SI-RPT-01'],
         ]);
 
-        StockInput::create([
+        $differentPart = StockInput::create([
             'pallet_id' => $palletB->id,
             'pallet_item_id' => $itemB->id,
             'user_id' => $operator->id,
@@ -127,6 +153,27 @@ class ReportFilterMatrixTest extends TestCase
             'box_quantity' => 1,
             'stored_at' => Carbon::parse('2026-02-10 09:00:00'),
             'part_numbers' => ['P-SI-RPT-02'],
+        ]);
+
+        DB::table('stock_input_boxes')->insert([
+            [
+                'stock_input_id' => $target->id,
+                'box_id' => $boxTarget->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'stock_input_id' => $outOfDateRange->id,
+                'box_id' => $boxTargetOutOfRange->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
+            [
+                'stock_input_id' => $differentPart->id,
+                'box_id' => $boxOther->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
         ]);
 
         $response = $this->actingAs($supervisi)->get(route('reports.stock-input', [
