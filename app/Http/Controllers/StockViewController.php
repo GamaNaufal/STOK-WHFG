@@ -26,12 +26,18 @@ class StockViewController extends Controller
 
     private function buildStockItems(?string $search = null)
     {
-        $palletQuery = Pallet::with(['stockLocation', 'items', 'boxes'])
+        $palletQuery = Pallet::query()
+            ->select(['id', 'pallet_number'])
+            ->with([
+                'stockLocation:id,pallet_id,warehouse_location',
+                'items:id,pallet_id,part_number,box_quantity,pcs_quantity,created_at',
+                'boxes:id,box_number,part_number,pcs_quantity,is_not_full,not_full_reason,is_withdrawn,expired_status,created_at',
+            ])
             ->whereHas('stockLocation', function ($q) {
                 $q->where('warehouse_location', '!=', 'Unknown');
             });
 
-        $items = collect();
+        $items = [];
 
         $palletQuery->chunkById(200, function ($pallets) use (&$items, $search) {
             foreach ($pallets as $pallet) {
@@ -52,7 +58,7 @@ class StockViewController extends Controller
                     }
 
                     foreach ($activeBoxes as $box) {
-                        $items->push([
+                        $items[] = [
                             'box_id' => $box->id,
                             'pallet_id' => $pallet->id,
                             'pallet_number' => $pallet->pallet_number,
@@ -64,7 +70,7 @@ class StockViewController extends Controller
                             'created_at' => $box->created_at,
                             'is_not_full' => (bool) $box->is_not_full,
                             'not_full_reason' => $box->not_full_reason,
-                        ]);
+                        ];
                     }
                 } elseif (!$hasAnyBoxHistory) {
                     // Fallback only for legacy pallets that truly have no box history.
@@ -80,7 +86,7 @@ class StockViewController extends Controller
                     }
 
                     foreach ($legacyItems as $item) {
-                        $items->push([
+                        $items[] = [
                             'box_id' => null,
                             'pallet_id' => $pallet->id,
                             'pallet_number' => $pallet->pallet_number,
@@ -92,13 +98,13 @@ class StockViewController extends Controller
                             'created_at' => $item->created_at,
                             'is_not_full' => false,
                             'not_full_reason' => null,
-                        ]);
+                        ];
                     }
                 }
             }
         });
 
-        return $items->sortBy('created_at');
+        return collect($items)->sortBy('created_at');
     }
 
     public function index(Request $request)

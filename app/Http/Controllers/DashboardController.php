@@ -17,42 +17,41 @@ class DashboardController extends Controller
 {
     private function buildStockSummaryTotals(): array
     {
-        $items = collect();
+        $totalBox = 0;
+        $totalPcs = 0;
 
-        $palletQuery = Pallet::with(['stockLocation', 'items', 'boxes'])
+        $palletQuery = Pallet::query()
+            ->select(['id'])
+            ->with([
+                'stockLocation:id,pallet_id,warehouse_location',
+                'items:id,pallet_id,box_quantity,pcs_quantity',
+                'boxes:id,is_withdrawn,pcs_quantity',
+            ])
             ->whereHas('stockLocation', function ($q) {
                 $q->where('warehouse_location', '!=', 'Unknown');
             });
 
-        $palletQuery->chunkById(200, function ($pallets) use (&$items) {
+        $palletQuery->chunkById(200, function ($pallets) use (&$totalBox, &$totalPcs) {
             foreach ($pallets as $pallet) {
                 $activeBoxes = $pallet->boxes->where('is_withdrawn', false);
 
                 if ($activeBoxes->isNotEmpty()) {
-                    foreach ($activeBoxes as $box) {
-                        $items->push([
-                            'box_quantity' => 1,
-                            'pcs_quantity' => (int) $box->pcs_quantity,
-                        ]);
-                    }
+                    $totalBox += $activeBoxes->count();
+                    $totalPcs += (int) $activeBoxes->sum('pcs_quantity');
                 } else {
                     $legacyItems = $pallet->items->filter(function ($item) {
                         return $item->pcs_quantity > 0 || $item->box_quantity > 0;
                     });
 
-                    foreach ($legacyItems as $item) {
-                        $items->push([
-                            'box_quantity' => (int) $item->box_quantity,
-                            'pcs_quantity' => (int) $item->pcs_quantity,
-                        ]);
-                    }
+                    $totalBox += (int) $legacyItems->sum('box_quantity');
+                    $totalPcs += (int) $legacyItems->sum('pcs_quantity');
                 }
             }
         });
 
         return [
-            'total_box' => (int) $items->sum('box_quantity'),
-            'total_pcs' => $items->sum('pcs_quantity') ?? 0,
+            'total_box' => $totalBox,
+            'total_pcs' => $totalPcs,
         ];
     }
 

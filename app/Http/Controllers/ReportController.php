@@ -267,7 +267,20 @@ class ReportController extends Controller
      */
     public function exportWithdrawalCsv(Request $request)
     {
-        $query = StockWithdrawal::with(['user', 'palletItem', 'box']);
+        $query = StockWithdrawal::query()
+            ->select([
+                'id',
+                'withdrawn_at',
+                'status',
+                'user_id',
+                'pcs_quantity',
+                'box_quantity',
+                'part_number',
+                'box_id',
+                'notes',
+                'warehouse_location',
+            ])
+            ->with('user:id,name');
 
         if ($request->filled('start_date')) {
             $query->whereDate('withdrawn_at', '>=', $request->input('start_date'));
@@ -294,7 +307,20 @@ class ReportController extends Controller
      */
     public function exportStockInputCsv(Request $request)
     {
-        $query = StockInput::with(['pallet', 'user', 'boxes:id,part_number,pcs_quantity']);
+        $query = StockInput::query()
+            ->select([
+                'id',
+                'stored_at',
+                'user_id',
+                'pcs_quantity',
+                'box_quantity',
+                'part_numbers',
+                'warehouse_location',
+            ])
+            ->with([
+                'user:id,name',
+                'boxes:id,part_number,pcs_quantity',
+            ]);
 
         if ($request->filled('start_date')) {
             $query->whereDate('stored_at', '>=', $request->input('start_date'));

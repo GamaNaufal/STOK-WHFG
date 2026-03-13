@@ -20,33 +20,34 @@ class ExpiredBoxService
 
     public function syncStatuses(): void
     {
-        $boxes = $this->getExpirableBoxesQuery()
+        $this->getExpirableBoxesQuery()
             ->whereNotIn('boxes.expired_status', ['handled'])
-            ->get();
+            ->orderBy('boxes.id')
+            ->chunkById(500, function ($rows): void {
+                foreach ($rows as $row) {
+                    if (!$row->stored_at) {
+                        continue;
+                    }
 
-        foreach ($boxes as $row) {
-            if (!$row->stored_at) {
-                continue;
-            }
+                    $storedAt = Carbon::parse($row->stored_at);
+                    $ageMonths = $storedAt->diffInMonths(now());
 
-            $storedAt = Carbon::parse($row->stored_at);
-            $ageMonths = $storedAt->diffInMonths(now());
+                    $nextStatus = 'active';
+                    if ($ageMonths >= 12) {
+                        $nextStatus = 'expired';
+                    } elseif ($ageMonths >= 9) {
+                        $nextStatus = 'warning';
+                    }
 
-            $nextStatus = 'active';
-            if ($ageMonths >= 12) {
-                $nextStatus = 'expired';
-            } elseif ($ageMonths >= 9) {
-                $nextStatus = 'warning';
-            }
+                    if ($row->expired_status !== $nextStatus) {
+                        Box::where('id', $row->id)->update(['expired_status' => $nextStatus]);
+                    }
 
-            if ($row->expired_status !== $nextStatus) {
-                Box::where('id', $row->id)->update(['expired_status' => $nextStatus]);
-            }
-
-            if ($nextStatus === 'expired') {
-                $this->ensureReportExists($row, $ageMonths, 'expired');
-            }
-        }
+                    if ($nextStatus === 'expired') {
+                        $this->ensureReportExists($row, $ageMonths, 'expired');
+                    }
+                }
+            }, 'boxes.id', 'id');
     }
 
     public function handleBox(int $boxId, int $userId): void

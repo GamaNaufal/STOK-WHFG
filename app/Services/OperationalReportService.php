@@ -361,7 +361,18 @@ class OperationalReportService
             ->orderBy('name')
             ->get(['id', 'name']);
 
-        $auditQuery = $auditBaseQuery->clone()->with('user');
+        $auditQuery = $auditBaseQuery->clone()
+            ->select([
+                'id',
+                'type',
+                'action',
+                'model',
+                'model_id',
+                'description',
+                'user_id',
+                'created_at',
+            ])
+            ->with('user:id,name');
 
         if ($request->filled('audit_type')) {
             $auditQuery->where('type', $request->input('audit_type'));
