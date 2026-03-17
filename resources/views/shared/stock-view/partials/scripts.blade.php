@@ -22,6 +22,14 @@
     const allParts = Array.isArray(bootstrapData.allParts) ? bootstrapData.allParts : [];
     const masterParts = Array.isArray(bootstrapData.masterParts) ? bootstrapData.masterParts : [];
     const allPallets = Array.isArray(bootstrapData.allPallets) ? bootstrapData.allPallets : [];
+    const allBoxNumbers = Array.isArray(bootstrapData.allBoxNumbers) ? bootstrapData.allBoxNumbers : [];
+    const allSearchTerms = Array.isArray(bootstrapData.allSearchTerms)
+        ? bootstrapData.allSearchTerms
+        : [...allParts, ...allPallets, ...allBoxNumbers];
+    const currentSearch = String(bootstrapData.search || '').trim();
+    const directBoxTarget = bootstrapData.directBoxTarget && typeof bootstrapData.directBoxTarget === 'object'
+        ? bootstrapData.directBoxTarget
+        : null;
     const viewMode = bootstrapData.viewMode || 'part';
     const searchInput = document.getElementById('searchInput');
     const searchDropdown = document.getElementById('searchDropdown');
@@ -34,6 +42,8 @@
     let currentPartNumber = null;
     let currentPalletId = null;
     let currentPalletDetailData = null;
+    let pendingHighlightBoxId = null;
+    let hasAutoOpenedDirectBox = false;
     let editPartSelectEnhanced = false;
     let pendingDeleteAction = null;
 
@@ -43,6 +53,10 @@
                 sensitivity: 'base'
             })
         );
+    }
+
+    function normalizeSearchKey(value) {
+        return String(value ?? '').trim().toLowerCase();
     }
 
     function escapeHtml(input) {
@@ -208,8 +222,21 @@
         printWindow.document.close();
     }
 
-    const sortedAllParts = sortLabelsAscending(allParts);
-    const sortedAllPallets = sortLabelsAscending(allPallets);
+    const sortedAllSearchTerms = sortLabelsAscending(allSearchTerms);
+    const partTermSet = new Set((allParts || []).map(normalizeSearchKey));
+    const palletTermSet = new Set((allPallets || []).map(normalizeSearchKey));
+    const boxTermSet = new Set((allBoxNumbers || []).map(normalizeSearchKey));
+
+    function getSearchTermTypes(term) {
+        const key = normalizeSearchKey(term);
+        const types = [];
+
+        if (partTermSet.has(key)) types.push('No Part');
+        if (palletTermSet.has(key)) types.push('Pallet');
+        if (boxTermSet.has(key)) types.push('ID Box');
+
+        return types.length ? types : ['Lainnya'];
+    }
 
     function syncModalA11y(modalEl) {
         if (!modalEl) return;
@@ -422,7 +449,7 @@
 
     function loadSearchSuggestions(searchTerm) {
         if (!hasSearchUi) return;
-        const dataSource = viewMode === 'pallet' ? sortedAllPallets : sortedAllParts;
+        const dataSource = sortedAllSearchTerms;
         let filtered = dataSource;
         
         if (searchTerm.trim()) {
@@ -445,7 +472,7 @@
         if (!searchTerm.trim() && filtered.length > 0) {
             const header = document.createElement('div');
             header.style.cssText = 'padding: 12px 16px; font-weight: 600; color: #0C7779; border-bottom: 1px solid #e5e7eb; font-size: 12px; text-transform: uppercase;';
-            header.textContent = viewMode === 'pallet' ? '📦 Rekomendasi Pallet' : '🏷️ Rekomendasi Part';
+            header.textContent = 'Rekomendasi Pencarian';
             searchDropdown.appendChild(header);
         }
         
@@ -453,9 +480,21 @@
             const suggestion = document.createElement('div');
             suggestion.className = 'dropdown-item';
             suggestion.style.cssText = 'padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: all 0.2s ease; font-size: 14px; background: white;';
-            
-            const icon = viewMode === 'pallet' ? '📦' : '🏷️';
-            suggestion.innerHTML = `<i class="bi bi-check-circle" style="color: #0C7779; margin-right: 8px; opacity: 0;"></i> ${icon} ${item}`;
+
+            const typeBadges = getSearchTermTypes(item)
+                .map(type => `<span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background:#ecfeff; color:#0f766e; font-size:11px; font-weight:700;">${escapeHtml(type)}</span>`)
+                .join('');
+
+            suggestion.innerHTML = `
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                    <div style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                        <i class="bi bi-check-circle" style="color: #0C7779; margin-right: 8px; opacity: 0;"></i>${escapeHtml(item)}
+                    </div>
+                    <div style="display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
+                        ${typeBadges}
+                    </div>
+                </div>
+            `;
             
             suggestion.addEventListener('click', function(e) {
                 e.stopPropagation();
@@ -523,53 +562,68 @@
                 document.getElementById('modalPartNumber').textContent = data.part_number;
                 document.getElementById('modalTotalBox').textContent = data.total_box;
                 document.getElementById('modalTotalPcs').textContent = data.total_pcs;
-                document.getElementById('modalPalletCount').textContent = data.pallet_count;
+
+                const groupedPallets = Object.values((data.pallets || []).reduce((acc, pallet) => {
+                    const key = String(pallet.pallet_id ?? pallet.pallet_number ?? 'unknown');
+                    if (!acc[key]) {
+                        acc[key] = {
+                            pallet_id: pallet.pallet_id ?? null,
+                            pallet_number: pallet.pallet_number || '-',
+                            total_box: 0,
+                            total_pcs: 0,
+                            location: pallet.location || '-',
+                            latest_created_at: pallet.created_at || '-',
+                            latest_created_at_raw: pallet.stored_at_raw || '',
+                        };
+                    }
+
+                    acc[key].total_box += Number(pallet.box_quantity || 0);
+                    acc[key].total_pcs += Number(pallet.pcs_quantity || 0);
+
+                    const currentRaw = String(acc[key].latest_created_at_raw || '');
+                    const incomingRaw = String(pallet.stored_at_raw || '');
+                    if (incomingRaw && incomingRaw > currentRaw) {
+                        acc[key].latest_created_at_raw = incomingRaw;
+                        acc[key].latest_created_at = pallet.created_at || acc[key].latest_created_at;
+                    }
+
+                    return acc;
+                }, {})).sort((left, right) => String(left.pallet_number).localeCompare(String(right.pallet_number), undefined, { sensitivity: 'base' }));
+
+                document.getElementById('modalPalletCount').textContent = groupedPallets.length;
 
                 const tableBody = document.getElementById('palletDetailsTable');
-                if (data.pallets.length === 0) {
+                if (groupedPallets.length === 0) {
                     tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">Tidak ada data</td></tr>';
                 } else {
-                    tableBody.innerHTML = data.pallets.map((pallet) => `
+                    tableBody.innerHTML = groupedPallets.map((pallet) => `
                         <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.2s ease;">
                             <td style="padding: 12px 8px; color: #0C7779; font-weight: 600; font-size: 13px;">
                                 <i class="bi bi-box2"></i> ${pallet.pallet_number}
                             </td>
                             <td style="padding: 12px 8px; color: #1f2937; font-size: 13px;">
-                                <span class="badge bg-primary" style="font-size: 11px;">${pallet.box_quantity} BOX</span>
-                                ${pallet.is_not_full ? '<span class="badge bg-warning text-dark ms-1" style="font-size: 10px;" title="Box not full">NOT FULL</span>' : ''}
+                                <span class="badge bg-primary" style="font-size: 11px;">${pallet.total_box} BOX</span>
                             </td>
                             <td style="padding: 12px 8px; color: #1f2937; font-weight: 600; font-size: 13px;">
-                                <span class="badge bg-success">${pallet.pcs_quantity} PCS</span>
+                                <span class="badge bg-success">${pallet.total_pcs} PCS</span>
                             </td>
                             <td style="padding: 12px 8px; color: #6b7280; font-size: 13px;">
                                 <i class="bi bi-geo-alt"></i> ${pallet.location}
                             </td>
                             <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">
-                                ${pallet.created_at}
+                                ${pallet.latest_created_at}
                             </td>
                             <td style="padding: 12px 8px; white-space: nowrap;">
-                                ${pallet.box_id ? `
-                                    ${canEditBox ? `<button type="button" class="btn btn-sm btn-outline-primary js-edit-box"
-                                        data-box-id="${pallet.box_id}"
-                                        data-box-number="${pallet.box_number || ''}"
-                                        data-part-number="${pallet.part_number || ''}"
-                                        data-pcs-quantity="${pallet.pcs_quantity || 0}"
-                                        data-stored-at="${pallet.stored_at_raw || ''}"
-                                        data-pallet-id="${pallet.pallet_id || ''}"
-                                        data-pallet-number="${pallet.pallet_number || ''}"
-                                        data-location="${pallet.location || ''}">Edit</button>` : ''}
-                                    <button type="button" class="btn btn-sm btn-outline-secondary js-box-history" data-box-id="${pallet.box_id}">History</button>
-                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
-                                        data-box-id="${pallet.box_id}"
-                                        data-box-number="${pallet.box_number || ''}"
-                                        data-part-number="${pallet.part_number || ''}"
-                                        data-pcs-quantity="${pallet.pcs_quantity || 0}"
-                                        data-pallet-id="${pallet.pallet_id || ''}"
-                                        data-pallet-number="${pallet.pallet_number || ''}"
-                                        data-location="${pallet.location || ''}">Hapus Box</button>` : ''}
-                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-danger js-delete-pallet"
-                                        data-pallet-id="${pallet.pallet_id || ''}"
-                                        data-pallet-number="${pallet.pallet_number || ''}">Hapus Pallet</button>` : ''}
+                                ${pallet.pallet_id ? `
+                                    <button type="button" class="btn btn-sm btn-outline-primary js-detail-pallet"
+                                        data-pallet-id="${pallet.pallet_id}">
+                                        Detail Pallet
+                                    </button>
+                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-danger js-delete-pallet ms-1"
+                                        data-pallet-id="${pallet.pallet_id}"
+                                        data-pallet-number="${pallet.pallet_number || ''}">
+                                        Hapus Pallet
+                                    </button>` : ''}
                                 ` : '<span class="text-muted">-</span>'}
                             </td>
                         </tr>
@@ -621,7 +675,7 @@
                     tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Tidak ada item di pallet ini</td></tr>';
                 } else {
                     tableBody.innerHTML = data.items.map(item => `
-                        <tr>
+                        <tr data-box-id="${item.box_id || ''}">
                             <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.box_number || '-'}</td>
                             <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.part_number}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.box_quantity}</td>
@@ -655,6 +709,25 @@
                             </td>
                         </tr>
                     `).join('');
+                }
+
+                if (pendingHighlightBoxId) {
+                    const selector = `tr[data-box-id="${pendingHighlightBoxId}"]`;
+                    const targetRow = tableBody.querySelector(selector);
+                    if (targetRow) {
+                        targetRow.style.backgroundColor = '#ecfeff';
+                        targetRow.style.outline = '2px solid #14b8a6';
+                        targetRow.style.outlineOffset = '-2px';
+                        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                        setTimeout(() => {
+                            targetRow.style.backgroundColor = '';
+                            targetRow.style.outline = '';
+                            targetRow.style.outlineOffset = '';
+                        }, 3000);
+                    }
+
+                    pendingHighlightBoxId = null;
                 }
 
                 contentEl.style.display = 'block';
@@ -898,5 +971,21 @@
             loadSearchSuggestions(searchInput.value);
         }
         initEditPartSelect();
+
+        const shouldAutoOpenDirectBox = (
+            viewMode === 'part'
+            && !hasAutoOpenedDirectBox
+            && !!currentSearch
+            && directBoxTarget
+            && Number.isFinite(Number(directBoxTarget.pallet_id))
+            && Number.isFinite(Number(directBoxTarget.box_id))
+        );
+
+        if (shouldAutoOpenDirectBox) {
+            hasAutoOpenedDirectBox = true;
+            pendingHighlightBoxId = String(directBoxTarget.box_id);
+            window.viewPalletDetail(String(directBoxTarget.pallet_id));
+            showAutoPopup(`Membuka detail pallet untuk ID Box ${directBoxTarget.box_number || directBoxTarget.box_id}`, 'success', 2200);
+        }
     });
 </script>

@@ -19,6 +19,70 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class StockViewController extends Controller
 {
+    private function resolveDirectBoxTarget(string $search, $items): ?array
+    {
+        $needle = mb_strtolower(trim($search));
+        if ($needle === '') {
+            return null;
+        }
+
+        $matches = $items
+            ->filter(function ($item) use ($needle) {
+                $boxId = isset($item['box_id']) ? (string) $item['box_id'] : '';
+                $boxNumber = isset($item['box_number']) ? (string) $item['box_number'] : '';
+                if ($boxId === '' && $boxNumber === '') {
+                    return false;
+                }
+
+                return mb_strtolower($boxId) === $needle
+                    || mb_strtolower($boxNumber) === $needle;
+            })
+            ->values();
+
+        if ($matches->count() !== 1) {
+            return null;
+        }
+
+        $target = $matches->first();
+        if (empty($target['box_id']) || empty($target['pallet_id'])) {
+            return null;
+        }
+
+        return [
+            'box_id' => (int) $target['box_id'],
+            'box_number' => (string) ($target['box_number'] ?? ''),
+            'pallet_id' => (int) $target['pallet_id'],
+            'pallet_number' => (string) ($target['pallet_number'] ?? ''),
+        ];
+    }
+
+    private function matchesGlobalSearch(?string $search, ?string $partNumber, ?string $palletNumber, ?string $boxNumber = null, $boxId = null): bool
+    {
+        if (!filled($search)) {
+            return true;
+        }
+
+        $needle = mb_strtolower(trim((string) $search));
+        if ($needle === '') {
+            return true;
+        }
+
+        $candidates = [
+            (string) ($partNumber ?? ''),
+            (string) ($palletNumber ?? ''),
+            (string) ($boxNumber ?? ''),
+            (string) ($boxId ?? ''),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate !== '' && mb_stripos($candidate, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function canDeleteStock(?object $user): bool
     {
         return $user && in_array($user->role, ['admin_warehouse', 'supervisi', 'admin'], true);
@@ -52,8 +116,13 @@ class StockViewController extends Controller
                 if ($activeBoxes->isNotEmpty()) {
                     if ($search) {
                         $activeBoxes = $activeBoxes->filter(function ($box) use ($search, $pallet) {
-                            return stripos($box->part_number, $search) !== false
-                                || stripos($pallet->pallet_number, $search) !== false;
+                            return $this->matchesGlobalSearch(
+                                $search,
+                                $box->part_number,
+                                $pallet->pallet_number,
+                                $box->box_number,
+                                $box->id
+                            );
                         });
                     }
 
@@ -80,8 +149,11 @@ class StockViewController extends Controller
 
                     if ($search) {
                         $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
-                            return stripos($item->part_number, $search) !== false
-                                || stripos($pallet->pallet_number, $search) !== false;
+                            return $this->matchesGlobalSearch(
+                                $search,
+                                $item->part_number,
+                                $pallet->pallet_number
+                            );
                         });
                     }
 
@@ -113,6 +185,7 @@ class StockViewController extends Controller
         $viewMode = $request->input('view_mode', 'part'); // Default view by part
 
         $items = $this->buildStockItems($search);
+        $directBoxTarget = filled($search) ? $this->resolveDirectBoxTarget((string) $search, $items) : null;
         if ($viewMode === 'not_full') {
             $items = $items->filter(fn ($item) => !empty($item['is_not_full']))->values();
         }
@@ -188,6 +261,17 @@ class StockViewController extends Controller
         $summaryTotalBox = $items->sum('box_quantity');
         $summaryTotalPcs = $items->sum('pcs_quantity');
         $summaryTotalParts = $items->pluck('part_number')->unique()->count();
+        $allParts = $items->pluck('part_number')->filter()->unique()->values();
+        $allPallets = $items->pluck('pallet_number')->filter()->unique()->values();
+        $allBoxNumbers = $items->pluck('box_number')->filter()->unique()->values();
+        $allSearchTerms = $allParts
+            ->concat($allPallets)
+            ->concat($allBoxNumbers)
+            ->unique()
+            ->sort(function ($left, $right) {
+                return strcasecmp((string) $left, (string) $right);
+            })
+            ->values();
         $masterPartNumbers = PartSetting::query()
             ->orderBy('part_number')
             ->pluck('part_number')
@@ -203,6 +287,11 @@ class StockViewController extends Controller
             'summaryTotalBox',
             'summaryTotalPcs',
             'summaryTotalParts',
+            'allParts',
+            'allPallets',
+            'allBoxNumbers',
+            'allSearchTerms',
+            'directBoxTarget',
             'masterPartNumbers'
         ));
     }
