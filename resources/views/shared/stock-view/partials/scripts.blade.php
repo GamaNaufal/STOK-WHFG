@@ -22,6 +22,8 @@
     const allParts = Array.isArray(bootstrapData.allParts) ? bootstrapData.allParts : [];
     const masterParts = Array.isArray(bootstrapData.masterParts) ? bootstrapData.masterParts : [];
     const allPallets = Array.isArray(bootstrapData.allPallets) ? bootstrapData.allPallets : [];
+    const allPalletIds = Array.isArray(bootstrapData.allPalletIds) ? bootstrapData.allPalletIds : [];
+    const allBoxIds = Array.isArray(bootstrapData.allBoxIds) ? bootstrapData.allBoxIds : [];
     const viewMode = bootstrapData.viewMode || 'part';
     const searchInput = document.getElementById('searchInput');
     const searchDropdown = document.getElementById('searchDropdown');
@@ -210,6 +212,8 @@
 
     const sortedAllParts = sortLabelsAscending(allParts);
     const sortedAllPallets = sortLabelsAscending(allPallets);
+    const sortedAllPalletIds = sortLabelsAscending(allPalletIds);
+    const sortedAllBoxIds = sortLabelsAscending(allBoxIds);
 
     function syncModalA11y(modalEl) {
         if (!modalEl) return;
@@ -420,14 +424,42 @@
 
     const hasSearchUi = searchInput && searchDropdown && searchForm;
 
+    const globalSearchSuggestions = [
+        ...sortedAllParts.map((value) => ({
+            value,
+            type: 'part',
+            label: `No Part: ${value}`,
+            icon: 'bi-tag'
+        })),
+        ...sortedAllPallets.map((value) => ({
+            value,
+            type: 'pallet_number',
+            label: `No Pallet: ${value}`,
+            icon: 'bi-layers'
+        })),
+        ...sortedAllPalletIds.map((value) => ({
+            value: String(value),
+            type: 'pallet_id',
+            label: `ID Pallet: ${value}`,
+            icon: 'bi-upc-scan'
+        })),
+        ...sortedAllBoxIds.map((value) => ({
+            value: String(value),
+            type: 'box_id',
+            label: `ID Box: ${value}`,
+            icon: 'bi-box-seam'
+        }))
+    ];
+
     function loadSearchSuggestions(searchTerm) {
         if (!hasSearchUi) return;
-        const dataSource = viewMode === 'pallet' ? sortedAllPallets : sortedAllParts;
-        let filtered = dataSource;
+        let filtered = globalSearchSuggestions;
+        const normalizedSearchTerm = searchTerm.trim().toLowerCase();
         
-        if (searchTerm.trim()) {
-            filtered = dataSource.filter(item => 
-                item.toLowerCase().includes(searchTerm.toLowerCase())
+        if (normalizedSearchTerm) {
+            filtered = globalSearchSuggestions.filter(item => 
+                String(item.value).toLowerCase().includes(normalizedSearchTerm)
+                || item.label.toLowerCase().includes(normalizedSearchTerm)
             );
         }
         
@@ -445,7 +477,7 @@
         if (!searchTerm.trim() && filtered.length > 0) {
             const header = document.createElement('div');
             header.style.cssText = 'padding: 12px 16px; font-weight: 600; color: #0C7779; border-bottom: 1px solid #e5e7eb; font-size: 12px; text-transform: uppercase;';
-            header.textContent = viewMode === 'pallet' ? '📦 Rekomendasi Pallet' : '🏷️ Rekomendasi Part';
+            header.textContent = 'Rekomendasi Pencarian Global';
             searchDropdown.appendChild(header);
         }
         
@@ -453,13 +485,12 @@
             const suggestion = document.createElement('div');
             suggestion.className = 'dropdown-item';
             suggestion.style.cssText = 'padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: all 0.2s ease; font-size: 14px; background: white;';
-            
-            const icon = viewMode === 'pallet' ? '📦' : '🏷️';
-            suggestion.innerHTML = `<i class="bi bi-check-circle" style="color: #0C7779; margin-right: 8px; opacity: 0;"></i> ${icon} ${item}`;
+
+            suggestion.innerHTML = `<i class="bi ${item.icon}" style="color: #0C7779; margin-right: 8px;"></i> ${item.label}`;
             
             suggestion.addEventListener('click', function(e) {
                 e.stopPropagation();
-                searchInput.value = item;
+                searchInput.value = item.value;
                 searchDropdown.style.display = 'none';
                 searchForm.submit();
             });
@@ -468,14 +499,12 @@
                 this.style.backgroundColor = '#f0f4f8';
                 this.style.color = '#0C7779';
                 this.style.fontWeight = '600';
-                this.querySelector('i').style.opacity = '1';
             });
             
             suggestion.addEventListener('mouseout', function() {
                 this.style.backgroundColor = 'white';
                 this.style.color = '#374151';
                 this.style.fontWeight = '400';
-                this.querySelector('i').style.opacity = '0';
             });
             
             searchDropdown.appendChild(suggestion);

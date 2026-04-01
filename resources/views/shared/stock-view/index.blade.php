@@ -52,7 +52,7 @@
                     <i class="bi bi-search"></i>
                 </span>
                 <input type="text" name="search" id="searchInput" class="form-control form-control-lg border-0" 
-                       placeholder="{{ $viewMode === 'pallet' ? 'Cari berdasarkan No Pallet...' : 'Cari berdasarkan No Part...' }}" 
+                      placeholder="Cari global: ID Box, ID/No Pallet, atau No Part..." 
                        value="{{ $search ?? '' }}"
                        autocomplete="off"
                        style="font-size: 1rem; padding: 14px 16px;">

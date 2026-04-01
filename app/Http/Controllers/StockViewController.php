@@ -26,6 +26,8 @@ class StockViewController extends Controller
 
     private function buildStockItems(?string $search = null)
     {
+        $normalizedSearch = trim((string) $search);
+
         $palletQuery = Pallet::query()
             ->select(['id', 'pallet_number'])
             ->with([
@@ -39,7 +41,7 @@ class StockViewController extends Controller
 
         $items = [];
 
-        $palletQuery->chunkById(200, function ($pallets) use (&$items, $search) {
+        $palletQuery->chunkById(200, function ($pallets) use (&$items, $normalizedSearch) {
             foreach ($pallets as $pallet) {
                 $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
                 $hasAnyBoxHistory = $pallet->boxes->isNotEmpty();
@@ -50,10 +52,13 @@ class StockViewController extends Controller
                     ->whereNotIn('expired_status', ['handled', 'expired']);
 
                 if ($activeBoxes->isNotEmpty()) {
-                    if ($search) {
-                        $activeBoxes = $activeBoxes->filter(function ($box) use ($search, $pallet) {
-                            return stripos($box->part_number, $search) !== false
-                                || stripos($pallet->pallet_number, $search) !== false;
+                    if ($normalizedSearch !== '') {
+                        $activeBoxes = $activeBoxes->filter(function ($box) use ($normalizedSearch, $pallet) {
+                            return stripos((string) $box->part_number, $normalizedSearch) !== false
+                                || stripos((string) $pallet->pallet_number, $normalizedSearch) !== false
+                                || stripos((string) $box->box_number, $normalizedSearch) !== false
+                                || stripos((string) $pallet->id, $normalizedSearch) !== false
+                                || stripos((string) $box->id, $normalizedSearch) !== false;
                         });
                     }
 
@@ -78,10 +83,11 @@ class StockViewController extends Controller
                         return $item->pcs_quantity > 0 || $item->box_quantity > 0;
                     });
 
-                    if ($search) {
-                        $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
-                            return stripos($item->part_number, $search) !== false
-                                || stripos($pallet->pallet_number, $search) !== false;
+                    if ($normalizedSearch !== '') {
+                        $legacyItems = $legacyItems->filter(function ($item) use ($normalizedSearch, $pallet) {
+                            return stripos((string) $item->part_number, $normalizedSearch) !== false
+                                || stripos((string) $pallet->pallet_number, $normalizedSearch) !== false
+                                || stripos((string) $pallet->id, $normalizedSearch) !== false;
                         });
                     }
 
@@ -188,6 +194,24 @@ class StockViewController extends Controller
         $summaryTotalBox = $items->sum('box_quantity');
         $summaryTotalPcs = $items->sum('pcs_quantity');
         $summaryTotalParts = $items->pluck('part_number')->unique()->count();
+        $searchPartNumbers = $items->pluck('part_number')
+            ->filter()
+            ->unique()
+            ->values();
+        $searchPalletNumbers = $items->pluck('pallet_number')
+            ->filter()
+            ->unique()
+            ->values();
+        $searchPalletIds = $items->pluck('pallet_id')
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values();
+        $searchBoxIds = $items->pluck('box_id')
+            ->filter()
+            ->map(fn ($id) => (string) $id)
+            ->unique()
+            ->values();
         $masterPartNumbers = PartSetting::query()
             ->orderBy('part_number')
             ->pluck('part_number')
@@ -203,6 +227,10 @@ class StockViewController extends Controller
             'summaryTotalBox',
             'summaryTotalPcs',
             'summaryTotalParts',
+            'searchPartNumbers',
+            'searchPalletNumbers',
+            'searchPalletIds',
+            'searchBoxIds',
             'masterPartNumbers'
         ));
     }
