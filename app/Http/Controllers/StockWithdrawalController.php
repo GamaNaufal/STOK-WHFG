@@ -45,25 +45,45 @@ class StockWithdrawalController extends Controller
         };
     }
 
+    private function applyStoredLocationExistsFilter($query)
+    {
+        return $query->whereExists(function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('pallet_boxes')
+                ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+                ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+                ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->where('stock_locations.warehouse_location', '!=', 'Unknown');
+        });
+    }
+
+    private function getStoredLocationPivotSubquery()
+    {
+        return DB::table('pallet_boxes as pb')
+            ->join('pallets as p', 'p.id', '=', 'pb.pallet_id')
+            ->join('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
+            ->where('sl.warehouse_location', '!=', 'Unknown')
+            ->select('pb.box_id', DB::raw('MIN(pb.id) as pivot_id'))
+            ->groupBy('pb.box_id');
+    }
+
     private function selectBoxesForWithdrawal(string $partNumber, int $requestedQty, ?int $deliveryOrderId = null): array
     {
         $selected = [];
         $remaining = $requestedQty;
 
         if ($deliveryOrderId && $remaining > 0) {
-            $reservedBoxes = Box::query()
+            $reservedBoxesQuery = Box::query()
                 ->where('part_number', $partNumber)
                 ->where('is_withdrawn', false)
                 ->whereNotIn('expired_status', ['handled', 'expired'])
                 ->where('assigned_delivery_order_id', $deliveryOrderId)
                 ->whereNotIn('boxes.id', $this->getLockedDeliveryPickBoxIdsQuery())
-                ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-                ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-                ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-                ->where('stock_locations.warehouse_location', '!=', 'Unknown')
                 ->orderBy('boxes.created_at', 'asc')
                 ->select('boxes.*')
-                ->lockForUpdate()
+                ->lockForUpdate();
+
+            $reservedBoxes = $this->applyStoredLocationExistsFilter($reservedBoxesQuery)
                 ->get();
 
             foreach ($reservedBoxes as $box) {
@@ -81,19 +101,17 @@ class StockWithdrawalController extends Controller
         }
 
         if ($remaining > 0) {
-            $fifoBoxes = Box::query()
+            $fifoBoxesQuery = Box::query()
                 ->where('part_number', $partNumber)
                 ->where('is_withdrawn', false)
                 ->whereNotIn('expired_status', ['handled', 'expired'])
                 ->whereNull('boxes.assigned_delivery_order_id')
                 ->whereNotIn('boxes.id', $this->getLockedDeliveryPickBoxIdsQuery())
-                ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-                ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-                ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-                ->where('stock_locations.warehouse_location', '!=', 'Unknown')
                 ->orderBy('boxes.created_at', 'asc')
                 ->select('boxes.*')
-                ->lockForUpdate()
+                ->lockForUpdate();
+
+            $fifoBoxes = $this->applyStoredLocationExistsFilter($fifoBoxesQuery)
                 ->get();
 
             foreach ($fifoBoxes as $box) {
@@ -138,16 +156,15 @@ class StockWithdrawalController extends Controller
     {
         $query = $request->input('q', '');
 
-        $boxParts = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $boxPartsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->where('boxes.part_number', 'like', '%' . $query . '%')
+            ->select('boxes.part_number')
             ->distinct()
-            ->limit(20)
+            ->limit(20);
+
+        $boxParts = $this->applyStoredLocationExistsFilter($boxPartsQuery)
             ->pluck('boxes.part_number');
 
         $legacyParts = PalletItem::select('part_number')
@@ -237,13 +254,23 @@ class StockWithdrawalController extends Controller
                 ], 422);
             }
 
-            $locations = $this->getLocationsByFIFO($partNumber, $requestedQty, true, false);
+            $locations = $this->getLocationsByFIFO($partNumber, $requestedQty, true, true);
+            $plannedQty = (int) collect($locations)->sum('will_take_pcs');
+            if ($plannedQty < $requestedQty) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stok tersedia, namun kombinasi box tidak memenuhi kuantitas exact. Butuh box not full.',
+                    'available' => $totalStock,
+                    'requested' => $requestedQty,
+                ], 422);
+            }
         } else {
             $locations = $remainingQty > 0
                 ? $this->getLocationsByFIFO($partNumber, $remainingQty, true, true)
                 : [];
 
-            if ($remainingQty > 0 && count($locations) === 0) {
+            $plannedQty = (int) collect($locations)->sum('will_take_pcs');
+            if ($remainingQty > 0 && $plannedQty < $remainingQty) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Stok tidak cukup untuk sisa kebutuhan. Butuh box not full.',
@@ -508,7 +535,14 @@ class StockWithdrawalController extends Controller
                 }
 
                 // Get locations in FIFO order
-                $locations = $this->getLocationsByFIFO($partNumber, $requestedQty);
+                $locations = $this->getLocationsByFIFO($partNumber, $requestedQty, true, true);
+                $plannedQty = (int) collect($locations)->sum('will_take_pcs');
+                if ($plannedQty < $requestedQty) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Stok tersedia, namun kombinasi box part {$partNumber} tidak memenuhi kuantitas exact. Butuh box not full.",
+                    ], 422);
+                }
 
                 $previewData[] = [
                     'part_number' => $partNumber,
@@ -659,17 +693,15 @@ class StockWithdrawalController extends Controller
      */
     private function getTotalStockForPart($partNumber, bool $excludeAssigned = false)
     {
-        $boxTotal = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $boxTotalQuery = DB::table('boxes')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
-            })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            });
+
+        $boxTotal = $this->applyStoredLocationExistsFilter($boxTotalQuery)
             ->sum('boxes.pcs_quantity');
 
         $legacyTotal = PalletItem::where('part_number', $partNumber)
@@ -693,16 +725,14 @@ class StockWithdrawalController extends Controller
             return [];
         }
 
-        $boxTotals = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $boxTotalsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->whereIn('boxes.part_number', $partNumbers)
             ->groupBy('boxes.part_number')
-            ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
+            ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'));
+
+        $boxTotals = $this->applyStoredLocationExistsFilter($boxTotalsQuery)
             ->pluck('total', 'boxes.part_number');
 
         $legacyTotals = PalletItem::select('part_number', DB::raw('SUM(pcs_quantity) as total'))
@@ -731,9 +761,14 @@ class StockWithdrawalController extends Controller
         $locations = [];
         $remainingQty = $requestedQty;
 
+        $storedPivotSubquery = $this->getStoredLocationPivotSubquery();
+
         $boxRows = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->joinSub($storedPivotSubquery, 'stored_box', function ($join) {
+                $join->on('stored_box.box_id', '=', 'boxes.id');
+            })
+            ->join('pallet_boxes as pb', 'pb.id', '=', 'stored_box.pivot_id')
+            ->join('pallets', 'pallets.id', '=', 'pb.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
@@ -750,7 +785,6 @@ class StockWithdrawalController extends Controller
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
             })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select([
                 'boxes.id as box_id',
@@ -791,7 +825,7 @@ class StockWithdrawalController extends Controller
                 'is_reserved' => false,
             ];
 
-            $remainingQty -= (int) $box->pcs_quantity;
+            $remainingQty -= $takeQty;
         }
 
         if (count($locations) === 0) {
@@ -844,9 +878,14 @@ class StockWithdrawalController extends Controller
 
     private function getReservedBoxesForOrder(int $orderId, string $partNumber)
     {
+        $storedPivotSubquery = $this->getStoredLocationPivotSubquery();
+
         return DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+            ->joinSub($storedPivotSubquery, 'stored_box', function ($join) {
+                $join->on('stored_box.box_id', '=', 'boxes.id');
+            })
+            ->join('pallet_boxes as pb', 'pb.id', '=', 'stored_box.pivot_id')
+            ->join('pallets', 'pallets.id', '=', 'pb.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
@@ -861,7 +900,6 @@ class StockWithdrawalController extends Controller
                             ->whereIn('status', ['scanning', 'blocked', 'approved']);
                     });
             })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select([
                 'boxes.box_number',

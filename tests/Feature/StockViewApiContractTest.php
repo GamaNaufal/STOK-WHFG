@@ -212,4 +212,46 @@ class StockViewApiContractTest extends TestCase
             'part_number' => 'P-WITHDRAWN-ONLY',
         ]);
     }
+
+    public function test_api_stock_by_part_counts_shared_active_box_once(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+
+        $palletA = Pallet::create(['pallet_number' => 'PLT-API-SHARE-A']);
+        $palletB = Pallet::create(['pallet_number' => 'PLT-API-SHARE-B']);
+
+        StockLocation::create([
+            'pallet_id' => $palletA->id,
+            'warehouse_location' => 'A8',
+            'stored_at' => now(),
+        ]);
+        StockLocation::create([
+            'pallet_id' => $palletB->id,
+            'warehouse_location' => 'A9',
+            'stored_at' => now(),
+        ]);
+
+        $sharedBox = Box::create([
+            'box_number' => 'BOX-API-SHARED-01',
+            'part_number' => 'P-API-SHARED',
+            'pcs_quantity' => 35,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-API-SHARED-01|P-API-SHARED|35',
+            'user_id' => $user->id,
+            'is_withdrawn' => false,
+            'expired_status' => 'active',
+        ]);
+
+        $palletA->boxes()->attach($sharedBox->id);
+        $palletB->boxes()->attach($sharedBox->id);
+
+        $response = $this->actingAs($user)->getJson('/api/stock/by-part');
+
+        $response->assertOk();
+        $response->assertJsonFragment([
+            'part_number' => 'P-API-SHARED',
+            'total_box' => 1,
+            'total_pcs' => 35,
+        ]);
+    }
 }

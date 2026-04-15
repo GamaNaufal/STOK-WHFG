@@ -16,6 +16,36 @@ class MergePalletFlowTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_merge_search_rejects_pallet_with_only_expired_boxes(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+
+        $pallet = Pallet::create(['pallet_number' => 'PLT-EXP-ONLY-01']);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A9',
+            'stored_at' => now(),
+        ]);
+
+        $expiredBox = Box::create([
+            'box_number' => 'BOX-EXP-ONLY-01',
+            'part_number' => 'P-EXP-ONLY',
+            'pcs_quantity' => 10,
+            'qr_code' => 'BOX-EXP-ONLY-01|P-EXP-ONLY|10',
+            'qty_box' => 1,
+            'user_id' => $operator->id,
+            'is_withdrawn' => false,
+            'expired_status' => 'expired',
+        ]);
+        $pallet->boxes()->attach($expiredBox->id);
+
+        $response = $this->actingAs($operator)->getJson(route('merge-pallet.search', [
+            'code' => $pallet->pallet_number,
+        ]));
+
+        $response->assertStatus(404);
+    }
+
     public function test_merge_pallet_fails_when_all_source_boxes_are_inactive(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);

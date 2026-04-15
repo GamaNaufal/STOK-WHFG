@@ -108,33 +108,6 @@ class StockInputController extends Controller
         return response()->json($pallets);
     }
 
-    private function moveSessionPalletItems(Pallet $fromPallet, Pallet $toPallet): void
-    {
-        $fromItems = $fromPallet->items()->get();
-
-        foreach ($fromItems as $fromItem) {
-            $targetItem = PalletItem::query()
-                ->where('pallet_id', $toPallet->id)
-                ->where('part_number', $fromItem->part_number)
-                ->first();
-
-            if (!$targetItem) {
-                PalletItem::create([
-                    'pallet_id' => $toPallet->id,
-                    'part_number' => $fromItem->part_number,
-                    'box_quantity' => (int) $fromItem->box_quantity,
-                    'pcs_quantity' => (int) $fromItem->pcs_quantity,
-                ]);
-                continue;
-            }
-
-            $targetItem->increment('box_quantity', (int) $fromItem->box_quantity);
-            $targetItem->increment('pcs_quantity', (int) $fromItem->pcs_quantity);
-        }
-
-        $fromPallet->items()->delete();
-    }
-
     public function selectExistingPallet(Request $request)
     {
         $validated = $request->validate([
@@ -183,11 +156,9 @@ class StockInputController extends Controller
         }
 
         if ($currentPalletId && (int) $currentPalletId !== (int) $pallet->id) {
-            $currentPallet = Pallet::with(['items', 'stockLocation'])->find($currentPalletId);
+            $currentPallet = Pallet::with(['stockLocation'])->find($currentPalletId);
 
             if ($currentPallet) {
-                $this->moveSessionPalletItems($currentPallet, $pallet);
-
                 if ($currentPalletSource === 'new' && $currentPallet->boxes()->count() === 0 && !$currentPallet->stockLocation) {
                     $currentPallet->delete();
                 }
@@ -368,23 +339,6 @@ class StockInputController extends Controller
         ];
         session(['scanned_boxes' => $scannedBoxes]);
 
-        $palletItem = PalletItem::query()
-            ->where('pallet_id', $pallet->id)
-            ->where('part_number', $partNumber)
-            ->first();
-
-        if (!$palletItem) {
-            PalletItem::create([
-                'pallet_id' => $pallet->id,
-                'part_number' => $partNumber,
-                'box_quantity' => 1,
-                'pcs_quantity' => $pcsQuantity,
-            ]);
-        } else {
-            $palletItem->increment('box_quantity');
-            $palletItem->increment('pcs_quantity', $pcsQuantity);
-        }
-
         session()->forget('pending_box');
 
         return response()->json([
@@ -486,27 +440,6 @@ class StockInputController extends Controller
         ];
         session(['scanned_boxes' => $scannedBoxes]);
 
-        // Create pallet item for preview (tapi belum commit ke database)
-        $palletItem = PalletItem::query()
-            ->where('pallet_id', $pallet->id)
-            ->where('part_number', $part_number)
-            ->first();
-
-        if (!$palletItem) {
-            $palletItem = PalletItem::create([
-                'pallet_id' => $pallet->id,
-                'part_number' => $part_number,
-                'box_quantity' => 1,
-                'pcs_quantity' => $pcs_quantity,
-            ]);
-        } else {
-            $palletItem->increment('box_quantity');
-            $palletItem->increment('pcs_quantity', $pcs_quantity);
-        }
-
-        // Get updated pallet info
-        $pallet->load('boxes');
-
         return response()->json([
             'success' => true,
             'pallet_id' => $pallet->id,
@@ -516,7 +449,7 @@ class StockInputController extends Controller
             'box_number' => $box_number,
             'part_number' => $part_number,
             'pcs_quantity' => $pcs_quantity,
-            'boxes_in_pallet' => $pallet->boxes->count(),
+            'boxes_in_pallet' => count($scannedBoxes),
         ]);
     }
 
@@ -531,7 +464,7 @@ class StockInputController extends Controller
             ]);
         }
 
-        $pallet = Pallet::with(['items', 'stockLocation'])->find($pallet_id);
+        $pallet = Pallet::with(['stockLocation'])->find($pallet_id);
 
         if (!$pallet) {
             session()->forget('current_pallet_id');
@@ -582,6 +515,20 @@ class StockInputController extends Controller
             ->values()
             ->all();
 
+        $itemsSummary = collect($boxesForPrint)
+            ->filter(fn ($box) => !empty($box['part_number']))
+            ->groupBy('part_number')
+            ->map(function ($boxes, $partNumber) {
+                return [
+                    'part_number' => $partNumber,
+                    'box_quantity' => $boxes->count(),
+                    'pcs_quantity' => (int) $boxes->sum(function ($box) {
+                        return (int) ($box['pcs_quantity'] ?? 0);
+                    }),
+                ];
+            })
+            ->values();
+
         $totalPcs = collect($boxesForPrint)->sum(function ($box) {
             return (int) ($box['pcs_quantity'] ?? 0);
         });
@@ -598,13 +545,7 @@ class StockInputController extends Controller
                 'boxes_existing' => $existingBoxes,
                 'boxes_pending' => $pendingBoxes,
                 'boxes_for_print' => $boxesForPrint,
-                'items' => $pallet->items->map(function ($item) {
-                    return [
-                        'part_number' => $item->part_number,
-                        'box_quantity' => $item->box_quantity,
-                        'pcs_quantity' => $item->pcs_quantity,
-                    ];
-                }),
+                'items' => $itemsSummary,
                 'total_boxes' => count($scannedBoxes),
                 'total_boxes_existing' => count($existingBoxes),
                 'total_boxes_pending' => $pendingBoxes->count(),
@@ -823,6 +764,29 @@ class StockInputController extends Controller
         ]);
     }
 
+    private function syncPalletItemsWithActiveBoxes(Pallet $pallet): void
+    {
+        $activeByPart = $pallet->activeBoxes()
+            ->select('boxes.part_number', DB::raw('COUNT(*) as box_quantity'), DB::raw('SUM(boxes.pcs_quantity) as pcs_quantity'))
+            ->groupBy('boxes.part_number')
+            ->get();
+
+        $pallet->items()->delete();
+
+        foreach ($activeByPart as $row) {
+            if (empty($row->part_number)) {
+                continue;
+            }
+
+            PalletItem::create([
+                'pallet_id' => $pallet->id,
+                'part_number' => (string) $row->part_number,
+                'box_quantity' => (int) $row->box_quantity,
+                'pcs_quantity' => (int) $row->pcs_quantity,
+            ]);
+        }
+    }
+
     private function createStockInputRecord(Pallet $pallet, array $attachedBoxIds, ?string $locationCode): StockInput
     {
         $attachedBoxes = Box::query()
@@ -862,11 +826,20 @@ class StockInputController extends Controller
         session()->forget('scanned_boxes');
         session()->forget('current_pallet_id');
         session()->forget('current_pallet_source');
+        session()->forget('pending_box');
     }
 
     public function store(Request $request)
     {
         $validated = $this->validateStoreRequest($request);
+
+        $activePalletId = (int) session('current_pallet_id', 0);
+        if ($activePalletId <= 0 || $activePalletId !== (int) $validated['pallet_id']) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Pallet aktif tidak sesuai dengan request. Muat ulang halaman lalu coba lagi.'
+            ], 422);
+        }
 
         DB::beginTransaction(); // Start transaction to ensure data integrity
 
@@ -893,6 +866,15 @@ class StockInputController extends Controller
 
             $hasLocationInput = $this->hasLocationInput($request);
             $hasExistingLocation = (bool) $pallet->stockLocation;
+            $currentPalletSource = (string) session('current_pallet_source', 'new');
+
+            if ($currentPalletSource === 'existing' && $hasExistingLocation && $hasLocationInput) {
+                DB::rollBack();
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Pallet existing tidak boleh mengganti lokasi dari proses input ini.'
+                ], 422);
+            }
 
             if (!$hasLocationInput && !$hasExistingLocation) {
                 DB::rollBack();
@@ -904,6 +886,9 @@ class StockInputController extends Controller
 
             // Attach boxes ke palet sekarang (saat user klik Save)
             $attachedBoxIds = $this->attachScannedBoxes($pallet, $scannedBoxes);
+
+            // Rebuild pallet_items from active boxes so preview stage never mutates persistent stock data.
+            $this->syncPalletItemsWithActiveBoxes($pallet);
 
             // Simpan lokasi bila pallet belum punya lokasi, atau gunakan lokasi existing
             $locationCode = $pallet->stockLocation?->warehouse_location;

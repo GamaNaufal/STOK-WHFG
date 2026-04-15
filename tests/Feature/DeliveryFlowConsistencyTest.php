@@ -1297,4 +1297,218 @@ class DeliveryFlowConsistencyTest extends TestCase
                 'blocked_reason' => 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
             ]);
     }
+
+    public function test_start_pick_rejects_shared_box_double_count_when_unique_stock_is_insufficient(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Shared Box Dedup Pick',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-PICK-SHARED',
+            'quantity' => 40,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $palletA = Pallet::create(['pallet_number' => 'PLT-PICK-SHARED-A']);
+        $palletB = Pallet::create(['pallet_number' => 'PLT-PICK-SHARED-B']);
+
+        StockLocation::create([
+            'pallet_id' => $palletA->id,
+            'warehouse_location' => 'B1',
+            'stored_at' => now(),
+        ]);
+        StockLocation::create([
+            'pallet_id' => $palletB->id,
+            'warehouse_location' => 'B2',
+            'stored_at' => now(),
+        ]);
+
+        $sharedBox = Box::create([
+            'box_number' => 'BOX-PICK-SHARED-01',
+            'part_number' => 'P-PICK-SHARED',
+            'part_name' => 'Part Pick Shared',
+            'pcs_quantity' => 30,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-PICK-SHARED-01|P-PICK-SHARED|30',
+            'user_id' => $operator->id,
+            'is_withdrawn' => false,
+            'expired_status' => 'active',
+        ]);
+
+        $palletA->boxes()->attach($sharedBox->id);
+        $palletB->boxes()->attach($sharedBox->id);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.start', $order->id));
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'message' => 'Stok box tidak cukup untuk part P-PICK-SHARED',
+            ]);
+
+        $this->assertDatabaseMissing('delivery_pick_sessions', [
+            'delivery_order_id' => $order->id,
+            'status' => 'scanning',
+        ]);
+    }
+
+    public function test_approved_legacy_session_does_not_lock_boxes_for_new_pick_session(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $legacyOrder = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Legacy Approved Session Order',
+            'delivery_date' => now()->addDays(2)->toDateString(),
+            'status' => 'processing',
+        ]);
+
+        $targetOrder = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'New Pick Order',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $targetOrder->id,
+            'part_number' => 'P-LOCK-STATUS',
+            'quantity' => 10,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $pallet = Pallet::create(['pallet_number' => 'PLT-LOCK-STATUS']);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'B3',
+            'stored_at' => now(),
+        ]);
+
+        $box = Box::create([
+            'box_number' => 'BOX-LOCK-STATUS-01',
+            'part_number' => 'P-LOCK-STATUS',
+            'pcs_quantity' => 10,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-LOCK-STATUS-01|P-LOCK-STATUS|10',
+            'user_id' => $operator->id,
+            'is_withdrawn' => false,
+            'expired_status' => 'active',
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        $legacySession = DeliveryPickSession::create([
+            'delivery_order_id' => $legacyOrder->id,
+            'created_by' => $operator->id,
+            'status' => 'approved',
+            'started_at' => now()->subHour(),
+        ]);
+
+        DeliveryPickItem::create([
+            'pick_session_id' => $legacySession->id,
+            'box_id' => $box->id,
+            'part_number' => 'P-LOCK-STATUS',
+            'pcs_quantity' => 10,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.start', $targetOrder->id));
+
+        $response->assertOk()->assertJsonStructure([
+            'session_id',
+            'pdf_url',
+            'scan_url',
+        ]);
+
+        $this->assertDatabaseHas('delivery_pick_items', [
+            'pick_session_id' => (int) $response->json('session_id'),
+            'box_id' => $box->id,
+            'part_number' => 'P-LOCK-STATUS',
+            'pcs_quantity' => 10,
+        ]);
+    }
+
+    public function test_complete_rejects_when_scanned_qty_is_less_than_remaining_order_qty(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Complete Guard',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-COMPLETE-GUARD',
+            'quantity' => 50,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $pallet = Pallet::create(['pallet_number' => 'PLT-COMPLETE-GUARD']);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'B4',
+            'stored_at' => now(),
+        ]);
+
+        $box = Box::create([
+            'box_number' => 'BOX-COMPLETE-GUARD-01',
+            'part_number' => 'P-COMPLETE-GUARD',
+            'pcs_quantity' => 20,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-COMPLETE-GUARD-01|P-COMPLETE-GUARD|20',
+            'user_id' => $operator->id,
+            'is_withdrawn' => false,
+            'expired_status' => 'active',
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        DeliveryPickItem::create([
+            'pick_session_id' => $session->id,
+            'box_id' => $box->id,
+            'part_number' => 'P-COMPLETE-GUARD',
+            'pcs_quantity' => 20,
+            'status' => 'scanned',
+            'scanned_at' => now(),
+            'scanned_by' => $operator->id,
+        ]);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.complete', $session->id));
+
+        $response->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Qty part P-COMPLETE-GUARD belum cukup untuk complete.',
+            ]);
+
+        $this->assertDatabaseHas('delivery_pick_sessions', [
+            'id' => $session->id,
+            'status' => 'scanning',
+        ]);
+
+        $this->assertDatabaseHas('delivery_orders', [
+            'id' => $order->id,
+            'status' => 'processing',
+        ]);
+    }
 }

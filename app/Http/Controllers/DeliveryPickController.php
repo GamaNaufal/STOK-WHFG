@@ -28,6 +28,18 @@ class DeliveryPickController extends Controller
     private const SESSION_RECALC_MESSAGE = 'Sesi picking ini perlu dihitung ulang karena ada order dengan prioritas tanggal lebih awal.';
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
 
+    private function applyStoredLocationExistsFilter($query)
+    {
+        return $query->whereExists(function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('pallet_boxes')
+                ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+                ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+                ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->where('stock_locations.warehouse_location', '!=', 'Unknown');
+        });
+    }
+
     private function getVerificationActiveLockedBoxIds(): array
     {
         return DB::table('delivery_pick_items')
@@ -92,19 +104,17 @@ class DeliveryPickController extends Controller
     {
         $lockedBoxIds = $this->getVerificationActiveLockedBoxIds();
 
-        $rows = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $rowsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
             })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full')
+            ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full');
+
+        $rows = $this->applyStoredLocationExistsFilter($rowsQuery)
             ->get();
 
         $pools = [];
@@ -120,16 +130,14 @@ class DeliveryPickController extends Controller
 
     private function buildVerificationReservedPoolsByOrderPart(): array
     {
-        $rows = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $rowsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNotNull('boxes.assigned_delivery_order_id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full')
+            ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full');
+
+        $rows = $this->applyStoredLocationExistsFilter($rowsQuery)
             ->get();
 
         $pools = [];
@@ -822,6 +830,25 @@ class DeliveryPickController extends Controller
                     ->where('pick_session_id', $session->id)
                     ->lockForUpdate()
                     ->get();
+
+                foreach ($order->items as $orderItem) {
+                    $requiredQty = max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity);
+                    if ($requiredQty <= 0) {
+                        continue;
+                    }
+
+                    $pickedQty = (int) $sessionItems
+                        ->where('part_number', (string) $orderItem->part_number)
+                        ->sum('pcs_quantity');
+
+                    if ($pickedQty < $requiredQty) {
+                        return [
+                            'success' => false,
+                            'message' => 'Qty part ' . $orderItem->part_number . ' belum cukup untuk complete.',
+                            'status' => 422,
+                        ];
+                    }
+                }
 
                 $batchId = (string) Str::uuid();
 
@@ -1694,19 +1721,17 @@ class DeliveryPickController extends Controller
                   ->whereIn('pick_session_id', function ($q2) {
                       $q2->select('id')
                         ->from('delivery_pick_sessions')
-                        ->whereIn('status', ['scanning', 'blocked', 'approved']);
+                        ->whereIn('status', self::ACTIVE_LOCK_STATUSES);
                   });
             })
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
                 $cutoffDate = Carbon::parse($deliveryDate)->subMonths(12);
                 $q->where('boxes.created_at', '>=', $cutoffDate);
             });
+
+        $query = $this->applyStoredLocationExistsFilter($query);
 
         if ($lockRows) {
             $query->lockForUpdate();
@@ -1728,19 +1753,17 @@ class DeliveryPickController extends Controller
                   ->whereIn('pick_session_id', function ($q2) {
                       $q2->select('id')
                         ->from('delivery_pick_sessions')
-                        ->whereIn('status', ['scanning', 'blocked', 'approved']);
+                        ->whereIn('status', self::ACTIVE_LOCK_STATUSES);
                   });
             })
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
                 $cutoffDate = Carbon::parse($deliveryDate)->subMonths(12);
                 $q->where('boxes.created_at', '>=', $cutoffDate);
             })
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*');
+
+        $query = $this->applyStoredLocationExistsFilter($query);
 
         if ($lockRows) {
             $query->lockForUpdate();

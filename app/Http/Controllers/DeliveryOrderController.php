@@ -20,6 +20,18 @@ class DeliveryOrderController extends Controller
 {
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
 
+    private function applyStoredLocationExistsFilter($query)
+    {
+        return $query->whereExists(function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('pallet_boxes')
+                ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+                ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+                ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->where('stock_locations.warehouse_location', '!=', 'Unknown');
+        });
+    }
+
     private function getActivePickLockedBoxIds(): array
     {
         return DB::table('delivery_pick_items')
@@ -53,18 +65,17 @@ class DeliveryOrderController extends Controller
     {
         $lockedBoxIds = $this->getActivePickLockedBoxIds();
 
-        $boxRows = DB::table('boxes')
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $boxRowsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
             })
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
-            ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full', 'boxes.created_at')
+            ->orderBy('boxes.created_at', 'asc')
+            ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full', 'boxes.created_at');
+
+        $boxRows = $this->applyStoredLocationExistsFilter($boxRowsQuery)
             ->get();
 
         $legacyRows = PalletItem::where('pcs_quantity', '>', 0)
@@ -112,18 +123,15 @@ class DeliveryOrderController extends Controller
     {
         $lockedBoxIds = $this->getActivePickLockedBoxIds();
 
-        $boxTotals = Box::select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+        $boxTotals = $this->applyStoredLocationExistsFilter(DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
             })
-            ->groupBy('boxes.part_number')
+            ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
+            ->groupBy('boxes.part_number'))
             ->pluck('total', 'boxes.part_number');
 
         $legacyTotals = PalletItem::select('part_number', DB::raw('SUM(pcs_quantity) as total'))
@@ -145,20 +153,17 @@ class DeliveryOrderController extends Controller
 
     private function getReservedStockByOrder(): array
     {
-        $rows = Box::select(
+        $rows = $this->applyStoredLocationExistsFilter(DB::table('boxes')
+            ->select(
                 'boxes.assigned_delivery_order_id',
                 'boxes.part_number',
                 DB::raw('SUM(boxes.pcs_quantity) as total')
             )
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
-            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number')
-            ->get();
+        )->get();
 
         $reserved = [];
         foreach ($rows as $row) {

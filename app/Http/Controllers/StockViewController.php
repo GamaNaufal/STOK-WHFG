@@ -88,8 +88,30 @@ class StockViewController extends Controller
         return $user && in_array($user->role, ['admin_warehouse', 'supervisi', 'admin'], true);
     }
 
+    private function getCanonicalPalletByActiveBoxId(): array
+    {
+        return DB::table('pallet_boxes as pb')
+            ->join('pallets as p', 'p.id', '=', 'pb.pallet_id')
+            ->join('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
+            ->join('boxes as b', 'b.id', '=', 'pb.box_id')
+            ->whereNull('b.deleted_at')
+            ->where('b.is_withdrawn', false)
+            ->where(function ($q) {
+                $q->whereNull('b.expired_status')
+                    ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
+            })
+            ->where('sl.warehouse_location', '!=', 'Unknown')
+            ->groupBy('pb.box_id')
+            ->select('pb.box_id', DB::raw('MIN(pb.pallet_id) as canonical_pallet_id'))
+            ->pluck('canonical_pallet_id', 'pb.box_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+    }
+
     private function buildStockItems(?string $search = null)
     {
+        $canonicalPalletByBoxId = $this->getCanonicalPalletByActiveBoxId();
+
         $palletQuery = Pallet::query()
             ->select(['id', 'pallet_number'])
             ->with([
@@ -103,7 +125,7 @@ class StockViewController extends Controller
 
         $items = [];
 
-        $palletQuery->chunkById(200, function ($pallets) use (&$items, $search) {
+        $palletQuery->chunkById(200, function ($pallets) use (&$items, $search, $canonicalPalletByBoxId) {
             foreach ($pallets as $pallet) {
                 $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
                 $hasAnyBoxHistory = $pallet->boxes->isNotEmpty();
@@ -111,7 +133,12 @@ class StockViewController extends Controller
                 // Prefer active boxes as source of truth
                 $activeBoxes = $pallet->boxes
                     ->where('is_withdrawn', false)
-                    ->whereNotIn('expired_status', ['handled', 'expired']);
+                    ->whereNotIn('expired_status', ['handled', 'expired'])
+                    ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
+                        $boxId = (int) $box->id;
+                        $canonicalPalletId = (int) ($canonicalPalletByBoxId[$boxId] ?? $pallet->id);
+                        return $canonicalPalletId === (int) $pallet->id;
+                    });
 
                 if ($activeBoxes->isNotEmpty()) {
                     if ($search) {

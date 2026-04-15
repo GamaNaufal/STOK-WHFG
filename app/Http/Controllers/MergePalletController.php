@@ -259,13 +259,16 @@ class MergePalletController extends Controller
     {
         // Get all pallets with active boxes only
         $allPallets = Pallet::whereHas('boxes', function($query) {
-                $query->where('is_withdrawn', false);
+                $query->where('is_withdrawn', false)
+                    ->whereNotIn('expired_status', ['handled', 'expired']);
             })
             ->with(['stockLocation.masterLocation', 'boxes' => function($query) {
-                $query->where('is_withdrawn', false); // Only load active boxes
+                $query->where('is_withdrawn', false)
+                    ->whereNotIn('expired_status', ['handled', 'expired']); // Only load active boxes
             }])
             ->withCount(['boxes as active_boxes_count' => function($query) {
-                $query->where('is_withdrawn', false);
+                $query->where('is_withdrawn', false)
+                    ->whereNotIn('expired_status', ['handled', 'expired']);
             }])
             ->orderBy('id', 'desc')
             ->limit(50)
@@ -310,7 +313,8 @@ class MergePalletController extends Controller
         // Find by Pallet Number - force fresh data
         $pallet = Pallet::where('pallet_number', $code)
             ->with(['boxes' => function($query) {
-                $query->where('is_withdrawn', false); // Only load active boxes
+                $query->where('is_withdrawn', false)
+                    ->whereNotIn('expired_status', ['handled', 'expired']); // Only load active boxes
             }, 'stockLocation.masterLocation'])
             ->first();
 
