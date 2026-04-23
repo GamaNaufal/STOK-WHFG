@@ -677,7 +677,8 @@ class StockViewController extends Controller
                 }
             }
 
-            $box->forceDelete();
+            // Keep historical stock input mappings intact by using soft delete.
+            $box->delete();
 
             $autoDeletedPallets = collect();
 
@@ -765,7 +766,7 @@ class StockViewController extends Controller
                     'deleted_by_role' => $user->role,
                     'auto_deleted_pallets' => $autoDeletedPallets->all(),
                 ],
-                sprintf('Box %s dihapus permanen dari stock view', $oldValues['box_number'] ?? (string) $boxId)
+                sprintf('Box %s dihapus dari stok aktif (soft delete) melalui stock view', $oldValues['box_number'] ?? (string) $boxId)
             );
 
             DB::commit();
@@ -779,7 +780,7 @@ class StockViewController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Box berhasil dihapus permanen dan stok telah diperbarui.',
+            'message' => 'Box berhasil dihapus dari stok aktif dan stok telah diperbarui.',
         ]);
     }
 
@@ -808,7 +809,7 @@ class StockViewController extends Controller
                 ])->values()->all(),
             ];
 
-            $hardDeletedBoxCount = 0;
+            $softDeletedBoxCount = 0;
             $detachedSharedBoxCount = 0;
 
             foreach ($attachedBoxes as $box) {
@@ -823,8 +824,8 @@ class StockViewController extends Controller
                     ->count();
 
                 if ($linkedPalletCount <= 1) {
-                    $box->forceDelete();
-                    $hardDeletedBoxCount++;
+                    $box->delete();
+                    $softDeletedBoxCount++;
                 } else {
                     DB::table('pallet_boxes')
                         ->where('pallet_id', $pallet->id)
@@ -851,11 +852,12 @@ class StockViewController extends Controller
                 $oldValues,
                 [
                     'deleted' => true,
-                    'hard_deleted_box_count' => $hardDeletedBoxCount,
+                    'soft_deleted_box_count' => $softDeletedBoxCount,
+                    'hard_deleted_box_count' => 0,
                     'detached_shared_box_count' => $detachedSharedBoxCount,
                     'deleted_by_role' => $user->role,
                 ],
-                sprintf('Pallet %s dihapus permanen dari stock view', $oldValues['pallet_number'] ?? (string) $palletId)
+                sprintf('Pallet %s dihapus dari stok aktif melalui stock view', $oldValues['pallet_number'] ?? (string) $palletId)
             );
 
             DB::commit();
@@ -869,7 +871,7 @@ class StockViewController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Pallet berhasil dihapus permanen.',
+            'message' => 'Pallet berhasil dihapus dari stok aktif.',
         ]);
     }
 

@@ -27,11 +27,15 @@ class StockInputExport implements FromCollection, WithHeadings, WithStyles
         $currentRow = 2;
         
         foreach ($this->stockInputs as $input) {
-            $resolvedBoxIds = collect((array) ($input->box_ids ?? []))->filter()->values();
-            if ($resolvedBoxIds->isEmpty() && $input->relationLoaded('boxes')) {
-                $resolvedBoxIds = $input->boxes->pluck('id')->filter()->values();
+            $resolvedBoxLabels = collect((array) ($input->box_id_labels ?? []))->filter()->values();
+            if ($resolvedBoxLabels->isEmpty()) {
+                $resolvedBoxIds = collect((array) ($input->box_ids ?? []))->filter()->values();
+                if ($resolvedBoxIds->isEmpty() && $input->relationLoaded('boxes')) {
+                    $resolvedBoxIds = $input->boxes->pluck('id')->filter()->values();
+                }
+                $resolvedBoxLabels = $resolvedBoxIds;
             }
-            $boxIdDisplay = $resolvedBoxIds->isNotEmpty() ? $resolvedBoxIds->implode(', ') : '-';
+            $boxIdDisplay = $resolvedBoxLabels->isNotEmpty() ? $resolvedBoxLabels->implode(', ') : '-';
 
             $boxes = collect();
             if ($input->relationLoaded('boxes')) {

@@ -196,4 +196,69 @@ class ReportFilterMatrixTest extends TestCase
                 && $filters['warehouse_location'] === 'LOC-R1';
         });
     }
+
+    public function test_stock_input_report_keeps_box_ids_when_some_boxes_are_soft_deleted(): void
+    {
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+
+        $pallet = Pallet::create(['pallet_number' => 'PLT-RPT-SOFT']);
+        $item = PalletItem::create([
+            'pallet_id' => $pallet->id,
+            'part_number' => 'P-SI-SOFT-DEL',
+            'box_quantity' => 23,
+            'pcs_quantity' => 230,
+        ]);
+
+        $boxes = collect(range(1, 23))->map(function ($sequence) use ($operator) {
+            return Box::create([
+                'box_number' => '96' . str_pad((string) $sequence, 4, '0', STR_PAD_LEFT),
+                'part_number' => 'P-SI-SOFT-DEL',
+                'pcs_quantity' => 10,
+                'qr_code' => 'RPT-SOFT-' . $sequence . '|P-SI-SOFT-DEL|10',
+                'user_id' => $operator->id,
+            ]);
+        });
+
+        $stockInput = StockInput::create([
+            'pallet_id' => $pallet->id,
+            'pallet_item_id' => $item->id,
+            'user_id' => $operator->id,
+            'warehouse_location' => 'LOC-SOFT',
+            'pcs_quantity' => 230,
+            'box_quantity' => 23,
+            'stored_at' => Carbon::parse('2026-02-10 10:00:00'),
+            'part_numbers' => ['P-SI-SOFT-DEL'],
+        ]);
+
+        DB::table('stock_input_boxes')->insert(
+            $boxes->map(fn (Box $box) => [
+                'stock_input_id' => $stockInput->id,
+                'box_id' => $box->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])->values()->all()
+        );
+
+        Box::whereIn('id', $boxes->take(6)->pluck('id')->all())->delete();
+
+        $response = $this->actingAs($supervisi)->get(route('reports.stock-input', [
+            'start_date' => '2026-02-09',
+            'end_date' => '2026-02-11',
+            'part_number' => 'P-SI-SOFT-DEL',
+            'warehouse_location' => 'LOC-SOFT',
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('stockInputs', function ($stockInputs) use ($stockInput) {
+            $record = $stockInputs->getCollection()->firstWhere('id', $stockInput->id);
+            $boxAuditItems = collect((array) ($record?->box_audit_items ?? []));
+
+            return $stockInputs->total() === 1
+                && $record !== null
+                && count((array) ($record->box_ids ?? [])) === 23
+                && $boxAuditItems->count() === 23
+                && $boxAuditItems->where('status', 'deleted_not_shipped')->count() === 6;
+        });
+    }
 }

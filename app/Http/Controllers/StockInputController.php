@@ -766,7 +766,12 @@ class StockInputController extends Controller
 
     private function syncPalletItemsWithActiveBoxes(Pallet $pallet): void
     {
-        $activeByPart = $pallet->activeBoxes()
+        $activeByPart = DB::table('pallet_boxes')
+            ->join('boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->where('pallet_boxes.pallet_id', $pallet->id)
+            ->whereNull('boxes.deleted_at')
+            ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->select('boxes.part_number', DB::raw('COUNT(*) as box_quantity'), DB::raw('SUM(boxes.pcs_quantity) as pcs_quantity'))
             ->groupBy('boxes.part_number')
             ->get();

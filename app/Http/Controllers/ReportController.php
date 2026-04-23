@@ -185,7 +185,15 @@ class ReportController extends Controller
     public function stockInputReport(Request $request)
     {
         // Get stock inputs from stock_inputs table
-        $query = StockInput::with(['pallet', 'user', 'boxes:id,part_number,pcs_quantity']);
+        $query = StockInput::with([
+            'pallet',
+            'user',
+            'boxes' => function ($boxQuery) {
+                $boxQuery
+                    ->withTrashed()
+                    ->select('boxes.id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_withdrawn', 'boxes.deleted_at');
+            },
+        ]);
 
         // Date range filter
         if ($request->filled('start_date')) {
@@ -201,6 +209,7 @@ class ReportController extends Controller
             $partNumber = (string) $request->input('part_number');
 
             $query->whereHas('boxes', function ($q) use ($partNumber) {
+                $q->withTrashed();
                 $q->where('boxes.part_number', 'like', '%' . $partNumber . '%');
             });
         }
@@ -213,7 +222,9 @@ class ReportController extends Controller
         $stockInputs = $query->orderBy('stored_at', 'desc')->paginate(50);
 
         $stockInputs->getCollection()->transform(function (StockInput $input) {
-            $boxIds = $input->boxes->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+            $boxAuditItems = $this->buildBoxAuditItems($input);
+            $boxIds = collect($boxAuditItems)->pluck('id')->values()->all();
+            $boxIdLabels = collect($boxAuditItems)->pluck('label')->values()->all();
             $partSummaries = $input->boxes
                 ->groupBy('part_number')
                 ->map(function ($boxes, $partNumber) {
@@ -227,6 +238,8 @@ class ReportController extends Controller
                 ->all();
 
             $input->setAttribute('box_ids', $boxIds);
+            $input->setAttribute('box_id_labels', $boxIdLabels);
+            $input->setAttribute('box_audit_items', $boxAuditItems);
             $input->setAttribute('part_summaries', $partSummaries);
             return $input;
         });
@@ -319,7 +332,11 @@ class ReportController extends Controller
             ])
             ->with([
                 'user:id,name',
-                'boxes:id,part_number,pcs_quantity',
+                'boxes' => function ($boxQuery) {
+                    $boxQuery
+                        ->withTrashed()
+                        ->select('boxes.id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_withdrawn', 'boxes.deleted_at');
+                },
             ]);
 
         if ($request->filled('start_date')) {
@@ -333,6 +350,7 @@ class ReportController extends Controller
         if ($request->filled('part_number')) {
             $partNumber = (string) $request->input('part_number');
             $query->whereHas('boxes', function ($q) use ($partNumber) {
+                $q->withTrashed();
                 $q->where('boxes.part_number', 'like', '%' . $partNumber . '%');
             });
         }
@@ -344,7 +362,9 @@ class ReportController extends Controller
         $stockInputs = $query->orderBy('stored_at', 'desc')->get();
 
         $stockInputs->transform(function (StockInput $input) {
-            $input->setAttribute('box_ids', $input->boxes->pluck('id')->map(fn ($id) => (int) $id)->values()->all());
+            $boxAuditItems = $this->buildBoxAuditItems($input);
+            $input->setAttribute('box_ids', collect($boxAuditItems)->pluck('id')->values()->all());
+            $input->setAttribute('box_id_labels', collect($boxAuditItems)->pluck('label')->values()->all());
             return $input;
         });
 
@@ -352,5 +372,34 @@ class ReportController extends Controller
             new StockInputExport($stockInputs),
             'stock_input_report_' . now()->format('Ymd_His') . '.xlsx'
         );
+    }
+
+    private function buildBoxAuditItems(StockInput $input): array
+    {
+        return $input->boxes
+            ->map(function ($box) {
+                $boxId = (int) $box->id;
+                $isDeleted = $box->deleted_at !== null;
+                $isWithdrawn = (bool) ($box->is_withdrawn ?? false);
+
+                $status = 'active';
+                $label = (string) $boxId;
+
+                if ($isDeleted && !$isWithdrawn) {
+                    $status = 'deleted_not_shipped';
+                    $label .= ' [DELETED - BUKAN TERKIRIM]';
+                } elseif ($isDeleted && $isWithdrawn) {
+                    $status = 'deleted_shipped';
+                    $label .= ' [DELETED - TERKIRIM]';
+                }
+
+                return [
+                    'id' => $boxId,
+                    'status' => $status,
+                    'label' => $label,
+                ];
+            })
+            ->values()
+            ->all();
     }
 }

@@ -139,6 +139,203 @@ Artisan::command('health:concurrency', function () {
     return 0;
 })->purpose('Run delivery concurrency health checks (session/item/withdrawal/verification consistency)');
 
+Artisan::command('stock-input:diagnose
+    {stockInputId? : Stock input ID to inspect}
+    {--recent=0 : Show latest rows when ID is omitted}
+    {--date= : Filter by stored_at prefix (YYYY-MM-DD or YYYY-MM-DD HH:MM)}
+    {--pallet= : Filter by pallet number (example: PLT-108)}
+    {--operator= : Filter by operator name}
+    {--location= : Filter by warehouse location}
+    {--all : Include matched rows when listing without stockInputId}', function () {
+    $stockInputIdArg = $this->argument('stockInputId');
+    $recent = max(0, (int) $this->option('recent'));
+    $dateFilter = trim((string) $this->option('date'));
+    $palletFilter = trim((string) $this->option('pallet'));
+    $operatorFilter = trim((string) $this->option('operator'));
+    $locationFilter = trim((string) $this->option('location'));
+    $includeAll = (bool) $this->option('all');
+
+    if ($stockInputIdArg === null) {
+        $limit = $recent > 0 ? $recent : 20;
+
+        $listQuery = DB::table('stock_inputs as si')
+            ->leftJoin('pallets as p', 'p.id', '=', 'si.pallet_id')
+            ->leftJoin('users as u', 'u.id', '=', 'si.user_id')
+            ->leftJoin('stock_input_boxes as sib', 'sib.stock_input_id', '=', 'si.id')
+            ->whereNull('si.deleted_at')
+            ->when($dateFilter !== '', fn ($q) => $q->where('si.stored_at', 'like', $dateFilter . '%'))
+            ->when($palletFilter !== '', fn ($q) => $q->where('p.pallet_number', 'like', '%' . $palletFilter . '%'))
+            ->when($operatorFilter !== '', fn ($q) => $q->where('u.name', 'like', '%' . $operatorFilter . '%'))
+            ->when($locationFilter !== '', fn ($q) => $q->where('si.warehouse_location', 'like', '%' . $locationFilter . '%'))
+            ->groupBy('si.id', 'si.stored_at', 'si.user_id', 'u.name', 'si.warehouse_location', 'si.box_quantity', 'p.pallet_number')
+            ->selectRaw('si.id, si.stored_at, si.user_id, u.name as operator_name, p.pallet_number, si.warehouse_location, si.box_quantity as recorded_box_qty, COUNT(sib.id) as mapped_box_qty');
+
+        if (!$includeAll) {
+            $listQuery->havingRaw('si.box_quantity <> COUNT(sib.id)');
+        }
+
+        $recentRows = $listQuery
+            ->orderByDesc('si.stored_at')
+            ->limit($limit)
+            ->get();
+
+        if ($recentRows->isEmpty()) {
+            if ($includeAll) {
+                $this->info('No stock input rows found for current filters.');
+            } else {
+                $this->info('No stock input mismatch found for current filters.');
+            }
+            return 0;
+        }
+
+        if ($includeAll) {
+            $this->warn('Recent stock input rows:');
+        } else {
+            $this->warn('Recent stock input mismatch found:');
+        }
+        $this->table(
+            ['stock_input_id', 'stored_at', 'pallet', 'operator', 'user_id', 'location', 'recorded_box', 'mapped_box', 'gap'],
+            $recentRows->map(function ($row) {
+                $recorded = (int) round((float) $row->recorded_box_qty);
+                $mapped = (int) $row->mapped_box_qty;
+
+                return [
+                    (int) $row->id,
+                    (string) $row->stored_at,
+                    (string) ($row->pallet_number ?? '-'),
+                    (string) ($row->operator_name ?? '-'),
+                    (int) $row->user_id,
+                    (string) $row->warehouse_location,
+                    $recorded,
+                    $mapped,
+                    $recorded - $mapped,
+                ];
+            })->all()
+        );
+
+        $this->line('Run detail check: php artisan stock-input:diagnose <stock_input_id>');
+        $this->line('Example filter check: php artisan stock-input:diagnose --date="2026-04-20" --pallet="PLT-108" --all --recent=30');
+        return 0;
+    }
+
+    $stockInputId = (int) $stockInputIdArg;
+    if ($stockInputId <= 0) {
+        $this->error('stockInputId must be a positive integer.');
+        return 1;
+    }
+
+    $summary = DB::table('stock_inputs as si')
+        ->leftJoin('stock_input_boxes as sib', 'sib.stock_input_id', '=', 'si.id')
+        ->leftJoin('boxes as b', 'b.id', '=', 'sib.box_id')
+        ->where('si.id', $stockInputId)
+        ->groupBy('si.id', 'si.stored_at', 'si.user_id', 'si.warehouse_location', 'si.box_quantity', 'si.pcs_quantity')
+        ->selectRaw('si.id, si.stored_at, si.user_id, si.warehouse_location')
+        ->selectRaw('si.box_quantity as recorded_box_qty, si.pcs_quantity as recorded_pcs_qty')
+        ->selectRaw('COUNT(sib.id) as mapped_box_qty')
+        ->selectRaw('SUM(CASE WHEN b.deleted_at IS NULL THEN 1 ELSE 0 END) as active_box_qty')
+        ->selectRaw('SUM(CASE WHEN b.deleted_at IS NOT NULL THEN 1 ELSE 0 END) as soft_deleted_box_qty')
+        ->selectRaw('SUM(CASE WHEN b.deleted_at IS NULL THEN COALESCE(b.pcs_quantity, 0) ELSE 0 END) as active_pcs_qty')
+        ->selectRaw('SUM(CASE WHEN b.deleted_at IS NOT NULL THEN COALESCE(b.pcs_quantity, 0) ELSE 0 END) as soft_deleted_pcs_qty')
+        ->first();
+
+    if (!$summary) {
+        $this->error('stock_input_id not found: ' . $stockInputId);
+        return 1;
+    }
+
+    $recordedBoxQty = (int) round((float) $summary->recorded_box_qty);
+    $mappedBoxQty = (int) $summary->mapped_box_qty;
+    $boxGap = $recordedBoxQty - $mappedBoxQty;
+
+    $this->line('=== Stock Input Diagnose ===');
+    $this->table(
+        ['metric', 'value'],
+        [
+            ['stock_input_id', (int) $summary->id],
+            ['stored_at', (string) $summary->stored_at],
+            ['user_id', (int) $summary->user_id],
+            ['warehouse_location', (string) $summary->warehouse_location],
+            ['recorded_box_qty', $recordedBoxQty],
+            ['mapped_box_qty (stock_input_boxes)', $mappedBoxQty],
+            ['gap (recorded - mapped)', $boxGap],
+            ['active_box_qty', (int) $summary->active_box_qty],
+            ['soft_deleted_box_qty', (int) $summary->soft_deleted_box_qty],
+            ['recorded_pcs_qty', (int) $summary->recorded_pcs_qty],
+            ['active_pcs_qty', (int) $summary->active_pcs_qty],
+            ['soft_deleted_pcs_qty', (int) $summary->soft_deleted_pcs_qty],
+        ]
+    );
+
+    $boxRows = DB::table('stock_input_boxes as sib')
+        ->leftJoin('boxes as b', 'b.id', '=', 'sib.box_id')
+        ->where('sib.stock_input_id', $stockInputId)
+        ->orderBy('sib.box_id')
+        ->get([
+            'sib.box_id',
+            'b.box_number',
+            'b.part_number',
+            'b.pcs_quantity',
+            'b.is_withdrawn',
+            'b.deleted_at',
+        ]);
+
+    if ($boxRows->isNotEmpty()) {
+        $this->newLine();
+        $this->line('Box mapping detail (max 100 rows):');
+        $this->table(
+            ['box_id', 'box_number', 'part_number', 'pcs', 'status'],
+            $boxRows->take(100)->map(function ($row) {
+                $status = 'active';
+                if ($row->deleted_at !== null) {
+                    $status = 'soft-deleted';
+                } elseif ((int) $row->is_withdrawn === 1) {
+                    $status = 'withdrawn';
+                }
+
+                return [
+                    (int) $row->box_id,
+                    (string) ($row->box_number ?? '-'),
+                    (string) ($row->part_number ?? '-'),
+                    (int) ($row->pcs_quantity ?? 0),
+                    $status,
+                ];
+            })->all()
+        );
+
+        if ($boxRows->count() > 100) {
+            $this->warn('Only first 100 rows shown. Total mapped rows: ' . $boxRows->count());
+        }
+    }
+
+    $this->newLine();
+    $this->line('Interpretation:');
+
+    $storedAt = (string) $summary->stored_at;
+    $pivotFeatureDate = '2026-03-11 00:00:00';
+
+    if ($boxGap === 0) {
+        $this->info('- recorded_box_qty matches mapped_box_qty.');
+    } else {
+        $this->warn('- recorded_box_qty does not match mapped_box_qty.');
+
+        if ($storedAt < $pivotFeatureDate) {
+            $this->line('- Possible legacy data: stock input created before stock_input_boxes migration date.');
+        }
+
+        if ($recordedBoxQty === 1 && $mappedBoxQty === 0) {
+            $this->line('- Possible Not Full approval flow: stock_inputs row exists without stock_input_boxes mapping.');
+        }
+
+        $this->line('- Possible hard-delete history: forceDelete on boxes can remove pivot rows via FK cascade.');
+    }
+
+    if ((int) $summary->soft_deleted_box_qty > 0) {
+        $this->line('- Soft-deleted boxes exist in mapping. Use withTrashed in report query to include them.');
+    }
+
+    return 0;
+})->purpose('Diagnose mismatch between stock_inputs.box_quantity and stock_input_boxes mappings');
+
 Schedule::call(function () {
     app(\App\Services\ExpiredBoxService::class)->sendDailySummary();
 })->dailyAt('07:00');

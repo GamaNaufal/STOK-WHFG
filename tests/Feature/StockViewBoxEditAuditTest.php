@@ -9,9 +9,12 @@ use App\Models\DeliveryOrderItem;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
+use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class StockViewBoxEditAuditTest extends TestCase
@@ -350,5 +353,102 @@ class StockViewBoxEditAuditTest extends TestCase
         $after = $this->actingAs($ppc)->get(route('delivery.index'));
         $after->assertOk();
         $after->assertSee('60 / 100', false);
+    }
+
+    public function test_delete_box_soft_deletes_box_and_report_marks_deleted_not_shipped(): void
+    {
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+
+        $pallet = Pallet::create(['pallet_number' => 'PLT-DEL-MARK-01']);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => Carbon::parse('2026-04-22 08:00:00'),
+        ]);
+
+        $box = Box::create([
+            'box_number' => '3001',
+            'part_number' => 'P-DEL-MARK',
+            'pcs_quantity' => 100,
+            'qty_box' => 1,
+            'qr_code' => '3001|P-DEL-MARK|100',
+            'user_id' => $adminWarehouse->id,
+            'is_withdrawn' => false,
+            'expired_status' => 'active',
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        $otherBox = Box::create([
+            'box_number' => '3002',
+            'part_number' => 'P-DEL-MARK',
+            'pcs_quantity' => 100,
+            'qty_box' => 1,
+            'qr_code' => '3002|P-DEL-MARK|100',
+            'user_id' => $adminWarehouse->id,
+            'is_withdrawn' => false,
+            'expired_status' => 'active',
+        ]);
+        $pallet->boxes()->attach($otherBox->id);
+
+        $palletItem = PalletItem::create([
+            'pallet_id' => $pallet->id,
+            'part_number' => 'P-DEL-MARK',
+            'box_quantity' => 2,
+            'pcs_quantity' => 200,
+        ]);
+
+        $storedAt = Carbon::parse('2026-04-22 09:00:00');
+        $stockInput = StockInput::create([
+            'pallet_id' => $pallet->id,
+            'pallet_item_id' => $palletItem->id,
+            'user_id' => $adminWarehouse->id,
+            'warehouse_location' => 'A1',
+            'pcs_quantity' => 100,
+            'box_quantity' => 1,
+            'stored_at' => $storedAt,
+            'part_numbers' => ['P-DEL-MARK'],
+        ]);
+
+        DB::table('stock_input_boxes')->insert([
+            'stock_input_id' => $stockInput->id,
+            'box_id' => $box->id,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $deleteResponse = $this->actingAs($adminWarehouse)->deleteJson(route('stock-view.box-delete', $box->id));
+
+        $deleteResponse->assertOk()->assertJson([
+            'success' => true,
+        ]);
+
+        $this->assertSoftDeleted('boxes', ['id' => $box->id]);
+        $this->assertDatabaseHas('stock_input_boxes', [
+            'stock_input_id' => $stockInput->id,
+            'box_id' => $box->id,
+        ]);
+
+        $reportResponse = $this->actingAs($supervisi)->get(route('reports.stock-input', [
+            'start_date' => $storedAt->toDateString(),
+            'end_date' => $storedAt->toDateString(),
+            'part_number' => 'P-DEL-MARK',
+            'warehouse_location' => 'A1',
+        ]));
+
+        $reportResponse->assertOk();
+        $reportResponse->assertViewHas('stockInputs', function ($stockInputs) use ($stockInput, $box) {
+            $record = $stockInputs->getCollection()->firstWhere('id', $stockInput->id);
+            if (!$record) {
+                return false;
+            }
+
+            $boxAuditItems = collect((array) ($record->box_audit_items ?? []));
+            $deletedBox = $boxAuditItems->firstWhere('id', (int) $box->id);
+
+            return $deletedBox !== null
+                && ($deletedBox['status'] ?? null) === 'deleted_not_shipped'
+                && str_contains((string) ($deletedBox['label'] ?? ''), 'DELETED - BUKAN TERKIRIM');
+        });
     }
 }

@@ -166,7 +166,35 @@
                                     </span>
                                 </td>
                                 <td style="padding: 16px 20px;">
-                                    <small style="color: #6b7280;">{{ !empty($input->box_ids) ? implode(', ', $input->box_ids) : '-' }}</small>
+                                    @php
+                                        $boxAuditItems = collect($input->box_audit_items ?? []);
+                                    @endphp
+                                    @if($boxAuditItems->isNotEmpty())
+                                        <div style="display: flex; flex-wrap: wrap; gap: 6px; max-width: 420px;">
+                                            @foreach($boxAuditItems as $boxAudit)
+                                                @php
+                                                    $status = $boxAudit['status'] ?? 'active';
+                                                    $isDeletedNotShipped = $status === 'deleted_not_shipped';
+                                                    $isDeletedShipped = $status === 'deleted_shipped';
+                                                @endphp
+                                                @if($isDeletedNotShipped)
+                                                    <span class="badge" style="background-color: #fee2e2; color: #b91c1c; font-weight: 600; white-space: normal; text-align: left;">
+                                                        {{ $boxAudit['label'] ?? '-' }}
+                                                    </span>
+                                                @elseif($isDeletedShipped)
+                                                    <span class="badge" style="background-color: #fef3c7; color: #92400e; font-weight: 600; white-space: normal; text-align: left;">
+                                                        {{ $boxAudit['label'] ?? '-' }}
+                                                    </span>
+                                                @else
+                                                    <span class="badge" style="background-color: #f3f4f6; color: #4b5563; font-weight: 600; white-space: normal; text-align: left;">
+                                                        {{ $boxAudit['label'] ?? '-' }}
+                                                    </span>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    @else
+                                        <small style="color: #6b7280;">-</small>
+                                    @endif
                                 </td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">{{ (int) $input->box_quantity }}</td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">{{ $input->pcs_quantity }} PCS</td>
