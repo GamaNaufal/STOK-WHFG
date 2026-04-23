@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Pallet;
 use App\Models\Box;
-use App\Models\PalletItem;
 use App\Models\MasterLocation;
 use App\Models\StockInput;
 use App\Models\StockLocation;
@@ -110,6 +109,13 @@ class MergePalletController extends Controller
         return [$sourcePallets, $palletNumbers, $allBoxes, $boxOrigins];
     }
 
+    private function normalizePartNumber($partNumber): ?string
+    {
+        $normalized = strtoupper(trim((string) $partNumber));
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
     private function attachBoxesAndCreateItems(Pallet $newPallet, array $allBoxes, array $boxOrigins, Request $request): void
     {
         $allBoxIds = array_values(array_unique(array_map('intval', array_column($allBoxes, 'id'))));
@@ -140,8 +146,15 @@ class MergePalletController extends Controller
 
         $itemsByPart = [];
         foreach ($allBoxes as $box) {
-            $partNumber = $box['part_number'];
-            $timestamp = isset($box['created_at']) ? strtotime($box['created_at']) : time();
+            $partNumber = $this->normalizePartNumber($box['part_number'] ?? '');
+            if ($partNumber === null) {
+                continue;
+            }
+
+            $timestamp = isset($box['created_at']) ? strtotime((string) $box['created_at']) : false;
+            if ($timestamp === false) {
+                $timestamp = time();
+            }
 
             if (!isset($itemsByPart[$partNumber])) {
                 $itemsByPart[$partNumber] = [
@@ -153,22 +166,33 @@ class MergePalletController extends Controller
             }
 
             $itemsByPart[$partNumber]['box_quantity']++;
-            $itemsByPart[$partNumber]['pcs_quantity'] += $box['pcs_quantity'];
+            $itemsByPart[$partNumber]['pcs_quantity'] += (int) ($box['pcs_quantity'] ?? 0);
 
             if ($timestamp < $itemsByPart[$partNumber]['created_at']) {
                 $itemsByPart[$partNumber]['created_at'] = $timestamp;
             }
         }
 
+        $now = now();
+        $payload = [];
+
         foreach ($itemsByPart as $item) {
-            PalletItem::create([
+            $payload[] = [
                 'pallet_id' => $newPallet->id,
                 'part_number' => $item['part_number'],
                 'box_quantity' => $item['box_quantity'],
                 'pcs_quantity' => $item['pcs_quantity'],
                 'created_at' => date('Y-m-d H:i:s', $item['created_at']),
-                'updated_at' => now(),
-            ]);
+                'updated_at' => $now,
+            ];
+        }
+
+        if (!empty($payload)) {
+            DB::table('pallet_items')->upsert(
+                $payload,
+                ['pallet_id', 'part_number'],
+                ['box_quantity', 'pcs_quantity', 'created_at', 'updated_at']
+            );
         }
     }
 
