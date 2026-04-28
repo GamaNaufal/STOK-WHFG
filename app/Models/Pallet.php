@@ -13,6 +13,8 @@ class Pallet extends Model
 {
     protected $fillable = [
         'pallet_number',
+        'created_at',
+        'updated_at',
     ];
 
     public function items()

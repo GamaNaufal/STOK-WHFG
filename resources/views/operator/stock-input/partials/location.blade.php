@@ -73,6 +73,24 @@
                 <i class="bi bi-info-circle"></i> Untuk pallet baru: pilih lokasi kosong dari dropdown. Untuk pallet existing: lokasi boleh dikosongkan (akan pakai lokasi pallet saat ini).
             </small>
 
+            <!-- Date Input Section -->
+            <div class="mt-4 p-3" style="background: #f0fdf4; border: 2px solid #86efac; border-radius: 10px;">
+                <label class="form-label fw-bold" style="font-size: 15px; color: #166534; margin-bottom: 12px;">
+                    <i class="bi bi-calendar-event" style="color: #22c55e;"></i> Tanggal Input Box & Pallet
+                </label>
+                <div class="input-group">
+                    <span class="input-group-text" style="border: 2px solid #86efac; background: white;">
+                        <i class="bi bi-calendar3"></i>
+                    </span>
+                    <input type="date" id="inputDateField" class="form-control" 
+                           style="border: 2px solid #86efac; padding: 10px 12px;"
+                           max="{{ date('Y-m-d') }}">
+                </div>
+                <small class="form-text text-muted d-block mt-2" style="font-size: 13px; color: #166534;">
+                    <i class="bi bi-info-circle"></i> Opsional: Jika kosong, akan otomatis menggunakan hari ini dengan jam saat ini.
+                </small>
+            </div>
+
             <!-- Action Buttons -->
             <div class="d-grid gap-3 d-md-flex justify-content-md-end mt-4">
                 <button type="button" class="btn btn-lg" id="cancel-btn"

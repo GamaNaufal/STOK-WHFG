@@ -44,6 +44,53 @@
     let existingPalletSearchTimeout;
     let isSelectingExistingPallet = false;
 
+    /**
+     * Fungsi untuk memutar suara error/alert 3x beep
+     * Menggunakan Web Audio API untuk generate beep sound
+     */
+    function playErrorSound() {
+        try {
+            const audioContext = new (
+                window.AudioContext || window.webkitAudioContext
+            )();
+
+            const beepDuration = 0.2; // Durasi setiap beep 200ms
+            const delayBetweenBeeps = 0.15; // Delay antar beep 150ms
+            const currentTime = audioContext.currentTime;
+
+            // Buat 3 beep berturut-turut
+            for (let i = 0; i < 3; i++) {
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                // Konfigurasi suara error - frekuensi tinggi untuk warning/alert
+                oscillator.frequency.value = 800; // Frekuensi 800 Hz (tinggi)
+                oscillator.type = "sine";
+
+                // Hitung waktu start dan stop untuk setiap beep
+                const beepStartTime =
+                    currentTime + i * (beepDuration + delayBetweenBeeps);
+                const beepStopTime = beepStartTime + beepDuration;
+
+                // Volume
+                gainNode.gain.setValueAtTime(1.0, beepStartTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, beepStopTime);
+
+                // Durasi beep
+                oscillator.start(beepStartTime);
+                oscillator.stop(beepStopTime);
+            }
+        } catch (error) {
+            console.log(
+                "Audio context not available or audio play failed:",
+                error,
+            );
+        }
+    }
+
     function normalizeBarcodeInput(rawValue) {
         return String(rawValue || "")
             .replace(/[\u0000-\u001F\u007F\s]+/g, "")
@@ -150,6 +197,7 @@
         document.getElementById("barcode-error-text").textContent = text;
         errorEl.style.display = "block";
         document.getElementById("barcode-status").style.display = "none";
+        playErrorSound(); // Putar suara error
     }
 
     function showPartStatus(text) {
@@ -164,12 +212,14 @@
         document.getElementById("part-error-text").textContent = text;
         errorEl.style.display = "block";
         document.getElementById("part-status").style.display = "none";
+        playErrorSound(); // Putar suara error
     }
 
     function showError(message) {
         errorText.textContent = message;
         errorMessage.style.display = "block";
         infoBox.style.display = "none";
+        playErrorSound(); // Putar suara error
     }
 
     function showInfo(message) {
@@ -827,11 +877,18 @@
             return;
         }
 
+        const inputDateField = document.getElementById("inputDateField");
+        const inputDate = inputDateField ? inputDateField.value : null;
+
         const form = new FormData();
         form.append("pallet_id", currentPalletId);
         if (selectedId && selectedCode) {
             form.append("location_id", selectedId);
             form.append("warehouse_location", selectedCode);
+        }
+        // Tambah input_date jika user mengisinya
+        if (inputDate) {
+            form.append("input_date", inputDate);
         }
         form.append("_token", config.csrfToken);
 

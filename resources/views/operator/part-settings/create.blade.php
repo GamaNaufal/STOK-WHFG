@@ -72,7 +72,7 @@
                                 </div>
                             @enderror
                             <small class="form-text text-muted d-block mt-2">
-                                <i class="bi bi-info-circle"></i> Jumlah qty standar per box untuk part ini
+                                <i class="bi bi-info-circle"></i> Jumlah qty standar per pcs untuk part ini
                             </small>
                         </div>
 

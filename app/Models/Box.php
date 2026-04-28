@@ -46,6 +46,8 @@ class Box extends Model
         'expired_status',
         'handled_at',
         'handled_by',
+        'created_at',
+        'updated_at',
     ];
 
     protected $casts = [

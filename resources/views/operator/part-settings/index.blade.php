@@ -89,7 +89,7 @@
                                         </td>
                                         <td style="padding: 15px;">
                                             <span class="badge" style="background-color: #e0f2fe; color: #0369a1; font-size: 13px; padding: 6px 12px;">
-                                                {{ $part->qty_box }} Box
+                                                {{ $part->qty_box }} pcs
                                             </span>
                                         </td>
                                         <td style="padding: 15px; text-align: center;">

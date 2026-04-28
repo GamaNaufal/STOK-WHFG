@@ -582,6 +582,7 @@ class StockInputController extends Controller
     {
         return $request->validate([
             'pallet_id' => 'required|exists:pallets,id',
+            'input_date' => 'nullable|date|date_format:Y-m-d',
             // 'warehouse_location' => 'required|string', // Validasi manual di bawah karena bisa 'location_id' atau text
         ]);
     }
@@ -891,6 +892,25 @@ class StockInputController extends Controller
 
             // Attach boxes ke palet sekarang (saat user klik Save)
             $attachedBoxIds = $this->attachScannedBoxes($pallet, $scannedBoxes);
+
+            // Update created_at untuk box dan pallet jika user input tanggal
+            if (!empty($validated['input_date'])) {
+                $inputDate = \Carbon\Carbon::createFromFormat('Y-m-d', $validated['input_date'])->startOfDay();
+                
+                // Update created_at untuk semua boxes yang baru di-attach
+                if (!empty($attachedBoxIds)) {
+                    Box::whereIn('id', $attachedBoxIds)->update([
+                        'created_at' => $inputDate,
+                        'updated_at' => now(),
+                    ]);
+                }
+                
+                // Update created_at untuk pallet
+                $pallet->update([
+                    'created_at' => $inputDate,
+                    'updated_at' => now(),
+                ]);
+            }
 
             // Rebuild pallet_items from active boxes so preview stage never mutates persistent stock data.
             $this->syncPalletItemsWithActiveBoxes($pallet);
