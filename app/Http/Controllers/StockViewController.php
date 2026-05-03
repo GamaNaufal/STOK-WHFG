@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\StockViewByBoxIdExport;
 use App\Exports\StockViewByPalletExport;
 use App\Exports\StockViewByPartExport;
 use App\Models\AuditLog;
@@ -56,7 +57,7 @@ class StockViewController extends Controller
         ];
     }
 
-    private function matchesGlobalSearch(?string $search, ?string $partNumber, ?string $palletNumber, ?string $boxNumber = null, $boxId = null): bool
+    private function matchesGlobalSearch(?string $search, ?string $location, ?string $partNumber, ?string $palletNumber, ?string $boxNumber = null, $boxId = null): bool
     {
         if (!filled($search)) {
             return true;
@@ -68,6 +69,7 @@ class StockViewController extends Controller
         }
 
         $candidates = [
+            (string) ($location ?? ''),
             (string) ($partNumber ?? ''),
             (string) ($palletNumber ?? ''),
             (string) ($boxNumber ?? ''),
@@ -86,6 +88,323 @@ class StockViewController extends Controller
     private function canDeleteStock(?object $user): bool
     {
         return $user && in_array($user->role, ['admin_warehouse', 'supervisi', 'admin'], true);
+    }
+
+    private function getDefaultSortMode(string $viewMode): string
+    {
+        return match ($viewMode) {
+            'box_id' => 'box_id_asc',
+            'pallet' => 'pallet_asc',
+            'not_full' => 'created_oldest',
+            default => 'part_asc',
+        };
+    }
+
+    private function getSortOptionsByViewMode(string $viewMode): array
+    {
+        return match ($viewMode) {
+            'box_id' => [
+                'box_id_asc' => 'ID Box A-Z',
+                'box_id_desc' => 'ID Box Z-A',
+                'box_number_asc' => 'No Box A-Z',
+                'box_number_desc' => 'No Box Z-A',
+                'part_asc' => 'Part A-Z',
+                'part_desc' => 'Part Z-A',
+                'pallet_asc' => 'Pallet A-Z',
+                'pallet_desc' => 'Pallet Z-A',
+                'pcs_asc' => 'PCS Kecil-Besar',
+                'pcs_desc' => 'PCS Besar-Kecil',
+                'location_asc' => 'Lokasi A-Z',
+                'location_desc' => 'Lokasi Z-A',
+                'created_oldest' => 'Paling lama ditambahkan',
+                'created_newest' => 'Paling baru ditambahkan',
+                'updated_oldest' => 'Paling lama di-update',
+                'updated_newest' => 'Terakhir di-update',
+            ],
+            'pallet' => [
+                'pallet_asc' => 'Pallet A-Z',
+                'pallet_desc' => 'Pallet Z-A',
+                'location_asc' => 'Lokasi A-Z',
+                'location_desc' => 'Lokasi Z-A',
+                'total_box_asc' => 'Total Box Kecil-Besar',
+                'total_box_desc' => 'Total Box Besar-Kecil',
+                'total_pcs_asc' => 'Total PCS Kecil-Besar',
+                'total_pcs_desc' => 'Total PCS Besar-Kecil',
+                'created_oldest' => 'Paling lama ditambahkan',
+                'created_newest' => 'Paling baru ditambahkan',
+                'updated_oldest' => 'Paling lama di-update',
+                'updated_newest' => 'Terakhir di-update',
+            ],
+            'not_full' => [
+                'box_number_asc' => 'No Box A-Z',
+                'box_number_desc' => 'No Box Z-A',
+                'part_asc' => 'Part A-Z',
+                'part_desc' => 'Part Z-A',
+                'pallet_asc' => 'Pallet A-Z',
+                'pallet_desc' => 'Pallet Z-A',
+                'pcs_asc' => 'PCS Kecil-Besar',
+                'pcs_desc' => 'PCS Besar-Kecil',
+                'location_asc' => 'Lokasi A-Z',
+                'location_desc' => 'Lokasi Z-A',
+                'created_oldest' => 'Paling lama ditambahkan',
+                'created_newest' => 'Paling baru ditambahkan',
+                'updated_oldest' => 'Paling lama di-update',
+                'updated_newest' => 'Terakhir di-update',
+            ],
+            default => [
+                'part_asc' => 'Part A-Z',
+                'part_desc' => 'Part Z-A',
+                'total_box_asc' => 'Total Box Kecil-Besar',
+                'total_box_desc' => 'Total Box Besar-Kecil',
+                'total_pcs_asc' => 'Total PCS Kecil-Besar',
+                'total_pcs_desc' => 'Total PCS Besar-Kecil',
+                'created_oldest' => 'Paling lama ditambahkan',
+                'created_newest' => 'Paling baru ditambahkan',
+                'updated_oldest' => 'Paling lama di-update',
+                'updated_newest' => 'Terakhir di-update',
+            ],
+        };
+    }
+
+    private function normalizeSortMode(string $viewMode, ?string $sortMode): string
+    {
+        $sortOptions = $this->getSortOptionsByViewMode($viewMode);
+        $defaultSortMode = $this->getDefaultSortMode($viewMode);
+
+        if (!$sortMode || !array_key_exists($sortMode, $sortOptions)) {
+            return $defaultSortMode;
+        }
+
+        return $sortMode;
+    }
+
+    private function toTimestamp($value): ?int
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->getTimestamp();
+        }
+
+        if (is_numeric($value)) {
+            return (int) $value;
+        }
+
+        if (is_string($value) && trim($value) !== '') {
+            $timestamp = strtotime($value);
+            return $timestamp !== false ? $timestamp : null;
+        }
+
+        return null;
+    }
+
+    private function compareNullableString($left, $right, string $direction = 'asc'): int
+    {
+        $leftValue = mb_strtolower(trim((string) ($left ?? '')));
+        $rightValue = mb_strtolower(trim((string) ($right ?? '')));
+
+        if ($leftValue === '' && $rightValue === '') {
+            return 0;
+        }
+
+        if ($leftValue === '') {
+            return 1;
+        }
+
+        if ($rightValue === '') {
+            return -1;
+        }
+
+        $comparison = strcmp($leftValue, $rightValue);
+
+        return $direction === 'desc' ? -$comparison : $comparison;
+    }
+
+    private function compareNullableNumber($left, $right, string $direction = 'asc'): int
+    {
+        $leftIsMissing = !is_numeric($left);
+        $rightIsMissing = !is_numeric($right);
+
+        if ($leftIsMissing && $rightIsMissing) {
+            return 0;
+        }
+
+        if ($leftIsMissing) {
+            return 1;
+        }
+
+        if ($rightIsMissing) {
+            return -1;
+        }
+
+        $comparison = ((float) $left) <=> ((float) $right);
+
+        return $direction === 'desc' ? -$comparison : $comparison;
+    }
+
+    private function compareNullableTimestamp($left, $right, string $direction = 'asc'): int
+    {
+        $leftTimestamp = $this->toTimestamp($left);
+        $rightTimestamp = $this->toTimestamp($right);
+
+        if ($leftTimestamp === null && $rightTimestamp === null) {
+            return 0;
+        }
+
+        if ($leftTimestamp === null) {
+            return 1;
+        }
+
+        if ($rightTimestamp === null) {
+            return -1;
+        }
+
+        $comparison = $leftTimestamp <=> $rightTimestamp;
+
+        return $direction === 'desc' ? -$comparison : $comparison;
+    }
+
+    private function buildPartGroups($items)
+    {
+        return collect($items)
+            ->groupBy('part_number')
+            ->map(function ($itemGroup) {
+                $sortedByCreated = $itemGroup->sortBy(fn ($item) => $this->toTimestamp($item['created_at'] ?? null));
+                $sortedByUpdated = $itemGroup->sortByDesc(fn ($item) => $this->toTimestamp($item['updated_at'] ?? null));
+
+                $totalPcs = $itemGroup->sum('pcs_quantity');
+                $totalBox = $itemGroup->sum('box_quantity');
+
+                return [
+                    'part_number' => $itemGroup->first()['part_number'],
+                    'total_box' => (int) $totalBox,
+                    'total_pcs' => $totalPcs,
+                    'items' => $itemGroup->sortBy('created_at'),
+                    'sort_created_at' => $sortedByCreated->first()['created_at'] ?? null,
+                    'sort_updated_at' => $sortedByUpdated->first()['updated_at'] ?? ($sortedByUpdated->first()['created_at'] ?? null),
+                ];
+            });
+    }
+
+    private function buildPalletGroups($items, array $mergedPalletIds = [])
+    {
+        return collect($items)
+            ->groupBy('pallet_id')
+            ->map(function ($itemGroup) use ($mergedPalletIds) {
+                $firstItem = $itemGroup->first();
+                $sortedByCreated = $itemGroup->sortBy(fn ($item) => $this->toTimestamp($item['created_at'] ?? null));
+                $sortedByUpdated = $itemGroup->sortByDesc(fn ($item) => $this->toTimestamp($item['updated_at'] ?? null));
+                $totalPcs = $itemGroup->sum('pcs_quantity');
+                $totalBox = $itemGroup->sum('box_quantity');
+                $isMerged = in_array($firstItem['pallet_id'], $mergedPalletIds, true);
+
+                return [
+                    'pallet_id' => $firstItem['pallet_id'],
+                    'pallet_number' => $firstItem['pallet_number'],
+                    'location' => $firstItem['location'] ?? 'Unknown',
+                    'total_box' => (int) $totalBox,
+                    'total_pcs' => $totalPcs,
+                    'items' => $itemGroup,
+                    'is_merged' => $isMerged,
+                    'sort_created_at' => $sortedByCreated->first()['created_at'] ?? null,
+                    'sort_updated_at' => $sortedByUpdated->first()['updated_at'] ?? ($sortedByUpdated->first()['created_at'] ?? null),
+                ];
+            });
+    }
+
+    private function buildNotFullRows($items)
+    {
+        return collect($items)
+            ->map(function ($item) {
+                return [
+                    'box_id' => $item['box_id'] ?? null,
+                    'pallet_id' => $item['pallet_id'],
+                    'box_number' => $item['box_number'] ?? '-',
+                    'part_number' => $item['part_number'],
+                    'pcs_quantity' => $item['pcs_quantity'],
+                    'location' => $item['location'] ?? 'Unknown',
+                    'pallet_number' => $item['pallet_number'],
+                    'created_at' => $item['created_at'],
+                    'updated_at' => $item['updated_at'] ?? $item['created_at'],
+                    'reason' => $item['not_full_reason'] ?? null,
+                ];
+            })->values();
+    }
+
+    private function sortItemsByBoxId($items, string $sortMode = 'box_id_asc')
+    {
+        return $this->sortRowsForView('box_id', $items, $sortMode);
+    }
+
+    private function sortRowsForView(string $viewMode, $rows, string $sortMode)
+    {
+        $sortedRows = collect($rows)->sort(function ($left, $right) use ($viewMode, $sortMode) {
+            return match ($viewMode) {
+                'part' => match ($sortMode) {
+                    'part_desc' => $this->compareNullableString($right['part_number'] ?? null, $left['part_number'] ?? null),
+                    'total_box_asc' => $this->compareNullableNumber($left['total_box'] ?? null, $right['total_box'] ?? null),
+                    'total_box_desc' => $this->compareNullableNumber($right['total_box'] ?? null, $left['total_box'] ?? null),
+                    'total_pcs_asc' => $this->compareNullableNumber($left['total_pcs'] ?? null, $right['total_pcs'] ?? null),
+                    'total_pcs_desc' => $this->compareNullableNumber($right['total_pcs'] ?? null, $left['total_pcs'] ?? null),
+                    'created_oldest' => $this->compareNullableTimestamp($left['sort_created_at'] ?? null, $right['sort_created_at'] ?? null),
+                    'created_newest' => $this->compareNullableTimestamp($right['sort_created_at'] ?? null, $left['sort_created_at'] ?? null),
+                    'updated_oldest' => $this->compareNullableTimestamp($left['sort_updated_at'] ?? null, $right['sort_updated_at'] ?? null),
+                    'updated_newest' => $this->compareNullableTimestamp($right['sort_updated_at'] ?? null, $left['sort_updated_at'] ?? null),
+                    default => $this->compareNullableString($left['part_number'] ?? null, $right['part_number'] ?? null),
+                },
+                'box_id' => match ($sortMode) {
+                    'box_id_asc' => $this->compareNullableNumber($left['box_id'] ?? null, $right['box_id'] ?? null),
+                    'box_id_desc' => $this->compareNullableNumber($right['box_id'] ?? null, $left['box_id'] ?? null),
+                    'box_number_asc' => $this->compareNullableString($left['box_number'] ?? null, $right['box_number'] ?? null),
+                    'box_number_desc' => $this->compareNullableString($right['box_number'] ?? null, $left['box_number'] ?? null),
+                    'part_asc' => $this->compareNullableString($left['part_number'] ?? null, $right['part_number'] ?? null),
+                    'part_desc' => $this->compareNullableString($right['part_number'] ?? null, $left['part_number'] ?? null),
+                    'pallet_asc' => $this->compareNullableString($left['pallet_number'] ?? null, $right['pallet_number'] ?? null),
+                    'pallet_desc' => $this->compareNullableString($right['pallet_number'] ?? null, $left['pallet_number'] ?? null),
+                    'pcs_asc' => $this->compareNullableNumber($left['pcs_quantity'] ?? null, $right['pcs_quantity'] ?? null),
+                    'pcs_desc' => $this->compareNullableNumber($right['pcs_quantity'] ?? null, $left['pcs_quantity'] ?? null),
+                    'location_asc' => $this->compareNullableString($left['location'] ?? null, $right['location'] ?? null),
+                    'location_desc' => $this->compareNullableString($right['location'] ?? null, $left['location'] ?? null),
+                    'created_oldest' => $this->compareNullableTimestamp($left['created_at'] ?? null, $right['created_at'] ?? null),
+                    'created_newest' => $this->compareNullableTimestamp($right['created_at'] ?? null, $left['created_at'] ?? null),
+                    'updated_oldest' => $this->compareNullableTimestamp($left['updated_at'] ?? null, $right['updated_at'] ?? null),
+                    'updated_newest' => $this->compareNullableTimestamp($right['updated_at'] ?? null, $left['updated_at'] ?? null),
+                    default => $this->compareNullableNumber($left['box_id'] ?? null, $right['box_id'] ?? null),
+                },
+                'pallet' => match ($sortMode) {
+                    'pallet_desc' => $this->compareNullableString($right['pallet_number'] ?? null, $left['pallet_number'] ?? null),
+                    'location_asc' => $this->compareNullableString($left['location'] ?? null, $right['location'] ?? null),
+                    'location_desc' => $this->compareNullableString($right['location'] ?? null, $left['location'] ?? null),
+                    'total_box_asc' => $this->compareNullableNumber($left['total_box'] ?? null, $right['total_box'] ?? null),
+                    'total_box_desc' => $this->compareNullableNumber($right['total_box'] ?? null, $left['total_box'] ?? null),
+                    'total_pcs_asc' => $this->compareNullableNumber($left['total_pcs'] ?? null, $right['total_pcs'] ?? null),
+                    'total_pcs_desc' => $this->compareNullableNumber($right['total_pcs'] ?? null, $left['total_pcs'] ?? null),
+                    'created_oldest' => $this->compareNullableTimestamp($left['sort_created_at'] ?? null, $right['sort_created_at'] ?? null),
+                    'created_newest' => $this->compareNullableTimestamp($right['sort_created_at'] ?? null, $left['sort_created_at'] ?? null),
+                    'updated_oldest' => $this->compareNullableTimestamp($left['sort_updated_at'] ?? null, $right['sort_updated_at'] ?? null),
+                    'updated_newest' => $this->compareNullableTimestamp($right['sort_updated_at'] ?? null, $left['sort_updated_at'] ?? null),
+                    default => $this->compareNullableString($left['pallet_number'] ?? null, $right['pallet_number'] ?? null),
+                },
+                'not_full' => match ($sortMode) {
+                    'box_number_asc' => $this->compareNullableString($left['box_number'] ?? null, $right['box_number'] ?? null),
+                    'box_number_desc' => $this->compareNullableString($right['box_number'] ?? null, $left['box_number'] ?? null),
+                    'part_asc' => $this->compareNullableString($left['part_number'] ?? null, $right['part_number'] ?? null),
+                    'part_desc' => $this->compareNullableString($right['part_number'] ?? null, $left['part_number'] ?? null),
+                    'pallet_asc' => $this->compareNullableString($left['pallet_number'] ?? null, $right['pallet_number'] ?? null),
+                    'pallet_desc' => $this->compareNullableString($right['pallet_number'] ?? null, $left['pallet_number'] ?? null),
+                    'pcs_asc' => $this->compareNullableNumber($left['pcs_quantity'] ?? null, $right['pcs_quantity'] ?? null),
+                    'pcs_desc' => $this->compareNullableNumber($right['pcs_quantity'] ?? null, $left['pcs_quantity'] ?? null),
+                    'location_asc' => $this->compareNullableString($left['location'] ?? null, $right['location'] ?? null),
+                    'location_desc' => $this->compareNullableString($right['location'] ?? null, $left['location'] ?? null),
+                    'created_oldest' => $this->compareNullableTimestamp($left['created_at'] ?? null, $right['created_at'] ?? null),
+                    'created_newest' => $this->compareNullableTimestamp($right['created_at'] ?? null, $left['created_at'] ?? null),
+                    'updated_oldest' => $this->compareNullableTimestamp($left['updated_at'] ?? null, $right['updated_at'] ?? null),
+                    'updated_newest' => $this->compareNullableTimestamp($right['updated_at'] ?? null, $left['updated_at'] ?? null),
+                    default => $this->compareNullableString($left['box_number'] ?? null, $right['box_number'] ?? null),
+                },
+                default => 0,
+            };
+        })->values();
+
+        return $sortedRows;
     }
 
     private function getCanonicalPalletByActiveBoxId(): array
@@ -116,8 +435,8 @@ class StockViewController extends Controller
             ->select(['id', 'pallet_number'])
             ->with([
                 'stockLocation:id,pallet_id,warehouse_location',
-                'items:id,pallet_id,part_number,box_quantity,pcs_quantity,created_at',
-                'boxes:id,box_number,part_number,pcs_quantity,is_not_full,not_full_reason,is_withdrawn,expired_status,created_at',
+                'items:id,pallet_id,part_number,box_quantity,pcs_quantity,created_at,updated_at',
+                'boxes:id,box_number,part_number,pcs_quantity,is_not_full,not_full_reason,is_withdrawn,expired_status,created_at,updated_at',
             ])
             ->whereHas('stockLocation', function ($q) {
                 $q->where('warehouse_location', '!=', 'Unknown');
@@ -142,9 +461,10 @@ class StockViewController extends Controller
 
                 if ($activeBoxes->isNotEmpty()) {
                     if ($search) {
-                        $activeBoxes = $activeBoxes->filter(function ($box) use ($search, $pallet) {
+                        $activeBoxes = $activeBoxes->filter(function ($box) use ($search, $pallet, $location) {
                             return $this->matchesGlobalSearch(
                                 $search,
+                                $location,
                                 $box->part_number,
                                 $pallet->pallet_number,
                                 $box->box_number,
@@ -164,6 +484,7 @@ class StockViewController extends Controller
                             'box_quantity' => 1,
                             'pcs_quantity' => (int) $box->pcs_quantity,
                             'created_at' => $box->created_at,
+                            'updated_at' => $box->updated_at,
                             'is_not_full' => (bool) $box->is_not_full,
                             'not_full_reason' => $box->not_full_reason,
                         ];
@@ -175,9 +496,10 @@ class StockViewController extends Controller
                     });
 
                     if ($search) {
-                        $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet) {
+                        $legacyItems = $legacyItems->filter(function ($item) use ($search, $pallet, $location) {
                             return $this->matchesGlobalSearch(
                                 $search,
+                                $location,
                                 $item->part_number,
                                 $pallet->pallet_number
                             );
@@ -195,6 +517,7 @@ class StockViewController extends Controller
                             'box_quantity' => (int) $item->box_quantity,
                             'pcs_quantity' => (int) $item->pcs_quantity,
                             'created_at' => $item->created_at,
+                            'updated_at' => $item->updated_at,
                             'is_not_full' => false,
                             'not_full_reason' => null,
                         ];
@@ -210,6 +533,8 @@ class StockViewController extends Controller
     {
         $search = $request->input('search');
         $viewMode = $request->input('view_mode', 'part'); // Default view by part
+        $sortMode = $this->normalizeSortMode($viewMode, $request->input('sort'));
+        $sortOptions = $this->getSortOptionsByViewMode($viewMode);
 
         $items = $this->buildStockItems($search);
         $directBoxTarget = filled($search) ? $this->resolveDirectBoxTarget((string) $search, $items) : null;
@@ -222,19 +547,12 @@ class StockViewController extends Controller
         // Data for "By Part" view
         $groupedByPart = collect();
         if ($viewMode === 'part') {
-            $groupedByPart = $items->groupBy('part_number')->map(function ($itemGroup) {
-                $totalPcs = $itemGroup->sum('pcs_quantity');
-                $totalBox = $itemGroup->sum('box_quantity');
+            $groupedByPart = $this->sortRowsForView('part', $this->buildPartGroups($items), $sortMode);
+        }
 
-                return [
-                    'part_number' => $itemGroup->first()['part_number'],
-                    'total_box' => (int) $totalBox,
-                    'total_pcs' => $totalPcs,
-                    'items' => $itemGroup->sortBy('created_at'),
-                ];
-            })->sortBy(function ($row) {
-                return mb_strtolower((string) ($row['part_number'] ?? ''));
-            }, SORT_STRING);
+        $groupedByBoxId = collect();
+        if ($viewMode === 'box_id') {
+            $groupedByBoxId = $this->sortItemsByBoxId($items, $sortMode);
         }
 
         // Data for "By Pallet" view
@@ -248,39 +566,12 @@ class StockViewController extends Controller
                 ->unique()
                 ->toArray();
 
-            $groupedByPallet = $items->groupBy('pallet_id')->map(function ($itemGroup) use ($mergedPalletIds) {
-                $firstItem = $itemGroup->first();
-                $totalPcs = $itemGroup->sum('pcs_quantity');
-                $totalBox = $itemGroup->sum('box_quantity');
-                $isMerged = in_array($firstItem['pallet_id'], $mergedPalletIds, true);
-
-                return [
-                    'pallet_id' => $firstItem['pallet_id'],
-                    'pallet_number' => $firstItem['pallet_number'],
-                    'location' => $firstItem['location'] ?? 'Unknown',
-                    'total_box' => (int) $totalBox,
-                    'total_pcs' => $totalPcs,
-                    'items' => $itemGroup,
-                    'is_merged' => $isMerged,
-                ];
-            });
+            $groupedByPallet = $this->sortRowsForView('pallet', $this->buildPalletGroups($items, $mergedPalletIds), $sortMode);
         }
 
         $notFullBoxes = collect();
         if ($viewMode === 'not_full') {
-            $notFullBoxes = $items->map(function ($item) {
-                return [
-                    'box_id' => $item['box_id'] ?? null,
-                    'pallet_id' => $item['pallet_id'],
-                    'box_number' => $item['box_number'] ?? '-',
-                    'part_number' => $item['part_number'],
-                    'pcs_quantity' => $item['pcs_quantity'],
-                    'location' => $item['location'] ?? 'Unknown',
-                    'pallet_number' => $item['pallet_number'],
-                    'created_at' => $item['created_at'],
-                    'reason' => $item['not_full_reason'] ?? null,
-                ];
-            })->values();
+            $notFullBoxes = $this->sortRowsForView('not_full', $this->buildNotFullRows($items), $sortMode);
         }
         
         // Calculate totals for summary cards regardless of view mode
@@ -291,9 +582,11 @@ class StockViewController extends Controller
         $allParts = $items->pluck('part_number')->filter()->unique()->values();
         $allPallets = $items->pluck('pallet_number')->filter()->unique()->values();
         $allBoxNumbers = $items->pluck('box_number')->filter()->unique()->values();
+        $allLocations = $items->pluck('location')->filter()->unique()->values();
         $allSearchTerms = $allParts
             ->concat($allPallets)
             ->concat($allBoxNumbers)
+            ->concat($allLocations)
             ->unique()
             ->sort(function ($left, $right) {
                 return strcasecmp((string) $left, (string) $right);
@@ -306,6 +599,7 @@ class StockViewController extends Controller
 
         return view('shared.stock-view.index', compact(
             'groupedByPart', 
+            'groupedByBoxId',
             'groupedByPallet',
             'notFullBoxes',
             'search', 
@@ -317,9 +611,12 @@ class StockViewController extends Controller
             'allParts',
             'allPallets',
             'allBoxNumbers',
+            'allLocations',
             'allSearchTerms',
             'directBoxTarget',
             'masterPartNumbers'
+            , 'sortMode',
+            'sortOptions'
         ));
     }
 
@@ -882,19 +1179,26 @@ class StockViewController extends Controller
     {
         $search = $request->query('search');
         $stocks = $this->buildStockItems($search);
-        
-        // Group by part number and sum quantities
-        $groupedByPart = $stocks->groupBy('part_number')->map(function ($items) {
-            return [
-                'part_number' => $items->first()['part_number'],
-                'box_quantity' => $items->sum('box_quantity'),
-                'pcs_quantity' => $items->sum('pcs_quantity'),
-            ];
-        })->values();
+        $sortMode = $this->normalizeSortMode('part', $request->query('sort'));
 
         return Excel::download(
-            new StockViewByPartExport($groupedByPart),
+            new StockViewByPartExport($this->buildPartGroups($stocks), $sortMode),
             'stock_by_part_' . now()->format('Ymd_His') . '.xlsx'
+        );
+    }
+
+    /**
+     * Export stock view by box id to Excel
+     */
+    public function exportByBoxId(Request $request)
+    {
+        $search = $request->query('search');
+        $sortMode = $this->normalizeSortMode('box_id', $request->query('sort'));
+        $stocks = $this->buildStockItems($search);
+
+        return Excel::download(
+            new StockViewByBoxIdExport($stocks, $sortMode),
+            'stock_by_box_id_' . now()->format('Ymd_His') . '.xlsx'
         );
     }
 
@@ -905,19 +1209,17 @@ class StockViewController extends Controller
     {
         $search = $request->query('search');
         $stocks = $this->buildStockItems($search);
+        $sortMode = $this->normalizeSortMode('pallet', $request->query('sort'));
         
-        // Group by pallet and sum quantities
-        $groupedByPallet = $stocks->groupBy('pallet_number')->map(function ($items) {
-            return [
-                'pallet_number' => $items->first()['pallet_number'],
-                'location' => $items->first()['location'],
-                'box_quantity' => $items->sum('box_quantity'),
-                'pcs_quantity' => $items->sum('pcs_quantity'),
-            ];
-        })->values();
+        $mergedPalletIds = AuditLog::where('model', 'Pallet')
+            ->where('type', 'pallet_merged')
+            ->whereIn('model_id', $stocks->pluck('pallet_id')->unique()->values())
+            ->pluck('model_id')
+            ->unique()
+            ->toArray();
 
         return Excel::download(
-            new StockViewByPalletExport($groupedByPallet),
+            new StockViewByPalletExport($this->buildPalletGroups($stocks, $mergedPalletIds), $sortMode),
             'stock_by_pallet_' . now()->format('Ymd_His') . '.xlsx'
         );
     }

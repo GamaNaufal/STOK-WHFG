@@ -118,6 +118,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:warehouse_operator,ppc,admin_warehouse,supervisi,admin')->group(function () {
         Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
         Route::get('/stock-view/export-part', [StockViewController::class, 'exportByPart'])->name('stock-view.export-part');
+        Route::get('/stock-view/export-box-id', [StockViewController::class, 'exportByBoxId'])->name('stock-view.export-box-id');
         Route::get('/stock-view/export-pallet', [StockViewController::class, 'exportByPallet'])->name('stock-view.export-pallet');
         Route::get('/stock-view/boxes/{boxId}/history', [StockViewController::class, 'boxHistory'])->name('stock-view.box-history');
     });

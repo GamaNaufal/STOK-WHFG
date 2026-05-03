@@ -32,6 +32,10 @@
                         <a href="{{ route('stock-view.export-part', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
                             <i class="bi bi-download"></i> Export Excel
                         </a>
+                    @elseif($viewMode === 'box_id' && $groupedByBoxId->count() > 0)
+                        <a href="{{ route('stock-view.export-box-id', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
+                            <i class="bi bi-download"></i> Export Excel
+                        </a>
                     @elseif($viewMode === 'pallet' && $groupedByPallet->count() > 0)
                         <a href="{{ route('stock-view.export-pallet', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
                             <i class="bi bi-download"></i> Export Excel
@@ -48,6 +52,7 @@
         <div class="position-relative">
             <form method="GET" action="{{ route('stock-view.index') }}" id="searchForm" class="input-group input-group-lg">
                 <input type="hidden" name="view_mode" value="{{ $viewMode }}">
+                <input type="hidden" name="sort" value="{{ $sortMode }}">
                 <span class="input-group-text border-0" style="background: #0C7779; color: white; border-radius: 10px 0 0 10px; font-size: 1.2rem;">
                     <i class="bi bi-search"></i>
                 </span>
@@ -60,7 +65,7 @@
                     <i class="bi bi-search"></i> Cari
                 </button>
                 @if($search)
-                    <a href="{{ route('stock-view.index', ['view_mode' => $viewMode]) }}" class="btn btn-outline-danger border-0" style="border-radius: 0 10px 10px 0; background: white;">
+                    <a href="{{ route('stock-view.index', ['view_mode' => $viewMode, 'sort' => $sortMode]) }}" class="btn btn-outline-danger border-0" style="border-radius: 0 10px 10px 0; background: white;">
                         <i class="bi bi-x-circle"></i> Atur Ulang
                     </a>
                 @endif
@@ -130,17 +135,22 @@
 <div class="row mb-3">
     <div class="col-12 d-flex justify-content-end">
         <div class="btn-group shadow-sm" style="border-radius: 8px;">
-            <a href="{{ route('stock-view.index', ['view_mode' => 'part', 'search' => $search]) }}" 
+            <a href="{{ route('stock-view.index', ['view_mode' => 'part', 'search' => $search, 'sort' => $sortMode]) }}" 
                class="btn {{ $viewMode === 'part' ? 'btn-primary' : 'btn-light' }}"
                @if($viewMode === 'part') style="background: #0C7779; border-color: #0C7779;" @endif>
                 <i class="bi bi-tag"></i> By Part Number
             </a>
-            <a href="{{ route('stock-view.index', ['view_mode' => 'pallet', 'search' => $search]) }}" 
+            <a href="{{ route('stock-view.index', ['view_mode' => 'box_id', 'search' => $search, 'sort' => $sortMode]) }}" 
+               class="btn {{ $viewMode === 'box_id' ? 'btn-primary' : 'btn-light' }}"
+               @if($viewMode === 'box_id') style="background: #0C7779; border-color: #0C7779;" @endif>
+                <i class="bi bi-upc-scan"></i> By Box ID
+            </a>
+            <a href="{{ route('stock-view.index', ['view_mode' => 'pallet', 'search' => $search, 'sort' => $sortMode]) }}" 
                class="btn {{ $viewMode === 'pallet' ? 'btn-primary' : 'btn-light' }}"
                @if($viewMode === 'pallet') style="background: #0C7779; border-color: #0C7779;" @endif>
                 <i class="bi bi-layers"></i> By Pallet
             </a>
-            <a href="{{ route('stock-view.index', ['view_mode' => 'not_full', 'search' => $search]) }}" 
+            <a href="{{ route('stock-view.index', ['view_mode' => 'not_full', 'search' => $search, 'sort' => $sortMode]) }}" 
                class="btn {{ $viewMode === 'not_full' ? 'btn-primary' : 'btn-light' }}"
                @if($viewMode === 'not_full') style="background: #0C7779; border-color: #0C7779;" @endif>
                 <i class="bi bi-exclamation-circle"></i> By Not Full
@@ -149,16 +159,61 @@
     </div>
 </div>
 
+@php
+    $sortQuery = request()->except(['sort', 'page']);
+    $sortUrl = function (string $sortKey) use ($sortQuery, $viewMode) {
+        return route('stock-view.index', array_merge($sortQuery, [
+            'view_mode' => $viewMode,
+            'sort' => $sortKey,
+        ]));
+    };
+    $sortToggle = function (string $ascKey, string $descKey) use ($sortMode) {
+        if ($sortMode === $ascKey) {
+            return $descKey;
+        }
+
+        return $ascKey;
+    };
+    $sortIcon = function (string $currentSort, string $ascKey, string $descKey) {
+        if ($currentSort === $ascKey) {
+            return 'bi-sort-up';
+        }
+
+        if ($currentSort === $descKey) {
+            return 'bi-sort-down';
+        }
+
+        return 'bi-filter';
+    };
+@endphp
+
 <div class="row">
     <div class="col-12">
-        @if(($viewMode === 'part' && $groupedByPart->count() > 0) || ($viewMode === 'pallet' && $groupedByPallet->count() > 0) || ($viewMode === 'not_full' && $notFullBoxes->count() > 0))
+        @if(($viewMode === 'part' && $groupedByPart->count() > 0) || ($viewMode === 'box_id' && $groupedByBoxId->count() > 0) || ($viewMode === 'pallet' && $groupedByPallet->count() > 0) || ($viewMode === 'not_full' && $notFullBoxes->count() > 0))
             <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
                 <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                             color: white; 
                             padding: 20px 24px; 
                             font-weight: 600;
                             font-size: 15px;">
-                    <i class="bi bi-table"></i> Daftar Stok Tersedia
+                    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                        <div>
+                            <i class="bi bi-table"></i> Daftar Stok Tersedia
+                        </div>
+                        @if(in_array($viewMode, ['part', 'pallet'], true))
+                            <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                                <span style="font-size: 12px; opacity: 0.85; font-weight: 500;">Urut ditambahkan</span>
+                                <a href="{{ $sortUrl('created_oldest') }}" class="stock-sort-pill {{ $sortMode === 'created_oldest' ? 'is-active' : '' }}">
+                                    <i class="bi bi-hourglass-split"></i>
+                                    <span>Terlama</span>
+                                </a>
+                                <a href="{{ $sortUrl('created_newest') }}" class="stock-sort-pill {{ $sortMode === 'created_newest' ? 'is-active' : '' }}">
+                                    <i class="bi bi-hourglass-bottom"></i>
+                                    <span>Terbaru</span>
+                                </a>
+                            </div>
+                        @endif
+                    </div>
                 </div>
 
                 <div class="table-responsive" style="overflow: hidden;">
@@ -167,47 +222,150 @@
                             <tr>
                                 @if($viewMode === 'part')
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                        <i class="bi bi-tag"></i> No Part
+                                        <a href="{{ $sortUrl($sortToggle('part_asc', 'part_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['part_asc', 'part_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-tag"></i>
+                                            <span>No Part</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'part_asc', 'part_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                        <i class="bi bi-box2"></i> Total Box
+                                        <a href="{{ $sortUrl($sortToggle('total_box_asc', 'total_box_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['total_box_asc', 'total_box_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-box2"></i>
+                                            <span>Total Box</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'total_box_asc', 'total_box_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                        <i class="bi bi-stack"></i> Total PCS
+                                        <a href="{{ $sortUrl($sortToggle('total_pcs_asc', 'total_pcs_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['total_pcs_asc', 'total_pcs_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-stack"></i>
+                                            <span>Total PCS</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'total_pcs_asc', 'total_pcs_desc') }} stock-sort-icon"></i>
+                                        </a>
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
+                                @elseif($viewMode === 'box_id')
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                        <a href="{{ $sortUrl($sortToggle('box_id_asc', 'box_id_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['box_id_asc', 'box_id_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-upc-scan"></i>
+                                            <span>ID Box</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'box_id_asc', 'box_id_desc') }} stock-sort-icon"></i>
+                                        </a>
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                        <a href="{{ $sortUrl($sortToggle('box_number_asc', 'box_number_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['box_number_asc', 'box_number_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-tags"></i>
+                                            <span>No Box</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'box_number_asc', 'box_number_desc') }} stock-sort-icon"></i>
+                                        </a>
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                        <a href="{{ $sortUrl($sortToggle('part_asc', 'part_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['part_asc', 'part_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-tag"></i>
+                                            <span>No Part</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'part_asc', 'part_desc') }} stock-sort-icon"></i>
+                                        </a>
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                        <a href="{{ $sortUrl($sortToggle('pallet_asc', 'pallet_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['pallet_asc', 'pallet_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-layers"></i>
+                                            <span>No Pallet</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'pallet_asc', 'pallet_desc') }} stock-sort-icon"></i>
+                                        </a>
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                        <a href="{{ $sortUrl($sortToggle('pcs_asc', 'pcs_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['pcs_asc', 'pcs_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-stack"></i>
+                                            <span>PCS</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'pcs_asc', 'pcs_desc') }} stock-sort-icon"></i>
+                                        </a>
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                        <a href="{{ $sortUrl($sortToggle('location_asc', 'location_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['location_asc', 'location_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-geo-alt"></i>
+                                            <span>Lokasi</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'location_asc', 'location_desc') }} stock-sort-icon"></i>
+                                        </a>
+                                    </th>
+                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                        <a href="{{ $sortUrl($sortToggle('created_oldest', 'created_newest')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['created_oldest', 'created_newest'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-calendar"></i>
+                                            <span>Tanggal</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'created_oldest', 'created_newest') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
                                 @elseif($viewMode === 'pallet')
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                        <i class="bi bi-layers"></i> No Pallet
+                                        <a href="{{ $sortUrl($sortToggle('pallet_asc', 'pallet_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['pallet_asc', 'pallet_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-layers"></i>
+                                            <span>No Pallet</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'pallet_asc', 'pallet_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                        <i class="bi bi-geo-alt"></i> Lokasi
+                                        <a href="{{ $sortUrl($sortToggle('location_asc', 'location_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['location_asc', 'location_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-geo-alt"></i>
+                                            <span>Lokasi</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'location_asc', 'location_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                        <i class="bi bi-box2"></i> Total Box
+                                        <a href="{{ $sortUrl($sortToggle('total_box_asc', 'total_box_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['total_box_asc', 'total_box_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-box2"></i>
+                                            <span>Total Box</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'total_box_asc', 'total_box_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                        <i class="bi bi-stack"></i> Total PCS
+                                        <a href="{{ $sortUrl($sortToggle('total_pcs_asc', 'total_pcs_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['total_pcs_asc', 'total_pcs_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-stack"></i>
+                                            <span>Total PCS</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'total_pcs_asc', 'total_pcs_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
                                 @else
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                        <i class="bi bi-upc-scan"></i> ID Box
+                                        <a href="{{ $sortUrl($sortToggle('box_number_asc', 'box_number_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['box_number_asc', 'box_number_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-upc-scan"></i>
+                                            <span>No Box</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'box_number_asc', 'box_number_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                        <i class="bi bi-tag"></i> No Part
+                                        <a href="{{ $sortUrl($sortToggle('part_asc', 'part_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['part_asc', 'part_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-tag"></i>
+                                            <span>No Part</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'part_asc', 'part_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                        <i class="bi bi-layers"></i> No Pallet
+                                        <a href="{{ $sortUrl($sortToggle('pallet_asc', 'pallet_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['pallet_asc', 'pallet_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-layers"></i>
+                                            <span>No Pallet</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'pallet_asc', 'pallet_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                        <i class="bi bi-stack"></i> PCS
+                                        <a href="{{ $sortUrl($sortToggle('pcs_asc', 'pcs_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['pcs_asc', 'pcs_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-stack"></i>
+                                            <span>PCS</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'pcs_asc', 'pcs_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                        <i class="bi bi-geo-alt"></i> Lokasi
+                                        <a href="{{ $sortUrl($sortToggle('location_asc', 'location_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['location_asc', 'location_desc'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-geo-alt"></i>
+                                            <span>Lokasi</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'location_asc', 'location_desc') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
-                                        <i class="bi bi-calendar"></i> Tanggal
+                                        <a href="{{ $sortUrl($sortToggle('created_oldest', 'created_newest')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['created_oldest', 'created_newest'], true) ? 'is-active' : '' }}">
+                                            <i class="bi bi-calendar"></i>
+                                            <span>Tanggal</span>
+                                            <i class="bi {{ $sortIcon($sortMode, 'created_oldest', 'created_newest') }} stock-sort-icon"></i>
+                                        </a>
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
                                 @endif
@@ -245,6 +403,78 @@
                                                            box-shadow: 0 4px 8px rgba(12, 119, 121, 0.15);">
                                                 <i class="bi bi-eye"></i> Detail
                                             </button>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            @elseif($viewMode === 'box_id')
+                                @php
+                                    $currentUserRole = auth()->user()->role ?? null;
+                                    $canEditBox = in_array($currentUserRole, ['admin_warehouse', 'admin'], true);
+                                    $canDeleteStock = in_array($currentUserRole, ['admin_warehouse', 'supervisi', 'admin'], true);
+                                @endphp
+                                @foreach($groupedByBoxId as $boxData)
+                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;" onmouseenter="this.style.backgroundColor='#f9fafb';" onmouseleave="this.style.backgroundColor='transparent';">
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center;">
+                                            <span style="background: linear-gradient(135deg, #f0f4f8 0%, #e0f2fe 100%); color: #0C7779; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; display: inline-block; box-shadow: 0 2px 4px rgba(12, 119, 121, 0.1);">
+                                                {{ $boxData['box_id'] ?? 'Legacy' }}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #9a3412; font-weight: 700;">
+                                            <span style="background: #fff7ed; padding: 6px 12px; border-radius: 8px; display: inline-block;">
+                                                {{ $boxData['box_number'] ?? '-' }}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
+                                            {{ $boxData['part_number'] }}
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
+                                            {{ $boxData['pallet_number'] }}
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
+                                            <span style="background: #f0f4f8; padding: 6px 12px; border-radius: 8px; display: inline-block;">{{ (int) $boxData['pcs_quantity'] }}</span>
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #4b5563;">
+                                            {{ $boxData['location'] ?? 'Unknown' }}
+                                        </td>
+                                        <td style="padding: 16px 20px; color: #6b7280;">
+                                            {{ optional($boxData['created_at'])->format('d M Y H:i') }}
+                                        </td>
+                                        <td style="padding: 16px 20px; text-align: center;">
+                                            <div class="d-inline-flex gap-1 flex-wrap justify-content-center">
+                                                @if(!empty($boxData['box_id']))
+                                                    <button type="button" class="btn btn-sm btn-outline-primary js-box-history"
+                                                            data-box-id="{{ $boxData['box_id'] ?? '' }}"
+                                                            style="font-size: 12px;">
+                                                        <i class="bi bi-clock-history"></i> History
+                                                    </button>
+                                                    @if($canEditBox)
+                                                        <button type="button" class="btn btn-sm btn-outline-success js-edit-box"
+                                                                data-box-id="{{ $boxData['box_id'] ?? '' }}"
+                                                                data-box-number="{{ $boxData['box_number'] ?? '' }}"
+                                                                data-part-number="{{ $boxData['part_number'] ?? '' }}"
+                                                                data-pcs-quantity="{{ $boxData['pcs_quantity'] ?? 0 }}"
+                                                                data-stored-at="{{ optional($boxData['created_at'])->format('Y-m-d H:i') }}"
+                                                                style="font-size: 12px;">
+                                                            <i class="bi bi-pencil-square"></i> Edit
+                                                        </button>
+                                                    @endif
+                                                    @if($canDeleteStock)
+                                                        <button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                                                data-box-id="{{ $boxData['box_id'] ?? '' }}"
+                                                                data-box-number="{{ $boxData['box_number'] ?? '' }}"
+                                                                data-part-number="{{ $boxData['part_number'] ?? '' }}"
+                                                                data-pcs-quantity="{{ $boxData['pcs_quantity'] ?? 0 }}"
+                                                                data-pallet-id="{{ $boxData['pallet_id'] ?? '' }}"
+                                                                data-pallet-number="{{ $boxData['pallet_number'] ?? '' }}"
+                                                                data-location="{{ $boxData['location'] ?? '' }}"
+                                                                style="font-size: 12px;">
+                                                            <i class="bi bi-trash"></i> Hapus
+                                                        </button>
+                                                    @endif
+                                                @else
+                                                    <span class="text-muted small">Legacy</span>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach

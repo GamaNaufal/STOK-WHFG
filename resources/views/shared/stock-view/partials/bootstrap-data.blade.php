@@ -5,6 +5,7 @@
     'masterParts' => $masterPartNumbers,
     'allPallets' => $allPallets,
     'allBoxNumbers' => $allBoxNumbers,
+    'allLocations' => $allLocations,
     'allSearchTerms' => $allSearchTerms,
     'search' => $search,
     'directBoxTarget' => $directBoxTarget,

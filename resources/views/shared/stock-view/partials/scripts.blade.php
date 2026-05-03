@@ -23,9 +23,10 @@
     const masterParts = Array.isArray(bootstrapData.masterParts) ? bootstrapData.masterParts : [];
     const allPallets = Array.isArray(bootstrapData.allPallets) ? bootstrapData.allPallets : [];
     const allBoxNumbers = Array.isArray(bootstrapData.allBoxNumbers) ? bootstrapData.allBoxNumbers : [];
+    const allLocations = Array.isArray(bootstrapData.allLocations) ? bootstrapData.allLocations : [];
     const allSearchTerms = Array.isArray(bootstrapData.allSearchTerms)
         ? bootstrapData.allSearchTerms
-        : [...allParts, ...allPallets, ...allBoxNumbers];
+        : [...allParts, ...allPallets, ...allBoxNumbers, ...allLocations];
     const currentSearch = String(bootstrapData.search || '').trim();
     const directBoxTarget = bootstrapData.directBoxTarget && typeof bootstrapData.directBoxTarget === 'object'
         ? bootstrapData.directBoxTarget
@@ -226,6 +227,7 @@
     const partTermSet = new Set((allParts || []).map(normalizeSearchKey));
     const palletTermSet = new Set((allPallets || []).map(normalizeSearchKey));
     const boxTermSet = new Set((allBoxNumbers || []).map(normalizeSearchKey));
+    const locationTermSet = new Set((allLocations || []).map(normalizeSearchKey));
 
     function getSearchTermTypes(term) {
         const key = normalizeSearchKey(term);
@@ -234,6 +236,7 @@
         if (partTermSet.has(key)) types.push('No Part');
         if (palletTermSet.has(key)) types.push('Pallet');
         if (boxTermSet.has(key)) types.push('ID Box');
+        if (locationTermSet.has(key)) types.push('Lokasi');
 
         return types.length ? types : ['Lainnya'];
     }

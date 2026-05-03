@@ -10,7 +10,7 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 
-class StockViewByPartExport implements FromCollection, WithHeadings, WithStyles
+class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
 {
     protected $stocks;
     protected $sortMode;
@@ -19,34 +19,44 @@ class StockViewByPartExport implements FromCollection, WithHeadings, WithStyles
     public function __construct($stocks, ?string $sortMode = null)
     {
         $this->stocks = $stocks;
-        $this->sortMode = $sortMode ?: 'part_asc';
+        $this->sortMode = $sortMode ?: 'box_id_asc';
     }
 
     public function collection()
     {
         $rows = collect($this->stocks)->sort(function ($left, $right) {
             return match ($this->sortMode) {
+                'box_id_desc' => $this->compareNullableNumber($right['box_id'] ?? null, $left['box_id'] ?? null),
+                'box_number_asc' => $this->compareNullableString($left['box_number'] ?? null, $right['box_number'] ?? null),
+                'box_number_desc' => $this->compareNullableString($right['box_number'] ?? null, $left['box_number'] ?? null),
+                'part_asc' => $this->compareNullableString($left['part_number'] ?? null, $right['part_number'] ?? null),
                 'part_desc' => $this->compareNullableString($right['part_number'] ?? null, $left['part_number'] ?? null),
-                'total_box_asc' => $this->compareNullableNumber($left['total_box'] ?? null, $right['total_box'] ?? null),
-                'total_box_desc' => $this->compareNullableNumber($right['total_box'] ?? null, $left['total_box'] ?? null),
-                'total_pcs_asc' => $this->compareNullableNumber($left['total_pcs'] ?? null, $right['total_pcs'] ?? null),
-                'total_pcs_desc' => $this->compareNullableNumber($right['total_pcs'] ?? null, $left['total_pcs'] ?? null),
-                'created_oldest' => $this->compareNullableTimestamp($left['sort_created_at'] ?? null, $right['sort_created_at'] ?? null),
-                'created_newest' => $this->compareNullableTimestamp($right['sort_created_at'] ?? null, $left['sort_created_at'] ?? null),
-                'updated_oldest' => $this->compareNullableTimestamp($left['sort_updated_at'] ?? null, $right['sort_updated_at'] ?? null),
-                'updated_newest' => $this->compareNullableTimestamp($right['sort_updated_at'] ?? null, $left['sort_updated_at'] ?? null),
-                default => $this->compareNullableString($left['part_number'] ?? null, $right['part_number'] ?? null),
+                'pallet_asc' => $this->compareNullableString($left['pallet_number'] ?? null, $right['pallet_number'] ?? null),
+                'pallet_desc' => $this->compareNullableString($right['pallet_number'] ?? null, $left['pallet_number'] ?? null),
+                'pcs_asc' => $this->compareNullableNumber($left['pcs_quantity'] ?? null, $right['pcs_quantity'] ?? null),
+                'pcs_desc' => $this->compareNullableNumber($right['pcs_quantity'] ?? null, $left['pcs_quantity'] ?? null),
+                'location_asc' => $this->compareNullableString($left['location'] ?? null, $right['location'] ?? null),
+                'location_desc' => $this->compareNullableString($right['location'] ?? null, $left['location'] ?? null),
+                'created_oldest' => $this->compareNullableTimestamp($left['created_at'] ?? null, $right['created_at'] ?? null),
+                'created_newest' => $this->compareNullableTimestamp($right['created_at'] ?? null, $left['created_at'] ?? null),
+                'updated_oldest' => $this->compareNullableTimestamp($left['updated_at'] ?? null, $right['updated_at'] ?? null),
+                'updated_newest' => $this->compareNullableTimestamp($right['updated_at'] ?? null, $left['updated_at'] ?? null),
+                default => $this->compareNullableNumber($left['box_id'] ?? null, $right['box_id'] ?? null),
             };
         })->values();
 
         $data = collect();
         $currentRow = 2;
-        
+
         foreach ($rows as $stock) {
             $data->push([
+                'ID Box' => $stock['box_id'] ?? 'Legacy',
+                'No Box' => $stock['box_number'] ?? '-',
                 'No Part' => $stock['part_number'] ?? '-',
-                'Total Box' => (int) ($stock['total_box'] ?? $stock['box_quantity'] ?? 0),
-                'Total PCS' => (int) ($stock['total_pcs'] ?? $stock['pcs_quantity'] ?? 0),
+                'No Pallet' => $stock['pallet_number'] ?? '-',
+                'PCS' => (int) ($stock['pcs_quantity'] ?? 0),
+                'Lokasi' => $stock['location'] ?? '-',
+                'Tanggal' => $this->formatDate($stock['created_at'] ?? null),
             ]);
             $currentRow++;
             $this->groupEndRows[] = $currentRow - 1;
@@ -58,9 +68,13 @@ class StockViewByPartExport implements FromCollection, WithHeadings, WithStyles
     public function headings(): array
     {
         return [
+            'ID Box',
+            'No Box',
             'No Part',
-            'Total Box',
-            'Total PCS',
+            'No Pallet',
+            'PCS',
+            'Lokasi',
+            'Tanggal',
         ];
     }
 
@@ -68,8 +82,7 @@ class StockViewByPartExport implements FromCollection, WithHeadings, WithStyles
     {
         $lastRow = $this->stocks->count() + 1;
 
-        // Apply borders to all cells
-        $sheet->getStyle('A1:C' . $lastRow)->applyFromArray([
+        $sheet->getStyle('A1:G' . $lastRow)->applyFromArray([
             'border' => [
                 'allBorders' => [
                     'borderStyle' => Border::BORDER_THIN,
@@ -78,7 +91,6 @@ class StockViewByPartExport implements FromCollection, WithHeadings, WithStyles
             ],
         ]);
 
-        // Header styling
         $sheet->getStyle('1:1')->applyFromArray([
             'font' => [
                 'bold' => true,
@@ -96,7 +108,6 @@ class StockViewByPartExport implements FromCollection, WithHeadings, WithStyles
             ],
         ]);
 
-        // Data rows styling
         $sheet->getStyle('2:' . $lastRow)->applyFromArray([
             'alignment' => [
                 'vertical' => Alignment::VERTICAL_TOP,
@@ -104,14 +115,16 @@ class StockViewByPartExport implements FromCollection, WithHeadings, WithStyles
             ],
         ]);
 
-        // Set column widths
-        $sheet->getColumnDimension('A')->setWidth(20);  // No Part
-        $sheet->getColumnDimension('B')->setWidth(15);  // Total Box
-        $sheet->getColumnDimension('C')->setWidth(15);  // Total PCS
+        $sheet->getColumnDimension('A')->setWidth(12);
+        $sheet->getColumnDimension('B')->setWidth(20);
+        $sheet->getColumnDimension('C')->setWidth(20);
+        $sheet->getColumnDimension('D')->setWidth(20);
+        $sheet->getColumnDimension('E')->setWidth(12);
+        $sheet->getColumnDimension('F')->setWidth(20);
+        $sheet->getColumnDimension('G')->setWidth(18);
 
-        // Apply thicker border di akhir setiap entry
         foreach ($this->groupEndRows as $row) {
-            $sheet->getStyle('A' . $row . ':C' . $row)->applyFromArray([
+            $sheet->getStyle('A' . $row . ':G' . $row)->applyFromArray([
                 'border' => [
                     'bottom' => [
                         'borderStyle' => Border::BORDER_MEDIUM,
@@ -121,8 +134,16 @@ class StockViewByPartExport implements FromCollection, WithHeadings, WithStyles
             ]);
         }
 
-        // Freeze header row
         $sheet->freezePane('A2');
+    }
+
+    private function formatDate($value): string
+    {
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format('d M Y H:i');
+        }
+
+        return $value ? (string) $value : '-';
     }
 
     private function compareNullableString($left, $right, string $direction = 'asc'): int
