@@ -854,6 +854,19 @@
     }
 
     document.getElementById("save-btn").addEventListener("click", function () {
+        const deliveryOrderSelect = document.getElementById(
+            config.deliveryOrderSelectId || "deliveryOrderSelect",
+        );
+
+        if (
+            config.requireDeliveryOrder &&
+            deliveryOrderSelect &&
+            !deliveryOrderSelect.value
+        ) {
+            showError("Pilih delivery order terlebih dahulu.");
+            return;
+        }
+
         if (
             palletModeExisting &&
             palletModeExisting.checked &&
@@ -886,6 +899,9 @@
             form.append("location_id", selectedId);
             form.append("warehouse_location", selectedCode);
         }
+        if (deliveryOrderSelect && deliveryOrderSelect.value) {
+            form.append("delivery_order_id", deliveryOrderSelect.value);
+        }
         // Tambah input_date jika user mengisinya
         if (inputDate) {
             form.append("input_date", inputDate);
@@ -907,19 +923,78 @@
                 }
                 return response.json();
             })
-            .then(() => {
+            .then((data) => {
                 const savedLocation =
                     selectedCode ||
                     currentPalletLocationCode ||
                     "(tanpa lokasi)";
-                sessionStorage.setItem(
-                    "stockInputPostSaveMessage",
+                const assignUrl = config.assignAfterSaveUrl;
+                const deliveryOrderId = deliveryOrderSelect?.value || "";
+
+                if (assignUrl && deliveryOrderId && data?.stock_input_id) {
+                    return fetch(assignUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "X-CSRF-TOKEN": config.csrfToken,
+                        },
+                        body: JSON.stringify({
+                            delivery_order_id: Number(deliveryOrderId),
+                            stock_input_id: Number(data.stock_input_id),
+                        }),
+                    })
+                        .then((response) => {
+                            if (!response.ok) {
+                                return response.json().then((err) => {
+                                    throw new Error(
+                                        err.message ||
+                                            "Gagal assign ke delivery",
+                                    );
+                                });
+                            }
+                            return response.json();
+                        })
+                        .then((assignData) => ({
+                            savedLocation,
+                            assignData,
+                            assignError: null,
+                        }))
+                        .catch((error) => ({
+                            savedLocation,
+                            assignData: null,
+                            assignError:
+                                error?.message || "Gagal assign ke delivery",
+                        }));
+                }
+
+                return {
+                    savedLocation,
+                    assignData: null,
+                    assignError: null,
+                };
+            })
+            .then(({ savedLocation, assignData, assignError }) => {
+                let message =
                     "Data pallet berhasil tersimpan di lokasi: " +
-                        savedLocation,
-                );
+                    savedLocation;
+
+                if (assignData) {
+                    message +=
+                        ". Assigned: " +
+                        (assignData.assigned_count ?? 0) +
+                        ", Skipped: " +
+                        (assignData.skipped_count ?? 0);
+                }
+                if (assignError) {
+                    message += ". Assign gagal: " + assignError;
+                }
+
+                sessionStorage.setItem("stockInputPostSaveMessage", message);
                 showToast(
-                    "Stok berhasil disimpan di lokasi: " + savedLocation,
-                    "success",
+                    assignError
+                        ? "Stok tersimpan. Assign gagal: " + assignError
+                        : "Stok berhasil disimpan di lokasi: " + savedLocation,
+                    assignError ? "warning" : "success",
                 );
                 window.location.href = config.indexUrl;
             })

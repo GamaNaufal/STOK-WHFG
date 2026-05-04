@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 // use App\Http\Controllers\BoxController; // DISABLED - fitur tidak dipakai
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeliveryAssignController;
 use App\Http\Controllers\StockInputController;
 use App\Http\Controllers\StockViewController;
 use App\Http\Controllers\StockWithdrawalController;
@@ -40,8 +41,8 @@ Route::middleware('auth')->group(function () {
         Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
     });
 
-    // Stock Input Routes (Warehouse Operator/Admin) - Scan QR Box
-    Route::middleware('role:warehouse_operator,admin')->group(function () {
+    // Stock Input Routes (Warehouse Operator/Admin Warehouse/Admin) - Scan QR Box
+    Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
         Route::get('/stock-input', [StockInputController::class, 'index'])->name('stock-input.index');
         Route::post('/stock-input/scan-box', [StockInputController::class, 'scanBox'])->name('stock-input.scan-box');
         Route::post('/stock-input/scan-barcode', [StockInputController::class, 'scanBarcode'])->name('stock-input.scan-barcode');
@@ -121,6 +122,14 @@ Route::middleware('auth')->group(function () {
         Route::get('/stock-view/export-box-id', [StockViewController::class, 'exportByBoxId'])->name('stock-view.export-box-id');
         Route::get('/stock-view/export-pallet', [StockViewController::class, 'exportByPallet'])->name('stock-view.export-pallet');
         Route::get('/stock-view/boxes/{boxId}/history', [StockViewController::class, 'boxHistory'])->name('stock-view.box-history');
+    });
+
+    // Delivery Assignment Routes (Warehouse Operator, Admin Warehouse, Admin)
+    Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
+        Route::get('/delivery-assign', [DeliveryAssignController::class, 'index'])->name('delivery-assign.index');
+        Route::get('/delivery-assign/search', [DeliveryAssignController::class, 'search'])->name('delivery-assign.search');
+        Route::post('/delivery-assign/assign', [DeliveryAssignController::class, 'assign'])->name('delivery-assign.assign');
+        Route::post('/delivery-assign/assign-input', [DeliveryAssignController::class, 'assignFromStockInput'])->name('delivery-assign.assign-input');
     });
 
     Route::middleware('role:admin_warehouse,admin')->group(function () {

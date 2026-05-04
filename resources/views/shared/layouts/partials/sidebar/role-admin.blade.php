@@ -5,6 +5,7 @@
         || request()->routeIs('box-not-full.create')
         || request()->routeIs('box-not-full.approvals')
         || request()->routeIs('merge-pallet*')
+        || request()->routeIs('delivery-assign*')
         || request()->routeIs('stock-view*')
         || request()->routeIs('expired-box*');
 
@@ -57,6 +58,11 @@
             <li class="nav-item">
                 <a class="nav-link {{ request()->routeIs('stock-view*') ? 'active' : '' }}" href="{{ route('stock-view.index') }}">
                     <i class="bi bi-eye"></i> Lihat Stok
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {{ request()->routeIs('delivery-assign*') ? 'active' : '' }}" href="{{ route('delivery-assign.index') }}">
+                    <i class="bi bi-send"></i> Assign Delivery
                 </a>
             </li>
             <li class="nav-item">

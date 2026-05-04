@@ -16,6 +16,12 @@
     </a>
 </li>
 <li class="nav-item">
+    <a class="nav-link {{ request()->routeIs('delivery-assign*') ? 'active' : '' }}"
+       href="{{ route('delivery-assign.index') }}">
+        <i class="bi bi-send"></i> Assign Delivery
+    </a>
+</li>
+<li class="nav-item">
     <a class="nav-link {{ request()->routeIs('delivery.pick.verification') ? 'active' : '' }}"
        href="{{ route('delivery.pick.verification') }}">
         <i class="bi bi-upc-scan"></i> Picking Verification

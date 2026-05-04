@@ -938,7 +938,11 @@ class StockInputController extends Controller
 
             DB::commit(); // Commit transaction
 
-            return response()->json(['message' => 'Stok berhasil disimpan!'], 200);
+            return response()->json([
+                'message' => 'Stok berhasil disimpan!',
+                'stock_input_id' => $stockInput->id,
+                'box_ids' => $attachedBoxIds,
+            ], 200);
 
         } catch (\Exception $e) {
             DB::rollBack(); // Rollback transaction on error
