@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 namespace App\Http\Controllers;
 
@@ -6,6 +6,7 @@ use App\Models\Box;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
+use App\Models\PartSetting;
 use App\Models\StockInput;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
@@ -98,6 +99,114 @@ class DeliveryAssignController extends Controller
             'part_number' => $box?->part_number,
             'reason' => $reason,
         ];
+    }
+
+    private function addNewBoxError(array &$errors, int $index, ?string $boxNumber, ?string $partNumber, string $reason): void
+    {
+        $errors[] = [
+            'index' => $index,
+            'box_number' => $boxNumber,
+            'part_number' => $partNumber,
+            'reason' => $reason,
+        ];
+    }
+
+    private function validateNewBoxes(array $newBoxes): array
+    {
+        $errors = [];
+        $prepared = [];
+        $invalidIndexes = [];
+
+        foreach ($newBoxes as $index => $entry) {
+            $boxNumber = trim((string) ($entry['box_number'] ?? ''));
+            $partNumber = trim((string) ($entry['part_number'] ?? ''));
+            $pcsQuantityRaw = $entry['pcs_quantity'] ?? null;
+            $pcsQuantity = is_numeric($pcsQuantityRaw) ? (int) $pcsQuantityRaw : null;
+
+            if ($boxNumber === '' || !ctype_digit($boxNumber)) {
+                $this->addNewBoxError($errors, $index, $boxNumber, $partNumber, 'ID Box harus berupa angka.');
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
+            if ($partNumber === '') {
+                $this->addNewBoxError($errors, $index, $boxNumber, $partNumber, 'No Part wajib diisi.');
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
+            if ($pcsQuantity === null || $pcsQuantity <= 0) {
+                $this->addNewBoxError($errors, $index, $boxNumber, $partNumber, 'Qty PCS harus lebih dari 0.');
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
+            $prepared[$index] = [
+                'box_number' => $boxNumber,
+                'part_number' => $partNumber,
+                'pcs_quantity' => $pcsQuantity,
+            ];
+        }
+
+        if (empty($prepared)) {
+            return [[], $errors];
+        }
+
+        $boxNumbers = array_values(array_unique(array_column($prepared, 'box_number')));
+        $partNumbers = array_values(array_unique(array_column($prepared, 'part_number')));
+
+        $boxNumberCounts = array_count_values(array_column($prepared, 'box_number'));
+        foreach ($prepared as $index => $entry) {
+            if (($boxNumberCounts[$entry['box_number']] ?? 0) > 1) {
+                $this->addNewBoxError($errors, $index, $entry['box_number'], $entry['part_number'], 'ID Box duplikat dalam input.');
+                $invalidIndexes[$index] = true;
+            }
+        }
+
+        $existingBoxNumbers = Box::query()
+            ->whereIn('box_number', $boxNumbers)
+            ->pluck('box_number')
+            ->map(fn ($value) => (string) $value)
+            ->all();
+        $existingLookup = array_fill_keys($existingBoxNumbers, true);
+
+        $partSettings = PartSetting::query()
+            ->whereIn('part_number', $partNumbers)
+            ->get()
+            ->keyBy('part_number');
+
+        $validEntries = [];
+        foreach ($prepared as $index => $entry) {
+            if (!empty($invalidIndexes[$index])) {
+                continue;
+            }
+
+            if (!empty($existingLookup[$entry['box_number']])) {
+                $this->addNewBoxError($errors, $index, $entry['box_number'], $entry['part_number'], 'ID Box sudah ada di sistem.');
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
+            $partSetting = $partSettings->get($entry['part_number']);
+            if (!$partSetting) {
+                $this->addNewBoxError($errors, $index, $entry['box_number'], $entry['part_number'], 'No Part tidak ditemukan di Master Part.');
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
+            $qtyBox = (int) ($partSetting->qty_box ?? 0);
+            if ($qtyBox > 0 && $entry['pcs_quantity'] > $qtyBox) {
+                $this->addNewBoxError($errors, $index, $entry['box_number'], $entry['part_number'], 'Qty PCS melebihi qty box master.');
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
+            $validEntries[] = array_merge($entry, [
+                'qty_box' => $qtyBox > 0 ? $qtyBox : null,
+            ]);
+        }
+
+        return [$validEntries, $errors];
     }
 
     private function assignBoxesToDelivery(int $deliveryOrderId, array $boxIds): array
@@ -375,6 +484,72 @@ class DeliveryAssignController extends Controller
         ]);
     }
 
+    public function palletBoxes(Request $request, int $palletId)
+    {
+        $limit = (int) $request->query('limit', 60);
+        if ($limit <= 0) {
+            $limit = 60;
+        }
+        if ($limit > 200) {
+            $limit = 200;
+        }
+
+        $pallet = DB::table('pallets as p')
+            ->join('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
+            ->where('p.id', $palletId)
+            ->where('sl.warehouse_location', '!=', 'Unknown')
+            ->select(
+                'p.id',
+                'p.pallet_number',
+                'sl.warehouse_location as location'
+            )
+            ->first();
+
+        if (!$pallet) {
+            return response()->json([
+                'message' => 'Pallet tidak ditemukan.',
+            ], 404);
+        }
+
+        $lockedBoxIds = $this->getActiveLockedBoxIds();
+
+        $baseQuery = DB::table('boxes as b')
+            ->join('pallet_boxes as pb', 'pb.box_id', '=', 'b.id')
+            ->where('pb.pallet_id', $palletId)
+            ->whereNull('b.deleted_at')
+            ->where('b.is_withdrawn', false)
+            ->where(function ($q) {
+                $q->whereNull('b.expired_status')
+                    ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
+            })
+            ->whereNull('b.assigned_delivery_order_id')
+            ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
+                $q->whereNotIn('b.id', $lockedBoxIds);
+            });
+
+        $total = (clone $baseQuery)->distinct()->count('b.id');
+
+        $boxes = $baseQuery
+            ->distinct()
+            ->select(
+                'b.id',
+                'b.box_number',
+                'b.part_number',
+                'b.pcs_quantity',
+                'b.is_not_full'
+            )
+            ->orderBy('b.box_number')
+            ->limit($limit)
+            ->get();
+
+        return response()->json([
+            'pallet' => $pallet,
+            'total' => $total,
+            'limit' => $limit,
+            'boxes' => $boxes,
+        ]);
+    }
+
     public function assign(Request $request)
     {
         $validated = $request->validate([
@@ -383,6 +558,10 @@ class DeliveryAssignController extends Controller
             'box_ids.*' => ['integer'],
             'pallet_ids' => ['array'],
             'pallet_ids.*' => ['integer'],
+            'new_boxes' => ['array'],
+            'new_boxes.*.box_number' => ['required', 'string'],
+            'new_boxes.*.part_number' => ['required', 'string'],
+            'new_boxes.*.pcs_quantity' => ['required', 'integer', 'min:1'],
         ]);
 
         $deliveryOrderId = (int) $validated['delivery_order_id'];
@@ -395,24 +574,243 @@ class DeliveryAssignController extends Controller
 
         $boxIds = $validated['box_ids'] ?? [];
         $palletIds = $validated['pallet_ids'] ?? [];
+        $newBoxes = $validated['new_boxes'] ?? [];
+
+        [$validNewBoxes, $newBoxErrors] = $this->validateNewBoxes($newBoxes);
+        if (!empty($newBoxErrors)) {
+            return response()->json([
+                'message' => 'Box baru tidak valid. Periksa kembali input scan.',
+                'new_box_errors' => $newBoxErrors,
+            ], 422);
+        }
 
         $expandedBoxIds = $this->resolveBoxIdsFromPallets($palletIds);
         $allBoxIds = array_values(array_unique(array_merge($boxIds, $expandedBoxIds)));
 
-        if (empty($allBoxIds)) {
+        if (empty($allBoxIds) && empty($validNewBoxes)) {
             return response()->json([
-                'message' => 'Pilih minimal satu box atau pallet untuk di-assign.',
+                'message' => 'Pilih minimal satu box/pallet atau scan box baru.',
             ], 422);
         }
 
-        $result = $this->assignBoxesToDelivery($deliveryOrderId, $allBoxIds);
+        $lockedBoxIds = $this->getActiveLockedBoxIds();
+        $lockedLookup = array_fill_keys($lockedBoxIds, true);
+
+        $boxes = Box::query()
+            ->with(['pallets.stockLocation'])
+            ->whereIn('id', $allBoxIds)
+            ->get();
+
+        $boxesById = $boxes->keyBy('id');
+        $skipped = [];
+        $eligibleBoxes = [];
+
+        foreach ($allBoxIds as $boxId) {
+            $box = $boxesById->get($boxId);
+            if (!$box) {
+                $skipped[] = $this->buildSkipEntry(null, 'Box tidak ditemukan');
+                continue;
+            }
+
+            if (!empty($lockedLookup[$boxId])) {
+                $skipped[] = $this->buildSkipEntry($box, 'Box terkunci di sesi picking aktif');
+                continue;
+            }
+
+            if ($box->is_withdrawn) {
+                $skipped[] = $this->buildSkipEntry($box, 'Box sudah diwithdraw');
+                continue;
+            }
+
+            if ($box->expired_status && in_array($box->expired_status, ['handled', 'expired'], true)) {
+                $skipped[] = $this->buildSkipEntry($box, 'Box expired atau sudah ditangani');
+                continue;
+            }
+
+            $assignedOrderId = $box->assigned_delivery_order_id ? (int) $box->assigned_delivery_order_id : null;
+            if ($assignedOrderId && $assignedOrderId !== $deliveryOrderId) {
+                $skipped[] = $this->buildSkipEntry($box, 'Box sudah ter-assign ke delivery lain');
+                continue;
+            }
+
+            if ($assignedOrderId === $deliveryOrderId) {
+                $skipped[] = $this->buildSkipEntry($box, 'Box sudah ter-assign ke delivery ini');
+                continue;
+            }
+
+            $hasStoredLocation = $box->pallets->contains(function ($pallet) {
+                return $pallet->stockLocation
+                    && $pallet->stockLocation->warehouse_location !== 'Unknown';
+            });
+
+            if (!$hasStoredLocation) {
+                $skipped[] = $this->buildSkipEntry($box, 'Box belum memiliki lokasi tersimpan');
+                continue;
+            }
+
+            $eligibleBoxes[] = $box;
+        }
+
+        if (empty($eligibleBoxes) && empty($validNewBoxes)) {
+            return response()->json([
+                'assigned_existing_count' => 0,
+                'assigned_existing_box_ids' => [],
+                'created_new_count' => 0,
+                'created_new_box_ids' => [],
+                'skipped_count' => count($skipped),
+                'skipped' => $skipped,
+                'pick_session_id' => null,
+            ]);
+        }
+
+        $assignedExistingBoxIds = [];
+        $createdNewBoxIds = [];
+        $sessionId = null;
+        $userId = (int) Auth::id();
+
+        DB::transaction(function () use (
+            $deliveryOrderId,
+            $eligibleBoxes,
+            $validNewBoxes,
+            $userId,
+            &$assignedExistingBoxIds,
+            &$createdNewBoxIds,
+            &$sessionId
+        ) {
+            $session = DeliveryPickSession::query()
+                ->where('delivery_order_id', $deliveryOrderId)
+                ->where('status', 'pending')
+                ->orderByDesc('id')
+                ->first();
+
+            if (!$session) {
+                $session = DeliveryPickSession::create([
+                    'delivery_order_id' => $deliveryOrderId,
+                    'created_by' => $userId,
+                    'status' => 'pending',
+                ]);
+            }
+
+            $sessionId = $session->id;
+
+            if (!empty($eligibleBoxes)) {
+                $assignedExistingBoxIds = collect($eligibleBoxes)
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                Box::whereIn('id', $assignedExistingBoxIds)
+                    ->update([
+                        'assigned_delivery_order_id' => $deliveryOrderId,
+                        'updated_at' => now(),
+                    ]);
+
+                $existingBoxIds = DeliveryPickItem::query()
+                    ->where('pick_session_id', $session->id)
+                    ->whereIn('box_id', $assignedExistingBoxIds)
+                    ->pluck('box_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all();
+
+                $existingLookup = array_fill_keys($existingBoxIds, true);
+                $now = now();
+                $rows = [];
+
+                foreach ($eligibleBoxes as $box) {
+                    if (!empty($existingLookup[$box->id])) {
+                        continue;
+                    }
+
+                    $rows[] = [
+                        'pick_session_id' => $session->id,
+                        'box_id' => $box->id,
+                        'part_number' => $box->part_number,
+                        'pcs_quantity' => (int) $box->pcs_quantity,
+                        'status' => 'pending',
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+
+                if (!empty($rows)) {
+                    DB::table('delivery_pick_items')->insert($rows);
+                }
+            }
+
+            if (!empty($validNewBoxes)) {
+                $now = now();
+                $newBoxRows = [];
+                foreach ($validNewBoxes as $entry) {
+                    $newBoxRows[] = [
+                        'box_number' => $entry['box_number'],
+                        'part_number' => $entry['part_number'],
+                        'pcs_quantity' => $entry['pcs_quantity'],
+                        'qr_code' => $entry['box_number'] . '|' . $entry['part_number'] . '|' . $entry['pcs_quantity'],
+                        'user_id' => $userId,
+                        'qty_box' => $entry['qty_box'],
+                        'is_not_full' => $entry['qty_box'] ? $entry['pcs_quantity'] < $entry['qty_box'] : false,
+                        'not_full_reason' => $entry['qty_box'] && $entry['pcs_quantity'] < $entry['qty_box'] ? 'Direct delivery input' : null,
+                        'assigned_delivery_order_id' => $deliveryOrderId,
+                        'created_at' => $now,
+                        'updated_at' => $now,
+                    ];
+                }
+
+                foreach ($newBoxRows as $row) {
+                    $box = Box::create($row);
+                    $createdNewBoxIds[] = (int) $box->id;
+                }
+
+                if (!empty($createdNewBoxIds)) {
+                    $pickRows = [];
+                    foreach ($createdNewBoxIds as $index => $boxId) {
+                        $entry = $validNewBoxes[$index] ?? null;
+                        if (!$entry) {
+                            continue;
+                        }
+
+                        $pickRows[] = [
+                            'pick_session_id' => $session->id,
+                            'box_id' => $boxId,
+                            'part_number' => $entry['part_number'],
+                            'pcs_quantity' => (int) $entry['pcs_quantity'],
+                            'status' => 'pending',
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }
+
+                    if (!empty($pickRows)) {
+                        DB::table('delivery_pick_items')->insert($pickRows);
+                    }
+                }
+            }
+        });
+
+        if (!empty($assignedExistingBoxIds) || !empty($createdNewBoxIds)) {
+            AuditService::log(
+                'delivery_assignment',
+                'created',
+                'DeliveryOrder',
+                $deliveryOrderId,
+                [],
+                [
+                    'assigned_existing_box_ids' => $assignedExistingBoxIds,
+                    'created_new_box_ids' => $createdNewBoxIds,
+                    'pick_session_id' => $sessionId,
+                ],
+                'Assign manual stock + direct input box ke delivery order'
+            );
+        }
 
         return response()->json([
-            'assigned_count' => count($result['assigned_box_ids']),
-            'assigned_box_ids' => $result['assigned_box_ids'],
-            'skipped_count' => count($result['skipped']),
-            'skipped' => $result['skipped'],
-            'pick_session_id' => $result['session_id'],
+            'assigned_existing_count' => count($assignedExistingBoxIds),
+            'assigned_existing_box_ids' => $assignedExistingBoxIds,
+            'created_new_count' => count($createdNewBoxIds),
+            'created_new_box_ids' => $createdNewBoxIds,
+            'skipped_count' => count($skipped),
+            'skipped' => $skipped,
+            'pick_session_id' => $sessionId,
         ]);
     }
 
@@ -451,3 +849,4 @@ class DeliveryAssignController extends Controller
         ]);
     }
 }
+

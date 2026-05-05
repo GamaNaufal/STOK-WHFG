@@ -114,8 +114,7 @@ class DeliveryPickController extends Controller
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full');
 
-        $rows = $this->applyStoredLocationExistsFilter($rowsQuery)
-            ->get();
+        $rows = $rowsQuery->get();
 
         $pools = [];
         foreach ($rows as $row) {

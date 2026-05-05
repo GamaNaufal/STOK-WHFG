@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -128,8 +128,8 @@ Route::middleware('auth')->group(function () {
     Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
         Route::get('/delivery-assign', [DeliveryAssignController::class, 'index'])->name('delivery-assign.index');
         Route::get('/delivery-assign/search', [DeliveryAssignController::class, 'search'])->name('delivery-assign.search');
+        Route::get('/delivery-assign/pallets/{palletId}/boxes', [DeliveryAssignController::class, 'palletBoxes'])->name('delivery-assign.pallet-boxes');
         Route::post('/delivery-assign/assign', [DeliveryAssignController::class, 'assign'])->name('delivery-assign.assign');
-        Route::post('/delivery-assign/assign-input', [DeliveryAssignController::class, 'assignFromStockInput'])->name('delivery-assign.assign-input');
     });
 
     Route::middleware('role:admin_warehouse,admin')->group(function () {
@@ -179,4 +179,5 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable']); // Search Available Locations
 
 });
+
 

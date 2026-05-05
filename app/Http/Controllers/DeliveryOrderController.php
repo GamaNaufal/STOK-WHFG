@@ -153,7 +153,7 @@ class DeliveryOrderController extends Controller
 
     private function getReservedStockByOrder(): array
     {
-        $rows = $this->applyStoredLocationExistsFilter(DB::table('boxes')
+        $rows = DB::table('boxes')
             ->select(
                 'boxes.assigned_delivery_order_id',
                 'boxes.part_number',
@@ -163,7 +163,7 @@ class DeliveryOrderController extends Controller
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number')
-        )->get();
+            ->get();
 
         $reserved = [];
         foreach ($rows as $row) {
