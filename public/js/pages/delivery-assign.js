@@ -29,6 +29,10 @@
     const selectedBoxes = new Map();
     const scannedBoxes = new Map();
     const selectionOrder = [];
+    const gateState = {
+        enabled: false,
+        lastDeliveryOrderId: deliveryOrderSelect?.value || "",
+    };
 
     function escapeHtml(input) {
         return String(input ?? "")
@@ -72,6 +76,82 @@
             return;
         }
         resultBox.style.display = "none";
+    }
+
+    function showGatePlaceholders() {
+        if (palletList) {
+            palletList.innerHTML =
+                '<div class="list-group-item text-muted">Pilih delivery order terlebih dahulu.</div>';
+        }
+        if (boxList) {
+            boxList.innerHTML =
+                '<div class="list-group-item text-muted">Pilih delivery order terlebih dahulu.</div>';
+        }
+        if (palletCount) {
+            palletCount.textContent = "0";
+        }
+        if (boxCount) {
+            boxCount.textContent = "0";
+        }
+    }
+
+    function setGateState(enabled) {
+        gateState.enabled = enabled;
+        const disabled = !enabled;
+        [
+            searchInput,
+            searchBtn,
+            newBoxNumberInput,
+            newBoxPartInput,
+            newBoxQtyInput,
+            addNewBoxBtn,
+            assignBtn,
+        ].forEach((element) => {
+            if (!element) {
+                return;
+            }
+            element.disabled = disabled;
+        });
+
+        if (!enabled) {
+            showGatePlaceholders();
+        }
+    }
+
+    function hasSelections() {
+        return (
+            selectedPallets.size > 0 ||
+            selectedBoxes.size > 0 ||
+            scannedBoxes.size > 0
+        );
+    }
+
+    function confirmDeliveryOrderChange(onConfirm, onCancel) {
+        if (
+            window.WarehouseAlert &&
+            typeof window.WarehouseAlert.confirm === "function"
+        ) {
+            window.WarehouseAlert.confirm({
+                title: "Ganti Delivery Order",
+                message:
+                    "Mengganti delivery order akan mengosongkan pilihan box/pallet yang sudah dipilih.",
+                warningItems: [
+                    "Semua pilihan saat ini akan direset.",
+                    "Pastikan Anda memilih delivery order yang benar.",
+                ],
+                confirmText: "Ya, ganti",
+                cancelText: "Batal",
+                confirmColor: "#0C7779",
+                onConfirm,
+            });
+            return;
+        }
+
+        if (window.confirm("Ganti delivery order dan reset pilihan?")) {
+            onConfirm();
+        } else if (typeof onCancel === "function") {
+            onCancel();
+        }
     }
 
     function updateSummary() {
@@ -168,7 +248,9 @@
 
                 const removeBtn = item.querySelector('[data-action="remove"]');
                 const toggleBtn = item.querySelector('[data-action="toggle"]');
-                const detailBox = item.querySelector('[data-role="pallet-boxes"]');
+                const detailBox = item.querySelector(
+                    '[data-role="pallet-boxes"]',
+                );
 
                 removeBtn.addEventListener("click", () => {
                     selectedPallets.delete(entry.id);
@@ -319,10 +401,9 @@
                 container.dataset.loaded = "1";
             })
             .catch((error) => {
-                container.innerHTML =
-                    `<div class="small text-danger">${escapeHtml(
-                        error.message,
-                    )}</div>`;
+                container.innerHTML = `<div class="small text-danger">${escapeHtml(
+                    error.message,
+                )}</div>`;
             });
     }
 
@@ -452,6 +533,18 @@
     function performSearch(options = {}) {
         const strict = options.strict === true;
         hideResult();
+
+        if (!deliveryOrderSelect?.value) {
+            if (strict) {
+                return Promise.reject(
+                    new Error("Pilih delivery order terlebih dahulu."),
+                );
+            }
+            showResult("warning", "Pilih delivery order terlebih dahulu.");
+            showGatePlaceholders();
+            return Promise.resolve(null);
+        }
+
         const query = String(searchInput.value || "").trim();
 
         palletList.innerHTML =
@@ -489,7 +582,8 @@
             });
     }
 
-    function clearSelection() {
+    function clearSelection(options = {}) {
+        const { skipSearch = false, silent = false } = options;
         selectedPallets.clear();
         selectedBoxes.clear();
         scannedBoxes.clear();
@@ -497,6 +591,22 @@
         updateSummary();
         renderSelectedList();
         hideNewBoxError();
+
+        if (skipSearch) {
+            if (!deliveryOrderSelect?.value) {
+                showGatePlaceholders();
+            }
+            return;
+        }
+
+        if (!deliveryOrderSelect?.value) {
+            if (!silent) {
+                showResult("warning", "Pilih delivery order terlebih dahulu.");
+            }
+            showGatePlaceholders();
+            return;
+        }
+
         performSearch();
     }
 
@@ -701,7 +811,9 @@
                 confirmColor: "#0C7779",
                 onConfirm: proceed,
             });
-        } else if (window.confirm("Assign ini tidak bisa di-rewind. Lanjutkan?")) {
+        } else if (
+            window.confirm("Assign ini tidak bisa di-rewind. Lanjutkan?")
+        ) {
             proceed();
         }
     }
@@ -735,6 +847,33 @@
             });
         });
 
+    if (deliveryOrderSelect) {
+        deliveryOrderSelect.addEventListener("change", () => {
+            const nextValue = deliveryOrderSelect.value || "";
+            const previousValue = gateState.lastDeliveryOrderId || "";
+
+            if (nextValue === previousValue) {
+                return;
+            }
+
+            const applyChange = () => {
+                clearSelection({ skipSearch: true, silent: true });
+                gateState.lastDeliveryOrderId = nextValue;
+                setGateState(Boolean(nextValue));
+            };
+
+            if (hasSelections()) {
+                confirmDeliveryOrderChange(applyChange, () => {
+                    deliveryOrderSelect.value = previousValue;
+                });
+                return;
+            }
+
+            applyChange();
+        });
+    }
+
+    setGateState(Boolean(deliveryOrderSelect?.value));
     updateSummary();
     renderSelectedList();
 })();
