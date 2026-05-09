@@ -208,11 +208,13 @@ class StockWithdrawalController extends Controller
             'part_number' => 'required|string',
             'pcs_quantity' => 'required|integer|min:1',
             'delivery_order_id' => 'nullable|integer',
+            'allow_partial' => 'sometimes|boolean',
         ]);
 
         $partNumber = $request->input('part_number');
         $requestedQty = (int) $request->input('pcs_quantity');
         $orderId = $request->input('delivery_order_id');
+        $allowPartial = filter_var($request->input('allow_partial', false), FILTER_VALIDATE_BOOLEAN);
 
         $reservedLocations = [];
         $reservedTotal = 0;
@@ -240,6 +242,8 @@ class StockWithdrawalController extends Controller
         }
 
         $remainingQty = max(0, $requestedQty - $reservedTotal);
+    $plannedQty = $reservedTotal;
+    $isPartial = false;
 
         if (!$orderId) {
             // Get total available stock (exclude reserved boxes)
@@ -269,12 +273,23 @@ class StockWithdrawalController extends Controller
                 ? $this->getLocationsByFIFO($partNumber, $remainingQty, true, true)
                 : [];
 
-            $plannedQty = (int) collect($locations)->sum('will_take_pcs');
-            if ($remainingQty > 0 && $plannedQty < $remainingQty) {
+            $plannedQty += (int) collect($locations)->sum('will_take_pcs');
+            $isPartial = $allowPartial && $remainingQty > 0 && $plannedQty < $requestedQty;
+
+            if ($remainingQty > 0 && $plannedQty < $remainingQty && !$allowPartial) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Stok tidak cukup untuk sisa kebutuhan. Butuh box not full.',
                     'available' => $reservedTotal,
+                    'requested' => $requestedQty,
+                ], 422);
+            }
+
+            if ($remainingQty > 0 && $plannedQty <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Stok tidak tersedia untuk pengiriman ini.',
+                    'available' => 0,
                     'requested' => $requestedQty,
                 ], 422);
             }
@@ -286,6 +301,8 @@ class StockWithdrawalController extends Controller
             'success' => true,
             'part_number' => $partNumber,
             'requested_qty' => $requestedQty,
+            'planned_qty' => $plannedQty,
+            'is_partial' => $isPartial,
             'total_available' => $orderId ? ($reservedTotal + $this->getTotalStockForPart($partNumber, true)) : $this->getTotalStockForPart($partNumber, true),
             'locations' => $locations,
         ]);

@@ -46,6 +46,15 @@
                         <option value="month" {{ request('group_by') === 'month' ? 'selected' : '' }}>Bulanan</option>
                     </select>
                 </div>
+                <div class="col-lg-2 col-md-4">
+                    <label class="form-label">Fulfillment</label>
+                    <select name="fulfillment_filter" class="form-select">
+                        <option value="all" {{ request('fulfillment_filter', 'all') === 'all' ? 'selected' : '' }}>Semua</option>
+                        <option value="backorder" {{ request('fulfillment_filter') === 'backorder' ? 'selected' : '' }}>Backorder saja</option>
+                        <option value="partial" {{ request('fulfillment_filter') === 'partial' ? 'selected' : '' }}>Partial saja</option>
+                        <option value="full" {{ request('fulfillment_filter') === 'full' ? 'selected' : '' }}>Full saja</option>
+                    </select>
+                </div>
                 <div class="col-lg-3 col-md-4">
                     <label class="form-label">Start Date</label>
                     <input type="date" name="start_date" class="form-control" value="{{ request('start_date') }}">
@@ -80,14 +89,23 @@
         });
         $activePalletPreview = $activePallets->sortByDesc('last_in_sort')->values()->take(5);
         $fulfillmentPreview = $fulfillmentRows->sortBy('rate')->take(5);
+        $backorderPreview = $fulfillmentRows->where('status', 'Backorder')->take(5);
         $scanPreview = $issueList->take(5);
     @endphp
 
     <div class="row g-4 mb-4">
         <div class="col-md-3">
+            @php
+                $fulfillmentFilterLabel = [
+                    'all' => 'Order Full',
+                    'full' => 'Order Full',
+                    'partial' => 'Order Partial',
+                    'backorder' => 'Order Backorder',
+                ][request('fulfillment_filter', 'all')] ?? 'Order Full';
+            @endphp
             <div class="card shadow-sm border-0 h-100" data-bs-toggle="popover" data-bs-html="true" data-bs-placement="left" data-popover-target="fulfillment-popover" data-popover-title="Fulfillment (Top 5)">
                 <div class="card-body position-relative">
-                    <h6 class="text-muted">Fulfillment Rate (Order Full)</h6>
+                    <h6 class="text-muted">Fulfillment Rate ({{ $fulfillmentFilterLabel }})</h6>
                     <div class="display-6 fw-bold">{{ $fulfillmentRate }}%</div>
                     <a href="#fulfillment-report" class="stretched-link" aria-label="Lihat detail fulfillment"></a>
                 </div>
@@ -117,6 +135,15 @@
                     <h6 class="text-muted">Scan Issues</h6>
                     <div class="display-6 fw-bold">{{ $issueSummary->sum('total') }}</div>
                     <a href="#scan-issues" class="stretched-link" aria-label="Lihat detail scan issues"></a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card shadow-sm border-0 h-100" data-bs-toggle="popover" data-bs-html="true" data-bs-placement="left" data-popover-target="backorder-popover" data-popover-title="Backorders (Top 5)">
+                <div class="card-body position-relative">
+                    <h6 class="text-muted">Backorders</h6>
+                    <div class="display-6 fw-bold">{{ $backorderCount ?? 0 }}</div>
+                    <a href="#fulfillment-report" class="stretched-link" aria-label="Lihat detail backorders"></a>
                 </div>
             </div>
         </div>
@@ -290,6 +317,33 @@
                                         </thead>
                                         <tbody>
                                             @forelse($fulfillmentRows->where('status', 'Partial')->take(5) as $row)
+                                                <tr>
+                                                    <td>#{{ $row['order_id'] }}</td>
+                                                    <td>{{ $row['customer'] }}</td>
+                                                    <td>{{ $row['rate'] }}%</td>
+                                                    <td>{{ $row['status'] }}</td>
+                                                </tr>
+                                            @empty
+                                                <tr><td colspan="4" class="text-center text-muted">Tidak ada data.</td></tr>
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div id="fulfillment-backorder" class="d-none">
+                                <div class="text-muted small mb-2">Order Backorder (Top 5)</div>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-striped align-middle mb-0">
+                                        <thead>
+                                            <tr>
+                                                <th>Order</th>
+                                                <th>Customer</th>
+                                                <th>Rate</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @forelse($fulfillmentRows->where('status', 'Backorder')->take(5) as $row)
                                                 <tr>
                                                     <td>#{{ $row['order_id'] }}</td>
                                                     <td>{{ $row['customer'] }}</td>

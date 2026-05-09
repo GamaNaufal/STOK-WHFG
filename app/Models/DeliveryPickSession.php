@@ -18,6 +18,7 @@ class DeliveryPickSession extends Model
         'delivery_order_id',
         'created_by',
         'status',
+        'allow_partial',
         'started_at',
         'completed_at',
         'approved_by',
@@ -29,6 +30,7 @@ class DeliveryPickSession extends Model
     ];
 
     protected $casts = [
+        'allow_partial' => 'boolean',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'approved_at' => 'datetime',

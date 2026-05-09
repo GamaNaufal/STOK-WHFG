@@ -30,6 +30,13 @@ class DeliveryOrderModelTest extends TestCase
             'status' => 'approved',
         ]);
 
+        $partial = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Partial',
+            'delivery_date' => now()->addDays(2)->toDateString(),
+            'status' => 'partial',
+        ]);
+
         $completed = DeliveryOrder::create([
             'sales_user_id' => $sales->id,
             'customer_name' => 'Cust Completed',
@@ -56,6 +63,9 @@ class DeliveryOrderModelTest extends TestCase
 
         $this->assertSame(1, DeliveryOrder::approved()->count());
         $this->assertSame((int) $approved->id, (int) DeliveryOrder::approved()->first()->id);
+
+        $this->assertSame(1, DeliveryOrder::partial()->count());
+        $this->assertSame((int) $partial->id, (int) DeliveryOrder::partial()->first()->id);
 
         $this->assertSame(1, DeliveryOrder::completed()->count());
         $this->assertSame((int) $completed->id, (int) DeliveryOrder::completed()->first()->id);

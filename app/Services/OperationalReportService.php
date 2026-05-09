@@ -68,6 +68,15 @@ class OperationalReportService
         return $groupBy;
     }
 
+    private function normalizeFulfillmentFilter(string $filter): string
+    {
+        if (!in_array($filter, ['all', 'full', 'partial', 'backorder'], true)) {
+            return 'all';
+        }
+
+        return $filter;
+    }
+
     private function buildCurrentHandling()
     {
         return Box::query()
@@ -88,9 +97,9 @@ class OperationalReportService
 
     private function buildMatchingReport(?Carbon $start, ?Carbon $end)
     {
-        $matchingOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
-            ->select(['id', 'customer_name', 'delivery_date', 'status'])
-            ->whereIn('status', ['approved', 'processing', 'completed'])
+        $matchingOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity', 'parentOrder:id'])
+            ->select(['id', 'parent_delivery_order_id', 'customer_name', 'delivery_date', 'status'])
+            ->whereIn('status', ['approved', 'processing', 'partial', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('delivery_date', '<=', $end->toDateString()))
             ->orderBy('delivery_date', 'asc')
@@ -101,6 +110,7 @@ class OperationalReportService
             $fulfilled = (int) $order->items->sum('fulfilled_quantity');
             $rate = $required > 0 ? round(($fulfilled / $required) * 100, 1) : 0;
             $isFull = $order->items->every(fn ($item) => $item->fulfilled_quantity >= $item->quantity);
+            $isBackorder = !empty($order->parent_delivery_order_id);
 
             return [
                 'order_id' => $order->id,
@@ -109,7 +119,8 @@ class OperationalReportService
                 'required' => $required,
                 'fulfilled' => $fulfilled,
                 'rate' => $rate,
-                'status' => $isFull ? 'Full' : 'Partial',
+                'status' => $isBackorder ? 'Backorder' : ($isFull ? 'Full' : 'Partial'),
+                'parent_order_id' => $order->parent_delivery_order_id,
             ];
         });
     }
@@ -308,11 +319,11 @@ class OperationalReportService
         return [$issueSummary, $issueList];
     }
 
-    private function buildFulfillmentReport(?Carbon $start, ?Carbon $end): array
+    private function buildFulfillmentReport(?Carbon $start, ?Carbon $end, string $fulfillmentFilter = 'all'): array
     {
         $fulfillmentOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
-            ->select(['id', 'customer_name', 'delivery_date', 'status'])
-            ->whereIn('status', ['approved', 'processing', 'completed'])
+            ->select(['id', 'parent_delivery_order_id', 'customer_name', 'delivery_date', 'status'])
+            ->whereIn('status', ['approved', 'processing', 'partial', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('delivery_date', '<=', $end->toDateString()))
             ->orderBy('delivery_date', 'asc')
@@ -323,6 +334,7 @@ class OperationalReportService
             $fulfilled = (int) $order->items->sum('fulfilled_quantity');
             $rate = $required > 0 ? round(($fulfilled / $required) * 100, 1) : 0;
             $isFull = $order->items->every(fn ($item) => $item->fulfilled_quantity >= $item->quantity);
+            $isBackorder = !empty($order->parent_delivery_order_id);
 
             return [
                 'order_id' => $order->id,
@@ -331,15 +343,23 @@ class OperationalReportService
                 'required' => $required,
                 'fulfilled' => $fulfilled,
                 'rate' => $rate,
-                'status' => $isFull ? 'Full' : 'Partial',
+                'status' => $isBackorder ? 'Backorder' : ($isFull ? 'Full' : 'Partial'),
             ];
         });
 
+        $fulfillmentRows = match ($fulfillmentFilter) {
+            'full' => $fulfillmentRows->where('status', 'Full')->values(),
+            'partial' => $fulfillmentRows->where('status', 'Partial')->values(),
+            'backorder' => $fulfillmentRows->where('status', 'Backorder')->values(),
+            default => $fulfillmentRows->values(),
+        };
+
         $fullCount = $fulfillmentRows->where('status', 'Full')->count();
-        $totalCount = $fulfillmentRows->count();
+        $backorderCount = $fulfillmentRows->where('status', 'Backorder')->count();
+        $totalCount = $fulfillmentRows->whereIn('status', ['Full', 'Partial'])->count();
         $fulfillmentRate = $totalCount > 0 ? round(($fullCount / $totalCount) * 100, 1) : 0;
 
-        return [$fulfillmentRows, $fulfillmentRate];
+        return [$fulfillmentRows, $fulfillmentRate, $backorderCount];
     }
 
     private function buildAuditReport(Request $request, ?Carbon $start, ?Carbon $end, bool $forExport): array
@@ -404,6 +424,7 @@ class OperationalReportService
     {
         [$start, $end, $rangeLabel] = $this->resolveDateRange($request);
         $groupBy = $this->normalizeGroupBy((string) $request->input('group_by', 'day'));
+        $fulfillmentFilter = $this->normalizeFulfillmentFilter((string) $request->input('fulfillment_filter', 'all'));
 
         $currentHandling = $this->buildCurrentHandling();
         $matchingReport = $this->buildMatchingReport($start, $end);
@@ -415,7 +436,7 @@ class OperationalReportService
         $peakHours = $this->buildPeakHours($inboundQuery, $outboundQuery);
 
         [$issueSummary, $issueList] = $this->buildIssueReport($start, $end);
-        [$fulfillmentRows, $fulfillmentRate] = $this->buildFulfillmentReport($start, $end);
+        [$fulfillmentRows, $fulfillmentRate, $backorderCount] = $this->buildFulfillmentReport($start, $end, $fulfillmentFilter);
         [$auditSummary, $auditLogs, $auditTypes, $auditActions, $auditUserOptions] = $this->buildAuditReport($request, $start, $end, $forExport);
 
         return [
@@ -433,6 +454,8 @@ class OperationalReportService
             'issueList' => $issueList,
             'fulfillmentRows' => $fulfillmentRows,
             'fulfillmentRate' => $fulfillmentRate,
+            'backorderCount' => $backorderCount,
+            'fulfillmentFilter' => $fulfillmentFilter,
             'auditSummary' => $auditSummary,
             'auditLogs' => $auditLogs,
             'auditTypes' => $auditTypes,

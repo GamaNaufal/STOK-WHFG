@@ -186,8 +186,8 @@ class DeliveryOrderController extends Controller
              return redirect('/')->with('error', 'Unauthorized access to Schedule.');
         }
 
-        $approvedOrders = DeliveryOrder::with(['items', 'salesUser'])
-            ->whereIn('status', ['approved', 'processing']) 
+        $approvedOrders = DeliveryOrder::with(['items', 'salesUser', 'parentOrder'])
+            ->whereIn('status', ['approved', 'processing', 'partial']) 
             ->orderBy('delivery_date', 'asc')
             ->get();
 
@@ -223,6 +223,7 @@ class DeliveryOrderController extends Controller
 
         $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $activeLockedByOrderPart, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId, $globalActiveSession, $currentUserId) {
             $allAvailable = true;
+            $hasAnyFulfillable = false;
             $hasPendingAdditionalApproval = !empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
 
             $today = now()->timezone(config('app.timezone'))->startOfDay();
@@ -295,6 +296,10 @@ class DeliveryOrderController extends Controller
                 $item->is_fulfillable = $strictFulfillable >= $requiredQty;
                 $item->needs_not_full = $needsNotFull;
 
+                if ($strictFulfillable > 0) {
+                    $hasAnyFulfillable = true;
+                }
+
                 if (!$item->is_fulfillable) {
                     $allAvailable = false;
                 }
@@ -305,6 +310,7 @@ class DeliveryOrderController extends Controller
                 ? 'Pending approval not full tambahan'
                 : null;
             $order->has_sufficient_stock = $allAvailable && !$hasPendingAdditionalApproval;
+            $order->has_partial_stock = $hasAnyFulfillable && !$allAvailable && !$hasPendingAdditionalApproval;
 
             $hasGlobalLock = $globalActiveSession !== null;
             $isActiveOrder = $hasGlobalLock && (int) $globalActiveSession->delivery_order_id === (int) $order->id;
@@ -370,7 +376,20 @@ class DeliveryOrderController extends Controller
 
         $historyRows = $historyRows->sortByDesc('completed_at')->values();
 
-        return view('operator.delivery.index', compact('approvedOrders', 'completedOrders', 'historyRows'));
+        $displayOrders = $approvedOrders
+            ->whereNull('parent_delivery_order_id')
+            ->values()
+            ->map(function ($order) use ($approvedOrders) {
+                $order->child_orders = $approvedOrders
+                    ->where('parent_delivery_order_id', $order->id)
+                    ->sortBy(['delivery_date', 'id'])
+                    ->values();
+                $order->has_child_orders = $order->child_orders->isNotEmpty();
+
+                return $order;
+            });
+
+        return view('operator.delivery.index', compact('approvedOrders', 'displayOrders', 'completedOrders', 'historyRows'));
     }
 
     // Sales Page: Input Form & History
@@ -460,8 +479,8 @@ class DeliveryOrderController extends Controller
             });
         });
 
-        $historyOrders = DeliveryOrder::with(['items', 'salesUser'])
-            ->whereIn('status', ['approved', 'rejected', 'correction', 'processing', 'completed'])
+        $historyOrders = DeliveryOrder::with(['items', 'salesUser', 'parentOrder'])
+            ->whereIn('status', ['approved', 'rejected', 'correction', 'processing', 'partial', 'completed'])
             ->orderBy('updated_at', 'desc')
             ->limit(15)
             ->get();

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Box;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
@@ -27,6 +28,7 @@ class DeliveryPickController extends Controller
     private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
     private const SESSION_RECALC_MESSAGE = 'Sesi picking ini perlu dihitung ulang karena ada order dengan prioritas tanggal lebih awal.';
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
+    private const PARTIAL_FULFILLMENT_ROLES = ['admin', 'admin_warehouse'];
 
     private function applyStoredLocationExistsFilter($query)
     {
@@ -160,7 +162,7 @@ class DeliveryPickController extends Controller
         }
 
         $orders = DeliveryOrder::with('items')
-            ->whereIn('status', ['approved', 'processing'])
+            ->whereIn('status', ['approved', 'processing', 'partial'])
             ->orderBy('delivery_date', 'asc')
             ->limit(100)
             ->get();
@@ -304,7 +306,7 @@ class DeliveryPickController extends Controller
         return view('operator.delivery.picking-verification', compact('orders'));
     }
 
-    private function createSessionItems(DeliveryOrder $order, DeliveryPickSession $session): void
+    private function createSessionItems(DeliveryOrder $order, DeliveryPickSession $session, bool $allowPartial = false): void
     {
         foreach ($order->items as $item) {
             $remainingQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
@@ -333,7 +335,11 @@ class DeliveryPickController extends Controller
             $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved, $order->delivery_date, true);
             $totalPcs = $boxes->sum('pcs_quantity') + (int) $reservedTotal;
 
-            if ($totalPcs < $remainingQty) {
+            if ($totalPcs <= 0) {
+                continue;
+            }
+
+            if ($totalPcs < $remainingQty && !$allowPartial) {
                 throw new \RuntimeException('Stok box tidak cukup untuk part ' . $item->part_number);
             }
 
@@ -353,9 +359,46 @@ class DeliveryPickController extends Controller
         }
     }
 
-    private function startOrReusePickSession(DeliveryOrder $order, int $userId): DeliveryPickSession
+    private function createBackorderFromRemaining(DeliveryOrder $order): ?DeliveryOrder
     {
-        return DB::transaction(function () use ($order, $userId) {
+        $remainingItems = $order->items
+            ->map(function ($orderItem) {
+                return [
+                    'part_number' => (string) $orderItem->part_number,
+                    'remaining_quantity' => max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity),
+                ];
+            })
+            ->filter(fn ($item) => (int) $item['remaining_quantity'] > 0)
+            ->values();
+
+        if ($remainingItems->isEmpty()) {
+            return null;
+        }
+
+        $backorder = DeliveryOrder::create([
+            'parent_delivery_order_id' => $order->id,
+            'sales_user_id' => $order->sales_user_id,
+            'customer_name' => $order->customer_name,
+            'delivery_date' => $order->delivery_date,
+            'status' => 'approved',
+            'notes' => trim((string) ($order->notes ? $order->notes . ' | ' : '') . 'Backorder generated from order #' . $order->id),
+        ]);
+
+        foreach ($remainingItems as $item) {
+            DeliveryOrderItem::create([
+                'delivery_order_id' => $backorder->id,
+                'part_number' => (string) $item['part_number'],
+                'quantity' => (int) $item['remaining_quantity'],
+                'fulfilled_quantity' => 0,
+            ]);
+        }
+
+        return $backorder;
+    }
+
+    private function startOrReusePickSession(DeliveryOrder $order, int $userId, bool $allowPartial = false): DeliveryPickSession
+    {
+        return DB::transaction(function () use ($order, $userId, $allowPartial) {
             DeliveryOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
             $this->assertOrderDeliveryGateOpenOrFail((int) $order->id, true);
 
@@ -390,13 +433,14 @@ class DeliveryPickController extends Controller
                 'delivery_order_id' => $order->id,
                 'created_by' => $userId,
                 'status' => 'scanning',
+                'allow_partial' => $allowPartial,
                 'started_at' => now(),
             ]);
 
-            $this->createSessionItems($order, $session);
+            $this->createSessionItems($order, $session, $allowPartial);
 
             if (!$session->items()->exists()) {
-                throw new \RuntimeException('Semua item sudah terpenuhi.');
+                throw new \RuntimeException($allowPartial ? 'Stok belum tersedia untuk partial delivery.' : 'Semua item sudah terpenuhi.');
             }
 
             return $session;
@@ -406,14 +450,18 @@ class DeliveryPickController extends Controller
     public function startPick($orderId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
         try {
-            $session = $this->startOrReusePickSession($order, (int) $user->id);
+            $session = $this->startOrReusePickSession(
+                $order,
+                (int) $user->id,
+                in_array($user->role, self::PARTIAL_FULFILLMENT_ROLES, true)
+            );
         } catch (\Throwable $e) {
             $message = (string) $e->getMessage();
             $statusCode = $message === self::DELIVERY_APPROVAL_PENDING_MESSAGE || str_contains($message, 'diproses') || str_contains($message, 'aktif')
@@ -433,14 +481,18 @@ class DeliveryPickController extends Controller
     public function startVerification($orderId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
         try {
-            $session = $this->startOrReusePickSession($order, (int) $user->id);
+            $session = $this->startOrReusePickSession(
+                $order,
+                (int) $user->id,
+                in_array($user->role, self::PARTIAL_FULFILLMENT_ROLES, true)
+            );
         } catch (\Throwable $e) {
             $message = (string) $e->getMessage();
             $statusCode = $message === self::DELIVERY_APPROVAL_PENDING_MESSAGE || str_contains($message, 'diproses') || str_contains($message, 'aktif')
@@ -459,7 +511,7 @@ class DeliveryPickController extends Controller
     public function showScan($orderId, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
@@ -482,7 +534,7 @@ class DeliveryPickController extends Controller
     public function showVerificationScan($orderId, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
@@ -512,7 +564,7 @@ class DeliveryPickController extends Controller
     public function cancel($sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -558,7 +610,7 @@ class DeliveryPickController extends Controller
     public function scanBox(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -668,7 +720,7 @@ class DeliveryPickController extends Controller
     public function verifyScanBox(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -780,13 +832,13 @@ class DeliveryPickController extends Controller
     public function complete(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin'], true)) {
+        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
         try {
             $result = DB::transaction(function () use ($sessionId, $user) {
-                $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+                $session = DeliveryPickSession::with('creator')->whereKey($sessionId)->lockForUpdate()->firstOrFail();
 
                 if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
                     return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
@@ -807,6 +859,8 @@ class DeliveryPickController extends Controller
                 if ($session->status === 'blocked') {
                     return ['success' => false, 'message' => 'Session diblokir.', 'status' => 423];
                 }
+
+                $allowPartial = (bool) $session->allow_partial;
 
                 $hasPendingIssue = DeliveryIssue::where('pick_session_id', $session->id)
                     ->where('status', 'pending')
@@ -840,13 +894,19 @@ class DeliveryPickController extends Controller
                         ->where('part_number', (string) $orderItem->part_number)
                         ->sum('pcs_quantity');
 
-                    if ($pickedQty < $requiredQty) {
+                    if (!$allowPartial && $pickedQty < $requiredQty) {
                         return [
                             'success' => false,
                             'message' => 'Qty part ' . $orderItem->part_number . ' belum cukup untuk complete.',
                             'status' => 422,
                         ];
                     }
+
+                    $orderItem->fulfilled_quantity = min(
+                        (int) $orderItem->quantity,
+                        (int) $orderItem->fulfilled_quantity + min($requiredQty, $pickedQty)
+                    );
+                    $orderItem->save();
                 }
 
                 $batchId = (string) Str::uuid();
@@ -911,19 +971,19 @@ class DeliveryPickController extends Controller
 
                 $session = DeliveryPickSession::with('items')->findOrFail($session->id);
 
-                AuditService::logBatchStockWithdrawal($session, 'completed');
-
+                $remainingAfterComplete = 0;
                 foreach ($order->items as $orderItem) {
-                    $pickedPcs = $session->items->where('part_number', $orderItem->part_number)->sum('pcs_quantity');
-                    $orderItem->fulfilled_quantity = min(
-                        (int) $orderItem->quantity,
-                        (int) $orderItem->fulfilled_quantity + (int) $pickedPcs
-                    );
-                    $orderItem->save();
+                    $remainingAfterComplete += max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity);
                 }
 
-                $order->status = 'completed';
+                AuditService::logBatchStockWithdrawal($session, $remainingAfterComplete > 0 ? 'partial' : 'completed');
+
+                $order->status = $remainingAfterComplete > 0 ? 'partial' : 'completed';
                 $order->save();
+
+                if ($remainingAfterComplete > 0) {
+                    $this->createBackorderFromRemaining($order->fresh(['items']));
+                }
 
                 $session->status = 'completed';
                 $session->completed_at = now();
@@ -931,7 +991,12 @@ class DeliveryPickController extends Controller
                 $session->redo_until = now()->addDays(5);
                 $session->save();
 
-                return ['success' => true];
+                return [
+                    'success' => true,
+                    'message' => $remainingAfterComplete > 0
+                        ? 'Delivery selesai sebagian. Sisa qty masih menunggu batch berikutnya.'
+                        : 'Delivery selesai.',
+                ];
             });
 
             $statusCode = (int) ($result['status'] ?? 200);

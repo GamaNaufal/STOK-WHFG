@@ -18,6 +18,7 @@ class DeliveryOrder extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'parent_delivery_order_id',
         'sales_user_id',
         'customer_name',
         'delivery_date',
@@ -42,6 +43,16 @@ class DeliveryOrder extends Model
         return $this->belongsTo(User::class, 'sales_user_id');
     }
 
+    public function parentOrder()
+    {
+        return $this->belongsTo(DeliveryOrder::class, 'parent_delivery_order_id');
+    }
+
+    public function childOrders()
+    {
+        return $this->hasMany(DeliveryOrder::class, 'parent_delivery_order_id');
+    }
+
     // Relationship ke pick sessions
     public function pickSessions()
     {
@@ -59,6 +70,11 @@ class DeliveryOrder extends Model
     public function scopeApproved($query)
     {
         return $query->where('status', 'approved');
+    }
+
+    public function scopePartial($query)
+    {
+        return $query->where('status', 'partial');
     }
 
     public function scopeCompleted($query)

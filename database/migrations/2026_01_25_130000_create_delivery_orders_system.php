@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('sales_user_id')->constrained('users'); // Who created it
             $table->string('customer_name');
             $table->date('delivery_date');
-            $table->enum('status', ['pending', 'approved', 'rejected', 'processing', 'completed', 'correction', 'deleted'])->default('pending');
+            $table->enum('status', ['pending', 'approved', 'rejected', 'processing', 'partial', 'completed', 'correction', 'deleted'])->default('pending');
             $table->text('notes')->nullable();
             $table->timestamps();
             $table->softDeletes();
