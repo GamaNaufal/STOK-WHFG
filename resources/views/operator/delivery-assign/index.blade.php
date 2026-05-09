@@ -37,6 +37,7 @@
                         @endforeach
                     </select>
                     <small class="text-muted d-block mt-2">Pilih delivery order terlebih dahulu sebelum input atau assign.</small>
+                    <div id="deliveryAssignPartStatus" class="alert alert-info mt-3 mb-0 py-2 small" style="display: none;"></div>
                 </div>
             </div>
         </div>
@@ -49,7 +50,7 @@
                     <div class="fw-semibold">Input Box Baru</div>
                     <div class="text-muted small">Box baru langsung di-assign ke delivery tanpa pallet/location.</div>
                 </div>
-                <span class="badge bg-light text-dark">Bisa dicampur dengan stok existing</span>
+                <span class="badge bg-light text-dark">Part mengikuti delivery order</span>
             </div>
             <div class="row g-3 align-items-end">
                 <div class="col-lg-4">
@@ -58,7 +59,9 @@
                 </div>
                 <div class="col-lg-4">
                     <label class="form-label fw-semibold">No Part</label>
-                    <input type="text" class="form-control" id="deliveryAssignNewBoxPart" placeholder="Scan/ketik no part" autocomplete="off">
+                    <select class="form-select" id="deliveryAssignNewBoxPart" disabled>
+                        <option value="">Pilih delivery order terlebih dahulu</option>
+                    </select>
                 </div>
                 <div class="col-lg-3">
                     <label class="form-label fw-semibold">Qty PCS</label>
@@ -137,9 +140,10 @@
 <script>
     window.deliveryAssignConfig = {
         csrfToken: '{{ csrf_token() }}',
-        searchUrl: '{{ route('delivery-assign.search') }}',
-        assignUrl: '{{ route('delivery-assign.assign') }}',
-        palletBoxesUrl: '{{ route('delivery-assign.pallet-boxes', ['palletId' => '__PALLET__']) }}'
+        searchUrl: '/delivery-assign/search',
+        assignUrl: '/delivery-assign/assign',
+        deliveryOrderPartsUrl: '/delivery-assign/delivery-orders/__ORDER__/parts',
+        palletBoxesUrl: '/delivery-assign/pallets/__PALLET__/boxes'
     };
 </script>
 <script src="{{ asset('js/pages/delivery-assign.js') }}"></script>

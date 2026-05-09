@@ -127,6 +127,7 @@ Route::middleware('auth')->group(function () {
     // Delivery Assignment Routes (Warehouse Operator, Admin Warehouse, Admin)
     Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
         Route::get('/delivery-assign', [DeliveryAssignController::class, 'index'])->name('delivery-assign.index');
+        Route::get('/delivery-assign/delivery-orders/{deliveryOrderId}/parts', [DeliveryAssignController::class, 'deliveryOrderParts'])->name('delivery-assign.delivery-order-parts');
         Route::get('/delivery-assign/search', [DeliveryAssignController::class, 'search'])->name('delivery-assign.search');
         Route::get('/delivery-assign/pallets/{palletId}/boxes', [DeliveryAssignController::class, 'palletBoxes'])->name('delivery-assign.pallet-boxes');
         Route::post('/delivery-assign/assign', [DeliveryAssignController::class, 'assign'])->name('delivery-assign.assign');

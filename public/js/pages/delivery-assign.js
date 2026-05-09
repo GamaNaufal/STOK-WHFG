@@ -16,10 +16,13 @@
     const newBoxNumberInput = document.getElementById(
         "deliveryAssignNewBoxNumber",
     );
-    const newBoxPartInput = document.getElementById("deliveryAssignNewBoxPart");
+    const newBoxPartSelect = document.getElementById(
+        "deliveryAssignNewBoxPart",
+    );
     const newBoxQtyInput = document.getElementById("deliveryAssignNewBoxQty");
     const addNewBoxBtn = document.getElementById("deliveryAssignAddNewBox");
     const newBoxError = document.getElementById("deliveryAssignNewBoxError");
+    const partStatus = document.getElementById("deliveryAssignPartStatus");
 
     if (!searchInput || !searchBtn || !palletList || !boxList || !assignBtn) {
         return;
@@ -29,6 +32,7 @@
     const selectedBoxes = new Map();
     const scannedBoxes = new Map();
     const selectionOrder = [];
+    const deliveryOrderParts = new Map();
     const gateState = {
         enabled: false,
         lastDeliveryOrderId: deliveryOrderSelect?.value || "",
@@ -79,6 +83,12 @@
     }
 
     function showGatePlaceholders() {
+        if (partStatus) {
+            partStatus.className = "alert alert-info mt-3 mb-0 py-2 small";
+            partStatus.textContent =
+                "Pilih delivery order untuk melihat part yang masih bisa di-assign.";
+            partStatus.style.display = "block";
+        }
         if (palletList) {
             palletList.innerHTML =
                 '<div class="list-group-item text-muted">Pilih delivery order terlebih dahulu.</div>';
@@ -93,6 +103,12 @@
         if (boxCount) {
             boxCount.textContent = "0";
         }
+        if (newBoxPartSelect) {
+            newBoxPartSelect.innerHTML =
+                '<option value="">Pilih delivery order terlebih dahulu</option>';
+            newBoxPartSelect.disabled = true;
+        }
+        deliveryOrderParts.clear();
     }
 
     function setGateState(enabled) {
@@ -102,7 +118,7 @@
             searchInput,
             searchBtn,
             newBoxNumberInput,
-            newBoxPartInput,
+            newBoxPartSelect,
             newBoxQtyInput,
             addNewBoxBtn,
             assignBtn,
@@ -116,6 +132,107 @@
         if (!enabled) {
             showGatePlaceholders();
         }
+    }
+
+    function renderDeliveryOrderParts(parts) {
+        if (!newBoxPartSelect) {
+            return;
+        }
+
+        newBoxPartSelect.innerHTML = "";
+
+        if (!Array.isArray(parts) || parts.length === 0) {
+            newBoxPartSelect.innerHTML =
+                '<option value="">Tidak ada part tersisa untuk delivery order ini</option>';
+            newBoxPartSelect.disabled = true;
+            if (partStatus) {
+                partStatus.className =
+                    "alert alert-warning mt-3 mb-0 py-2 small";
+                partStatus.textContent =
+                    "Semua part pada delivery order ini sudah habis atau tidak tersisa untuk assign.";
+                partStatus.style.display = "block";
+            }
+            return;
+        }
+
+        newBoxPartSelect.disabled = !gateState.enabled;
+        newBoxPartSelect.innerHTML =
+            '<option value="">-- Pilih No Part --</option>';
+
+        if (partStatus) {
+            partStatus.className = "alert alert-success mt-3 mb-0 py-2 small";
+            partStatus.textContent = `${parts.length} part masih tersedia untuk delivery order ini.`;
+            partStatus.style.display = "block";
+        }
+
+        parts.forEach((part) => {
+            const partNumber = String(part.part_number || "");
+            const requestedQuantity = Number(part.requested_quantity || 0);
+            const assignedQuantity = Number(part.assigned_quantity || 0);
+            const remainingQuantity = Number(part.remaining_quantity || 0);
+
+            const option = document.createElement("option");
+            option.value = partNumber;
+            option.textContent = `${partNumber} (sisa ${remainingQuantity}/${requestedQuantity})`;
+            option.dataset.requestedQuantity = String(requestedQuantity);
+            option.dataset.assignedQuantity = String(assignedQuantity);
+            option.dataset.remainingQuantity = String(remainingQuantity);
+            newBoxPartSelect.appendChild(option);
+        });
+    }
+
+    function loadDeliveryOrderParts(deliveryOrderId) {
+        if (!config.deliveryOrderPartsUrl) {
+            renderDeliveryOrderParts([]);
+            return Promise.resolve([]);
+        }
+
+        if (!deliveryOrderId) {
+            renderDeliveryOrderParts([]);
+            return Promise.resolve([]);
+        }
+
+        const url = config.deliveryOrderPartsUrl.replace(
+            "__ORDER__",
+            String(deliveryOrderId),
+        );
+
+        if (newBoxPartSelect) {
+            newBoxPartSelect.disabled = true;
+            newBoxPartSelect.innerHTML =
+                '<option value="">Memuat part delivery order...</option>';
+        }
+
+        return fetch(url)
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Gagal memuat part delivery order.");
+                }
+                return response.json();
+            })
+            .then((data) => {
+                const parts = Array.isArray(data.parts) ? data.parts : [];
+                deliveryOrderParts.clear();
+                parts.forEach((part) => {
+                    deliveryOrderParts.set(
+                        String(part.part_number || ""),
+                        part,
+                    );
+                });
+                renderDeliveryOrderParts(parts);
+                return parts;
+            })
+            .catch((error) => {
+                deliveryOrderParts.clear();
+                renderDeliveryOrderParts([]);
+                if (partStatus) {
+                    partStatus.className =
+                        "alert alert-danger mt-3 mb-0 py-2 small";
+                    partStatus.textContent = error.message;
+                    partStatus.style.display = "block";
+                }
+                throw error;
+            });
     }
 
     function hasSelections() {
@@ -356,6 +473,13 @@
             return;
         }
 
+        const deliveryOrderId = String(deliveryOrderSelect?.value || "");
+        if (!deliveryOrderId) {
+            container.innerHTML =
+                '<div class="small text-muted">Pilih delivery order terlebih dahulu.</div>';
+            return;
+        }
+
         const url = config.palletBoxesUrl
             .replace("__PALLET__", String(palletId))
             .replace("%7B%7BPALLET%7D%7D", String(palletId));
@@ -363,7 +487,9 @@
         container.innerHTML =
             '<div class="small text-muted">Memuat isi pallet...</div>';
 
-        fetch(`${url}?limit=60`)
+        fetch(
+            `${url}?limit=60&delivery_order_id=${encodeURIComponent(deliveryOrderId)}`,
+        )
             .then((response) => {
                 if (!response.ok) {
                     throw new Error("Gagal memuat isi pallet.");
@@ -546,13 +672,19 @@
         }
 
         const query = String(searchInput.value || "").trim();
+        const deliveryOrderId = String(deliveryOrderSelect?.value || "");
 
         palletList.innerHTML =
             '<div class="list-group-item text-muted">Mencari pallet...</div>';
         boxList.innerHTML =
             '<div class="list-group-item text-muted">Mencari box...</div>';
 
-        const url = config.searchUrl + "?q=" + encodeURIComponent(query);
+        const url =
+            config.searchUrl +
+            "?q=" +
+            encodeURIComponent(query) +
+            "&delivery_order_id=" +
+            encodeURIComponent(deliveryOrderId);
 
         return fetch(url)
             .then((response) => {
@@ -619,8 +751,23 @@
             return;
         }
 
+        const partNumber = String(newBoxPartSelect?.value || "").trim();
+        if (!partNumber) {
+            showNewBoxError(
+                "Pilih No Part dari delivery order terlebih dahulu.",
+            );
+            return;
+        }
+
+        const partInfo = deliveryOrderParts.get(partNumber);
+        if (!partInfo || Number(partInfo.remaining_quantity || 0) <= 0) {
+            showNewBoxError(
+                "No Part tersebut tidak tersedia untuk delivery order ini.",
+            );
+            return;
+        }
+
         const boxNumber = String(newBoxNumberInput?.value || "").trim();
-        const partNumber = String(newBoxPartInput?.value || "").trim();
         const qtyValue = String(newBoxQtyInput?.value || "").trim();
 
         if (!boxNumber || !partNumber || !qtyValue) {
@@ -667,8 +814,8 @@
         if (newBoxNumberInput) {
             newBoxNumberInput.value = "";
         }
-        if (newBoxPartInput) {
-            newBoxPartInput.value = "";
+        if (newBoxPartSelect) {
+            newBoxPartSelect.value = "";
         }
         if (newBoxQtyInput) {
             newBoxQtyInput.value = "";
@@ -836,7 +983,7 @@
         addNewBoxBtn.addEventListener("click", addNewBox);
     }
 
-    [newBoxNumberInput, newBoxPartInput, newBoxQtyInput]
+    [newBoxNumberInput, newBoxPartSelect, newBoxQtyInput]
         .filter(Boolean)
         .forEach((input) => {
             input.addEventListener("keydown", (event) => {
@@ -860,6 +1007,18 @@
                 clearSelection({ skipSearch: true, silent: true });
                 gateState.lastDeliveryOrderId = nextValue;
                 setGateState(Boolean(nextValue));
+                if (!nextValue) {
+                    renderDeliveryOrderParts([]);
+                    return Promise.resolve(null);
+                }
+
+                return loadDeliveryOrderParts(nextValue)
+                    .then(() => performSearch())
+                    .catch((error) => {
+                        showResult("danger", error.message);
+                        showGatePlaceholders();
+                        return null;
+                    });
             };
 
             if (hasSelections()) {
@@ -869,11 +1028,18 @@
                 return;
             }
 
-            applyChange();
+            applyChange().catch(() => null);
         });
     }
 
     setGateState(Boolean(deliveryOrderSelect?.value));
+    if (deliveryOrderSelect?.value) {
+        loadDeliveryOrderParts(deliveryOrderSelect.value).catch((error) => {
+            showResult("danger", error.message);
+        });
+    } else {
+        renderDeliveryOrderParts([]);
+    }
     updateSummary();
     renderSelectedList();
 })();

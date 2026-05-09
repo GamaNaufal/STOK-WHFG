@@ -66,6 +66,98 @@ class DeliveryAssignController extends Controller
             ->exists();
     }
 
+    private function getDeliveryOrderPartAvailability(int $deliveryOrderId): array
+    {
+        $requestedRows = DB::table('delivery_order_items')
+            ->where('delivery_order_id', $deliveryOrderId)
+            ->select('part_number', DB::raw('SUM(quantity) as requested_quantity'))
+            ->groupBy('part_number')
+            ->get();
+
+        $assignedRows = DB::table('boxes')
+            ->where('assigned_delivery_order_id', $deliveryOrderId)
+            ->whereNull('deleted_at')
+            ->where('is_withdrawn', false)
+            ->where(function ($q) {
+                $q->whereNull('expired_status')
+                    ->orWhereNotIn('expired_status', ['handled', 'expired']);
+            })
+            ->select('part_number', DB::raw('SUM(pcs_quantity) as assigned_quantity'))
+            ->groupBy('part_number')
+            ->get();
+
+        $assignedLookup = [];
+        foreach ($assignedRows as $row) {
+            $assignedLookup[(string) $row->part_number] = (int) $row->assigned_quantity;
+        }
+
+        $availability = [];
+        foreach ($requestedRows as $row) {
+            $partNumber = (string) $row->part_number;
+            $requestedQuantity = (int) $row->requested_quantity;
+            $assignedQuantity = (int) ($assignedLookup[$partNumber] ?? 0);
+            $remainingQuantity = max(0, $requestedQuantity - $assignedQuantity);
+
+            $availability[$partNumber] = [
+                'part_number' => $partNumber,
+                'requested_quantity' => $requestedQuantity,
+                'assigned_quantity' => $assignedQuantity,
+                'remaining_quantity' => $remainingQuantity,
+            ];
+        }
+
+        return $availability;
+    }
+
+    private function getDeliveryOrderAvailablePartNumbers(int $deliveryOrderId): array
+    {
+        $availability = $this->getDeliveryOrderPartAvailability($deliveryOrderId);
+
+        return array_values(array_keys(array_filter(
+            $availability,
+            fn ($entry) => (int) ($entry['remaining_quantity'] ?? 0) > 0
+        )));
+    }
+
+    private function validateDeliveryOrderPartCoverage(int $deliveryOrderId, array $boxes, array $newBoxes): array
+    {
+        $availability = $this->getDeliveryOrderPartAvailability($deliveryOrderId);
+        $selectedTotals = [];
+
+        foreach ($boxes as $box) {
+            if (!$box) {
+                continue;
+            }
+
+            $partNumber = (string) $box->part_number;
+            $selectedTotals[$partNumber] = ($selectedTotals[$partNumber] ?? 0) + (int) $box->pcs_quantity;
+        }
+
+        foreach ($newBoxes as $entry) {
+            $partNumber = (string) ($entry['part_number'] ?? '');
+            if ($partNumber === '') {
+                continue;
+            }
+
+            $selectedTotals[$partNumber] = ($selectedTotals[$partNumber] ?? 0) + (int) ($entry['pcs_quantity'] ?? 0);
+        }
+
+        $errors = [];
+        foreach ($selectedTotals as $partNumber => $selectedQuantity) {
+            if (!isset($availability[$partNumber])) {
+                $errors[] = "Part {$partNumber} tidak ada di delivery order ini.";
+                continue;
+            }
+
+            $remainingQuantity = (int) ($availability[$partNumber]['remaining_quantity'] ?? 0);
+            if ($selectedQuantity > $remainingQuantity) {
+                $errors[] = "Part {$partNumber} melebihi sisa request delivery order ({$selectedQuantity}/{$remainingQuantity}).";
+            }
+        }
+
+        return $errors;
+    }
+
     private function resolveBoxIdsFromPallets(array $palletIds): array
     {
         if (empty($palletIds)) {
@@ -393,9 +485,46 @@ class DeliveryAssignController extends Controller
         ]);
     }
 
+    public function deliveryOrderParts(Request $request, int $deliveryOrderId)
+    {
+        if ($deliveryOrderId <= 0 || !DeliveryOrder::query()->whereKey($deliveryOrderId)->exists()) {
+            return response()->json([
+                'message' => 'Delivery order tidak ditemukan.',
+            ], 404);
+        }
+
+        $availability = $this->getDeliveryOrderPartAvailability($deliveryOrderId);
+
+        return response()->json([
+            'delivery_order_id' => $deliveryOrderId,
+            'parts' => array_values(array_filter(
+                $availability,
+                fn ($entry) => (int) ($entry['remaining_quantity'] ?? 0) > 0
+            )),
+        ]);
+    }
+
     public function search(Request $request)
     {
         $search = trim((string) $request->query('q', ''));
+        $deliveryOrderId = (int) $request->query('delivery_order_id', 0);
+
+        if ($deliveryOrderId <= 0 || !DeliveryOrder::query()->whereKey($deliveryOrderId)->exists()) {
+            return response()->json([
+                'message' => 'Delivery order harus dipilih terlebih dahulu.',
+                'boxes' => [],
+                'pallets' => [],
+            ], 422);
+        }
+
+        $availableParts = $this->getDeliveryOrderAvailablePartNumbers($deliveryOrderId);
+        if (empty($availableParts)) {
+            return response()->json([
+                'boxes' => [],
+                'pallets' => [],
+            ]);
+        }
+
         $lockedBoxIds = $this->getActiveLockedBoxIds();
 
         $canonicalSubquery = $this->buildCanonicalPalletSubquery();
@@ -413,6 +542,7 @@ class DeliveryAssignController extends Controller
                     ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
             })
             ->whereNull('b.assigned_delivery_order_id')
+            ->whereIn('b.part_number', $availableParts)
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('b.id', $lockedBoxIds);
             })
@@ -455,6 +585,7 @@ class DeliveryAssignController extends Controller
             })
             ->where('sl.warehouse_location', '!=', 'Unknown')
             ->whereNull('b.assigned_delivery_order_id')
+            ->whereIn('b.part_number', $availableParts)
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('b.id', $lockedBoxIds);
             })
@@ -486,6 +617,23 @@ class DeliveryAssignController extends Controller
 
     public function palletBoxes(Request $request, int $palletId)
     {
+        $deliveryOrderId = (int) $request->query('delivery_order_id', 0);
+        if ($deliveryOrderId <= 0 || !DeliveryOrder::query()->whereKey($deliveryOrderId)->exists()) {
+            return response()->json([
+                'message' => 'Delivery order harus dipilih terlebih dahulu.',
+            ], 422);
+        }
+
+        $availableParts = $this->getDeliveryOrderAvailablePartNumbers($deliveryOrderId);
+        if (empty($availableParts)) {
+            return response()->json([
+                'pallet' => null,
+                'total' => 0,
+                'limit' => 0,
+                'boxes' => [],
+            ]);
+        }
+
         $limit = (int) $request->query('limit', 60);
         if ($limit <= 0) {
             $limit = 60;
@@ -523,6 +671,7 @@ class DeliveryAssignController extends Controller
                     ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
             })
             ->whereNull('b.assigned_delivery_order_id')
+            ->whereIn('b.part_number', $availableParts)
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('b.id', $lockedBoxIds);
             });
@@ -593,17 +742,18 @@ class DeliveryAssignController extends Controller
             ], 422);
         }
 
-        $lockedBoxIds = $this->getActiveLockedBoxIds();
-        $lockedLookup = array_fill_keys($lockedBoxIds, true);
-
         $boxes = Box::query()
             ->with(['pallets.stockLocation'])
             ->whereIn('id', $allBoxIds)
             ->get();
 
         $boxesById = $boxes->keyBy('id');
+
         $skipped = [];
         $eligibleBoxes = [];
+
+        $lockedBoxIds = $this->getActiveLockedBoxIds();
+        $lockedLookup = array_fill_keys($lockedBoxIds, true);
 
         foreach ($allBoxIds as $boxId) {
             $box = $boxesById->get($boxId);
@@ -661,6 +811,14 @@ class DeliveryAssignController extends Controller
                 'skipped' => $skipped,
                 'pick_session_id' => null,
             ]);
+        }
+
+        $partCoverageErrors = $this->validateDeliveryOrderPartCoverage($deliveryOrderId, $eligibleBoxes, $validNewBoxes);
+        if (!empty($partCoverageErrors)) {
+            return response()->json([
+                'message' => $partCoverageErrors[0],
+                'part_coverage_errors' => $partCoverageErrors,
+            ], 422);
         }
 
         $assignedExistingBoxIds = [];
