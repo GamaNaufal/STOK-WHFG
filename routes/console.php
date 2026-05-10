@@ -13,7 +13,7 @@ Artisan::command('inspire', function () {
 Artisan::command('locations:sync', function () {
     $this->info('Syncing master_locations with stock_locations...');
 
-    DB::transaction(function () {
+    DB  ::transaction(function () {
         \App\Models\MasterLocation::query()->update([
             'is_occupied' => false,
             'current_pallet_id' => null,
