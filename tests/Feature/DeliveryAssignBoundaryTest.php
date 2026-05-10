@@ -213,4 +213,69 @@ class DeliveryAssignBoundaryTest extends TestCase
             'assigned_delivery_order_id' => $order->id,
         ]);
     }
+
+    public function test_assigned_boxes_appear_in_stock_withdrawal_preview(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Preview Test',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-PREVIEW',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        PartSetting::create([
+            'part_number' => 'P-PREVIEW',
+            'qty_box' => 100,
+        ]);
+
+        $pallet = Pallet::create([
+            'pallet_number' => 'PLT-PREVIEW-01',
+        ]);
+
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        $box = Box::create([
+            'box_number' => '40001',
+            'part_number' => 'P-PREVIEW',
+            'part_name' => 'Preview Part',
+            'pcs_quantity' => 100,
+            'qty_box' => 100,
+            'qr_code' => '40001|P-PREVIEW|100',
+            'user_id' => $user->id,
+            'assigned_delivery_order_id' => $order->id, // Pre-assigned
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        // Preview withdrawal should show the assigned box
+        $response = $this->actingAs($user)->postJson(route('stock-withdrawal.preview'), [
+            'part_number' => 'P-PREVIEW',
+            'pcs_quantity' => 100,
+            'delivery_order_id' => $order->id,
+            'allow_partial' => false,
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('planned_qty', 100);
+        
+        // Check that locations include our assigned box (as reserved)
+        $locations = $response->json('locations');
+        $this->assertCount(1, $locations, 'Should have 1 location');
+        $this->assertTrue($locations[0]['is_reserved'], 'Assigned box should be marked as reserved');
+        $this->assertEquals('40001', $locations[0]['box_number']);
+    }
 }

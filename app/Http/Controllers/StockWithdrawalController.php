@@ -270,7 +270,7 @@ class StockWithdrawalController extends Controller
             }
         } else {
             $locations = $remainingQty > 0
-                ? $this->getLocationsByFIFO($partNumber, $remainingQty, true, true)
+                ? $this->getLocationsByFIFO($partNumber, $remainingQty, false, true)
                 : [];
 
             $plannedQty += (int) collect($locations)->sum('will_take_pcs');
