@@ -829,6 +829,62 @@
         assignBtn.disabled = true;
         assignBtn.textContent = "Memproses...";
 
+        const requestPayload = { ...payload };
+
+        const confirmOverage = (overageResponse) => {
+            const overages = Array.isArray(overageResponse?.part_overages)
+                ? overageResponse.part_overages
+                : [];
+
+            const warningItems = overages.map((entry) => {
+                const partNumber = String(entry.part_number || "-");
+                const selectedQty = Number(entry.selected_quantity || 0);
+                const remainingQty = Number(entry.remaining_quantity || 0);
+                const newRequestedQty = Number(
+                    entry.new_requested_quantity || 0,
+                );
+                return `Part ${partNumber}: assign ${selectedQty}, sisa ${remainingQty}, qty request baru ${newRequestedQty}.`;
+            });
+
+            const proceed = () =>
+                executeAssignment({
+                    ...requestPayload,
+                    confirm_overage: true,
+                });
+
+            if (
+                window.WarehouseAlert &&
+                typeof window.WarehouseAlert.confirm === "function"
+            ) {
+                window.WarehouseAlert.confirm({
+                    title: "Qty Melebihi Request",
+                    message:
+                        overageResponse?.message ||
+                        "Qty assign melebihi sisa request delivery order.",
+                    warningItems:
+                        warningItems.length > 0
+                            ? warningItems
+                            : [
+                                  "Jika dilanjutkan, qty request delivery order akan ditambah.",
+                              ],
+                    confirmText: "Lanjutkan & Tambah Qty",
+                    cancelText: "Batal",
+                    confirmColor: "#d97706",
+                    onConfirm: proceed,
+                });
+                return;
+            }
+
+            const fallbackMessage =
+                (overageResponse?.message ||
+                    "Qty melebihi request delivery order.") +
+                " Lanjutkan dan tambah qty request?";
+
+            if (window.confirm(fallbackMessage)) {
+                proceed();
+            }
+        };
+
         performSearch({ strict: true })
             .then(() =>
                 fetch(config.assignUrl, {
@@ -843,6 +899,17 @@
             .then((response) => {
                 if (!response.ok) {
                     return response.json().then((err) => {
+                        if (
+                            response.status === 409 &&
+                            err &&
+                            err.requires_overage_confirmation
+                        ) {
+                            throw {
+                                type: "overage_confirmation",
+                                payload: err,
+                            };
+                        }
+
                         let message = err.message || "Gagal assign.";
                         if (Array.isArray(err.new_box_errors)) {
                             const details = err.new_box_errors
@@ -892,6 +959,11 @@
                 clearSelection();
             })
             .catch((error) => {
+                if (error?.type === "overage_confirmation") {
+                    confirmOverage(error.payload);
+                    return;
+                }
+
                 showResult("danger", error.message);
                 showToastMessage(error.message, "danger");
             })

@@ -28,7 +28,6 @@ class DeliveryPickController extends Controller
     private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
     private const SESSION_RECALC_MESSAGE = 'Sesi picking ini perlu dihitung ulang karena ada order dengan prioritas tanggal lebih awal.';
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
-    private const PARTIAL_FULFILLMENT_ROLES = ['admin', 'admin_warehouse'];
 
     private function applyStoredLocationExistsFilter($query)
     {
@@ -131,14 +130,12 @@ class DeliveryPickController extends Controller
 
     private function buildVerificationReservedPoolsByOrderPart(): array
     {
-        $rowsQuery = DB::table('boxes')
+        $rows = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full');
-
-        $rows = $this->applyStoredLocationExistsFilter($rowsQuery)
+            ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full')
             ->get();
 
         $pools = [];
@@ -162,7 +159,7 @@ class DeliveryPickController extends Controller
         }
 
         $orders = DeliveryOrder::with('items')
-            ->whereIn('status', ['approved', 'processing', 'partial'])
+              ->whereIn('status', ['approved', 'processing'])
             ->orderBy('delivery_date', 'asc')
             ->limit(100)
             ->get();
@@ -306,7 +303,7 @@ class DeliveryPickController extends Controller
         return view('operator.delivery.picking-verification', compact('orders'));
     }
 
-    private function createSessionItems(DeliveryOrder $order, DeliveryPickSession $session, bool $allowPartial = false): void
+    private function createSessionItems(DeliveryOrder $order, DeliveryPickSession $session): void
     {
         foreach ($order->items as $item) {
             $remainingQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
@@ -359,46 +356,9 @@ class DeliveryPickController extends Controller
         }
     }
 
-    private function createBackorderFromRemaining(DeliveryOrder $order): ?DeliveryOrder
+    private function startOrReusePickSession(DeliveryOrder $order, int $userId): DeliveryPickSession
     {
-        $remainingItems = $order->items
-            ->map(function ($orderItem) {
-                return [
-                    'part_number' => (string) $orderItem->part_number,
-                    'remaining_quantity' => max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity),
-                ];
-            })
-            ->filter(fn ($item) => (int) $item['remaining_quantity'] > 0)
-            ->values();
-
-        if ($remainingItems->isEmpty()) {
-            return null;
-        }
-
-        $backorder = DeliveryOrder::create([
-            'parent_delivery_order_id' => $order->id,
-            'sales_user_id' => $order->sales_user_id,
-            'customer_name' => $order->customer_name,
-            'delivery_date' => $order->delivery_date,
-            'status' => 'approved',
-            'notes' => trim((string) ($order->notes ? $order->notes . ' | ' : '') . 'Backorder generated from order #' . $order->id),
-        ]);
-
-        foreach ($remainingItems as $item) {
-            DeliveryOrderItem::create([
-                'delivery_order_id' => $backorder->id,
-                'part_number' => (string) $item['part_number'],
-                'quantity' => (int) $item['remaining_quantity'],
-                'fulfilled_quantity' => 0,
-            ]);
-        }
-
-        return $backorder;
-    }
-
-    private function startOrReusePickSession(DeliveryOrder $order, int $userId, bool $allowPartial = false): DeliveryPickSession
-    {
-        return DB::transaction(function () use ($order, $userId, $allowPartial) {
+        return DB::transaction(function () use ($order, $userId) {
             DeliveryOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
             $this->assertOrderDeliveryGateOpenOrFail((int) $order->id, true);
 
@@ -433,14 +393,13 @@ class DeliveryPickController extends Controller
                 'delivery_order_id' => $order->id,
                 'created_by' => $userId,
                 'status' => 'scanning',
-                'allow_partial' => $allowPartial,
                 'started_at' => now(),
             ]);
 
-            $this->createSessionItems($order, $session, $allowPartial);
+            $this->createSessionItems($order, $session);
 
             if (!$session->items()->exists()) {
-                throw new \RuntimeException($allowPartial ? 'Stok belum tersedia untuk partial delivery.' : 'Semua item sudah terpenuhi.');
+                throw new \RuntimeException('Semua item sudah terpenuhi.');
             }
 
             return $session;
@@ -459,8 +418,7 @@ class DeliveryPickController extends Controller
         try {
             $session = $this->startOrReusePickSession(
                 $order,
-                (int) $user->id,
-                in_array($user->role, self::PARTIAL_FULFILLMENT_ROLES, true)
+                (int) $user->id
             );
         } catch (\Throwable $e) {
             $message = (string) $e->getMessage();
@@ -490,20 +448,8 @@ class DeliveryPickController extends Controller
         try {
             $session = $this->startOrReusePickSession(
                 $order,
-                (int) $user->id,
-                in_array($user->role, self::PARTIAL_FULFILLMENT_ROLES, true)
+                (int) $user->id
             );
-        } catch (\Throwable $e) {
-            $message = (string) $e->getMessage();
-            $statusCode = $message === self::DELIVERY_APPROVAL_PENDING_MESSAGE || str_contains($message, 'diproses') || str_contains($message, 'aktif')
-                ? 423
-                : 422;
-            return response()->json(['message' => $e->getMessage()], $statusCode);
-        }
-
-        return response()->json([
-            'session_id' => $session->id,
-            'verify_url' => route('delivery.pick.verify', [$order->id, $session->id]),
             'final_scan_url' => route('delivery.pick.scan', [$order->id, $session->id]),
         ]);
     }
@@ -860,8 +806,6 @@ class DeliveryPickController extends Controller
                     return ['success' => false, 'message' => 'Session diblokir.', 'status' => 423];
                 }
 
-                $allowPartial = (bool) $session->allow_partial;
-
                 $hasPendingIssue = DeliveryIssue::where('pick_session_id', $session->id)
                     ->where('status', 'pending')
                     ->lockForUpdate()
@@ -894,7 +838,7 @@ class DeliveryPickController extends Controller
                         ->where('part_number', (string) $orderItem->part_number)
                         ->sum('pcs_quantity');
 
-                    if (!$allowPartial && $pickedQty < $requiredQty) {
+                    if ($pickedQty < $requiredQty) {
                         return [
                             'success' => false,
                             'message' => 'Qty part ' . $orderItem->part_number . ' belum cukup untuk complete.',
@@ -976,14 +920,10 @@ class DeliveryPickController extends Controller
                     $remainingAfterComplete += max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity);
                 }
 
-                AuditService::logBatchStockWithdrawal($session, $remainingAfterComplete > 0 ? 'partial' : 'completed');
+                AuditService::logBatchStockWithdrawal($session, 'completed');
 
-                $order->status = $remainingAfterComplete > 0 ? 'partial' : 'completed';
+                $order->status = 'completed';
                 $order->save();
-
-                if ($remainingAfterComplete > 0) {
-                    $this->createBackorderFromRemaining($order->fresh(['items']));
-                }
 
                 $session->status = 'completed';
                 $session->completed_at = now();
@@ -993,9 +933,7 @@ class DeliveryPickController extends Controller
 
                 return [
                     'success' => true,
-                    'message' => $remainingAfterComplete > 0
-                        ? 'Delivery selesai sebagian. Sisa qty masih menunggu batch berikutnya.'
-                        : 'Delivery selesai.',
+                    'message' => 'Delivery selesai.',
                 ];
             });
 
@@ -1775,27 +1713,25 @@ class DeliveryPickController extends Controller
     private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null, bool $lockRows = false)
     {
         $query = Box::query()
-            ->where('part_number', $partNumber)
-            ->where('is_withdrawn', false)
-            ->whereNotIn('expired_status', ['handled', 'expired'])
-            ->where('assigned_delivery_order_id', $orderId)
+            ->with(['pallets.stockLocation'])
+            ->where('boxes.part_number', $partNumber)
+            ->where('boxes.is_withdrawn', false)
+            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where('boxes.assigned_delivery_order_id', $orderId)
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
-                  ->from('delivery_pick_items')
-                  ->whereIn('pick_session_id', function ($q2) {
-                      $q2->select('id')
-                        ->from('delivery_pick_sessions')
-                        ->whereIn('status', self::ACTIVE_LOCK_STATUSES);
-                  });
+                    ->from('delivery_pick_items')
+                    ->whereIn('pick_session_id', function ($q2) {
+                        $q2->select('id')
+                            ->from('delivery_pick_sessions')
+                            ->whereIn('status', self::ACTIVE_LOCK_STATUSES);
+                    });
             })
-            ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.*')
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
                 $cutoffDate = Carbon::parse($deliveryDate)->subMonths(12);
                 $q->where('boxes.created_at', '>=', $cutoffDate);
-            });
-
-        $query = $this->applyStoredLocationExistsFilter($query);
+            })
+            ->orderBy('boxes.created_at', 'asc');
 
         if ($lockRows) {
             $query->lockForUpdate();
@@ -1813,12 +1749,12 @@ class DeliveryPickController extends Controller
             ->whereNull('boxes.assigned_delivery_order_id')
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
-                  ->from('delivery_pick_items')
-                  ->whereIn('pick_session_id', function ($q2) {
-                      $q2->select('id')
-                        ->from('delivery_pick_sessions')
-                        ->whereIn('status', self::ACTIVE_LOCK_STATUSES);
-                  });
+                    ->from('delivery_pick_items')
+                    ->whereIn('pick_session_id', function ($q2) {
+                        $q2->select('id')
+                            ->from('delivery_pick_sessions')
+                            ->whereIn('status', self::ACTIVE_LOCK_STATUSES);
+                    });
             })
             ->when($deliveryDate, function ($q) use ($deliveryDate) {
                 $cutoffDate = Carbon::parse($deliveryDate)->subMonths(12);
@@ -1842,9 +1778,11 @@ class DeliveryPickController extends Controller
             if ($remaining <= 0) {
                 break;
             }
+
             if ((int) $box->pcs_quantity > $remaining) {
                 continue;
             }
+
             $selected->push($box);
             $remaining -= (int) $box->pcs_quantity;
         }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Box;
 use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
 use App\Models\PartSetting;
@@ -16,6 +17,15 @@ use Illuminate\Support\Facades\DB;
 class DeliveryAssignController extends Controller
 {
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
+
+    private function isApprovedDeliveryOrder(int $deliveryOrderId): bool
+    {
+        return DeliveryOrder::query()
+            ->whereNull('deleted_at')
+            ->whereKey($deliveryOrderId)
+            ->where('status', 'approved')
+            ->exists();
+    }
 
     private function applyStoredLocationExistsFilter($query)
     {
@@ -143,19 +153,79 @@ class DeliveryAssignController extends Controller
         }
 
         $errors = [];
+        $overages = [];
         foreach ($selectedTotals as $partNumber => $selectedQuantity) {
             if (!isset($availability[$partNumber])) {
                 $errors[] = "Part {$partNumber} tidak ada di delivery order ini.";
                 continue;
             }
 
+            $requestedQuantity = (int) ($availability[$partNumber]['requested_quantity'] ?? 0);
+            $assignedQuantity = (int) ($availability[$partNumber]['assigned_quantity'] ?? 0);
             $remainingQuantity = (int) ($availability[$partNumber]['remaining_quantity'] ?? 0);
             if ($selectedQuantity > $remainingQuantity) {
-                $errors[] = "Part {$partNumber} melebihi sisa request delivery order ({$selectedQuantity}/{$remainingQuantity}).";
+                $overageQuantity = $selectedQuantity - $remainingQuantity;
+                $overages[] = [
+                    'part_number' => $partNumber,
+                    'requested_quantity' => $requestedQuantity,
+                    'assigned_quantity' => $assignedQuantity,
+                    'remaining_quantity' => $remainingQuantity,
+                    'selected_quantity' => $selectedQuantity,
+                    'overage_quantity' => $overageQuantity,
+                    'new_requested_quantity' => $requestedQuantity + $overageQuantity,
+                ];
             }
         }
 
-        return $errors;
+        return [
+            'errors' => $errors,
+            'overages' => $overages,
+        ];
+    }
+
+    private function applyOverageAdjustments(int $deliveryOrderId, array $overages): array
+    {
+        if (empty($overages)) {
+            return [];
+        }
+
+        $adjustments = [];
+
+        foreach ($overages as $overage) {
+            $partNumber = (string) ($overage['part_number'] ?? '');
+            $newRequestedQuantity = (int) ($overage['new_requested_quantity'] ?? 0);
+            if ($partNumber === '' || $newRequestedQuantity <= 0) {
+                continue;
+            }
+
+            $item = DeliveryOrderItem::query()
+                ->where('delivery_order_id', $deliveryOrderId)
+                ->where('part_number', $partNumber)
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->first();
+
+            if (!$item) {
+                continue;
+            }
+
+            $oldQuantity = (int) $item->quantity;
+            if ($newRequestedQuantity <= $oldQuantity) {
+                continue;
+            }
+
+            $item->quantity = $newRequestedQuantity;
+            $item->save();
+
+            $adjustments[] = [
+                'part_number' => $partNumber,
+                'old_quantity' => $oldQuantity,
+                'new_quantity' => $newRequestedQuantity,
+                'increased_by' => $newRequestedQuantity - $oldQuantity,
+            ];
+        }
+
+        return $adjustments;
     }
 
     private function resolveBoxIdsFromPallets(array $palletIds): array
@@ -203,7 +273,7 @@ class DeliveryAssignController extends Controller
         ];
     }
 
-    private function validateNewBoxes(array $newBoxes): array
+    private function validateNewBoxes(array $newBoxes, int $deliveryOrderId): array
     {
         $errors = [];
         $prepared = [];
@@ -267,6 +337,13 @@ class DeliveryAssignController extends Controller
             ->get()
             ->keyBy('part_number');
 
+        $orderPartNumbers = DB::table('delivery_order_items')
+            ->where('delivery_order_id', $deliveryOrderId)
+            ->pluck('part_number')
+            ->map(fn ($partNumber) => (string) $partNumber)
+            ->all();
+        $orderPartLookup = array_fill_keys($orderPartNumbers, true);
+
         $validEntries = [];
         foreach ($prepared as $index => $entry) {
             if (!empty($invalidIndexes[$index])) {
@@ -286,15 +363,14 @@ class DeliveryAssignController extends Controller
                 continue;
             }
 
-            $qtyBox = (int) ($partSetting->qty_box ?? 0);
-            if ($qtyBox > 0 && $entry['pcs_quantity'] > $qtyBox) {
-                $this->addNewBoxError($errors, $index, $entry['box_number'], $entry['part_number'], 'Qty PCS melebihi qty box master.');
+            if (empty($orderPartLookup[$entry['part_number']])) {
+                $this->addNewBoxError($errors, $index, $entry['box_number'], $entry['part_number'], 'No Part tidak ada dalam delivery order yang dipilih.');
                 $invalidIndexes[$index] = true;
                 continue;
             }
 
             $validEntries[] = array_merge($entry, [
-                'qty_box' => $qtyBox > 0 ? $qtyBox : null,
+                'qty_box' => (int) ($partSetting->qty_box ?? 0) > 0 ? (int) $partSetting->qty_box : null,
             ]);
         }
 
@@ -476,6 +552,8 @@ class DeliveryAssignController extends Controller
     public function index()
     {
         $deliveryOrders = DeliveryOrder::query()
+            ->whereNull('deleted_at')
+            ->where('status', 'approved')
             ->orderByDesc('delivery_date')
             ->orderByDesc('id')
             ->get();
@@ -487,9 +565,9 @@ class DeliveryAssignController extends Controller
 
     public function deliveryOrderParts(Request $request, int $deliveryOrderId)
     {
-        if ($deliveryOrderId <= 0 || !DeliveryOrder::query()->whereKey($deliveryOrderId)->exists()) {
+        if ($deliveryOrderId <= 0 || !$this->isApprovedDeliveryOrder($deliveryOrderId)) {
             return response()->json([
-                'message' => 'Delivery order tidak ditemukan.',
+                'message' => 'Delivery order tidak ditemukan atau belum approved.',
             ], 404);
         }
 
@@ -509,9 +587,9 @@ class DeliveryAssignController extends Controller
         $search = trim((string) $request->query('q', ''));
         $deliveryOrderId = (int) $request->query('delivery_order_id', 0);
 
-        if ($deliveryOrderId <= 0 || !DeliveryOrder::query()->whereKey($deliveryOrderId)->exists()) {
+        if ($deliveryOrderId <= 0 || !$this->isApprovedDeliveryOrder($deliveryOrderId)) {
             return response()->json([
-                'message' => 'Delivery order harus dipilih terlebih dahulu.',
+                'message' => 'Delivery order harus dipilih dan status approved.',
                 'boxes' => [],
                 'pallets' => [],
             ], 422);
@@ -618,9 +696,9 @@ class DeliveryAssignController extends Controller
     public function palletBoxes(Request $request, int $palletId)
     {
         $deliveryOrderId = (int) $request->query('delivery_order_id', 0);
-        if ($deliveryOrderId <= 0 || !DeliveryOrder::query()->whereKey($deliveryOrderId)->exists()) {
+        if ($deliveryOrderId <= 0 || !$this->isApprovedDeliveryOrder($deliveryOrderId)) {
             return response()->json([
-                'message' => 'Delivery order harus dipilih terlebih dahulu.',
+                'message' => 'Delivery order harus dipilih dan status approved.',
             ], 422);
         }
 
@@ -711,9 +789,17 @@ class DeliveryAssignController extends Controller
             'new_boxes.*.box_number' => ['required', 'string'],
             'new_boxes.*.part_number' => ['required', 'string'],
             'new_boxes.*.pcs_quantity' => ['required', 'integer', 'min:1'],
+            'confirm_overage' => ['nullable', 'boolean'],
         ]);
 
         $deliveryOrderId = (int) $validated['delivery_order_id'];
+        $confirmOverage = (bool) ($validated['confirm_overage'] ?? false);
+
+        if (!$this->isApprovedDeliveryOrder($deliveryOrderId)) {
+            return response()->json([
+                'message' => 'Hanya delivery order dengan status approved yang dapat di-assign.',
+            ], 422);
+        }
 
         if ($this->hasActivePickSession($deliveryOrderId)) {
             return response()->json([
@@ -725,7 +811,7 @@ class DeliveryAssignController extends Controller
         $palletIds = $validated['pallet_ids'] ?? [];
         $newBoxes = $validated['new_boxes'] ?? [];
 
-        [$validNewBoxes, $newBoxErrors] = $this->validateNewBoxes($newBoxes);
+        [$validNewBoxes, $newBoxErrors] = $this->validateNewBoxes($newBoxes, $deliveryOrderId);
         if (!empty($newBoxErrors)) {
             return response()->json([
                 'message' => 'Box baru tidak valid. Periksa kembali input scan.',
@@ -813,7 +899,10 @@ class DeliveryAssignController extends Controller
             ]);
         }
 
-        $partCoverageErrors = $this->validateDeliveryOrderPartCoverage($deliveryOrderId, $eligibleBoxes, $validNewBoxes);
+        $partCoverage = $this->validateDeliveryOrderPartCoverage($deliveryOrderId, $eligibleBoxes, $validNewBoxes);
+        $partCoverageErrors = $partCoverage['errors'] ?? [];
+        $partOverages = $partCoverage['overages'] ?? [];
+
         if (!empty($partCoverageErrors)) {
             return response()->json([
                 'message' => $partCoverageErrors[0],
@@ -821,9 +910,28 @@ class DeliveryAssignController extends Controller
             ], 422);
         }
 
+        if (!empty($partOverages) && !$confirmOverage) {
+            $firstOverage = $partOverages[0];
+
+            return response()->json([
+                'message' => 'Qty assign melebihi sisa request delivery. Konfirmasi untuk menambah qty delivery order.',
+                'requires_overage_confirmation' => true,
+                'part_overages' => $partOverages,
+                'part_coverage_errors' => [
+                    sprintf(
+                        'Part %s melebihi sisa request (%d/%d). Jika dilanjutkan, qty request akan dinaikkan.',
+                        (string) ($firstOverage['part_number'] ?? '-'),
+                        (int) ($firstOverage['selected_quantity'] ?? 0),
+                        (int) ($firstOverage['remaining_quantity'] ?? 0)
+                    ),
+                ],
+            ], 409);
+        }
+
         $assignedExistingBoxIds = [];
         $createdNewBoxIds = [];
         $sessionId = null;
+        $overageAdjustments = [];
         $userId = (int) Auth::id();
 
         DB::transaction(function () use (
@@ -833,8 +941,14 @@ class DeliveryAssignController extends Controller
             $userId,
             &$assignedExistingBoxIds,
             &$createdNewBoxIds,
-            &$sessionId
+            &$sessionId,
+            &$overageAdjustments,
+            $partOverages
         ) {
+            if (!empty($partOverages)) {
+                $overageAdjustments = $this->applyOverageAdjustments($deliveryOrderId, $partOverages);
+            }
+
             $session = DeliveryPickSession::query()
                 ->where('delivery_order_id', $deliveryOrderId)
                 ->where('status', 'pending')
@@ -956,6 +1070,7 @@ class DeliveryAssignController extends Controller
                     'assigned_existing_box_ids' => $assignedExistingBoxIds,
                     'created_new_box_ids' => $createdNewBoxIds,
                     'pick_session_id' => $sessionId,
+                    'overage_adjustments' => $overageAdjustments,
                 ],
                 'Assign manual stock + direct input box ke delivery order'
             );
@@ -966,6 +1081,7 @@ class DeliveryAssignController extends Controller
             'assigned_existing_box_ids' => $assignedExistingBoxIds,
             'created_new_count' => count($createdNewBoxIds),
             'created_new_box_ids' => $createdNewBoxIds,
+            'overage_adjustments' => $overageAdjustments,
             'skipped_count' => count($skipped),
             'skipped' => $skipped,
             'pick_session_id' => $sessionId,
@@ -980,6 +1096,12 @@ class DeliveryAssignController extends Controller
         ]);
 
         $deliveryOrderId = (int) $validated['delivery_order_id'];
+
+        if (!$this->isApprovedDeliveryOrder($deliveryOrderId)) {
+            return response()->json([
+                'message' => 'Hanya delivery order dengan status approved yang dapat di-assign.',
+            ], 422);
+        }
 
         if ($this->hasActivePickSession($deliveryOrderId)) {
             return response()->json([

@@ -97,9 +97,9 @@ class OperationalReportService
 
     private function buildMatchingReport(?Carbon $start, ?Carbon $end)
     {
-        $matchingOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity', 'parentOrder:id'])
-            ->select(['id', 'parent_delivery_order_id', 'customer_name', 'delivery_date', 'status'])
-            ->whereIn('status', ['approved', 'processing', 'partial', 'completed'])
+        $matchingOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
+            ->select(['id', 'customer_name', 'delivery_date', 'status'])
+            ->whereIn('status', ['approved', 'processing', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('delivery_date', '<=', $end->toDateString()))
             ->orderBy('delivery_date', 'asc')
@@ -110,7 +110,6 @@ class OperationalReportService
             $fulfilled = (int) $order->items->sum('fulfilled_quantity');
             $rate = $required > 0 ? round(($fulfilled / $required) * 100, 1) : 0;
             $isFull = $order->items->every(fn ($item) => $item->fulfilled_quantity >= $item->quantity);
-            $isBackorder = !empty($order->parent_delivery_order_id);
 
             return [
                 'order_id' => $order->id,
@@ -119,8 +118,7 @@ class OperationalReportService
                 'required' => $required,
                 'fulfilled' => $fulfilled,
                 'rate' => $rate,
-                'status' => $isBackorder ? 'Backorder' : ($isFull ? 'Full' : 'Partial'),
-                'parent_order_id' => $order->parent_delivery_order_id,
+                'status' => $isFull ? 'Full' : 'Partial',
             ];
         });
     }
@@ -322,8 +320,8 @@ class OperationalReportService
     private function buildFulfillmentReport(?Carbon $start, ?Carbon $end, string $fulfillmentFilter = 'all'): array
     {
         $fulfillmentOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
-            ->select(['id', 'parent_delivery_order_id', 'customer_name', 'delivery_date', 'status'])
-            ->whereIn('status', ['approved', 'processing', 'partial', 'completed'])
+            ->select(['id', 'customer_name', 'delivery_date', 'status'])
+            ->whereIn('status', ['approved', 'processing', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('delivery_date', '<=', $end->toDateString()))
             ->orderBy('delivery_date', 'asc')
@@ -334,7 +332,6 @@ class OperationalReportService
             $fulfilled = (int) $order->items->sum('fulfilled_quantity');
             $rate = $required > 0 ? round(($fulfilled / $required) * 100, 1) : 0;
             $isFull = $order->items->every(fn ($item) => $item->fulfilled_quantity >= $item->quantity);
-            $isBackorder = !empty($order->parent_delivery_order_id);
 
             return [
                 'order_id' => $order->id,
@@ -343,7 +340,7 @@ class OperationalReportService
                 'required' => $required,
                 'fulfilled' => $fulfilled,
                 'rate' => $rate,
-                'status' => $isBackorder ? 'Backorder' : ($isFull ? 'Full' : 'Partial'),
+                'status' => $isFull ? 'Full' : 'Partial',
             ];
         });
 

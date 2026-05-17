@@ -74,6 +74,7 @@ class StockWithdrawalController extends Controller
 
         if ($deliveryOrderId && $remaining > 0) {
             $reservedBoxesQuery = Box::query()
+                ->with(['pallets.stockLocation'])
                 ->where('part_number', $partNumber)
                 ->where('is_withdrawn', false)
                 ->whereNotIn('expired_status', ['handled', 'expired'])
@@ -83,8 +84,7 @@ class StockWithdrawalController extends Controller
                 ->select('boxes.*')
                 ->lockForUpdate();
 
-            $reservedBoxes = $this->applyStoredLocationExistsFilter($reservedBoxesQuery)
-                ->get();
+            $reservedBoxes = $reservedBoxesQuery->get();
 
             foreach ($reservedBoxes as $box) {
                 if ($remaining <= 0) {
@@ -208,13 +208,11 @@ class StockWithdrawalController extends Controller
             'part_number' => 'required|string',
             'pcs_quantity' => 'required|integer|min:1',
             'delivery_order_id' => 'nullable|integer',
-            'allow_partial' => 'sometimes|boolean',
         ]);
 
         $partNumber = $request->input('part_number');
         $requestedQty = (int) $request->input('pcs_quantity');
         $orderId = $request->input('delivery_order_id');
-        $allowPartial = filter_var($request->input('allow_partial', false), FILTER_VALIDATE_BOOLEAN);
 
         $reservedLocations = [];
         $reservedTotal = 0;
@@ -222,11 +220,13 @@ class StockWithdrawalController extends Controller
         if ($orderId) {
             $reservedBoxes = $this->getReservedBoxesForOrder((int) $orderId, $partNumber);
             foreach ($reservedBoxes as $box) {
+                $pallet = $box->pallets->first();
+                $stockLocation = $pallet?->stockLocation;
                 $reservedLocations[] = [
-                    'pallet_id' => $box->pallet_id,
-                    'pallet_number' => $box->pallet_number,
-                    'warehouse_location' => $box->warehouse_location,
-                    'stored_date' => $box->stored_at ? Carbon::parse($box->stored_at)->format('d/m/Y H:i') : '-',
+                    'pallet_id' => $pallet?->id,
+                    'pallet_number' => $pallet?->pallet_number ?? '-',
+                    'warehouse_location' => $stockLocation?->warehouse_location ?? 'Unknown',
+                    'stored_date' => $box->created_at ? Carbon::parse($box->created_at)->format('d/m/Y H:i') : '-',
                     'available_pcs' => (int) $box->pcs_quantity,
                     'available_box' => 1,
                     'pcs_per_box' => (int) $box->pcs_quantity,
@@ -893,17 +893,10 @@ class StockWithdrawalController extends Controller
         return $locations;
     }
 
-    private function getReservedBoxesForOrder(int $orderId, string $partNumber)
+    private function getReservedBoxesForOrder(int $orderId, string $partNumber, $deliveryDate = null, bool $lockRows = false)
     {
-        $storedPivotSubquery = $this->getStoredLocationPivotSubquery();
-
-        return DB::table('boxes')
-            ->joinSub($storedPivotSubquery, 'stored_box', function ($join) {
-                $join->on('stored_box.box_id', '=', 'boxes.id');
-            })
-            ->join('pallet_boxes as pb', 'pb.id', '=', 'stored_box.pivot_id')
-            ->join('pallets', 'pallets.id', '=', 'pb.pallet_id')
-            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+        $query = Box::query()
+            ->with(['pallets.stockLocation'])
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
@@ -917,17 +910,13 @@ class StockWithdrawalController extends Controller
                             ->whereIn('status', ['scanning', 'blocked', 'approved']);
                     });
             })
-            ->orderBy('boxes.created_at', 'asc')
-            ->select([
-                'boxes.box_number',
-                'boxes.pcs_quantity',
-                'boxes.is_not_full',
-                'boxes.created_at as stored_at',
-                'pallets.id as pallet_id',
-                'pallets.pallet_number',
-                'stock_locations.warehouse_location',
-            ])
-            ->get();
+            ->orderBy('boxes.created_at', 'asc');
+
+        if ($lockRows) {
+            $query->lockForUpdate();
+        }
+
+        return $query->get();
     }
 
     /**

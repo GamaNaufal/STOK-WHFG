@@ -439,27 +439,13 @@
                     </tr>
                 </thead>
                 <tbody>
-                    @forelse($displayOrders as $order)
+                    @forelse($approvedOrders as $order)
                     <tr>
                         <td>
                             <strong>{{ $order->delivery_date->format('d M Y') }}</strong>
                         </td>
                         <td>
                             {{ $order->customer_name }}
-                            @if(!empty($order->has_child_orders))
-                                <div class="mt-1">
-                                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#backorder-group-{{ $order->id }}">
-                                        <i class="bi bi-diagram-3"></i> {{ $order->child_orders->count() }} Backorder
-                                    </button>
-                                </div>
-                            @endif
-                            @if(!empty($order->parent_delivery_order_id))
-                                <div class="mt-1">
-                                    <span class="badge bg-secondary">
-                                        <i class="bi bi-diagram-3"></i> Backorder dari #{{ $order->parent_delivery_order_id }}
-                                    </span>
-                                </div>
-                            @endif
                             @if(!empty($order->notes))
                                 <div class="mt-1 text-muted" style="font-size: 0.8rem; line-height: 1.35;">
                                     {{ \Illuminate\Support\Str::limit($order->notes, 140) }}
@@ -499,12 +485,6 @@
                                         <i class="bi bi-hourglass-split"></i> Pending Approval Not Full
                                     </span>
                                 </div>
-                            @elseif($order->status === 'partial')
-                                <div class="mt-1">
-                                    <span class="badge bg-info text-dark">
-                                        <i class="bi bi-arrow-repeat"></i> Partial
-                                    </span>
-                                </div>
                             @endif
                         </td>
                         @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
@@ -534,10 +514,6 @@
                                     <button class="btn-process" onclick="openFulfillModal('{{ $order->id }}')">
                                         <i class="bi bi-box-seam"></i> Process
                                     </button>
-                                @elseif(!empty($order->has_partial_stock) && in_array(Auth::user()->role, ['admin', 'admin_warehouse'], true))
-                                    <button class="btn-process" onclick="openFulfillModal('{{ $order->id }}')">
-                                        <i class="bi bi-box-seam"></i> Kirim Sebagian
-                                    </button>
                                 @else
                                     <button class="btn-insufficient" disabled>
                                         <i class="bi bi-x-circle"></i> Stock Kurang
@@ -555,89 +531,6 @@
                         </td>
                         @endif
                     </tr>
-                    @if(!empty($order->has_child_orders))
-                    <tr class="collapse" id="backorder-group-{{ $order->id }}">
-                        <td colspan="{{ (in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) ? 5 : 4 }}" class="bg-light">
-                            <div class="p-3">
-                                <div class="fw-semibold mb-3">Backorder Orders</div>
-                                <div class="table-responsive">
-                                    <table class="table table-sm align-middle mb-0">
-                                        <thead>
-                                            <tr>
-                                                <th style="width: 10%">Order</th>
-                                                <th style="width: 22%">Customer</th>
-                                                <th>Detail Pesanan</th>
-                                                <th style="width: 14%">Status</th>
-                                                @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
-                                                <th style="width: 18%" class="text-end">Action</th>
-                                                @endif
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @foreach($order->child_orders as $childOrder)
-                                                <tr>
-                                                    <td class="fw-bold">#{{ $childOrder->id }}</td>
-                                                    <td>
-                                                        {{ $childOrder->customer_name }}
-                                                        <div class="mt-1 text-muted" style="font-size: 0.8rem; line-height: 1.35;">
-                                                            Backorder dari #{{ $order->id }}
-                                                        </div>
-                                                    </td>
-                                                    <td>
-                                                        @foreach($childOrder->items as $item)
-                                                            <div class="part-item">
-                                                                <span class="part-name">{{ $item->part_number }}</span>
-                                                                <span class="part-qty {{ ((int) ($item->quantity ?? 0) > 0) ? 'warning' : 'ok' }}">
-                                                                    {{ $item->fulfilled_quantity ?? 0 }} / {{ $item->quantity }}
-                                                                </span>
-                                                            </div>
-                                                        @endforeach
-                                                    </td>
-                                                    <td>
-                                                        @if($childOrder->status === 'approved')
-                                                            <span class="badge bg-success">Approved</span>
-                                                        @elseif($childOrder->status === 'partial')
-                                                            <span class="badge bg-info text-dark">Partial</span>
-                                                        @else
-                                                            <span class="badge bg-secondary">{{ ucfirst($childOrder->status) }}</span>
-                                                        @endif
-                                                    </td>
-                                                    @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
-                                                    <td class="text-end">
-                                                        <div class="action-buttons">
-                                                            @if($childOrder->status === 'completed')
-                                                                <span class="btn-completed">
-                                                                    <i class="bi bi-check-circle"></i> Selesai
-                                                                </span>
-                                                            @elseif(!empty($childOrder->has_active_pick_session) && !empty($childOrder->active_pick_owned_by_current_user) && !empty($childOrder->active_pick_resume_url))
-                                                                <a class="btn-process" href="{{ $childOrder->active_pick_resume_url }}">
-                                                                    <i class="bi bi-arrow-repeat"></i> Lanjutkan
-                                                                </a>
-                                                            @elseif($childOrder->has_sufficient_stock ?? false)
-                                                                <button class="btn-process" onclick="openFulfillModal('{{ $childOrder->id }}')">
-                                                                    <i class="bi bi-box-seam"></i> Process
-                                                                </button>
-                                                            @elseif(!empty($childOrder->has_partial_stock) && in_array(Auth::user()->role, ['admin', 'admin_warehouse'], true))
-                                                                <button class="btn-process" onclick="openFulfillModal('{{ $childOrder->id }}')">
-                                                                    <i class="bi bi-box-seam"></i> Kirim Sebagian
-                                                                </button>
-                                                            @else
-                                                                <button class="btn-insufficient" disabled>
-                                                                    <i class="bi bi-x-circle"></i> Stock Kurang
-                                                                </button>
-                                                            @endif
-                                                        </div>
-                                                    </td>
-                                                    @endif
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </td>
-                    </tr>
-                    @endif
                     @empty
                     <tr>
                         <td colspan="{{ (in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) ? 5 : 4 }}" class="text-center py-5">
@@ -680,13 +573,6 @@
                             <td>{{ $order ? '#' . $order->id : '-' }}</td>
                             <td>
                                 {{ $order?->customer_name ?? '-' }}
-                                @if(!empty($order?->parent_delivery_order_id))
-                                    <div class="mt-1">
-                                        <span class="badge bg-secondary">
-                                            <i class="bi bi-diagram-3"></i> Backorder dari #{{ $order->parent_delivery_order_id }}
-                                        </span>
-                                    </div>
-                                @endif
                             </td>
                             <td>
                                 @if($order)
@@ -756,7 +642,7 @@
 @endsection
 
 <!-- Fulfill Modal -->
-<div class="modal fade" id="fulfillModal" tabindex="-1" data-can-partial="{{ in_array(Auth::user()->role, ['admin', 'admin_warehouse'], true) ? 1 : 0 }}">
+<div class="modal fade" id="fulfillModal" tabindex="-1">
     <div class="modal-dialog modal-xl">
         <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <div class="modal-header" style="background: linear-gradient(135deg, #0C7779 0%, #005461 100%); color: white; border: none; padding: 1.5rem;">
@@ -780,7 +666,6 @@
 <script>
     const fulfillModal = new bootstrap.Modal(document.getElementById('fulfillModal'));
     const picklistModal = new bootstrap.Modal(document.getElementById('picklistModal'));
-    const canPartialDelivery = document.getElementById('fulfillModal')?.dataset.canPartial === '1';
     let currentOrderId = null;
     let fulfillGateBlockedReason = null;
 
@@ -903,8 +788,7 @@
                     body: JSON.stringify({
                         part_number: item.part_number,
                         pcs_quantity: qty,
-                        delivery_order_id: currentOrderId,
-                        allow_partial: canPartialDelivery
+                        delivery_order_id: currentOrderId
                     })
                 })
                 .then(res => res.json())

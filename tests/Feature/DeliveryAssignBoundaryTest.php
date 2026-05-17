@@ -16,6 +16,57 @@ class DeliveryAssignBoundaryTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_index_shows_only_approved_delivery_orders(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $approved = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Approved Order',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        $pending = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Pending Order',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($user)->get(route('delivery-assign.index'));
+
+        $response->assertOk();
+
+        $deliveryOrders = $response->viewData('deliveryOrders');
+        $this->assertNotNull($deliveryOrders);
+        $this->assertTrue($deliveryOrders->contains('id', $approved->id));
+        $this->assertFalse($deliveryOrders->contains('id', $pending->id));
+    }
+
+    public function test_index_hides_soft_deleted_delivery_orders_even_if_status_is_approved(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $deletedOrder = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Deleted Approved Order',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+        $deletedOrder->delete();
+
+        $response = $this->actingAs($user)->get(route('delivery-assign.index'));
+
+        $response->assertOk();
+
+        $deliveryOrders = $response->viewData('deliveryOrders');
+        $this->assertNotNull($deliveryOrders);
+        $this->assertFalse($deliveryOrders->contains('id', $deletedOrder->id));
+    }
+
     public function test_delivery_order_parts_endpoint_returns_remaining_quantity_only(): void
     {
         $user = User::factory()->create(['role' => 'warehouse_operator']);
@@ -87,6 +138,30 @@ class DeliveryAssignBoundaryTest extends TestCase
         $response->assertJsonPath('parts.0.remaining_quantity', 40);
     }
 
+    public function test_delivery_order_parts_endpoint_rejects_deleted_orders(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Deleted Parts Order',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        $order->delete();
+
+        $response = $this->actingAs($user)->getJson(route('delivery-assign.delivery-order-parts', [
+            'deliveryOrderId' => $order->id,
+        ]));
+
+        $response->assertNotFound();
+        $response->assertJsonFragment([
+            'message' => 'Delivery order tidak ditemukan atau belum approved.',
+        ]);
+    }
+
     public function test_assign_rejects_part_not_requested_by_delivery_order(): void
     {
         $user = User::factory()->create(['role' => 'warehouse_operator']);
@@ -142,7 +217,147 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
     }
 
-    public function test_assign_rejects_quantity_overflow_for_same_part_across_existing_and_new_boxes(): void
+    public function test_assign_rejects_non_approved_delivery_order(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Pending For Assign',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'pending',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-PENDING-01',
+            'quantity' => 10,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $pallet = Pallet::create([
+            'pallet_number' => 'PLT-PENDING-01',
+        ]);
+
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
+        $box = Box::create([
+            'box_number' => '22001',
+            'part_number' => 'P-PENDING-01',
+            'part_name' => 'Pending Part',
+            'pcs_quantity' => 10,
+            'qty_box' => 10,
+            'qr_code' => '22001|P-PENDING-01|10',
+            'user_id' => $user->id,
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
+            'delivery_order_id' => $order->id,
+            'box_ids' => [$box->id],
+            'pallet_ids' => [],
+            'new_boxes' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonFragment([
+            'message' => 'Hanya delivery order dengan status approved yang dapat di-assign.',
+        ]);
+    }
+
+    public function test_assign_rejects_new_box_part_not_in_selected_delivery_order(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Boundary New Box Part',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-REQ-ONLY-NEWBOX',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        PartSetting::create([
+            'part_number' => 'P-NOT-IN-ORDER',
+            'qty_box' => 100,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
+            'delivery_order_id' => $order->id,
+            'box_ids' => [],
+            'pallet_ids' => [],
+            'new_boxes' => [
+                [
+                    'box_number' => '23001',
+                    'part_number' => 'P-NOT-IN-ORDER',
+                    'pcs_quantity' => 20,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('new_box_errors.0.reason', 'No Part tidak ada dalam delivery order yang dipilih.');
+    }
+
+    public function test_assign_allows_new_box_over_master_qty_box_when_delivery_qty_is_still_available(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Boundary Master Qty Box',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-MASTER-QTY',
+            'quantity' => 200,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        PartSetting::create([
+            'part_number' => 'P-MASTER-QTY',
+            'qty_box' => 100,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
+            'delivery_order_id' => $order->id,
+            'box_ids' => [],
+            'pallet_ids' => [],
+            'new_boxes' => [
+                [
+                    'box_number' => '24001',
+                    'part_number' => 'P-MASTER-QTY',
+                    'pcs_quantity' => 150,
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('created_new_count', 1);
+        $this->assertDatabaseHas('boxes', [
+            'box_number' => '24001',
+            'assigned_delivery_order_id' => $order->id,
+            'pcs_quantity' => 150,
+        ]);
+    }
+
+    public function test_assign_overflow_requires_confirmation_and_updates_delivery_item_quantity(): void
     {
         $user = User::factory()->create(['role' => 'warehouse_operator']);
         $sales = User::factory()->create(['role' => 'sales']);
@@ -187,7 +402,7 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
         $pallet->boxes()->attach($box->id);
 
-        $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
+        $firstResponse = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
             'delivery_order_id' => $order->id,
             'box_ids' => [$box->id],
             'pallet_ids' => [],
@@ -200,16 +415,46 @@ class DeliveryAssignBoundaryTest extends TestCase
             ],
         ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonFragment([
-            'message' => 'Part P-OVERFLOW melebihi sisa request delivery order (110/100).',
-        ]);
+        $firstResponse->assertStatus(409);
+        $firstResponse->assertJsonPath('requires_overage_confirmation', true);
         $this->assertDatabaseMissing('boxes', [
             'box_number' => '30002',
             'assigned_delivery_order_id' => $order->id,
         ]);
         $this->assertDatabaseMissing('boxes', [
             'id' => $box->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+
+        $confirmedResponse = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
+            'delivery_order_id' => $order->id,
+            'box_ids' => [$box->id],
+            'pallet_ids' => [],
+            'confirm_overage' => true,
+            'new_boxes' => [
+                [
+                    'box_number' => '30002',
+                    'part_number' => 'P-OVERFLOW',
+                    'pcs_quantity' => 50,
+                ],
+            ],
+        ]);
+
+        $confirmedResponse->assertOk();
+
+        $this->assertDatabaseHas('delivery_order_items', [
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-OVERFLOW',
+            'quantity' => 110,
+        ]);
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+
+        $this->assertDatabaseHas('boxes', [
+            'box_number' => '30002',
             'assigned_delivery_order_id' => $order->id,
         ]);
     }
@@ -265,7 +510,6 @@ class DeliveryAssignBoundaryTest extends TestCase
             'part_number' => 'P-PREVIEW',
             'pcs_quantity' => 100,
             'delivery_order_id' => $order->id,
-            'allow_partial' => false,
         ]);
 
         $response->assertStatus(200);

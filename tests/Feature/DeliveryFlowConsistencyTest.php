@@ -187,6 +187,57 @@ class DeliveryFlowConsistencyTest extends TestCase
         ]);
     }
 
+    public function test_start_pick_prioritizes_assigned_box_even_without_pallet_location(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Assigned Without Location',
+            'delivery_date' => now()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-ASSIGNED-NO-LOC',
+            'quantity' => 10,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        Box::create([
+            'box_number' => 'BOX-ASSIGNED-NO-LOC-01',
+            'part_number' => 'P-ASSIGNED-NO-LOC',
+            'part_name' => 'Part Assigned No Location',
+            'pcs_quantity' => 10,
+            'qty_box' => 1,
+            'qr_code' => 'BOX-ASSIGNED-NO-LOC-01|P-ASSIGNED-NO-LOC|10',
+            'user_id' => $operator->id,
+            'is_withdrawn' => false,
+            'assigned_delivery_order_id' => $order->id,
+            'expired_status' => 'active',
+        ]);
+
+        $response = $this->actingAs($operator)
+            ->postJson(route('delivery.pick.start', $order->id));
+
+        $response->assertOk()->assertJsonStructure([
+            'session_id',
+            'pdf_url',
+            'scan_url',
+        ]);
+
+        $sessionId = (int) $response->json('session_id');
+
+        $this->assertDatabaseHas('delivery_pick_items', [
+            'pick_session_id' => $sessionId,
+            'part_number' => 'P-ASSIGNED-NO-LOC',
+            'pcs_quantity' => 10,
+            'status' => 'pending',
+        ]);
+    }
+
     public function test_schedule_stock_check_skips_oversized_oldest_box_and_uses_next_fifo_box(): void
     {
         $ppc = User::factory()->create(['role' => 'ppc']);
@@ -1510,96 +1561,5 @@ class DeliveryFlowConsistencyTest extends TestCase
             'id' => $order->id,
             'status' => 'processing',
         ]);
-    }
-
-    public function test_partial_session_can_complete_and_mark_order_partial(): void
-    {
-        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
-        $sales = User::factory()->create(['role' => 'sales']);
-
-        $order = DeliveryOrder::create([
-            'sales_user_id' => $sales->id,
-            'customer_name' => 'Cust Partial Delivery',
-            'delivery_date' => now()->addDay()->toDateString(),
-            'status' => 'processing',
-        ]);
-
-        DeliveryOrderItem::create([
-            'delivery_order_id' => $order->id,
-            'part_number' => 'P-PARTIAL-DELIVERY',
-            'quantity' => 50,
-            'fulfilled_quantity' => 0,
-        ]);
-
-        $pallet = Pallet::create(['pallet_number' => 'PLT-PARTIAL-DELIVERY']);
-        StockLocation::create([
-            'pallet_id' => $pallet->id,
-            'warehouse_location' => 'B5',
-            'stored_at' => now(),
-        ]);
-
-        $box = Box::create([
-            'box_number' => 'BOX-PARTIAL-DELIVERY-01',
-            'part_number' => 'P-PARTIAL-DELIVERY',
-            'pcs_quantity' => 20,
-            'qty_box' => 1,
-            'qr_code' => 'BOX-PARTIAL-DELIVERY-01|P-PARTIAL-DELIVERY|20',
-            'user_id' => $adminWarehouse->id,
-            'is_withdrawn' => false,
-            'expired_status' => 'active',
-        ]);
-        $pallet->boxes()->attach($box->id);
-
-        $session = DeliveryPickSession::create([
-            'delivery_order_id' => $order->id,
-            'created_by' => $adminWarehouse->id,
-            'status' => 'scanning',
-            'allow_partial' => true,
-            'started_at' => now(),
-        ]);
-
-        DeliveryPickItem::create([
-            'pick_session_id' => $session->id,
-            'box_id' => $box->id,
-            'part_number' => 'P-PARTIAL-DELIVERY',
-            'pcs_quantity' => 20,
-            'status' => 'scanned',
-            'scanned_at' => now(),
-            'scanned_by' => $adminWarehouse->id,
-        ]);
-
-        $response = $this->actingAs($adminWarehouse)
-            ->postJson(route('delivery.pick.complete', $session->id));
-
-        $response->assertOk()
-            ->assertJson([
-                'success' => true,
-            ]);
-
-        $this->assertDatabaseHas('delivery_orders', [
-            'id' => $order->id,
-            'status' => 'partial',
-        ]);
-
-        $this->assertDatabaseHas('delivery_order_items', [
-            'id' => $order->items()->first()->id,
-            'fulfilled_quantity' => 20,
-        ]);
-
-        $this->assertDatabaseHas('delivery_pick_sessions', [
-            'id' => $session->id,
-            'status' => 'completed',
-        ]);
-
-        $this->assertDatabaseHas('delivery_orders', [
-            'parent_delivery_order_id' => $order->id,
-            'customer_name' => 'Cust Partial Delivery',
-            'status' => 'approved',
-        ]);
-
-        $backorder = DeliveryOrder::where('parent_delivery_order_id', $order->id)->first();
-        $this->assertNotNull($backorder);
-        $this->assertSame(30, (int) $backorder->items()->sum('quantity'));
-        $this->assertSame(0, (int) $backorder->items()->sum('fulfilled_quantity'));
     }
 }

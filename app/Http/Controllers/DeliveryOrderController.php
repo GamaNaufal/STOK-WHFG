@@ -186,8 +186,8 @@ class DeliveryOrderController extends Controller
              return redirect('/')->with('error', 'Unauthorized access to Schedule.');
         }
 
-        $approvedOrders = DeliveryOrder::with(['items', 'salesUser', 'parentOrder'])
-            ->whereIn('status', ['approved', 'processing', 'partial']) 
+        $approvedOrders = DeliveryOrder::with(['items', 'salesUser'])
+            ->whereIn('status', ['approved', 'processing'])
             ->orderBy('delivery_date', 'asc')
             ->get();
 
@@ -376,20 +376,7 @@ class DeliveryOrderController extends Controller
 
         $historyRows = $historyRows->sortByDesc('completed_at')->values();
 
-        $displayOrders = $approvedOrders
-            ->whereNull('parent_delivery_order_id')
-            ->values()
-            ->map(function ($order) use ($approvedOrders) {
-                $order->child_orders = $approvedOrders
-                    ->where('parent_delivery_order_id', $order->id)
-                    ->sortBy(['delivery_date', 'id'])
-                    ->values();
-                $order->has_child_orders = $order->child_orders->isNotEmpty();
-
-                return $order;
-            });
-
-        return view('operator.delivery.index', compact('approvedOrders', 'displayOrders', 'completedOrders', 'historyRows'));
+        return view('operator.delivery.index', compact('approvedOrders', 'completedOrders', 'historyRows'));
     }
 
     // Sales Page: Input Form & History
@@ -479,8 +466,8 @@ class DeliveryOrderController extends Controller
             });
         });
 
-        $historyOrders = DeliveryOrder::with(['items', 'salesUser', 'parentOrder'])
-            ->whereIn('status', ['approved', 'rejected', 'correction', 'processing', 'partial', 'completed'])
+        $historyOrders = DeliveryOrder::with(['items', 'salesUser'])
+            ->whereIn('status', ['approved', 'rejected', 'correction', 'processing', 'completed'])
             ->orderBy('updated_at', 'desc')
             ->limit(15)
             ->get();

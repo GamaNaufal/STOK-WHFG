@@ -512,13 +512,6 @@
                                     <td>{{ $order->updated_at->format('d M Y H:i') }}</td>
                                     <td>
                                         <strong>{{ $order->customer_name }}</strong>
-                                        @if(!empty($order->parent_delivery_order_id))
-                                            <div class="mt-1">
-                                                <span class="badge" style="background: #e5e7eb; color: #374151;">
-                                                    <i class="bi bi-diagram-3"></i> Backorder dari #{{ $order->parent_delivery_order_id }}
-                                                </span>
-                                            </div>
-                                        @endif
                                     </td>
                                     <td>{{ $order->salesUser->name ?? 'Unknown' }}</td>
                                     <td>
@@ -541,10 +534,6 @@
                                         @elseif($order->status == 'processing')
                                             <span class="badge" style="background: #dbeafe; color: #1e40af;">
                                                 <i class="bi bi-arrow-repeat"></i> Proses
-                                            </span>
-                                        @elseif($order->status == 'partial')
-                                            <span class="badge" style="background: #cffafe; color: #155e75;">
-                                                <i class="bi bi-scissors"></i> Partial
                                             </span>
                                         @else
                                             <span class="badge" style="background: #f3f4f6; color: #6b7280;">{{ ucfirst($order->status) }}</span>
