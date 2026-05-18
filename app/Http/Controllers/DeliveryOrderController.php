@@ -187,7 +187,8 @@ class DeliveryOrderController extends Controller
         }
 
         $approvedOrders = DeliveryOrder::with(['items', 'salesUser'])
-            ->whereIn('status', ['approved', 'processing'])
+            ->withCount(['childDeliveryOrders as split_children_count'])
+            ->whereIn('status', ['approved', 'processing', 'partial'])
             ->orderBy('delivery_date', 'asc')
             ->get();
 
@@ -226,8 +227,8 @@ class DeliveryOrderController extends Controller
             $hasAnyFulfillable = false;
             $hasPendingAdditionalApproval = !empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
 
-            $today = now()->timezone(config('app.timezone'))->startOfDay();
-            $deliveryDate = Carbon::parse($order->delivery_date)->timezone(config('app.timezone'))->startOfDay();
+            $today = now()->startOfDay();
+            $deliveryDate = Carbon::parse($order->delivery_date)->startOfDay();
             $order->days_remaining = $today->diffInDays($deliveryDate, false);
 
             $order->items->each(function ($item) use ($availableByPart, $reservedByOrder, $activeLockedByOrderPart, $order, $partSettings, &$fifoPools, &$allAvailable) {
@@ -322,6 +323,15 @@ class DeliveryOrderController extends Controller
             $order->active_pick_owner_name = $ownerName !== '' ? $ownerName : '-';
             $order->global_pick_lock_active = $hasGlobalLock;
             $order->global_pick_lock_order_id = $hasGlobalLock ? (int) $globalActiveSession->delivery_order_id : null;
+            $order->is_split_child = !empty($order->parent_delivery_order_id);
+            $order->has_split_children = ((int) ($order->split_children_count ?? 0)) > 0;
+            $order->can_split_delivery = !$order->is_split_child
+                && in_array($order->status, ['approved', 'partial'], true)
+                && empty($order->has_active_pick_session)
+                && empty($order->global_pick_lock_active)
+                && empty($order->has_pending_additional_approval)
+                && $order->items->contains(fn ($item) => (int) $item->quantity > 1);
+            $order->can_restore_split = $order->is_split_child && $order->status !== 'deleted';
 
             if ($isOwner) {
                 $order->active_pick_resume_url = route('delivery.pick.scan', [$order->id, $globalActiveSession->id]);
@@ -377,6 +387,167 @@ class DeliveryOrderController extends Controller
         $historyRows = $historyRows->sortByDesc('completed_at')->values();
 
         return view('operator.delivery.index', compact('approvedOrders', 'completedOrders', 'historyRows'));
+    }
+
+    public function split(Request $request, $id)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['admin', 'admin_warehouse'], true)) {
+            return redirect()->back()->with('error', 'Unauthorized access.');
+        }
+
+        $validated = $request->validate([
+            'items' => 'required|array|min:1',
+            'items.*.part_number' => 'required|string',
+            'items.*.quantity' => 'required|integer|min:1',
+        ]);
+
+        try {
+            DB::transaction(function () use ($id, $validated) {
+                $order = DeliveryOrder::with(['items'])->lockForUpdate()->findOrFail($id);
+
+                if (!empty($order->parent_delivery_order_id)) {
+                    throw new \RuntimeException('Delivery hasil split tidak dapat di-split lagi.');
+                }
+
+                if (!in_array($order->status, ['approved', 'partial'], true)) {
+                    throw new \RuntimeException('Delivery hanya bisa di-split dari status approved atau partial.');
+                }
+
+                $hasActivePickSession = DeliveryPickSession::where('delivery_order_id', (int) $order->id)
+                    ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($hasActivePickSession) {
+                    throw new \RuntimeException('Delivery sedang diproses dan tidak bisa di-split.');
+                }
+
+                $itemsToSplit = $validated['items'];
+                // Validate each requested part exists and quantity is valid
+                $childItems = [];
+                foreach ($itemsToSplit as $entry) {
+                    $partNumber = trim((string) ($entry['part_number'] ?? ''));
+                    $splitQuantity = (int) ($entry['quantity'] ?? 0);
+
+                    $sourceItem = $order->items->firstWhere('part_number', $partNumber);
+                    if (!$sourceItem) {
+                        throw new \RuntimeException("Part {$partNumber} tidak ditemukan pada delivery ini.");
+                    }
+
+                    $currentQuantity = (int) $sourceItem->quantity;
+                    if ($splitQuantity <= 0 || $splitQuantity >= $currentQuantity) {
+                        throw new \RuntimeException("Qty split untuk part {$partNumber} harus antara 1 dan " . ($currentQuantity - 1) . ".");
+                    }
+
+                    $childItems[] = ['part_number' => $partNumber, 'quantity' => $splitQuantity, 'source_item' => $sourceItem];
+                }
+
+                // Create child order with selected parts
+                $childOrder = DeliveryOrder::create([
+                    'parent_delivery_order_id' => $order->id,
+                    'sales_user_id' => $order->sales_user_id,
+                    'customer_name' => $order->customer_name,
+                    'delivery_date' => $order->delivery_date,
+                    'status' => 'approved',
+                    'notes' => $order->notes,
+                ]);
+
+                foreach ($childItems as $ci) {
+                    /** @var \App\Models\DeliveryOrderItem $src */
+                    $src = $ci['source_item'];
+                    $splitQuantity = (int) $ci['quantity'];
+
+                    // Reduce parent item
+                    $src->quantity = (int) $src->quantity - $splitQuantity;
+                    $src->save();
+
+                    // Create child item
+                    DeliveryOrderItem::create([
+                        'delivery_order_id' => $childOrder->id,
+                        'part_number' => $ci['part_number'],
+                        'quantity' => $splitQuantity,
+                        'fulfilled_quantity' => 0,
+                    ]);
+                }
+
+                if ($order->status !== 'partial') {
+                    $order->status = 'partial';
+                    $order->save();
+                }
+            });
+
+            return redirect()->back()->with('success', 'Delivery berhasil di-split.');
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+    }
+
+    public function restoreSplit($id)
+    {
+        $user = Auth::user();
+        if (!in_array($user->role, ['admin', 'admin_warehouse'], true)) {
+            return redirect()->back()->with('error', 'Unauthorized access.');
+        }
+
+        try {
+            DB::transaction(function () use ($id) {
+                $childOrder = DeliveryOrder::with(['items'])->lockForUpdate()->findOrFail($id);
+
+                if (empty($childOrder->parent_delivery_order_id)) {
+                    throw new \RuntimeException('Delivery ini bukan hasil split.');
+                }
+
+                if (in_array($childOrder->status, ['deleted', 'completed'], true)) {
+                    throw new \RuntimeException('Delivery ini tidak bisa dikembalikan.');
+                }
+
+                $parentOrder = DeliveryOrder::with(['items'])->lockForUpdate()->findOrFail((int) $childOrder->parent_delivery_order_id);
+
+                $hasActivePickSession = DeliveryPickSession::where('delivery_order_id', (int) $childOrder->id)
+                    ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($hasActivePickSession) {
+                    throw new \RuntimeException('Delivery hasil split sedang diproses dan tidak bisa dikembalikan.');
+                }
+
+                $childItem = $childOrder->items->first();
+                if (!$childItem) {
+                    throw new \RuntimeException('Item split tidak ditemukan.');
+                }
+
+                $parentItem = $parentOrder->items->firstWhere('part_number', $childItem->part_number);
+                if ($parentItem) {
+                    $parentItem->quantity = (int) $parentItem->quantity + (int) $childItem->quantity;
+                    $parentItem->save();
+                } else {
+                    DeliveryOrderItem::create([
+                        'delivery_order_id' => $parentOrder->id,
+                        'part_number' => $childItem->part_number,
+                        'quantity' => (int) $childItem->quantity,
+                        'fulfilled_quantity' => 0,
+                    ]);
+                }
+
+                $childOrder->status = 'deleted';
+                $childOrder->save();
+                $childOrder->delete();
+
+                $remainingActiveChildren = DeliveryOrder::query()
+                    ->where('parent_delivery_order_id', (int) $parentOrder->id)
+                    ->whereNull('deleted_at')
+                    ->exists();
+
+                $parentOrder->status = $remainingActiveChildren ? 'partial' : 'approved';
+                $parentOrder->save();
+            });
+
+            return redirect()->back()->with('success', 'Delivery split berhasil dikembalikan ke delivery utama.');
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
     }
 
     // Sales Page: Input Form & History

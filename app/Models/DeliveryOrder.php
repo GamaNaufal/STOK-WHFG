@@ -18,6 +18,7 @@ class DeliveryOrder extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'parent_delivery_order_id',
         'sales_user_id',
         'customer_name',
         'delivery_date',
@@ -40,6 +41,16 @@ class DeliveryOrder extends Model
     public function salesUser()
     {
         return $this->belongsTo(User::class, 'sales_user_id');
+    }
+
+    public function parentDeliveryOrder()
+    {
+        return $this->belongsTo(self::class, 'parent_delivery_order_id');
+    }
+
+    public function childDeliveryOrders()
+    {
+        return $this->hasMany(self::class, 'parent_delivery_order_id');
     }
 
 

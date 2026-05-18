@@ -28,6 +28,12 @@
     </a>
 </li>
 <li class="nav-item">
+    <a class="nav-link {{ request()->routeIs('delivery.index') ? 'active' : '' }}"
+       href="{{ route('delivery.index') }}">
+        <i class="bi bi-truck"></i> Delivery
+    </a>
+</li>
+<li class="nav-item">
     <a class="nav-link {{ request()->routeIs('part-settings*') ? 'active' : '' }}"
        href="{{ route('part-settings.index') }}">
         <i class="bi bi-list-check"></i> Master No Part

@@ -239,7 +239,7 @@
             gap: 0.5rem;
             justify-content: flex-start;
             align-items: center;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
         }
 
         .btn-process {
@@ -319,6 +319,48 @@
             background: #dc2626;
             color: white;
             border-color: #dc2626;
+        }
+
+        .btn-split {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.75rem;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            white-space: nowrap;
+        }
+
+        .btn-split:hover {
+            background: #d97706;
+            color: white;
+        }
+
+        .btn-restore {
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            padding: 0.4rem 0.75rem;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            white-space: nowrap;
+        }
+
+        .btn-restore:hover {
+            background: #0284c7;
+            color: white;
         }
 
         .btn-redo {
@@ -486,6 +528,19 @@
                                     </span>
                                 </div>
                             @endif
+                            @if(!empty($order->is_split_child))
+                                <div class="mt-1">
+                                    <span class="badge bg-secondary">
+                                        <i class="bi bi-diagram-3"></i> Hasil Split
+                                    </span>
+                                </div>
+                            @elseif(!empty($order->has_split_children))
+                                <div class="mt-1">
+                                    <span class="badge bg-info text-dark">
+                                        <i class="bi bi-diagram-3"></i> Delivery Utama Split
+                                    </span>
+                                </div>
+                            @endif
                         </td>
                         @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
                         <td class="text-end">
@@ -518,6 +573,25 @@
                                     <button class="btn-insufficient" disabled>
                                         <i class="bi bi-x-circle"></i> Stock Kurang
                                     </button>
+                                @endif
+                                @if(in_array(Auth::user()->role, ['admin', 'admin_warehouse'], true))
+                                    @if(!empty($order->can_restore_split))
+                                        <form method="POST" action="{{ route('delivery.restore-split', $order->id) }}" class="d-inline js-restore-split-form">
+                                            @csrf
+                                            <button type="button" class="btn-restore js-restore-split" data-order-id="{{ $order->id }}">
+                                                <i class="bi bi-arrow-counterclockwise"></i> Restore
+                                            </button>
+                                        </form>
+                                    @elseif(!empty($order->can_split_delivery))
+                                        <button type="button"
+                                            class="btn-split js-open-split-modal"
+                                            data-split-url="{{ route('delivery.split', $order->id) }}"
+                                            data-order-id="{{ $order->id }}"
+                                            data-customer-name="{{ e($order->customer_name) }}"
+                                            data-order-items='@json($order->items->map(fn ($item) => ["part_number" => $item->part_number, "quantity" => (int) $item->quantity])->values())'>
+                                            <i class="bi bi-scissors"></i> Split
+                                        </button>
+                                    @endif
                                 @endif
                                 @if(Auth::user()->role === 'admin')
                                     <button type="button"
@@ -634,6 +708,34 @@
     </div>
 </div>
 
+<!-- Split Modal -->
+<div class="modal fade" id="splitDeliveryModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
+            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 1.5rem;">
+                <h5 class="modal-title"><i class="bi bi-scissors"></i> Split Delivery</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="splitDeliveryForm" method="POST" action="">
+                @csrf
+                <div class="modal-body" style="padding: 1.5rem;">
+                    <div id="splitDeliveryInfo" class="mb-3 small text-muted"></div>
+                    <div id="splitItemsContainer">
+                        <!-- rows injected by JS: checkbox, part_number, available qty, qty input -->
+                    </div>
+                    <div class="form-text mt-2">Pilih satu atau lebih part lalu isi nominal split untuk setiap part (harus lebih kecil dari qty sumber).</div>
+                </div>
+                <div class="modal-footer" style="border-top: 1px solid #e9ecef; padding: 1.5rem;">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; font-weight: 600;">
+                        <i class="bi bi-scissors"></i> Simpan Split
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 
 
 
@@ -666,8 +768,166 @@
 <script>
     const fulfillModal = new bootstrap.Modal(document.getElementById('fulfillModal'));
     const picklistModal = new bootstrap.Modal(document.getElementById('picklistModal'));
-    let currentOrderId = null;
-    let fulfillGateBlockedReason = null;
+    const splitModal = new bootstrap.Modal(document.getElementById('splitDeliveryModal'));
+    const splitForm = document.getElementById('splitDeliveryForm');
+    const splitDeliveryInfo = document.getElementById('splitDeliveryInfo');
+    const splitItemsContainer = document.getElementById('splitItemsContainer');
+    let currentSplitItems = [];
+
+    function renderSplitItems(items) {
+        currentSplitItems = Array.isArray(items) ? items : [];
+        splitItemsContainer.innerHTML = '';
+
+        if (currentSplitItems.length === 0) {
+            splitItemsContainer.innerHTML = '<div class="small text-muted">Tidak ada item pada order ini.</div>';
+            return;
+        }
+
+        const table = document.createElement('table');
+        table.className = 'table table-sm';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th style="width:40px"></th>
+                    <th>Part Number</th>
+                    <th style="width:140px">Available</th>
+                    <th style="width:160px">Split Qty</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        `;
+
+        const tbody = table.querySelector('tbody');
+
+        currentSplitItems.forEach((item, idx) => {
+            const tr = document.createElement('tr');
+            const available = parseInt(item.quantity || 0, 10);
+            const max = Math.max(1, available - 1);
+
+            tr.innerHTML = `
+                <td class="align-middle text-center"><input type="checkbox" class="form-check-input js-split-check" data-idx="${idx}"></td>
+                <td class="align-middle">${item.part_number}</td>
+                <td class="align-middle">${available} PCS</td>
+                <td class="align-middle">
+                    <input type="number" class="form-control form-control-sm js-split-qty" data-idx="${idx}" min="1" max="${max}" value="1" style="max-width:120px;" disabled>
+                </td>
+            `;
+
+            tbody.appendChild(tr);
+        });
+
+        splitItemsContainer.appendChild(table);
+
+        // toggle qty input when checkbox changed
+        splitItemsContainer.querySelectorAll('.js-split-check').forEach((ch) => {
+            ch.addEventListener('change', (e) => {
+                const i = e.target.getAttribute('data-idx');
+                const qtyInput = splitItemsContainer.querySelector('.js-split-qty[data-idx="' + i + '"]');
+                if (!qtyInput) return;
+                qtyInput.disabled = !e.target.checked;
+                if (!e.target.checked) qtyInput.value = '1';
+            });
+        });
+    }
+
+    // Use event delegation to reliably handle split button clicks
+    document.addEventListener('click', (e) => {
+        const button = e.target.closest('.js-open-split-modal');
+        if (!button) return;
+
+        const splitUrl = button.getAttribute('data-split-url') || '#';
+        const orderId = button.getAttribute('data-order-id') || '-';
+        const customerName = button.getAttribute('data-customer-name') || '-';
+
+        try {
+            const items = JSON.parse(button.getAttribute('data-order-items') || '[]');
+            renderSplitItems(items);
+        } catch (error) {
+            renderSplitItems([]);
+        }
+
+        if (splitForm) {
+            splitForm.action = splitUrl;
+        }
+
+        if (splitDeliveryInfo) {
+            splitDeliveryInfo.textContent = `Order #${orderId} | ${customerName}`;
+        }
+
+        splitModal.show();
+    });
+
+    // On submit, gather checked items and inject hidden inputs then submit
+    splitForm?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        // remove previous dynamic inputs
+        splitForm.querySelectorAll('.js-dynamic-split-input')?.forEach(n => n.remove());
+
+        const checks = splitItemsContainer.querySelectorAll('.js-split-check');
+        const selected = [];
+
+        checks.forEach((ch) => {
+            if (!ch.checked) return;
+            const idx = ch.getAttribute('data-idx');
+            const item = currentSplitItems[parseInt(idx, 10)];
+            const qtyInput = splitItemsContainer.querySelector('.js-split-qty[data-idx="' + idx + '"]');
+            const qty = qtyInput ? parseInt(qtyInput.value || '0', 10) : 0;
+            selected.push({ part_number: item.part_number, quantity: qty, available: parseInt(item.quantity || 0, 10) });
+        });
+
+        if (selected.length === 0) {
+            WarehouseAlert.error({ title: 'Split Gagal', message: 'Pilih minimal satu part untuk di-split.' });
+            return;
+        }
+
+        // validate quantities
+        for (const s of selected) {
+            if (!Number.isInteger(s.quantity) || s.quantity < 1 || s.quantity >= s.available) {
+                WarehouseAlert.error({ title: 'Split Gagal', message: `Qty split untuk ${s.part_number} harus antara 1 dan ${s.available - 1}.` });
+                return;
+            }
+        }
+
+        // inject hidden inputs
+        selected.forEach((s, i) => {
+            const hn1 = document.createElement('input');
+            hn1.type = 'hidden';
+            hn1.name = `items[${i}][part_number]`;
+            hn1.value = s.part_number;
+            hn1.className = 'js-dynamic-split-input';
+            splitForm.appendChild(hn1);
+
+            const hn2 = document.createElement('input');
+            hn2.type = 'hidden';
+            hn2.name = `items[${i}][quantity]`;
+            hn2.value = String(s.quantity);
+            hn2.className = 'js-dynamic-split-input';
+            splitForm.appendChild(hn2);
+        });
+
+        splitForm.submit();
+    });
+
+    document.querySelectorAll('.js-restore-split').forEach((button) => {
+        button.addEventListener('click', () => {
+            const orderId = button.getAttribute('data-order-id') || '-';
+            const form = button.closest('.js-restore-split-form');
+            if (!form) {
+                return;
+            }
+
+            WarehouseAlert.delete({
+                title: 'Kembalikan split #' + orderId + '?',
+                itemName: 'delivery hasil split ini',
+                warningItems: [
+                    'Qty pada delivery utama akan ditambahkan kembali',
+                    'Delivery hasil split akan diarsipkan'
+                ],
+                confirmText: 'Ya, Kembalikan',
+                onConfirm: () => form.submit()
+            });
+        });
+    });
 
     function openFulfillModal(orderId) {
         currentOrderId = orderId;
@@ -925,8 +1185,7 @@
             });
         });
     });
-
-    async function fetchRedoOptions(optionsUrl, query = '') {
+        async function fetchRedoOptions(optionsUrl, query = '') {
         const url = new URL(optionsUrl, window.location.origin);
         if (query) {
             url.searchParams.set('q', query);

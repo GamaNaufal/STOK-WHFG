@@ -242,4 +242,127 @@ class DeliverySalesPpcWorkflowTest extends TestCase
             'notes' => 'Original note B',
         ]);
     }
+
+    public function test_admin_can_split_and_restore_delivery_order(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $parentOrder = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'PT Split Restore',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $parentOrder->id,
+            'part_number' => 'P-SPLIT-01',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $splitResponse = $this->actingAs($admin)->post(route('delivery.split', $parentOrder->id), [
+            'items' => [
+                ['part_number' => 'P-SPLIT-01', 'quantity' => 50]
+            ]
+        ]);
+
+        $splitResponse->assertRedirect();
+        $splitResponse->assertSessionHas('success');
+
+        $parentOrder->refresh();
+        $this->assertSame('partial', $parentOrder->status);
+
+        $this->assertDatabaseHas('delivery_order_items', [
+            'delivery_order_id' => $parentOrder->id,
+            'part_number' => 'P-SPLIT-01',
+            'quantity' => 50,
+        ]);
+
+        $childOrder = DeliveryOrder::query()
+            ->where('parent_delivery_order_id', $parentOrder->id)
+            ->first();
+
+        $this->assertNotNull($childOrder);
+        $this->assertDatabaseHas('delivery_orders', [
+            'id' => $childOrder->id,
+            'parent_delivery_order_id' => $parentOrder->id,
+            'customer_name' => 'PT Split Restore',
+            'status' => 'approved',
+        ]);
+
+        $this->assertDatabaseHas('delivery_order_items', [
+            'delivery_order_id' => $childOrder->id,
+            'part_number' => 'P-SPLIT-01',
+            'quantity' => 50,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $restoreResponse = $this->actingAs($admin)->post(route('delivery.restore-split', $childOrder->id));
+
+        $restoreResponse->assertRedirect();
+        $restoreResponse->assertSessionHas('success');
+
+        $this->assertSoftDeleted('delivery_orders', [
+            'id' => $childOrder->id,
+            'status' => 'deleted',
+        ]);
+
+        $this->assertDatabaseHas('delivery_orders', [
+            'id' => $parentOrder->id,
+            'status' => 'approved',
+        ]);
+
+        $this->assertDatabaseHas('delivery_order_items', [
+            'delivery_order_id' => $parentOrder->id,
+            'part_number' => 'P-SPLIT-01',
+            'quantity' => 100,
+        ]);
+    }
+
+    public function test_split_delivery_rejects_split_child_orders(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $parentOrder = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'PT Child Split Block',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $parentOrder->id,
+            'part_number' => 'P-BLOCK-01',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $this->actingAs($admin)->post(route('delivery.split', $parentOrder->id), [
+            'items' => [
+                ['part_number' => 'P-BLOCK-01', 'quantity' => 40]
+            ]
+        ])->assertRedirect();
+
+        $childOrder = DeliveryOrder::query()
+            ->where('parent_delivery_order_id', $parentOrder->id)
+            ->firstOrFail();
+
+        $response = $this->actingAs($admin)->post(route('delivery.split', $childOrder->id), [
+            'items' => [
+                ['part_number' => 'P-BLOCK-01', 'quantity' => 10]
+            ]
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+
+        $this->assertDatabaseHas('delivery_orders', [
+            'id' => $childOrder->id,
+            'parent_delivery_order_id' => $parentOrder->id,
+            'status' => 'approved',
+        ]);
+    }
 }

@@ -5,6 +5,7 @@ use App\Http\Controllers\AuthController;
 // use App\Http\Controllers\BoxController; // DISABLED - fitur tidak dipakai
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryAssignController;
+use App\Http\Controllers\DeliveryPickController;
 use App\Http\Controllers\StockInputController;
 use App\Http\Controllers\StockViewController;
 use App\Http\Controllers\StockWithdrawalController;
@@ -72,6 +73,8 @@ Route::middleware('auth')->group(function () {
         
         // Main Dashboard (Schedule Only)
         Route::get('/delivery-stock', [\App\Http\Controllers\DeliveryOrderController::class, 'index'])->name('delivery.index');
+        Route::post('/delivery-stock/{id}/split', [\App\Http\Controllers\DeliveryOrderController::class, 'split'])->middleware('role:admin_warehouse,admin')->name('delivery.split');
+        Route::post('/delivery-stock/{id}/restore-split', [\App\Http\Controllers\DeliveryOrderController::class, 'restoreSplit'])->middleware('role:admin_warehouse,admin')->name('delivery.restore-split');
         
         // Sales Side (Input & History)
         Route::get('/delivery-stock/sales-input', [\App\Http\Controllers\DeliveryOrderController::class, 'createOrder'])->name('delivery.create');
@@ -91,17 +94,17 @@ Route::middleware('auth')->group(function () {
         Route::post('/delivery-stock/confirm-withdrawal', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm'); // Keep logic
 
         // Picklist + Scan Flow
-        Route::get('/delivery-stock/picking-verification', [\App\Http\Controllers\DeliveryPickController::class, 'verificationIndex'])->name('delivery.pick.verification');
-        Route::post('/delivery-stock/{id}/start-verification', [\App\Http\Controllers\DeliveryPickController::class, 'startVerification'])->name('delivery.pick.start-verification');
-        Route::post('/delivery-stock/{id}/start-pick', [\App\Http\Controllers\DeliveryPickController::class, 'startPick'])->name('delivery.pick.start');
-        Route::get('/delivery-stock/{order}/pick/{session}/pdf', [\App\Http\Controllers\DeliveryPickController::class, 'pdf'])->name('delivery.pick.pdf');
-        Route::get('/delivery-stock/{order}/pick/{session}/print-preview', [\App\Http\Controllers\DeliveryPickController::class, 'printPreview'])->name('delivery.pick.print-preview');
-        Route::get('/delivery-stock/{order}/pick/{session}/verify', [\App\Http\Controllers\DeliveryPickController::class, 'showVerificationScan'])->name('delivery.pick.verify');
-        Route::get('/delivery-stock/{order}/pick/{session}/scan', [\App\Http\Controllers\DeliveryPickController::class, 'showScan'])->name('delivery.pick.scan');
-        Route::post('/delivery-pick/{session}/cancel', [\App\Http\Controllers\DeliveryPickController::class, 'cancel'])->name('delivery.pick.cancel');
-        Route::post('/delivery-pick/{session}/verify-scan', [\App\Http\Controllers\DeliveryPickController::class, 'verifyScanBox'])->name('delivery.pick.verify.scan');
-        Route::post('/delivery-pick/{session}/scan', [\App\Http\Controllers\DeliveryPickController::class, 'scanBox'])->name('delivery.pick.scan.submit');
-        Route::post('/delivery-pick/{session}/complete', [\App\Http\Controllers\DeliveryPickController::class, 'complete'])->name('delivery.pick.complete');
+        Route::get('/delivery-stock/picking-verification', [DeliveryPickController::class, 'verificationIndex'])->name('delivery.pick.verification');
+        Route::post('/delivery-stock/{id}/start-verification', [DeliveryPickController::class, 'startVerification'])->name('delivery.pick.start-verification');
+        Route::post('/delivery-stock/{id}/start-pick', [DeliveryPickController::class, 'startPick'])->name('delivery.pick.start');
+        Route::get('/delivery-stock/{order}/pick/{session}/pdf', [DeliveryPickController::class, 'pdf'])->name('delivery.pick.pdf');
+        Route::get('/delivery-stock/{order}/pick/{session}/print-preview', [DeliveryPickController::class, 'printPreview'])->name('delivery.pick.print-preview');
+        Route::get('/delivery-stock/{order}/pick/{session}/verify', [DeliveryPickController::class, 'showVerificationScan'])->name('delivery.pick.verify');
+        Route::get('/delivery-stock/{order}/pick/{session}/scan', [DeliveryPickController::class, 'showScan'])->name('delivery.pick.scan');
+        Route::post('/delivery-pick/{session}/cancel', [DeliveryPickController::class, 'cancel'])->name('delivery.pick.cancel');
+        Route::post('/delivery-pick/{session}/verify-scan', [DeliveryPickController::class, 'verifyScanBox'])->name('delivery.pick.verify.scan');
+        Route::post('/delivery-pick/{session}/scan', [DeliveryPickController::class, 'scanBox'])->name('delivery.pick.scan.submit');
+        Route::post('/delivery-pick/{session}/complete', [DeliveryPickController::class, 'complete'])->name('delivery.pick.complete');
         
         // Legacy/Utility routes for withdrawal logic (Search, Preview)
         Route::post('/stock-withdrawal/search', [StockWithdrawalController::class, 'searchParts'])->name('stock-withdrawal.search');
@@ -162,15 +165,15 @@ Route::middleware('auth')->group(function () {
 
     // Scan Issue Notifications (Admin Warehouse + Admin IT)
     Route::middleware('role:admin_warehouse,admin')->group(function () {
-        Route::get('/delivery-scan-issues', [\App\Http\Controllers\DeliveryPickController::class, 'issues'])->name('delivery.pick.issues');
-        Route::post('/delivery-scan-issues/{issue}/approve', [\App\Http\Controllers\DeliveryPickController::class, 'approveIssue'])->name('delivery.pick.issue.approve');
-        Route::get('/delivery-completions/{completion}/redo-options', [\App\Http\Controllers\DeliveryPickController::class, 'redoOptions'])->name('delivery.pick.redo-options');
-        Route::post('/delivery-completions/{completion}/redo', [\App\Http\Controllers\DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');
+        Route::get('/delivery-scan-issues', [DeliveryPickController::class, 'issues'])->name('delivery.pick.issues');
+        Route::post('/delivery-scan-issues/{issue}/approve', [DeliveryPickController::class, 'approveIssue'])->name('delivery.pick.issue.approve');
+        Route::get('/delivery-completions/{completion}/redo-options', [DeliveryPickController::class, 'redoOptions'])->name('delivery.pick.redo-options');
+        Route::post('/delivery-completions/{completion}/redo', [DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');
     });
 
     Route::middleware('role:admin')->group(function () {
-        Route::get('/delivery-locks', [\App\Http\Controllers\DeliveryPickController::class, 'lockManagement'])->name('delivery.pick.locks');
-        Route::post('/delivery-locks/{session}/terminate', [\App\Http\Controllers\DeliveryPickController::class, 'terminateLock'])->name('delivery.pick.lock.terminate');
+        Route::get('/delivery-locks', [DeliveryPickController::class, 'lockManagement'])->name('delivery.pick.locks');
+        Route::post('/delivery-locks/{session}/terminate', [DeliveryPickController::class, 'terminateLock'])->name('delivery.pick.lock.terminate');
     });
 
     // API Routes (Accessible by auth users, usually consumed by frontend scripts on allowed pages)
