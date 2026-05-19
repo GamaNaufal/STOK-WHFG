@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Box;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
+use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Models\PartSetting;
 use App\Models\StockLocation;
@@ -270,6 +271,132 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
     }
 
+    public function test_assign_rejects_new_boxes_without_pallet_selection(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Order With New Boxes',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-NEW-01',
+            'quantity' => 10,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        PartSetting::create([
+            'part_number' => 'P-NEW-01',
+            'qty_box' => 100,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
+            'delivery_order_id' => $order->id,
+            'box_ids' => [],
+            'pallet_ids' => [],
+            'new_boxes' => [
+                [
+                    'box_number' => '99001',
+                    'part_number' => 'P-NEW-01',
+                    'pcs_quantity' => 5,
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonFragment([
+            'message' => 'Pilih pallet untuk input box baru terlebih dahulu.',
+        ]);
+    }
+
+    public function test_assign_creates_new_boxes_under_new_pallet_with_location(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Order With New Pallet',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-NEW-02',
+            'quantity' => 10,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        PartSetting::create([
+            'part_number' => 'P-NEW-02',
+            'qty_box' => 100,
+        ]);
+
+        $location = MasterLocation::create([
+            'code' => 'A1',
+            'is_occupied' => false,
+            'current_pallet_id' => null,
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
+            'delivery_order_id' => $order->id,
+            'box_ids' => [],
+            'pallet_ids' => [],
+            'new_boxes' => [
+                [
+                    'box_number' => '99002',
+                    'part_number' => 'P-NEW-02',
+                    'pcs_quantity' => 5,
+                ],
+            ],
+            'new_boxes_pallet_mode' => 'new',
+            'new_boxes_pallet_number' => 'PLT-NEW-DEL-01',
+            'new_boxes_location_id' => $location->id,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonFragment([
+            'created_new_count' => 1,
+        ]);
+        $this->assertNotNull($response->json('created_stock_input_id'));
+
+        $pallet = Pallet::query()->where('pallet_number', 'PLT-NEW-DEL-01')->first();
+        $this->assertNotNull($pallet);
+
+        $this->assertDatabaseHas('master_locations', [
+            'id' => $location->id,
+            'is_occupied' => true,
+            'current_pallet_id' => $pallet->id,
+        ]);
+
+        $this->assertDatabaseHas('stock_locations', [
+            'pallet_id' => $pallet->id,
+            'master_location_id' => $location->id,
+            'warehouse_location' => 'A1',
+        ]);
+
+        $this->assertDatabaseHas('boxes', [
+            'box_number' => '99002',
+            'part_number' => 'P-NEW-02',
+            'pcs_quantity' => 5,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+
+        $boxId = Box::query()->where('box_number', '99002')->value('id');
+        $this->assertNotNull($boxId);
+
+        $this->assertDatabaseHas('pallet_boxes', [
+            'pallet_id' => $pallet->id,
+            'box_id' => $boxId,
+        ]);
+    }
+
     public function test_assign_rejects_new_box_part_not_in_selected_delivery_order(): void
     {
         $user = User::factory()->create(['role' => 'warehouse_operator']);
@@ -294,6 +421,16 @@ class DeliveryAssignBoundaryTest extends TestCase
             'qty_box' => 100,
         ]);
 
+        $pallet = Pallet::create([
+            'pallet_number' => 'PLT-NEWBOX-PART-01',
+        ]);
+
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
         $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
             'delivery_order_id' => $order->id,
             'box_ids' => [],
@@ -305,6 +442,8 @@ class DeliveryAssignBoundaryTest extends TestCase
                     'pcs_quantity' => 20,
                 ],
             ],
+            'new_boxes_pallet_mode' => 'existing',
+            'new_boxes_pallet_id' => $pallet->id,
         ]);
 
         $response->assertStatus(422);
@@ -335,6 +474,16 @@ class DeliveryAssignBoundaryTest extends TestCase
             'qty_box' => 100,
         ]);
 
+        $pallet = Pallet::create([
+            'pallet_number' => 'PLT-MASTERQTY-01',
+        ]);
+
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A1',
+            'stored_at' => now(),
+        ]);
+
         $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
             'delivery_order_id' => $order->id,
             'box_ids' => [],
@@ -346,6 +495,8 @@ class DeliveryAssignBoundaryTest extends TestCase
                     'pcs_quantity' => 150,
                 ],
             ],
+            'new_boxes_pallet_mode' => 'existing',
+            'new_boxes_pallet_id' => $pallet->id,
         ]);
 
         $response->assertOk();
@@ -413,6 +564,8 @@ class DeliveryAssignBoundaryTest extends TestCase
                     'pcs_quantity' => 50,
                 ],
             ],
+            'new_boxes_pallet_mode' => 'existing',
+            'new_boxes_pallet_id' => $pallet->id,
         ]);
 
         $firstResponse->assertStatus(409);
@@ -438,6 +591,8 @@ class DeliveryAssignBoundaryTest extends TestCase
                     'pcs_quantity' => 50,
                 ],
             ],
+            'new_boxes_pallet_mode' => 'existing',
+            'new_boxes_pallet_id' => $pallet->id,
         ]);
 
         $confirmedResponse->assertOk();

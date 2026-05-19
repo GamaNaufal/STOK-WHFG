@@ -24,6 +24,53 @@
     const newBoxError = document.getElementById("deliveryAssignNewBoxError");
     const partStatus = document.getElementById("deliveryAssignPartStatus");
 
+    const palletModeNew = document.getElementById(
+        "deliveryAssignPalletModeNew",
+    );
+    const palletModeExisting = document.getElementById(
+        "deliveryAssignPalletModeExisting",
+    );
+    const newPalletNumberSection = document.getElementById(
+        "deliveryAssignNewPalletNumberSection",
+    );
+    const existingPalletSection = document.getElementById(
+        "deliveryAssignExistingPalletSection",
+    );
+    const newPalletNumberInput = document.getElementById(
+        "deliveryAssignNewPalletNumber",
+    );
+    const existingPalletSearchInput = document.getElementById(
+        "deliveryAssignExistingPalletSearchInput",
+    );
+    const existingPalletSearchResults = document.getElementById(
+        "deliveryAssignExistingPalletSearchResults",
+    );
+    const selectedExistingPalletId = document.getElementById(
+        "deliveryAssignSelectedExistingPalletId",
+    );
+    const selectedExistingPalletText = document.getElementById(
+        "deliveryAssignSelectedExistingPalletText",
+    );
+
+    const locationSection = document.getElementById(
+        "deliveryAssignLocationSection",
+    );
+    const locationSearchInput = document.getElementById(
+        "deliveryAssignLocationSearchInput",
+    );
+    const locationSearchResults = document.getElementById(
+        "deliveryAssignLocationSearchResults",
+    );
+    const locationDropdownBtn = document.getElementById(
+        "deliveryAssignLocationDropdownBtn",
+    );
+    const selectedLocationId = document.getElementById(
+        "deliveryAssignLocationId",
+    );
+    const selectedLocationCode = document.getElementById(
+        "deliveryAssignLocationCode",
+    );
+
     if (!searchInput || !searchBtn || !palletList || !boxList || !assignBtn) {
         return;
     }
@@ -108,6 +155,37 @@
                 '<option value="">Pilih delivery order terlebih dahulu</option>';
             newBoxPartSelect.disabled = true;
         }
+
+        if (newPalletNumberInput) {
+            newPalletNumberInput.value = "";
+        }
+        if (existingPalletSearchInput) {
+            existingPalletSearchInput.value = "";
+        }
+        if (selectedExistingPalletId) {
+            selectedExistingPalletId.value = "";
+        }
+        if (selectedExistingPalletText) {
+            selectedExistingPalletText.value = "";
+        }
+        if (existingPalletSearchResults) {
+            existingPalletSearchResults.style.display = "none";
+            existingPalletSearchResults.innerHTML = "";
+        }
+        if (locationSearchInput) {
+            locationSearchInput.value = "";
+        }
+        if (selectedLocationId) {
+            selectedLocationId.value = "";
+        }
+        if (selectedLocationCode) {
+            selectedLocationCode.value = "";
+        }
+        if (locationSearchResults) {
+            locationSearchResults.style.display = "none";
+            locationSearchResults.innerHTML = "";
+        }
+
         deliveryOrderParts.clear();
     }
 
@@ -122,6 +200,12 @@
             newBoxQtyInput,
             addNewBoxBtn,
             assignBtn,
+            palletModeNew,
+            palletModeExisting,
+            newPalletNumberInput,
+            existingPalletSearchInput,
+            locationSearchInput,
+            locationDropdownBtn,
         ].forEach((element) => {
             if (!element) {
                 return;
@@ -300,6 +384,229 @@
         }
         newBoxError.style.display = "none";
         newBoxError.textContent = "";
+    }
+
+    function getNewBoxPalletMode() {
+        if (palletModeExisting && palletModeExisting.checked) {
+            return "existing";
+        }
+        return "new";
+    }
+
+    function setNewBoxPalletModeUI(mode) {
+        if (existingPalletSection) {
+            existingPalletSection.style.display =
+                mode === "existing" ? "block" : "none";
+        }
+        if (newPalletNumberSection) {
+            newPalletNumberSection.style.display =
+                mode === "existing" ? "none" : "block";
+        }
+        if (locationSection) {
+            locationSection.style.display =
+                mode === "existing" ? "none" : "block";
+        }
+
+        if (mode === "existing") {
+            if (newPalletNumberInput) {
+                newPalletNumberInput.value = "";
+            }
+            if (locationSearchInput) {
+                locationSearchInput.value = "";
+            }
+            if (selectedLocationId) {
+                selectedLocationId.value = "";
+            }
+            if (selectedLocationCode) {
+                selectedLocationCode.value = "";
+            }
+            if (locationSearchResults) {
+                locationSearchResults.style.display = "none";
+                locationSearchResults.innerHTML = "";
+            }
+            return;
+        }
+
+        if (existingPalletSearchInput) {
+            existingPalletSearchInput.value = "";
+        }
+        if (selectedExistingPalletId) {
+            selectedExistingPalletId.value = "";
+        }
+        if (selectedExistingPalletText) {
+            selectedExistingPalletText.value = "";
+        }
+        if (existingPalletSearchResults) {
+            existingPalletSearchResults.style.display = "none";
+            existingPalletSearchResults.innerHTML = "";
+        }
+    }
+
+    function validateNewBoxPalletInputs(options = {}) {
+        const { silent = false } = options;
+        const mode = getNewBoxPalletMode();
+
+        if (mode === "existing") {
+            const palletId = String(
+                selectedExistingPalletId?.value || "",
+            ).trim();
+            if (!palletId) {
+                if (!silent) {
+                    showNewBoxError(
+                        "Pilih pallet existing untuk input box baru.",
+                    );
+                }
+                return null;
+            }
+            return {
+                mode,
+                pallet_id: Number(palletId),
+            };
+        }
+
+        const palletNumber = String(newPalletNumberInput?.value || "").trim();
+        if (!palletNumber) {
+            if (!silent) {
+                showNewBoxError("Nomor pallet wajib diisi untuk pallet baru.");
+            }
+            return null;
+        }
+
+        const locationId = String(selectedLocationId?.value || "").trim();
+        const locationCode = String(selectedLocationCode?.value || "").trim();
+        if (!locationId || !locationCode) {
+            if (!silent) {
+                showNewBoxError("Pilih lokasi untuk pallet baru.");
+            }
+            return null;
+        }
+
+        return {
+            mode,
+            pallet_number: palletNumber,
+            location_id: Number(locationId),
+            location_code: locationCode,
+        };
+    }
+
+    function searchExistingPallets(query) {
+        if (!existingPalletSearchResults || !config.newBoxPalletSearchUrl) {
+            return;
+        }
+
+        existingPalletSearchResults.style.display = "block";
+        existingPalletSearchResults.innerHTML =
+            '<div class="list-group-item text-muted">Mencari pallet...</div>';
+
+        fetch(
+            config.newBoxPalletSearchUrl +
+                "?q=" +
+                encodeURIComponent(query || ""),
+            {
+                headers: {
+                    "X-CSRF-TOKEN": config.csrfToken,
+                },
+            },
+        )
+            .then((response) => {
+                if (!response.ok) {
+                    throw new Error("Gagal mencari pallet.");
+                }
+                return response.json();
+            })
+            .then((data) => {
+                const rows = Array.isArray(data?.pallets) ? data.pallets : [];
+                existingPalletSearchResults.innerHTML = "";
+
+                if (rows.length === 0) {
+                    existingPalletSearchResults.innerHTML =
+                        '<div class="list-group-item text-muted">Pallet tidak ditemukan.</div>';
+                    return;
+                }
+
+                rows.forEach((row) => {
+                    const item = document.createElement("a");
+                    item.href = "#";
+                    item.className = "list-group-item list-group-item-action";
+                    item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
+                                        <strong>${escapeHtml(row.pallet_number)}</strong>
+                                        <span class="badge bg-secondary">${Number(row.total_boxes || 0)} box</span>
+                                      </div>
+                                      <small class="text-muted">Lokasi: ${escapeHtml(row.warehouse_location || "-")}</small>`;
+                    item.onclick = (e) => {
+                        e.preventDefault();
+                        if (selectedExistingPalletId) {
+                            selectedExistingPalletId.value = String(row.id);
+                        }
+                        if (selectedExistingPalletText) {
+                            selectedExistingPalletText.value = `${row.pallet_number} (Lokasi: ${row.warehouse_location || "-"})`;
+                        }
+                        existingPalletSearchResults.style.display = "none";
+                    };
+                    existingPalletSearchResults.appendChild(item);
+                });
+            })
+            .catch((error) => {
+                existingPalletSearchResults.innerHTML =
+                    '<div class="list-group-item text-danger">' +
+                    escapeHtml(error.message) +
+                    "</div>";
+            });
+    }
+
+    function performLocationSearch(query) {
+        if (!locationSearchResults || !config.locationSearchUrl) {
+            return;
+        }
+
+        locationSearchResults.style.display = "block";
+        locationSearchResults.innerHTML =
+            '<div class="list-group-item text-muted">Mencari lokasi...</div>';
+
+        fetch(
+            config.locationSearchUrl + "?q=" + encodeURIComponent(query || ""),
+        )
+            .then((res) => res.json())
+            .then((rows) => {
+                locationSearchResults.innerHTML = "";
+                if (Array.isArray(rows) && rows.length > 0) {
+                    rows.forEach((loc) => {
+                        const item = document.createElement("a");
+                        item.href = "#";
+                        item.className =
+                            "list-group-item list-group-item-action";
+                        item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
+                                            <strong>${escapeHtml(loc.code)}</strong>
+                                            <span class="badge bg-success rounded-pill" style="font-size: 0.7em;">Available</span>
+                                          </div>`;
+                        item.onclick = (e) => {
+                            e.preventDefault();
+                            if (locationSearchInput) {
+                                locationSearchInput.value = String(
+                                    loc.code || "",
+                                );
+                            }
+                            if (selectedLocationId) {
+                                selectedLocationId.value = String(loc.id || "");
+                            }
+                            if (selectedLocationCode) {
+                                selectedLocationCode.value = String(
+                                    loc.code || "",
+                                );
+                            }
+                            locationSearchResults.style.display = "none";
+                        };
+                        locationSearchResults.appendChild(item);
+                    });
+                    return;
+                }
+
+                locationSearchResults.innerHTML =
+                    '<div class="list-group-item text-muted">Tidak ada lokasi tersedia.</div>';
+            })
+            .catch(() => {
+                locationSearchResults.style.display = "none";
+            });
     }
 
     function addToOrder(entry) {
@@ -751,6 +1058,11 @@
             return;
         }
 
+        const palletInfo = validateNewBoxPalletInputs();
+        if (!palletInfo) {
+            return;
+        }
+
         const partNumber = String(newBoxPartSelect?.value || "").trim();
         if (!partNumber) {
             showNewBoxError(
@@ -994,6 +1306,18 @@
             return;
         }
 
+        let palletInfo = null;
+        if (scannedBoxes.size > 0) {
+            palletInfo = validateNewBoxPalletInputs({ silent: true });
+            if (!palletInfo) {
+                showResult(
+                    "warning",
+                    "Untuk input box baru, pallet wajib diisi (pallet baru wajib pilih lokasi).",
+                );
+                return;
+            }
+        }
+
         const payload = {
             delivery_order_id: Number(deliveryOrderId),
             box_ids: Array.from(selectedBoxes.keys()),
@@ -1004,6 +1328,16 @@
                 pcs_quantity: box.pcs_quantity,
             })),
         };
+
+        if (palletInfo) {
+            payload.new_boxes_pallet_mode = palletInfo.mode;
+            if (palletInfo.mode === "existing") {
+                payload.new_boxes_pallet_id = palletInfo.pallet_id;
+            } else {
+                payload.new_boxes_pallet_number = palletInfo.pallet_number;
+                payload.new_boxes_location_id = palletInfo.location_id;
+            }
+        }
 
         const infoText =
             `Pallet: ${selectedPallets.size}, ` +
@@ -1055,6 +1389,102 @@
         addNewBoxBtn.addEventListener("click", addNewBox);
     }
 
+    if (palletModeNew) {
+        palletModeNew.addEventListener("change", function () {
+            if (this.checked) {
+                setNewBoxPalletModeUI("new");
+            }
+        });
+    }
+
+    if (palletModeExisting) {
+        palletModeExisting.addEventListener("change", function () {
+            if (this.checked) {
+                setNewBoxPalletModeUI("existing");
+            }
+        });
+    }
+
+    if (existingPalletSearchInput) {
+        let existingPalletSearchTimeout;
+
+        existingPalletSearchInput.addEventListener("input", function (e) {
+            window.clearTimeout(existingPalletSearchTimeout);
+            const query = String(e.target.value || "").trim();
+
+            if (selectedExistingPalletId) {
+                selectedExistingPalletId.value = "";
+            }
+            if (selectedExistingPalletText) {
+                selectedExistingPalletText.value = "";
+            }
+
+            existingPalletSearchTimeout = window.setTimeout(() => {
+                searchExistingPallets(query);
+            }, 250);
+        });
+
+        existingPalletSearchInput.addEventListener("focus", function () {
+            searchExistingPallets(String(this.value || "").trim());
+        });
+
+        document.addEventListener("click", function (e) {
+            if (
+                existingPalletSearchResults &&
+                !existingPalletSearchInput.contains(e.target) &&
+                !existingPalletSearchResults.contains(e.target)
+            ) {
+                existingPalletSearchResults.style.display = "none";
+            }
+        });
+    }
+
+    if (locationSearchInput) {
+        let locationSearchTimeout;
+
+        locationSearchInput.addEventListener("input", function (e) {
+            window.clearTimeout(locationSearchTimeout);
+            const query = String(e.target.value || "").trim();
+
+            if (selectedLocationId) {
+                selectedLocationId.value = "";
+            }
+            if (selectedLocationCode) {
+                selectedLocationCode.value = "";
+            }
+
+            locationSearchTimeout = window.setTimeout(() => {
+                performLocationSearch(query);
+            }, 250);
+        });
+
+        locationSearchInput.addEventListener("focus", function () {
+            performLocationSearch(String(this.value || "").trim());
+        });
+    }
+
+    if (locationDropdownBtn && locationSearchInput) {
+        locationDropdownBtn.addEventListener("click", function () {
+            locationSearchInput.focus();
+            performLocationSearch(
+                String(locationSearchInput.value || "").trim(),
+            );
+        });
+    }
+
+    if (locationSearchResults && locationSearchInput) {
+        document.addEventListener("click", function (e) {
+            if (
+                !locationSearchInput.contains(e.target) &&
+                !locationSearchResults.contains(e.target) &&
+                (!locationDropdownBtn ||
+                    !locationDropdownBtn.contains(e.target))
+            ) {
+                locationSearchResults.style.display = "none";
+            }
+        });
+    }
+
     [newBoxNumberInput, newBoxPartSelect, newBoxQtyInput]
         .filter(Boolean)
         .forEach((input) => {
@@ -1103,6 +1533,8 @@
             applyChange().catch(() => null);
         });
     }
+
+    setNewBoxPalletModeUI(getNewBoxPalletMode());
 
     setGateState(Boolean(deliveryOrderSelect?.value));
     if (deliveryOrderSelect?.value) {

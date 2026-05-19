@@ -48,10 +48,56 @@
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                 <div>
                     <div class="fw-semibold">Input Box Baru</div>
-                    <div class="text-muted small">Box baru langsung di-assign ke delivery tanpa pallet/location.</div>
+                    <div class="text-muted small">Box baru wajib memilih pallet. Pallet baru wajib memilih lokasi.</div>
                 </div>
                 <span class="badge bg-light text-dark">Part mengikuti delivery order</span>
             </div>
+
+            <div class="row g-3 align-items-end mb-3">
+                <div class="col-12">
+                    <div class="fw-semibold">Pallet untuk Input Box Baru</div>
+                    <div class="text-muted small">Pallet wajib diisi. Jika pallet baru: pilih lokasi kosong. Jika pallet existing: lokasi mengikuti lokasi pallet.</div>
+                </div>
+
+                <div class="col-lg-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="deliveryAssignPalletMode" id="deliveryAssignPalletModeNew" value="new" checked>
+                        <label class="form-check-label" for="deliveryAssignPalletModeNew">Pallet baru</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="deliveryAssignPalletMode" id="deliveryAssignPalletModeExisting" value="existing">
+                        <label class="form-check-label" for="deliveryAssignPalletModeExisting">Pallet existing</label>
+                    </div>
+                </div>
+
+                <div class="col-lg-4" id="deliveryAssignNewPalletNumberSection">
+                    <label class="form-label fw-semibold">No Pallet</label>
+                    <input type="text" class="form-control" id="deliveryAssignNewPalletNumber" placeholder="Contoh: PLT-001" autocomplete="off">
+                </div>
+
+                <div class="col-lg-5" id="deliveryAssignExistingPalletSection" style="display: none;">
+                    <label class="form-label fw-semibold">Cari Pallet Existing</label>
+                    <input type="text" class="form-control" id="deliveryAssignExistingPalletSearchInput" placeholder="Ketik no pallet..." autocomplete="off">
+                    <input type="hidden" id="deliveryAssignSelectedExistingPalletId" value="">
+                    <input type="text" class="form-control mt-2" id="deliveryAssignSelectedExistingPalletText" value="" placeholder="Belum ada pallet dipilih" readonly>
+                    <div class="list-group mt-2" id="deliveryAssignExistingPalletSearchResults" style="display: none; max-height: 220px; overflow-y: auto;"></div>
+                </div>
+
+                <div class="col-lg-6" id="deliveryAssignLocationSection">
+                    <label class="form-label fw-semibold">Lokasi (untuk pallet baru)</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                        <input type="text" class="form-control" id="deliveryAssignLocationSearchInput" placeholder="Cari lokasi kosong..." autocomplete="off">
+                        <button class="btn btn-outline-primary" type="button" id="deliveryAssignLocationDropdownBtn">
+                            <i class="bi bi-chevron-down"></i>
+                        </button>
+                    </div>
+                    <input type="hidden" id="deliveryAssignLocationId" value="">
+                    <input type="hidden" id="deliveryAssignLocationCode" value="">
+                    <div class="list-group mt-2" id="deliveryAssignLocationSearchResults" style="display: none; max-height: 220px; overflow-y: auto;"></div>
+                </div>
+            </div>
+
             <div class="row g-3 align-items-end">
                 <div class="col-lg-4">
                     <label class="form-label fw-semibold">ID Box</label>
@@ -143,7 +189,9 @@
         searchUrl: '/delivery-assign/search',
         assignUrl: '/delivery-assign/assign',
         deliveryOrderPartsUrl: '/delivery-assign/delivery-orders/__ORDER__/parts',
-        palletBoxesUrl: '/delivery-assign/pallets/__PALLET__/boxes'
+        palletBoxesUrl: '/delivery-assign/pallets/__PALLET__/boxes',
+        newBoxPalletSearchUrl: '{{ route("delivery-assign.search-new-box-pallets") }}',
+        locationSearchUrl: '/api/locations/search'
     };
 </script>
 <script src="{{ asset('js/pages/delivery-assign.js') }}"></script>

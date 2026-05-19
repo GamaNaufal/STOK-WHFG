@@ -7,7 +7,11 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
+use App\Models\MasterLocation;
+use App\Models\Pallet;
+use App\Models\PalletItem;
 use App\Models\PartSetting;
+use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
@@ -17,6 +21,118 @@ use Illuminate\Support\Facades\DB;
 class DeliveryAssignController extends Controller
 {
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
+
+    private function resolveAndClaimMasterLocation(int $masterLocationId, Pallet $pallet): string
+    {
+        $masterLocation = MasterLocation::query()->find($masterLocationId);
+        if (!$masterLocation) {
+            throw new \RuntimeException('Lokasi yang dipilih tidak ditemukan.');
+        }
+
+        $claimed = MasterLocation::query()
+            ->whereKey($masterLocation->id)
+            ->where('is_occupied', false)
+            ->update([
+                'is_occupied' => true,
+                'current_pallet_id' => $pallet->id,
+                'updated_at' => now(),
+            ]);
+
+        if ($claimed === 0) {
+            throw new \RuntimeException('Lokasi yang dipilih sudah terisi.');
+        }
+
+        return (string) $masterLocation->code;
+    }
+
+    private function syncPalletItemsWithActiveBoxes(Pallet $pallet): void
+    {
+        $activeByPart = DB::table('pallet_boxes')
+            ->join('boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->where('pallet_boxes.pallet_id', $pallet->id)
+            ->whereNull('boxes.deleted_at')
+            ->where('boxes.is_withdrawn', false)
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')
+                    ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
+            ->select(
+                'boxes.part_number',
+                DB::raw('COUNT(*) as box_quantity'),
+                DB::raw('SUM(boxes.pcs_quantity) as pcs_quantity')
+            )
+            ->groupBy('boxes.part_number')
+            ->get();
+
+        $pallet->items()->delete();
+
+        foreach ($activeByPart as $row) {
+            if (empty($row->part_number)) {
+                continue;
+            }
+
+            PalletItem::create([
+                'pallet_id' => $pallet->id,
+                'part_number' => (string) $row->part_number,
+                'box_quantity' => (int) $row->box_quantity,
+                'pcs_quantity' => (int) $row->pcs_quantity,
+            ]);
+        }
+    }
+
+    private function createStockInputRecord(Pallet $pallet, array $attachedBoxIds, string $locationCode): StockInput
+    {
+        $attachedBoxes = Box::query()
+            ->whereIn('id', $attachedBoxIds)
+            ->get(['id', 'part_number', 'pcs_quantity']);
+
+        if ($attachedBoxes->isEmpty()) {
+            throw new \RuntimeException('Tidak ada box valid untuk membuat stock input.');
+        }
+
+        $totalPcs = (int) $attachedBoxes->sum('pcs_quantity');
+        $partNumbers = $attachedBoxes
+            ->pluck('part_number')
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $palletItem = !empty($partNumbers)
+            ? $pallet->items()->whereIn('part_number', $partNumbers)->orderBy('id')->first()
+            : null;
+
+        return StockInput::create([
+            'pallet_id' => $pallet->id,
+            'pallet_item_id' => $palletItem?->id,
+            'user_id' => Auth::id(),
+            'warehouse_location' => $locationCode,
+            'pcs_quantity' => $totalPcs,
+            'box_quantity' => $attachedBoxes->count(),
+            'stored_at' => now(),
+            'part_numbers' => $partNumbers,
+        ]);
+    }
+
+    private function createStockInputBoxRecords(StockInput $stockInput, array $boxIds): void
+    {
+        $rows = collect($boxIds)
+            ->map(fn ($boxId) => (int) $boxId)
+            ->filter(fn ($boxId) => $boxId > 0)
+            ->unique()
+            ->values()
+            ->map(fn ($boxId) => [
+                'stock_input_id' => $stockInput->id,
+                'box_id' => $boxId,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ])
+            ->all();
+
+        if (!empty($rows)) {
+            DB::table('stock_input_boxes')->insert($rows);
+        }
+    }
 
     private function isApprovedDeliveryOrder(int $deliveryOrderId): bool
     {
@@ -789,6 +905,10 @@ class DeliveryAssignController extends Controller
             'new_boxes.*.box_number' => ['required', 'string'],
             'new_boxes.*.part_number' => ['required', 'string'],
             'new_boxes.*.pcs_quantity' => ['required', 'integer', 'min:1'],
+            'new_boxes_pallet_mode' => ['nullable', 'string', 'in:new,existing'],
+            'new_boxes_pallet_id' => ['nullable', 'integer', 'exists:pallets,id'],
+            'new_boxes_pallet_number' => ['nullable', 'string', 'max:255'],
+            'new_boxes_location_id' => ['nullable', 'integer', 'exists:master_locations,id'],
             'confirm_overage' => ['nullable', 'boolean'],
         ]);
 
@@ -811,12 +931,70 @@ class DeliveryAssignController extends Controller
         $palletIds = $validated['pallet_ids'] ?? [];
         $newBoxes = $validated['new_boxes'] ?? [];
 
+        $newBoxesPalletMode = $validated['new_boxes_pallet_mode'] ?? null;
+        $newBoxesPalletId = isset($validated['new_boxes_pallet_id']) ? (int) $validated['new_boxes_pallet_id'] : 0;
+        $newBoxesPalletNumber = trim((string) ($validated['new_boxes_pallet_number'] ?? ''));
+        $newBoxesLocationId = isset($validated['new_boxes_location_id']) ? (int) $validated['new_boxes_location_id'] : 0;
+
         [$validNewBoxes, $newBoxErrors] = $this->validateNewBoxes($newBoxes, $deliveryOrderId);
         if (!empty($newBoxErrors)) {
             return response()->json([
                 'message' => 'Box baru tidak valid. Periksa kembali input scan.',
                 'new_box_errors' => $newBoxErrors,
             ], 422);
+        }
+
+        if (!empty($validNewBoxes)) {
+            if (!$newBoxesPalletMode) {
+                return response()->json([
+                    'message' => 'Pilih pallet untuk input box baru terlebih dahulu.',
+                ], 422);
+            }
+
+            if ($newBoxesPalletMode === 'existing') {
+                if ($newBoxesPalletId <= 0) {
+                    return response()->json([
+                        'message' => 'Pilih pallet existing untuk input box baru.',
+                    ], 422);
+                }
+
+                $pallet = Pallet::query()->with('stockLocation')->find($newBoxesPalletId);
+                $locationCode = $pallet?->stockLocation?->warehouse_location;
+                if (!$pallet || !$locationCode || $locationCode === 'Unknown') {
+                    return response()->json([
+                        'message' => 'Pallet existing belum memiliki lokasi tersimpan. Gunakan pallet baru dan pilih lokasi.',
+                    ], 422);
+                }
+            } else {
+                if ($newBoxesPalletNumber === '') {
+                    return response()->json([
+                        'message' => 'Nomor pallet wajib diisi untuk pallet baru.',
+                    ], 422);
+                }
+
+                if ($newBoxesLocationId <= 0) {
+                    return response()->json([
+                        'message' => 'Pilih lokasi untuk pallet baru.',
+                    ], 422);
+                }
+
+                $alreadyExists = Pallet::query()->where('pallet_number', $newBoxesPalletNumber)->exists();
+                if ($alreadyExists) {
+                    return response()->json([
+                        'message' => 'Nomor pallet sudah ada. Pilih mode pallet existing.',
+                    ], 422);
+                }
+
+                $available = MasterLocation::query()
+                    ->whereKey($newBoxesLocationId)
+                    ->where('is_occupied', false)
+                    ->exists();
+                if (!$available) {
+                    return response()->json([
+                        'message' => 'Lokasi yang dipilih sudah terisi. Pilih lokasi lain.',
+                    ], 422);
+                }
+            }
         }
 
         $expandedBoxIds = $this->resolveBoxIdsFromPallets($palletIds);
@@ -930,6 +1108,7 @@ class DeliveryAssignController extends Controller
 
         $assignedExistingBoxIds = [];
         $createdNewBoxIds = [];
+        $createdStockInputIdForNewBoxes = null;
         $sessionId = null;
         $overageAdjustments = [];
         $userId = (int) Auth::id();
@@ -938,9 +1117,14 @@ class DeliveryAssignController extends Controller
             $deliveryOrderId,
             $eligibleBoxes,
             $validNewBoxes,
+            $newBoxesPalletMode,
+            $newBoxesPalletId,
+            $newBoxesPalletNumber,
+            $newBoxesLocationId,
             $userId,
             &$assignedExistingBoxIds,
             &$createdNewBoxIds,
+            &$createdStockInputIdForNewBoxes,
             &$sessionId,
             &$overageAdjustments,
             $partOverages
@@ -1010,6 +1194,34 @@ class DeliveryAssignController extends Controller
             }
 
             if (!empty($validNewBoxes)) {
+                $palletForNewBoxes = null;
+                $locationCodeForNewBoxes = null;
+
+                if ($newBoxesPalletMode === 'existing') {
+                    $palletForNewBoxes = Pallet::query()
+                        ->with(['stockLocation', 'items'])
+                        ->lockForUpdate()
+                        ->findOrFail($newBoxesPalletId);
+
+                    $locationCodeForNewBoxes = (string) ($palletForNewBoxes->stockLocation?->warehouse_location ?? '');
+                    if ($locationCodeForNewBoxes === '' || $locationCodeForNewBoxes === 'Unknown') {
+                        throw new \RuntimeException('Pallet existing belum memiliki lokasi tersimpan.');
+                    }
+                } else {
+                    $palletForNewBoxes = Pallet::create([
+                        'pallet_number' => $newBoxesPalletNumber,
+                    ]);
+
+                    $locationCodeForNewBoxes = $this->resolveAndClaimMasterLocation($newBoxesLocationId, $palletForNewBoxes);
+
+                    StockLocation::create([
+                        'pallet_id' => $palletForNewBoxes->id,
+                        'master_location_id' => $newBoxesLocationId,
+                        'warehouse_location' => $locationCodeForNewBoxes,
+                        'stored_at' => now(),
+                    ]);
+                }
+
                 $now = now();
                 $newBoxRows = [];
                 foreach ($validNewBoxes as $entry) {
@@ -1031,7 +1243,14 @@ class DeliveryAssignController extends Controller
                 foreach ($newBoxRows as $row) {
                     $box = Box::create($row);
                     $createdNewBoxIds[] = (int) $box->id;
+
+                    $palletForNewBoxes->boxes()->syncWithoutDetaching([$box->id]);
                 }
+
+                $this->syncPalletItemsWithActiveBoxes($palletForNewBoxes);
+                $stockInput = $this->createStockInputRecord($palletForNewBoxes, $createdNewBoxIds, $locationCodeForNewBoxes);
+                $this->createStockInputBoxRecords($stockInput, $createdNewBoxIds);
+                $createdStockInputIdForNewBoxes = (int) $stockInput->id;
 
                 if (!empty($createdNewBoxIds)) {
                     $pickRows = [];
@@ -1081,10 +1300,42 @@ class DeliveryAssignController extends Controller
             'assigned_existing_box_ids' => $assignedExistingBoxIds,
             'created_new_count' => count($createdNewBoxIds),
             'created_new_box_ids' => $createdNewBoxIds,
+            'created_stock_input_id' => $createdStockInputIdForNewBoxes,
             'overage_adjustments' => $overageAdjustments,
             'skipped_count' => count($skipped),
             'skipped' => $skipped,
             'pick_session_id' => $sessionId,
+        ]);
+    }
+
+    public function searchPalletsForNewBoxInput(Request $request)
+    {
+        $query = trim((string) $request->query('q', ''));
+
+        $pallets = Pallet::query()
+            ->with(['stockLocation'])
+            ->withCount('activeBoxes')
+            ->whereHas('stockLocation', function ($q) {
+                $q->where('warehouse_location', '!=', 'Unknown');
+            })
+            ->when($query !== '', function ($q) use ($query) {
+                $q->where('pallet_number', 'like', '%' . $query . '%');
+            })
+            ->orderByDesc('id')
+            ->limit(12)
+            ->get()
+            ->map(function (Pallet $pallet) {
+                return [
+                    'id' => $pallet->id,
+                    'pallet_number' => $pallet->pallet_number,
+                    'warehouse_location' => $pallet->stockLocation?->warehouse_location,
+                    'total_boxes' => (int) $pallet->active_boxes_count,
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'pallets' => $pallets,
         ]);
     }
 

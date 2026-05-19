@@ -64,15 +64,11 @@
       0 => 'Termwind\\Laravel\\TermwindServiceProvider',
     ),
   ),
-  'simplesoftwareio/simple-qrcode' => 
+  'pestphp/pest-plugin-laravel' => 
   array (
-    'aliases' => 
-    array (
-      'QrCode' => 'SimpleSoftwareIO\\QrCode\\Facades\\QrCode',
-    ),
     'providers' => 
     array (
-      0 => 'SimpleSoftwareIO\\QrCode\\QrCodeServiceProvider',
+      0 => 'Pest\\Laravel\\PestServiceProvider',
     ),
   ),
 );

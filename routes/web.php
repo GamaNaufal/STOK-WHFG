@@ -48,8 +48,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/stock-input/scan-box', [StockInputController::class, 'scanBox'])->name('stock-input.scan-box');
         Route::post('/stock-input/scan-barcode', [StockInputController::class, 'scanBarcode'])->name('stock-input.scan-barcode');
         Route::post('/stock-input/scan-part', [StockInputController::class, 'scanPartNumber'])->name('stock-input.scan-part');
-        Route::post('/stock-input/pending-location', [StockInputController::class, 'setPendingLocation'])->name('stock-input.pending-location');
-        Route::post('/stock-input/clear-pending-location', [StockInputController::class, 'clearPendingLocation'])->name('stock-input.clear-pending-location');
         Route::get('/stock-input/search-existing-pallet', [StockInputController::class, 'searchExistingPallet'])->name('stock-input.search-existing-pallet');
         Route::post('/stock-input/select-existing-pallet', [StockInputController::class, 'selectExistingPallet'])->name('stock-input.select-existing-pallet');
         Route::get('/stock-input/get-pallet-data', [StockInputController::class, 'getCurrentPalletData'])->name('stock-input.get-pallet-data');
@@ -134,6 +132,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/delivery-assign', [DeliveryAssignController::class, 'index'])->name('delivery-assign.index');
         Route::get('/delivery-assign/delivery-orders/{deliveryOrderId}/parts', [DeliveryAssignController::class, 'deliveryOrderParts'])->name('delivery-assign.delivery-order-parts');
         Route::get('/delivery-assign/search', [DeliveryAssignController::class, 'search'])->name('delivery-assign.search');
+        Route::get('/delivery-assign/pallets/search', [DeliveryAssignController::class, 'searchPalletsForNewBoxInput'])->name('delivery-assign.search-new-box-pallets');
         Route::get('/delivery-assign/pallets/{palletId}/boxes', [DeliveryAssignController::class, 'palletBoxes'])->name('delivery-assign.pallet-boxes');
         Route::post('/delivery-assign/assign', [DeliveryAssignController::class, 'assign'])->name('delivery-assign.assign');
     });
