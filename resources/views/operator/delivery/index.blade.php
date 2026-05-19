@@ -1051,7 +1051,22 @@
                         delivery_order_id: currentOrderId
                     })
                 })
-                .then(res => res.json())
+                .then(async (res) => {
+                    const contentType = res.headers.get('content-type') || '';
+                    const isJson = contentType.includes('application/json');
+                    const payload = isJson ? await res.json() : null;
+
+                    if (!res.ok) {
+                        const message = payload?.message || `Gagal memuat FIFO (HTTP ${res.status})`;
+                        throw new Error(message);
+                    }
+
+                    if (!payload) {
+                        throw new Error('Gagal memuat FIFO (response bukan JSON)');
+                    }
+
+                    return payload;
+                })
                 .then(data => {
                     loadingEl.style.display = 'none';
                     if (data.success) {
@@ -1093,10 +1108,10 @@
                         updateProcessButton();
                     }
                 })
-                .catch(() => {
+                .catch((error) => {
                     loadingEl.style.display = 'none';
                     item.hasFifoError = true;
-                    errorEl.textContent = 'Gagal memuat FIFO.';
+                    errorEl.textContent = error?.message || 'Gagal memuat FIFO.';
                     errorEl.style.display = 'block';
                     updateProcessButton();
                 });

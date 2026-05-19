@@ -43,6 +43,7 @@
     let lastScanTime = 0;
     let existingPalletSearchTimeout;
     let isSelectingExistingPallet = false;
+    let pendingLocationSaving = false;
 
     /**
      * Fungsi untuk memutar suara error/alert 3x beep
@@ -183,6 +184,99 @@
             locationStatusText.innerHTML =
                 '<i class="bi bi-info-circle"></i> Untuk pallet baru: pilih lokasi kosong dari dropdown. Untuk pallet existing: lokasi boleh dikosongkan (akan pakai lokasi pallet saat ini).';
         }
+    }
+
+    function setScannerEnabled(enabled) {
+        if (barcodeInput) {
+            barcodeInput.disabled = !enabled;
+        }
+        if (barcodeSubmitBtn) {
+            barcodeSubmitBtn.disabled = !enabled;
+        }
+
+        // Part input remains controlled by barcode scan flow.
+        if (!enabled && partInput) {
+            partInput.disabled = true;
+        }
+        if (!enabled && partSubmitBtn) {
+            partSubmitBtn.disabled = true;
+        }
+    }
+
+    function hasSelectedLocation() {
+        const selectedId = document.getElementById("selectedLocationId")?.value;
+        const selectedCode = document.getElementById(
+            "selectedLocationCode",
+        )?.value;
+        return !!(selectedId && selectedCode);
+    }
+
+    function updateScanLockUI() {
+        if (currentPalletSource === "existing") {
+            setScannerEnabled(!!currentPalletHasStoredLocation);
+            return;
+        }
+
+        // New pallet: must choose location before scanning.
+        if (currentPalletHasStoredLocation) {
+            setScannerEnabled(true);
+            return;
+        }
+
+        setScannerEnabled(hasSelectedLocation());
+    }
+
+    function clearPendingLocationSession() {
+        if (!config.clearPendingLocationUrl) {
+            return;
+        }
+        fetch(config.clearPendingLocationUrl, {
+            method: "POST",
+            headers: {
+                "X-CSRF-TOKEN": config.csrfToken,
+            },
+        }).catch(() => {
+            // no-op
+        });
+    }
+
+    function persistPendingLocationToSession(locationId, locationCode) {
+        if (!config.setPendingLocationUrl || pendingLocationSaving) {
+            return;
+        }
+        if (!locationId || !locationCode) {
+            return;
+        }
+
+        pendingLocationSaving = true;
+        const form = new FormData();
+        form.append("location_id", String(locationId));
+        form.append("_token", config.csrfToken);
+
+        fetch(config.setPendingLocationUrl, {
+            method: "POST",
+            headers: {
+                "X-CSRF-TOKEN": config.csrfToken,
+            },
+            body: form,
+        })
+            .then((res) => res.json().then((data) => ({ ok: res.ok, data })))
+            .then(({ ok, data }) => {
+                if (!ok || !data?.success) {
+                    throw new Error(data?.message || "Gagal menyimpan lokasi");
+                }
+                updateScanLockUI();
+                showInfo(
+                    `Lokasi ${data.warehouse_location} dipilih. Scanner siap digunakan.`,
+                );
+            })
+            .catch((err) => {
+                setScannerEnabled(false);
+                showError(err?.message || "Gagal menyimpan lokasi");
+            })
+            .finally(() => {
+                pendingLocationSaving = false;
+            });
     }
 
     function showBarcodeStatus(text) {
@@ -571,6 +665,16 @@
     document.addEventListener("DOMContentLoaded", function () {
         showPostSaveBannerIfAny();
         setPalletModeUI("new");
+
+        // Show location step from the start so new pallets can choose location before scanning.
+        if (step3) {
+            step3.style.display = "block";
+        }
+
+        // Default: lock scanning until requirements met.
+        setScannerEnabled(false);
+        updateScanLockUI();
+
         barcodeInput.focus();
     });
 
@@ -678,6 +782,8 @@
                 step2.style.display = "block";
                 step3.style.display = "block";
                 loadAndDisplayPalletData();
+
+                updateScanLockUI();
 
                 showInfo(
                     `Pallet existing ${data.pallet_number} dipilih. Lokasi aktif: ${data.warehouse_location || "-"}.`,
@@ -1014,6 +1120,11 @@
 
     function performSearch(query) {
         selectedLocationId.value = "";
+        selectedLocationCode.value = "";
+        if (currentPalletSource === "new") {
+            setScannerEnabled(false);
+            clearPendingLocationSession();
+        }
 
         searchResults.style.display = "block";
         searchResults.innerHTML =
@@ -1041,6 +1152,13 @@
                             selectedLocationId.value = loc.id;
                             selectedLocationCode.value = loc.code;
                             searchResults.style.display = "none";
+
+                            if (currentPalletSource === "new") {
+                                persistPendingLocationToSession(
+                                    loc.id,
+                                    loc.code,
+                                );
+                            }
                         };
                         searchResults.appendChild(item);
                     });
@@ -1069,6 +1187,14 @@
             searchTimeout = setTimeout(() => {
                 performSearch(query);
             }, 300);
+
+            if (currentPalletSource === "new") {
+                // Any manual typing invalidates the selection.
+                selectedLocationId.value = "";
+                selectedLocationCode.value = "";
+                setScannerEnabled(false);
+                clearPendingLocationSession();
+            }
         });
 
         searchInput.addEventListener("focus", function () {
@@ -1102,6 +1228,7 @@
             if (this.checked) {
                 currentPalletSource = "new";
                 setPalletModeUI("new");
+                updateScanLockUI();
             }
         });
     }
@@ -1111,6 +1238,10 @@
             if (this.checked) {
                 currentPalletSource = "existing";
                 setPalletModeUI("existing");
+
+                // Pending location is not applicable in existing mode.
+                clearPendingLocationSession();
+                updateScanLockUI();
             }
         });
     }
@@ -1172,6 +1303,8 @@
                     showInfo(
                         "Palet aktif ditemukan. Lanjutkan scan box atau tentukan lokasi.",
                     );
+
+                    updateScanLockUI();
                 }
             })
             .catch(() => {

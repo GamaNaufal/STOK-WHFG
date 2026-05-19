@@ -305,6 +305,8 @@ class DeliveryPickController extends Controller
 
     private function createSessionItems(DeliveryOrder $order, DeliveryPickSession $session): void
     {
+        $allowPartial = false;
+
         foreach ($order->items as $item) {
             $remainingQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
             if ($remainingQty <= 0) {
@@ -450,6 +452,19 @@ class DeliveryPickController extends Controller
                 $order,
                 (int) $user->id
             );
+        } catch (\Throwable $e) {
+            $message = (string) $e->getMessage();
+            $statusCode = $message === self::DELIVERY_APPROVAL_PENDING_MESSAGE || str_contains($message, 'diproses') || str_contains($message, 'aktif')
+                ? 423
+                : 422;
+            return response()->json(['message' => $e->getMessage()], $statusCode);
+        }
+
+        return response()->json([
+            'session_id' => $session->id,
+            'pdf_url' => route('delivery.pick.pdf', [$order->id, $session->id]),
+            'print_preview_url' => route('delivery.pick.print-preview', [$order->id, $session->id]),
+            'scan_url' => route('delivery.pick.scan', [$order->id, $session->id]),
             'final_scan_url' => route('delivery.pick.scan', [$order->id, $session->id]),
         ]);
     }
@@ -1726,10 +1741,6 @@ class DeliveryPickController extends Controller
                             ->from('delivery_pick_sessions')
                             ->whereIn('status', self::ACTIVE_LOCK_STATUSES);
                     });
-            })
-            ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $cutoffDate = Carbon::parse($deliveryDate)->subMonths(12);
-                $q->where('boxes.created_at', '>=', $cutoffDate);
             })
             ->orderBy('boxes.created_at', 'asc');
 

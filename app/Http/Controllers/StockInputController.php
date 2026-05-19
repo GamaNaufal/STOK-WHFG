@@ -20,6 +20,9 @@ use Illuminate\Support\Facades\DB;
 
 class StockInputController extends Controller
 {
+    private const PENDING_LOCATION_ID_SESSION_KEY = 'pending_location_id';
+    private const PENDING_LOCATION_CODE_SESSION_KEY = 'pending_location_code';
+
     private function isDuplicateKeyException(QueryException $e): bool
     {
         $sqlState = (string) ($e->getCode() ?? '');
@@ -73,6 +76,85 @@ class StockInputController extends Controller
         }
 
         throw new \RuntimeException('Gagal membuat nomor palet unik. Silakan coba lagi.');
+    }
+
+    private function requiresLocationBeforeScan(): bool
+    {
+        $source = (string) session('current_pallet_source', 'new');
+
+        // Existing pallet already has stored location and can proceed.
+        return $source !== 'existing';
+    }
+
+    private function ensurePendingLocationForNewPallet(): ?\Illuminate\Http\JsonResponse
+    {
+        if (!$this->requiresLocationBeforeScan()) {
+            return null;
+        }
+
+        $pendingId = session(self::PENDING_LOCATION_ID_SESSION_KEY);
+        $pendingCode = session(self::PENDING_LOCATION_CODE_SESSION_KEY);
+
+        if ($pendingId || $pendingCode) {
+            return null;
+        }
+
+        $palletId = (int) session('current_pallet_id', 0);
+        if ($palletId > 0) {
+            $palletHasLocation = StockLocation::query()->where('pallet_id', $palletId)->exists();
+            if ($palletHasLocation) {
+                return null;
+            }
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Pilih lokasi penyimpanan terlebih dahulu untuk pallet baru.',
+        ], 422);
+    }
+
+    public function setPendingLocation(Request $request)
+    {
+        $validated = $request->validate([
+            'location_id' => 'required|integer|exists:master_locations,id',
+        ]);
+
+        $masterLocation = MasterLocation::find($validated['location_id']);
+
+        if (!$masterLocation) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lokasi tidak ditemukan.',
+            ], 404);
+        }
+
+        if ((bool) $masterLocation->is_occupied) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Lokasi yang dipilih sudah terisi. Pilih lokasi lain.',
+            ], 422);
+        }
+
+        session([
+            self::PENDING_LOCATION_ID_SESSION_KEY => (int) $masterLocation->id,
+            self::PENDING_LOCATION_CODE_SESSION_KEY => (string) $masterLocation->code,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'location_id' => (int) $masterLocation->id,
+            'warehouse_location' => (string) $masterLocation->code,
+        ]);
+    }
+
+    public function clearPendingLocation(Request $request)
+    {
+        session()->forget(self::PENDING_LOCATION_ID_SESSION_KEY);
+        session()->forget(self::PENDING_LOCATION_CODE_SESSION_KEY);
+
+        return response()->json([
+            'success' => true,
+        ]);
     }
 
     public function index()
@@ -194,6 +276,10 @@ class StockInputController extends Controller
 
         $barcode = $validated['barcode'];
 
+        if ($guard = $this->ensurePendingLocationForNewPallet()) {
+            return $guard;
+        }
+
         // Pastikan tidak ada box pending yang belum di-scan no part
         if (session()->has('pending_box')) {
             return response()->json([
@@ -261,6 +347,10 @@ class StockInputController extends Controller
                 'success' => false,
                 'message' => 'Scan box terlebih dahulu.'
             ], 400);
+        }
+
+        if ($guard = $this->ensurePendingLocationForNewPallet()) {
+            return $guard;
         }
 
         $partNumber = $validated['part_number'];
@@ -364,6 +454,10 @@ class StockInputController extends Controller
         ]);
 
         $qrData = $validated['qr_data'];
+
+        if ($guard = $this->ensurePendingLocationForNewPallet()) {
+            return $guard;
+        }
 
         // Parse QR data: box_number|part_number|pcs_quantity
         $parts = explode('|', $qrData);
@@ -571,6 +665,8 @@ class StockInputController extends Controller
         session()->forget('current_pallet_source');
         session()->forget('scanned_boxes');
         session()->forget('pending_box');
+        session()->forget(self::PENDING_LOCATION_ID_SESSION_KEY);
+        session()->forget(self::PENDING_LOCATION_CODE_SESSION_KEY);
 
         return response()->json([
             'success' => true,
@@ -833,6 +929,8 @@ class StockInputController extends Controller
         session()->forget('current_pallet_id');
         session()->forget('current_pallet_source');
         session()->forget('pending_box');
+        session()->forget(self::PENDING_LOCATION_ID_SESSION_KEY);
+        session()->forget(self::PENDING_LOCATION_CODE_SESSION_KEY);
     }
 
     public function store(Request $request)

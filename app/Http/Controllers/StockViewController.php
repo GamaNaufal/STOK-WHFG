@@ -411,7 +411,7 @@ class StockViewController extends Controller
     {
         return DB::table('pallet_boxes as pb')
             ->join('pallets as p', 'p.id', '=', 'pb.pallet_id')
-            ->join('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
+            ->leftJoin('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
             ->join('boxes as b', 'b.id', '=', 'pb.box_id')
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
@@ -419,9 +419,11 @@ class StockViewController extends Controller
                 $q->whereNull('b.expired_status')
                     ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
             })
-            ->where('sl.warehouse_location', '!=', 'Unknown')
             ->groupBy('pb.box_id')
-            ->select('pb.box_id', DB::raw('MIN(pb.pallet_id) as canonical_pallet_id'))
+            ->select(
+                'pb.box_id',
+                DB::raw('COALESCE(MIN(CASE WHEN sl.warehouse_location IS NOT NULL AND sl.warehouse_location != "Unknown" THEN pb.pallet_id END), MIN(pb.pallet_id)) as canonical_pallet_id')
+            )
             ->pluck('canonical_pallet_id', 'pb.box_id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -438,8 +440,17 @@ class StockViewController extends Controller
                 'items:id,pallet_id,part_number,box_quantity,pcs_quantity,created_at,updated_at',
                 'boxes:id,box_number,part_number,pcs_quantity,is_not_full,not_full_reason,is_withdrawn,expired_status,created_at,updated_at',
             ])
-            ->whereHas('stockLocation', function ($q) {
-                $q->where('warehouse_location', '!=', 'Unknown');
+            ->where(function ($q) {
+                $q->whereHas('stockLocation', function ($q2) {
+                    $q2->where('warehouse_location', '!=', 'Unknown');
+                })->orWhereHas('boxes', function ($q2) {
+                    $q2->whereNull('boxes.deleted_at')
+                        ->where('boxes.is_withdrawn', false)
+                        ->where(function ($q3) {
+                            $q3->whereNull('boxes.expired_status')
+                                ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                        });
+                });
             });
 
         $items = [];
