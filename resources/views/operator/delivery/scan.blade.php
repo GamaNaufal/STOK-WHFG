@@ -73,7 +73,7 @@
                         </thead>
                         <tbody id="requiredBoxes">
                             @foreach($session->items as $item)
-                                <tr data-box-id="{{ $item->box_id }}">
+                                <tr data-box-id="{{ $item->box_id }}" class="{{ $item->status === 'scanned' ? 'table-success' : '' }}">
                                     <td class="ps-3 fw-bold">{{ $item->box->box_number }}</td>
                                     <td>{{ $item->part_number }}</td>
                                     <td>{{ $item->pcs_quantity }}</td>
@@ -124,6 +124,19 @@
         }
 
         row.classList.add('table-success');
+    }
+
+    function hydrateScannedRows() {
+        document.querySelectorAll('#requiredBoxes tr[data-box-id]').forEach((row) => {
+            const statusBadge = row.querySelector('td:last-child .badge');
+            if (!statusBadge) {
+                return;
+            }
+
+            if (statusBadge.textContent.trim().toLowerCase() === 'scanned') {
+                row.classList.add('table-success');
+            }
+        });
     }
 
     function showMessage(message, type = 'success') {
@@ -247,5 +260,7 @@
         })
         .catch(() => showToast('Gagal koneksi.', 'danger'));
     });
+
+    hydrateScannedRows();
 </script>
 @endsection

@@ -328,9 +328,25 @@ class DeliveryOrderController extends Controller
             $order->can_split_delivery = !$order->is_split_child
                 && in_array($order->status, ['approved', 'partial'], true)
                 && empty($order->has_active_pick_session)
-                && empty($order->global_pick_lock_active)
                 && empty($order->has_pending_additional_approval)
                 && $order->items->contains(fn ($item) => (int) $item->quantity > 1);
+            $order->split_disabled_reason = null;
+
+            if (!$order->can_split_delivery) {
+                if ($order->is_split_child) {
+                    $order->split_disabled_reason = 'Order ini adalah hasil split dan tidak bisa di-split lagi.';
+                } elseif (!in_array($order->status, ['approved', 'partial'], true)) {
+                    $order->split_disabled_reason = 'Split hanya tersedia untuk order berstatus approved atau partial.';
+                } elseif (!empty($order->has_active_pick_session)) {
+                    $order->split_disabled_reason = 'Order sedang diproses, split sementara tidak bisa dilakukan.';
+                } elseif (!empty($order->has_pending_additional_approval)) {
+                    $order->split_disabled_reason = 'Masih ada pending approval not full tambahan.';
+                } elseif (!$order->items->contains(fn ($item) => (int) $item->quantity > 1)) {
+                    $order->split_disabled_reason = 'Tidak ada part dengan qty lebih dari 1 untuk di-split.';
+                } else {
+                    $order->split_disabled_reason = 'Order ini belum memenuhi syarat split.';
+                }
+            }
             $order->can_restore_split = $order->is_split_child && $order->status !== 'deleted';
 
             if ($isOwner) {

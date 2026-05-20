@@ -582,13 +582,21 @@
                                                 <i class="bi bi-arrow-counterclockwise"></i> Restore
                                             </button>
                                         </form>
-                                    @elseif(!empty($order->can_split_delivery))
+                                    @endif
+                                    @if(!empty($order->can_split_delivery))
                                         <button type="button"
                                             class="btn-split js-open-split-modal"
                                             data-split-url="{{ route('delivery.split', $order->id) }}"
                                             data-order-id="{{ $order->id }}"
                                             data-customer-name="{{ e($order->customer_name) }}"
                                             data-order-items='@json($order->items->map(fn ($item) => ["part_number" => $item->part_number, "quantity" => (int) $item->quantity])->values())'>
+                                            <i class="bi bi-scissors"></i> Split
+                                        </button>
+                                    @else
+                                        <button type="button"
+                                            class="btn-insufficient"
+                                            disabled
+                                            title="{{ $order->split_disabled_reason ?? 'Order ini belum memenuhi syarat split.' }}">
                                             <i class="bi bi-scissors"></i> Split
                                         </button>
                                     @endif
