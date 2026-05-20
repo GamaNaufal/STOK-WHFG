@@ -187,9 +187,9 @@ class StockInputController extends Controller
         ]);
 
         $validated = $request->validate([
-            'barcode' => ['bail', 'required', 'string', 'regex:/^[0-9]+$/'],
+            'barcode' => ['bail', 'required', 'digits:8'],
         ], [
-            'barcode.regex' => 'ID Box hanya boleh berisi angka.',
+            'barcode.digits' => 'ID Box harus 8 angka.',
         ]);
 
         $barcode = $validated['barcode'];
@@ -379,10 +379,10 @@ class StockInputController extends Controller
         $part_number = $parts[1];
         $pcs_quantity = (int) $parts[2];
 
-        if (!preg_match('/^\d+$/', $box_number)) {
+        if (!preg_match('/^\d{8}$/', $box_number)) {
             return response()->json([
                 'success' => false,
-                'message' => 'ID Box hanya boleh berisi angka.'
+                'message' => 'ID Box harus 8 angka.'
             ], 422);
         }
 
@@ -868,6 +868,17 @@ class StockInputController extends Controller
                     'success' => false,
                     'message' => 'Tidak ada box yang ter-scan'
                 ], 400);
+            }
+
+            foreach ($scannedBoxes as $scannedBox) {
+                $boxNumber = (string) ($scannedBox['box_number'] ?? '');
+                if (!preg_match('/^\d{8}$/', $boxNumber)) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'ID Box harus 8 angka.'
+                    ], 422);
+                }
             }
 
             $hasLocationInput = $this->hasLocationInput($request);

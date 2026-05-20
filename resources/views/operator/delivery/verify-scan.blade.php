@@ -24,7 +24,7 @@
             <div class="card-body">
                 <div class="mb-3">
                     <label class="form-label fw-bold">ID Box</label>
-                    <input type="text" id="scanInput" class="form-control" placeholder="Scan / input ID Box" autofocus>
+                    <input type="text" id="scanInput" class="form-control" placeholder="Scan / input ID Box" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" autofocus>
                 </div>
                 <button class="btn btn-primary" id="btnScan">
                     <i class="bi bi-check2-circle"></i> Submit Scan
@@ -338,6 +338,16 @@
         const boxNumber = scanInput.value.trim();
         if (!boxNumber) {
             showMessage('ID Box wajib diisi.', 'danger');
+            return;
+        }
+
+        if (!/^\d+$/.test(boxNumber)) {
+            showMessage('ID Box hanya boleh angka.', 'danger');
+            return;
+        }
+
+        if (boxNumber.length !== 8) {
+            showMessage('ID Box harus 8 angka.', 'danger');
             return;
         }
 

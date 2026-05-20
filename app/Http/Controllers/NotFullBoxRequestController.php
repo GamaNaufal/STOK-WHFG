@@ -72,7 +72,7 @@ class NotFullBoxRequestController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'box_number' => ['required', 'string', 'max:100', 'regex:/^\d+$/'],
+            'box_number' => ['required', 'string', 'size:8', 'regex:/^\d+$/'],
             'part_number' => 'required|string|exists:part_settings,part_number',
             'pcs_quantity' => 'required|integer|min:1',
             'delivery_order_id' => 'required|integer|exists:delivery_orders,id',
@@ -82,6 +82,7 @@ class NotFullBoxRequestController extends Controller
             'target_pallet_id' => 'nullable|integer|exists:pallets,id',
             'target_location_id' => 'nullable|integer|exists:master_locations,id',
         ], [
+            'box_number.size' => 'ID Box harus 8 karakter.',
             'box_number.regex' => 'ID Box hanya boleh berisi angka.',
         ]);
 

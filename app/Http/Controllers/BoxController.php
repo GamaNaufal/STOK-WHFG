@@ -25,7 +25,7 @@ class BoxController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'box_number' => ['required', 'string', 'max:255', 'regex:/^\d+$/', 'unique:boxes,box_number'],
+            'box_number' => ['required', 'string', 'size:8', 'regex:/^\d+$/', 'unique:boxes,box_number'],
             'part_number' => 'required|string|max:255',
             'part_name' => 'nullable|string|max:255',
             'pcs_quantity' => 'required|integer|min:1',
@@ -36,6 +36,7 @@ class BoxController extends Controller
             'lot02' => 'nullable|string|max:255',
             'lot03' => 'nullable|string|max:255',
         ], [
+            'box_number.size' => 'ID Box harus 8 karakter.',
             'box_number.regex' => 'ID Box hanya boleh berisi angka.',
         ]);
 

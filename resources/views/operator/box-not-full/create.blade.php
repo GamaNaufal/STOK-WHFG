@@ -69,7 +69,7 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">ID Box (Scan)</label>
-                                <input type="text" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" value="{{ old('box_number') }}" required autofocus>
+                                <input type="text" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" value="{{ old('box_number') }}" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" required autofocus>
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label fw-bold">No Part</label>

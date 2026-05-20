@@ -112,6 +112,14 @@
             return null;
         }
 
+        if (barcode.length !== 8) {
+            const message = "ID Box harus 8 angka.";
+            showBarcodeError(message);
+            barcodeInput.value = "";
+            barcodeInput.focus();
+            return null;
+        }
+
         return barcode;
     }
 

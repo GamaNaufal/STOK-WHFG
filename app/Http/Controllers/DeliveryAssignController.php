@@ -402,7 +402,13 @@ class DeliveryAssignController extends Controller
             $pcsQuantity = is_numeric($pcsQuantityRaw) ? (int) $pcsQuantityRaw : null;
 
             if ($boxNumber === '' || !ctype_digit($boxNumber)) {
-                $this->addNewBoxError($errors, $index, $boxNumber, $partNumber, 'ID Box harus berupa angka.');
+                $this->addNewBoxError($errors, $index, $boxNumber, $partNumber, 'ID Box hanya boleh angka.');
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
+            if (strlen($boxNumber) !== 8) {
+                $this->addNewBoxError($errors, $index, $boxNumber, $partNumber, 'ID Box harus 8 angka.');
                 $invalidIndexes[$index] = true;
                 continue;
             }
@@ -902,7 +908,7 @@ class DeliveryAssignController extends Controller
             'pallet_ids' => ['array'],
             'pallet_ids.*' => ['integer'],
             'new_boxes' => ['array'],
-            'new_boxes.*.box_number' => ['required', 'string'],
+            'new_boxes.*.box_number' => ['required', 'digits:8'],
             'new_boxes.*.part_number' => ['required', 'string'],
             'new_boxes.*.pcs_quantity' => ['required', 'integer', 'min:1'],
             'new_boxes_pallet_mode' => ['nullable', 'string', 'in:new,existing'],
@@ -910,6 +916,8 @@ class DeliveryAssignController extends Controller
             'new_boxes_pallet_number' => ['nullable', 'string', 'max:255'],
             'new_boxes_location_id' => ['nullable', 'integer', 'exists:master_locations,id'],
             'confirm_overage' => ['nullable', 'boolean'],
+        ], [
+            'new_boxes.*.box_number.digits' => 'ID Box harus 8 angka.',
         ]);
 
         $deliveryOrderId = (int) $validated['delivery_order_id'];

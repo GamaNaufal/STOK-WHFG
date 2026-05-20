@@ -576,7 +576,9 @@ class DeliveryPickController extends Controller
         }
 
         $request->validate([
-            'box_number' => 'required|string',
+            'box_number' => 'required|digits:8',
+        ], [
+            'box_number.digits' => 'ID Box harus 8 angka.',
         ]);
 
         $result = DB::transaction(function () use ($request, $sessionId, $user) {
@@ -686,7 +688,9 @@ class DeliveryPickController extends Controller
         }
 
         $request->validate([
-            'box_number' => 'required|string',
+            'box_number' => 'required|digits:8',
+        ], [
+            'box_number.digits' => 'ID Box harus 8 angka.',
         ]);
 
         $result = DB::transaction(function () use ($request, $sessionId, $user) {

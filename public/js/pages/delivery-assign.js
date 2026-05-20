@@ -1092,6 +1092,11 @@
             return;
         }
 
+        if (boxNumber.length !== 8) {
+            showNewBoxError("ID Box harus 8 angka.");
+            return;
+        }
+
         const pcsQuantity = Number(qtyValue);
         if (!Number.isFinite(pcsQuantity) || pcsQuantity <= 0) {
             showNewBoxError("Qty PCS harus lebih dari 0.");
