@@ -775,7 +775,16 @@ class StockViewController extends Controller
         }
 
         $validated = $request->validate([
-            'part_number' => 'required|string|max:100|exists:part_settings,part_number',
+            'part_number' => [
+                'required',
+                'string',
+                'max:100',
+                function ($attribute, $value, $fail) {
+                    if (!$this->findExactPartSetting($value)) {
+                        $fail('No Part tidak ditemukan di Master Part.');
+                    }
+                },
+            ],
             'pcs_quantity' => 'required|integer|min:1',
             'stored_at' => 'required|date',
             'reason' => 'required|string|min:3|max:500',

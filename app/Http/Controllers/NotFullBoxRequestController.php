@@ -73,7 +73,7 @@ class NotFullBoxRequestController extends Controller
     {
         $request->validate([
             'box_number' => ['required', 'string', 'size:8', 'regex:/^\d+$/'],
-            'part_number' => 'required|string|exists:part_settings,part_number',
+            'part_number' => 'required|string',
             'pcs_quantity' => 'required|integer|min:1',
             'delivery_order_id' => 'required|integer|exists:delivery_orders,id',
             'reason' => 'required|string|min:3',
@@ -94,7 +94,8 @@ class NotFullBoxRequestController extends Controller
             return redirect()->back()->with('error', 'ID Box sudah pernah diajukan.')->withInput();
         }
 
-        $partSetting = PartSetting::where('part_number', $request->part_number)->first();
+        $partNumber = (string) $request->part_number;
+        $partSetting = $this->findExactPartSetting($partNumber);
         if (!$partSetting) {
             return redirect()->back()->with('error', 'No Part tidak ditemukan.')->withInput();
         }
@@ -121,7 +122,7 @@ class NotFullBoxRequestController extends Controller
         try {
             NotFullBoxRequest::create([
                 'box_number' => $request->box_number,
-                'part_number' => $request->part_number,
+                'part_number' => $partNumber,
                 'pcs_quantity' => (int) $request->pcs_quantity,
                 'fixed_qty' => $fixedQty,
                 'reason' => $request->reason,

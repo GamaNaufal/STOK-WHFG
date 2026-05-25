@@ -479,7 +479,7 @@ class DeliveryAssignController extends Controller
             }
 
             $partSetting = $partSettings->get($entry['part_number']);
-            if (!$partSetting) {
+            if (!$partSetting || (string) $partSetting->part_number !== (string) $entry['part_number']) {
                 $this->addNewBoxError($errors, $index, $entry['box_number'], $entry['part_number'], 'No Part tidak ditemukan di Master Part.');
                 $invalidIndexes[$index] = true;
                 continue;

@@ -175,6 +175,33 @@ class DeliveryOrderController extends Controller
         return $reserved;
     }
 
+    private function findInvalidMasterPartNumber(array $items): ?string
+    {
+        $partNumbers = collect($items)
+            ->map(fn ($item) => trim((string) ($item['part_number'] ?? '')))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($partNumbers->isEmpty()) {
+            return null;
+        }
+
+        $partSettings = PartSetting::query()
+            ->whereIn('part_number', $partNumbers->all())
+            ->get()
+            ->keyBy('part_number');
+
+        foreach ($partNumbers as $partNumber) {
+            $partSetting = $partSettings->get($partNumber);
+            if (!$partSetting || (string) $partSetting->part_number !== $partNumber) {
+                return $partNumber;
+            }
+        }
+
+        return null;
+    }
+
     // Dashboard: Only Approved Schedule (Visible to Admin & Warehouse)
     public function index()
     {
@@ -747,6 +774,13 @@ class DeliveryOrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1'
         ]);
 
+        $invalidPart = $this->findInvalidMasterPartNumber($request->input('items', []));
+        if ($invalidPart !== null) {
+            return redirect()->back()
+                ->with('error', "No Part {$invalidPart} tidak ditemukan di Master Part.")
+                ->withInput();
+        }
+
         DB::beginTransaction();
         try {
             $order->customer_name = $request->customer_name;
@@ -790,6 +824,13 @@ class DeliveryOrderController extends Controller
             'items.*.part_number' => 'required|string',
             'items.*.quantity' => 'required|integer|min:1',
         ]);
+
+        $invalidPart = $this->findInvalidMasterPartNumber($request->input('items', []));
+        if ($invalidPart !== null) {
+            return redirect()->back()
+                ->with('error', "No Part {$invalidPart} tidak ditemukan di Master Part.")
+                ->withInput();
+        }
 
         DB::beginTransaction();
         try {

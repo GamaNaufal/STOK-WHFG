@@ -265,7 +265,7 @@ class StockInputController extends Controller
 
         $partNumber = $validated['part_number'];
 
-        $partSetting = PartSetting::where('part_number', $partNumber)->first();
+        $partSetting = $this->findExactPartSetting($partNumber);
         if (!$partSetting) {
             return response()->json([
                 'success' => false,

@@ -26,7 +26,16 @@ class BoxController extends Controller
     {
         $validated = $request->validate([
             'box_number' => ['required', 'string', 'size:8', 'regex:/^\d+$/', 'unique:boxes,box_number'],
-            'part_number' => 'required|string|max:255',
+            'part_number' => [
+                'required',
+                'string',
+                'max:255',
+                function ($attribute, $value, $fail) {
+                    if (!$this->findExactPartSetting($value)) {
+                        $fail('No Part tidak ditemukan di Master Part.');
+                    }
+                },
+            ],
             'part_name' => 'nullable|string|max:255',
             'pcs_quantity' => 'required|integer|min:1',
             'qty_box' => 'nullable|integer|min:1',

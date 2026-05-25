@@ -8,6 +8,7 @@ use App\Models\DeliveryOrderItem;
 use App\Models\MasterLocation;
 use App\Models\NotFullBoxRequest;
 use App\Models\PalletItem;
+use App\Models\PartSetting;
 use App\Models\StockWithdrawal;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -116,6 +117,33 @@ class StockWithdrawalController extends Controller
         return $query->exists();
     }
 
+    private function findInvalidMasterPartNumber(array $items): ?string
+    {
+        $partNumbers = collect($items)
+            ->map(fn ($item) => trim((string) ($item['part_number'] ?? '')))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($partNumbers->isEmpty()) {
+            return null;
+        }
+
+        $partSettings = PartSetting::query()
+            ->whereIn('part_number', $partNumbers->all())
+            ->get()
+            ->keyBy('part_number');
+
+        foreach ($partNumbers as $partNumber) {
+            $partSetting = $partSettings->get($partNumber);
+            if (!$partSetting || (string) $partSetting->part_number !== $partNumber) {
+                return $partNumber;
+            }
+        }
+
+        return null;
+    }
+
     /**
      * Show the fulfillment page for a delivery order
      */
@@ -196,6 +224,13 @@ class StockWithdrawalController extends Controller
         $requestedQty = (int) $request->input('pcs_quantity');
         $orderId = $request->input('delivery_order_id');
         $allowPartial = $request->boolean('allow_partial', false);
+
+        if (!$this->findExactPartSetting($partNumber)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No Part tidak ditemukan di Master Part.',
+            ], 422);
+        }
 
         $reservedLocations = [];
         $reservedTotal = 0;
@@ -307,6 +342,13 @@ class StockWithdrawalController extends Controller
         $partNumber = $request->input('part_number');
         $requestedQty = (int) $request->input('pcs_quantity');
         $notes = $request->input('notes');
+
+        if (!$this->findExactPartSetting($partNumber)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No Part tidak ditemukan di Master Part.',
+            ], 422);
+        }
 
         try {
             $withdrawals = DB::transaction(function () use ($partNumber, $requestedQty, $notes, $request) {
@@ -435,6 +477,13 @@ class StockWithdrawalController extends Controller
         ]);
 
         $items = $request->input('items');
+        $invalidPart = $this->findInvalidMasterPartNumber($items);
+        if ($invalidPart !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => "No Part {$invalidPart} tidak ditemukan di Master Part.",
+            ], 422);
+        }
         try {
             DB::transaction(function () use ($items) {
                 $batchId = Str::uuid();
@@ -517,6 +566,13 @@ class StockWithdrawalController extends Controller
         ]);
 
         $items = $request->input('items');
+        $invalidPart = $this->findInvalidMasterPartNumber($items);
+        if ($invalidPart !== null) {
+            return response()->json([
+                'success' => false,
+                'message' => "No Part {$invalidPart} tidak ditemukan di Master Part.",
+            ], 422);
+        }
         $previewData = [];
         $partNumbers = collect($items)->pluck('part_number')->filter()->values();
         $totals = $this->getTotalsByPartNumbers($partNumbers->all());
