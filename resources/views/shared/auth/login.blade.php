@@ -84,24 +84,6 @@
             line-height: 1.6;
         }
 
-        .feature-list {
-            list-style: none;
-        }
-
-        .feature-list li {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1.25rem;
-            font-size: 0.95rem;
-            opacity: 0.9;
-        }
-
-        .feature-list i {
-            font-size: 1.25rem;
-            color: #249E94;
-        }
-
         .login-container {
             background: white;
             border-radius: 16px;
@@ -348,29 +330,6 @@
         <div class="login-info d-none d-lg-block">
             <h2>Warehouse FG</h2>
             <p>Sistem Manajemen Inventori & Pengiriman PT. Yamatogomu Indonesia</p>
-            
-            <ul class="feature-list">
-                <li>
-                    <i class="bi bi-box2-fill"></i>
-                    Kelola stok dan inventori dengan efisien
-                </li>
-                <li>
-                    <i class="bi bi-truck"></i>
-                    Tracking pengiriman real-time
-                </li>
-                <li>
-                    <i class="bi bi-graph-up"></i>
-                    Laporan dan analitik lengkap
-                </li>
-                <li>
-                    <i class="bi bi-shield-check"></i>
-                    Kontrol akses berbasis role
-                </li>
-                <li>
-                    <i class="bi bi-clock-history"></i>
-                    Audit trail untuk setiap operasi
-                </li>
-            </ul>
         </div>
 
         <!-- Right Side - Login Form -->
