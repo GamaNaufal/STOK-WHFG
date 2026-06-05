@@ -463,7 +463,7 @@ class StockViewController extends Controller
                 // Prefer active boxes as source of truth
                 $activeBoxes = $pallet->boxes
                     ->where('is_withdrawn', false)
-                    ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
+                    ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
                     ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
                         $boxId = (int) $box->id;
                         $canonicalPalletId = (int) ($canonicalPalletByBoxId[$boxId] ?? $pallet->id);
