@@ -772,7 +772,7 @@ class StockInputController extends Controller
             ->where('pallet_boxes.pallet_id', $pallet->id)
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->select('boxes.part_number', DB::raw('COUNT(*) as box_quantity'), DB::raw('SUM(boxes.pcs_quantity) as pcs_quantity'))
             ->groupBy('boxes.part_number')
             ->get();

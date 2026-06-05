@@ -39,7 +39,7 @@ class Pallet extends Model
         return $this->belongsToMany(Box::class, 'pallet_boxes')
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired']);
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); });
     }
 
     // Relationship ke stock inputs

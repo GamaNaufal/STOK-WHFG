@@ -21,7 +21,7 @@ class ExpiredBoxService
     public function syncStatuses(): void
     {
         $this->getExpirableBoxesQuery()
-            ->whereNotIn('boxes.expired_status', ['handled'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled']); })
             ->orderBy('boxes.id')
             ->chunkById(500, function ($rows): void {
                 foreach ($rows as $row) {

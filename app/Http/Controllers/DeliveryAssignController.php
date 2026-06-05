@@ -356,7 +356,7 @@ class DeliveryAssignController extends Controller
             ->join('pallet_boxes', 'pallet_boxes.box_id', '=', 'boxes.id')
             ->whereIn('pallet_boxes.pallet_id', $palletIds)
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
