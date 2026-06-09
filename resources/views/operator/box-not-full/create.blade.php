@@ -30,9 +30,9 @@
 
 @section('content')
 <div class="container-fluid">
-    @if($errors->any() && !session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <strong>Gagal mengirim request:</strong>
+    @if($errors->any())
+        <div class="alert alert-dismissible fade show shadow-sm" role="alert" style="background: #FEF2F2; border: none; border-left: 4px solid #EF4444; color: #991B1B; border-radius: 8px;">
+            <strong><i class="bi bi-exclamation-triangle"></i> Gagal mengirim request:</strong>
             <ul class="mb-0 mt-2">
                 @foreach($errors->all() as $error)
                     <li>{{ $error }}</li>

@@ -401,7 +401,7 @@ class DeliveryPickController extends Controller
             $this->createSessionItems($order, $session);
 
             if (!$session->items()->exists()) {
-                throw new \RuntimeException('Semua item sudah terpenuhi.');
+                throw new \RuntimeException('Stok tidak cukup atau tidak ada rekomendasi FIFO yang tersedia.');
             }
 
             return $session;
@@ -1769,10 +1769,6 @@ class DeliveryPickController extends Controller
                             ->from('delivery_pick_sessions')
                             ->whereIn('status', self::ACTIVE_LOCK_STATUSES);
                     });
-            })
-            ->when($deliveryDate, function ($q) use ($deliveryDate) {
-                $cutoffDate = Carbon::parse($deliveryDate)->subMonths(12);
-                $q->where('boxes.created_at', '>=', $cutoffDate);
             })
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.*');

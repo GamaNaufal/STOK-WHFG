@@ -9,9 +9,7 @@
     subtitle="Box berumur 9-12 bulan (warning) dan 12+ bulan (expired)"
 />
 
-    @if(session('success'))
-        <div class="alert alert-success">{{ session('success') }}</div>
-    @endif
+
 
 <div class="row g-4 mb-4">
     <div class="col-lg-6">

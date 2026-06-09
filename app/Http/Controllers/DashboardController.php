@@ -15,89 +15,84 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
-    private function getCanonicalPalletByActiveBoxId(): array
+    private function applyStoredLocationExistsFilter($query)
     {
-        return DB::table('pallet_boxes as pb')
-            ->join('pallets as p', 'p.id', '=', 'pb.pallet_id')
-            ->join('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
-            ->join('boxes as b', 'b.id', '=', 'pb.box_id')
-            ->whereNull('b.deleted_at')
-            ->where('b.is_withdrawn', false)
-            ->where(function ($q) {
-                $q->whereNull('b.expired_status')
-                    ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
-            })
-            ->where('sl.warehouse_location', '!=', 'Unknown')
-            ->groupBy('pb.box_id')
-            ->select('pb.box_id', DB::raw('MIN(pb.pallet_id) as canonical_pallet_id'))
-            ->pluck('canonical_pallet_id', 'pb.box_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
+        return $query->whereExists(function ($sub) {
+            $sub->select(DB::raw(1))
+                ->from('pallet_boxes')
+                ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
+                ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+                ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->where('stock_locations.warehouse_location', '!=', 'Unknown');
+        });
     }
 
     private function buildStockSummaryTotals(): array
     {
-        $totalBox = 0;
-        $totalPcs = 0;
-        $palletsWithLocation = 0;
-        $partNumbers = [];
-        $canonicalPalletByBoxId = $this->getCanonicalPalletByActiveBoxId();
-
-        $palletQuery = Pallet::query()
-            ->select(['id'])
-            ->with([
-                'stockLocation:id,pallet_id,warehouse_location',
-                'items:id,pallet_id,part_number,box_quantity,pcs_quantity',
-                'boxes:id,part_number,is_withdrawn,expired_status,pcs_quantity',
-            ])
-            ->whereHas('stockLocation', function ($q) {
-                $q->where('warehouse_location', '!=', 'Unknown');
+        // 1. Boxes
+        $boxQuery = DB::table('boxes')
+            ->where('boxes.is_withdrawn', false)
+            ->whereNull('boxes.deleted_at')
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')
+                  ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
             });
 
-        $palletQuery->chunkById(200, function ($pallets) use (&$totalBox, &$totalPcs, &$palletsWithLocation, &$partNumbers, $canonicalPalletByBoxId) {
-            foreach ($pallets as $pallet) {
-                $hasAnyBoxHistory = $pallet->boxes->isNotEmpty();
-                $activeBoxes = $pallet->boxes
-                    ->where('is_withdrawn', false)
-                    ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
-                    ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
-                        $boxId = (int) $box->id;
-                        $canonicalPalletId = (int) ($canonicalPalletByBoxId[$boxId] ?? $pallet->id);
-                        return $canonicalPalletId === (int) $pallet->id;
-                    });
+        $boxQuery = $this->applyStoredLocationExistsFilter($boxQuery);
 
-                if ($activeBoxes->isNotEmpty()) {
-                    $palletsWithLocation++;
-                    $totalBox += $activeBoxes->count();
-                    $totalPcs += (int) $activeBoxes->sum('pcs_quantity');
+        $totalBox = $boxQuery->count();
+        $totalPcs = (int) $boxQuery->sum('boxes.pcs_quantity');
+        $boxPartNumbers = $boxQuery->pluck('boxes.part_number')->filter()->unique()->values();
 
-                    foreach ($activeBoxes as $box) {
-                        if (!empty($box->part_number)) {
-                            $partNumbers[(string) $box->part_number] = true;
-                        }
-                    }
-                } elseif (!$hasAnyBoxHistory) {
-                    // Fallback only for true legacy pallets that have no box history.
-                    $legacyItems = $pallet->items->filter(function ($item) {
-                        return $item->pcs_quantity > 0 || $item->box_quantity > 0;
-                    });
+        // 2. Legacy Pallet Items
+        $legacyItemsQuery = DB::table('pallet_items')
+            ->join('pallets', 'pallets.id', '=', 'pallet_items.pallet_id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->where('pallet_items.pcs_quantity', '>', 0)
+            ->whereNotExists(function ($sub) {
+                $sub->select(DB::raw(1))
+                    ->from('pallet_boxes')
+                    ->whereColumn('pallet_boxes.pallet_id', 'pallets.id');
+            });
 
-                    if ($legacyItems->isNotEmpty()) {
-                        $palletsWithLocation++;
-                        $totalBox += (int) $legacyItems->sum('box_quantity');
-                        $totalPcs += (int) $legacyItems->sum('pcs_quantity');
+        $legacyBox = (int) $legacyItemsQuery->sum('pallet_items.box_quantity');
+        $legacyPcs = (int) $legacyItemsQuery->sum('pallet_items.pcs_quantity');
+        $legacyPartNumbers = $legacyItemsQuery->pluck('pallet_items.part_number')->filter()->unique()->values();
 
-                        foreach ($legacyItems as $item) {
-                            if (!empty($item->part_number)) {
-                                $partNumbers[(string) $item->part_number] = true;
-                            }
-                        }
-                    }
-                }
-            }
-        });
+        $totalBox += $legacyBox;
+        $totalPcs += $legacyPcs;
 
-        $totalItems = count($partNumbers);
+        $totalItems = $boxPartNumbers->merge($legacyPartNumbers)->unique()->count();
+
+        // 3. Pallets with Location that contain stock
+        $palletsWithLocation = DB::table('stock_locations')
+            ->where('warehouse_location', '!=', 'Unknown')
+            ->where(function ($q) {
+                $q->whereExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('pallet_boxes')
+                        ->join('boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+                        ->whereColumn('pallet_boxes.pallet_id', 'stock_locations.pallet_id')
+                        ->where('boxes.is_withdrawn', false)
+                        ->whereNull('boxes.deleted_at')
+                        ->where(function ($q2) {
+                            $q2->whereNull('boxes.expired_status')
+                               ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                        });
+                })->orWhereExists(function ($sub) {
+                    $sub->select(DB::raw(1))
+                        ->from('pallet_items')
+                        ->whereColumn('pallet_items.pallet_id', 'stock_locations.pallet_id')
+                        ->where('pallet_items.pcs_quantity', '>', 0)
+                        ->whereNotExists(function ($sub2) {
+                            $sub2->select(DB::raw(1))
+                                ->from('pallet_boxes')
+                                ->whereColumn('pallet_boxes.pallet_id', 'stock_locations.pallet_id');
+                        });
+                });
+            })
+            ->count();
 
         return [
             'pallets_with_location' => $palletsWithLocation,

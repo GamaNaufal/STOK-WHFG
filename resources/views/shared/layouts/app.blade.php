@@ -25,17 +25,23 @@
             <!-- Main Content -->
             <main class="col-md-10 main-content">
                 @if (session('success'))
-                    <div class="alert alert-success alert-dismissible fade show" role="alert">
-                        <i class="bi bi-check-circle"></i> {{ session('success') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            if (typeof window.showToast === 'function') {
+                                window.showToast("{{ session('success') }}", 'success');
+                            }
+                        });
+                    </script>
                 @endif
 
                 @if (session('error'))
-                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                        <i class="bi bi-exclamation-circle"></i> {{ session('error') }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            if (typeof window.showToast === 'function') {
+                                window.showToast("{{ session('error') }}", 'danger');
+                            }
+                        });
+                    </script>
                 @endif
 
                 @yield('content')

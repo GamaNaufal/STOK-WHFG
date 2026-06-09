@@ -16,7 +16,7 @@
     }
     .sidebar {
         background-color: #f8f9fb;
-        min-height: 100vh;
+        min-height: calc(100vh - var(--top-navbar-height));
         color: #333;
         box-shadow: 2px 0 8px rgba(0,0,0,0.05);
         border-right: 1px solid #e5e9f0;
@@ -151,6 +151,8 @@
         border-bottom: 1px solid #e5e9f0;
         z-index: 1100;
         isolation: isolate;
+        position: sticky;
+        top: 0;
     }
     .top-navbar .navbar-inner {
         min-height: var(--top-navbar-height);
@@ -495,7 +497,9 @@
         }
 
         .sidebar.offcanvas {
-            position: static;
+            position: sticky;
+            top: var(--top-navbar-height);
+            align-self: flex-start;
             transform: translateX(0);
             visibility: visible !important;
             height: calc(100vh - var(--top-navbar-height));
@@ -505,6 +509,7 @@
             background-color: #f8f9fb;
             margin-right: 0;
             opacity: 1;
+            overflow-y: auto;
         }
 
         .main-content {

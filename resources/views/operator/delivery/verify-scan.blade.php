@@ -302,7 +302,11 @@
     }
 
     function showMessage(message, type = 'success') {
-        scanMessage.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+        const bg = type === 'success' ? '#ECFDF5' : '#FEF2F2';
+        const border = type === 'success' ? '#10B981' : '#EF4444';
+        const color = type === 'success' ? '#065F46' : '#991B1B';
+        const icon = type === 'success' ? 'check-circle' : 'exclamation-triangle';
+        scanMessage.innerHTML = `<div class="alert shadow-sm" style="background: ${bg}; border: none; border-left: 4px solid ${border}; color: ${color}; border-radius: 8px;"><i class="bi bi-${icon}"></i> ${message}</div>`;
     }
 
     function markRowVerified(boxId) {

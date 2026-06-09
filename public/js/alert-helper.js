@@ -14,7 +14,7 @@ const WarehouseAlert = {
         infoText = "",
         confirmText = "Ya, Lanjutkan",
         cancelText = "Batal",
-        confirmColor = "#10B981",
+        confirmColor = "#0C7779",
         onConfirm = null,
     }) {
         const warningHtml =
@@ -59,7 +59,7 @@ const WarehouseAlert = {
             showCancelButton: true,
             confirmButtonText: confirmText,
             cancelButtonText: cancelText,
-            confirmButtonColor: confirmColor,
+            confirmButtonColor: "#0C7779",
             cancelButtonColor: "#6B7280",
             reverseButtons: true,
             width: "600px",
@@ -243,7 +243,7 @@ const WarehouseAlert = {
             icon: "success",
             iconColor: "#10B981",
             confirmButtonText: confirmText,
-            confirmButtonColor: "#10B981",
+            confirmButtonColor: "#0C7779",
             buttonsStyling: true,
         }).then((result) => {
             if (result.isConfirmed && onConfirm) {

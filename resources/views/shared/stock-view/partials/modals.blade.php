@@ -244,8 +244,8 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" style="padding: 20px;">
-                <div class="alert alert-warning" style="margin-bottom: 14px;">
-                    Data yang dihapus tidak dapat dikembalikan. Pastikan data berikut sudah benar.
+                <div class="alert shadow-sm" style="background: #FFFBEB; border: none; border-left: 4px solid #F59E0B; color: #92400E; margin-bottom: 14px; border-radius: 8px;">
+                    <i class="bi bi-exclamation-triangle"></i> Data yang dihapus tidak dapat dikembalikan. Pastikan data berikut sudah benar.
                 </div>
                 <div id="deleteConfirmSummary" class="mb-3 text-muted"></div>
                 <div class="table-responsive">
