@@ -299,7 +299,7 @@ class StockInputController extends Controller
                 ], 422);
             }
 
-            $deliveryOrder = DeliveryOrder::whereIn('status', ['approved', 'processing'])
+            $deliveryOrder = DeliveryOrder::whereIn('status', ['approved', 'processing', 'partial'])
                 ->find($validated['delivery_order_id']);
             if (!$deliveryOrder) {
                 return response()->json([

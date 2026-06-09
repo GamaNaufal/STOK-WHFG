@@ -48,7 +48,7 @@ class NotFullBoxRequestController extends Controller
             ]);
 
         $partNumbers = PartSetting::orderBy('part_number', 'asc')->get(['part_number', 'qty_box']);
-        $deliveryOrders = DeliveryOrder::whereIn('status', ['approved', 'processing'])
+        $deliveryOrders = DeliveryOrder::whereIn('status', ['approved', 'processing', 'partial'])
             ->orderBy('delivery_date', 'asc')
             ->get(['id', 'customer_name', 'delivery_date', 'status']);
         $pallets = Pallet::with('stockLocation')
@@ -105,7 +105,7 @@ class NotFullBoxRequestController extends Controller
             return redirect()->back()->with('error', 'PCS aktual harus lebih kecil dari fixed qty.')->withInput();
         }
 
-        $deliveryOrder = DeliveryOrder::whereIn('status', ['approved', 'processing'])
+        $deliveryOrder = DeliveryOrder::whereIn('status', ['approved', 'processing', 'partial'])
             ->find($request->delivery_order_id);
         if (!$deliveryOrder) {
             return redirect()->back()->with('error', 'Delivery yang dipilih tidak valid.')->withInput();

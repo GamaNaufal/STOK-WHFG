@@ -96,9 +96,10 @@ class MergePalletController extends Controller
 
             $sourcePallets[] = $sourcePallet;
             $palletNumbers[] = $sourcePallet->pallet_number;
-            $activeBoxes = $sourcePallet->boxes
-                ->where('is_withdrawn', false)
-                ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); });
+            $activeBoxes = $sourcePallet->boxes->filter(function ($box) {
+                return $box->is_withdrawn == false &&
+                       (is_null($box->expired_status) || !in_array($box->expired_status, ['handled', 'expired']));
+            });
             $allBoxes = array_merge($allBoxes, $activeBoxes->values()->toArray());
 
             foreach ($activeBoxes as $box) {

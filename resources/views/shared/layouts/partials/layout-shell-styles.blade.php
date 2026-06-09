@@ -279,6 +279,10 @@
         color: inherit !important;
     }
 
+    .swal2-container {
+        z-index: 1300 !important;
+    }
+
     .btn-primary {
         background-color: #0C7779;
         border-color: #0C7779;

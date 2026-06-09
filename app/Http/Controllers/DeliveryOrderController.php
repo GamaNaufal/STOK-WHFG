@@ -639,7 +639,7 @@ class DeliveryOrderController extends Controller
             ->get();
 
         $approvedOrders = DeliveryOrder::with('items')
-            ->whereIn('status', ['approved', 'processing'])
+            ->whereIn('status', ['approved', 'processing', 'partial'])
             ->orderBy('delivery_date', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();
@@ -966,7 +966,7 @@ class DeliveryOrderController extends Controller
         $availableByPart = $this->getAvailableStockByPart();
 
         $approvedOrders = DeliveryOrder::with('items')
-            ->whereIn('status', ['approved', 'processing'])
+            ->whereIn('status', ['approved', 'processing', 'partial'])
             ->orderBy('delivery_date', 'asc')
             ->orderBy('created_at', 'desc')
             ->get();

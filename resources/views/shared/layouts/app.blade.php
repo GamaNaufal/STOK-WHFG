@@ -43,7 +43,7 @@
         </div>
     </div>
 
-    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;"></div>
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1300;"></div>
 
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

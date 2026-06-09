@@ -159,7 +159,7 @@ class DeliveryPickController extends Controller
         }
 
         $orders = DeliveryOrder::with('items')
-              ->whereIn('status', ['approved', 'processing'])
+              ->whereIn('status', ['approved', 'processing', 'partial'])
             ->orderBy('delivery_date', 'asc')
             ->limit(100)
             ->get();
@@ -462,10 +462,9 @@ class DeliveryPickController extends Controller
 
         return response()->json([
             'session_id' => $session->id,
+            'verify_url' => route('delivery.pick.verify', [$order->id, $session->id]),
             'pdf_url' => route('delivery.pick.pdf', [$order->id, $session->id]),
             'print_preview_url' => route('delivery.pick.print-preview', [$order->id, $session->id]),
-            'scan_url' => route('delivery.pick.scan', [$order->id, $session->id]),
-            'final_scan_url' => route('delivery.pick.scan', [$order->id, $session->id]),
         ]);
     }
 

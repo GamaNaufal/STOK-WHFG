@@ -99,7 +99,7 @@ class OperationalReportService
     {
         $matchingOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
             ->select(['id', 'customer_name', 'delivery_date', 'status'])
-            ->whereIn('status', ['approved', 'processing', 'completed'])
+            ->whereIn('status', ['approved', 'processing', 'partial', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('delivery_date', '<=', $end->toDateString()))
             ->orderBy('delivery_date', 'asc')
@@ -205,7 +205,7 @@ class OperationalReportService
     {
         $deliveryPlanByDay = DB::table('delivery_orders as orders')
             ->join('delivery_order_items as items', 'items.delivery_order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['approved', 'processing', 'completed'])
+            ->whereIn('orders.status', ['approved', 'processing', 'partial', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('orders.delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('orders.delivery_date', '<=', $end->toDateString()))
             ->select(DB::raw('DATE(orders.delivery_date) as day'), DB::raw('SUM(items.quantity) as qty'))
@@ -214,7 +214,7 @@ class OperationalReportService
 
         $deliveryActualByDay = DB::table('delivery_orders as orders')
             ->join('delivery_order_items as items', 'items.delivery_order_id', '=', 'orders.id')
-            ->whereIn('orders.status', ['approved', 'processing', 'completed'])
+            ->whereIn('orders.status', ['approved', 'processing', 'partial', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('orders.delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('orders.delivery_date', '<=', $end->toDateString()))
             ->select(DB::raw('DATE(orders.delivery_date) as day'), DB::raw('SUM(COALESCE(items.fulfilled_quantity, 0)) as qty'))
@@ -321,7 +321,7 @@ class OperationalReportService
     {
         $fulfillmentOrders = DeliveryOrder::with(['items:id,delivery_order_id,quantity,fulfilled_quantity'])
             ->select(['id', 'customer_name', 'delivery_date', 'status'])
-            ->whereIn('status', ['approved', 'processing', 'completed'])
+            ->whereIn('status', ['approved', 'processing', 'partial', 'completed'])
             ->when($start, fn ($q) => $q->whereDate('delivery_date', '>=', $start->toDateString()))
             ->when($end, fn ($q) => $q->whereDate('delivery_date', '<=', $end->toDateString()))
             ->orderBy('delivery_date', 'asc')
