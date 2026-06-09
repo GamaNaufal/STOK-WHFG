@@ -59,7 +59,7 @@ class DashboardController extends Controller
                 $hasAnyBoxHistory = $pallet->boxes->isNotEmpty();
                 $activeBoxes = $pallet->boxes
                     ->where('is_withdrawn', false)
-                    ->whereNotIn('expired_status', ['handled', 'expired'])
+                    ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
                     ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
                         $boxId = (int) $box->id;
                         $canonicalPalletId = (int) ($canonicalPalletByBoxId[$boxId] ?? $pallet->id);

@@ -81,7 +81,7 @@ class OperationalReportService
     {
         return Box::query()
             ->where('is_withdrawn', false)
-            ->whereNotIn('expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->leftJoin('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')

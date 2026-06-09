@@ -25,6 +25,16 @@ class Box extends Model
 {
     use SoftDeletes;
 
+    protected static function booted()
+    {
+        static::creating(function ($box) {
+            $trashed = static::onlyTrashed()->where('box_number', $box->box_number)->first();
+            if ($trashed) {
+                $trashed->forceDelete();
+            }
+        });
+    }
+
     protected $fillable = [
         'box_number',
         'part_number',
@@ -109,7 +119,7 @@ class Box extends Model
     public function scopeActive($query)
     {
         return $query->where('is_withdrawn', false)
-            ->whereNotIn('expired_status', ['handled', 'expired']);
+            ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); });
     }
 
     public function scopeWithdrawn($query)

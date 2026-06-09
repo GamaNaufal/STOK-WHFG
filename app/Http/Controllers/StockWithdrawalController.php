@@ -71,7 +71,7 @@ class StockWithdrawalController extends Controller
         $fifoQuery = Box::query()
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
                     ->from('delivery_pick_items')
@@ -167,7 +167,7 @@ class StockWithdrawalController extends Controller
 
         $boxPartsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->where('boxes.part_number', 'like', '%' . $query . '%')
             ->select('boxes.part_number')
             ->distinct()
@@ -754,7 +754,7 @@ class StockWithdrawalController extends Controller
         $boxTotalQuery = DB::table('boxes')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
             });
@@ -785,7 +785,7 @@ class StockWithdrawalController extends Controller
 
         $boxTotalsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereIn('boxes.part_number', $partNumbers)
             ->groupBy('boxes.part_number')
             ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'));
@@ -830,7 +830,7 @@ class StockWithdrawalController extends Controller
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
                     ->from('delivery_pick_items')
@@ -940,7 +940,7 @@ class StockWithdrawalController extends Controller
             ->with(['pallets.stockLocation'])
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->where('boxes.assigned_delivery_order_id', $orderId)
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')

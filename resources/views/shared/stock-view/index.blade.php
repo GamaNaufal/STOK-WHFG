@@ -244,17 +244,10 @@
                                     </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
                                 @elseif($viewMode === 'box_id')
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
-                                        <a href="{{ $sortUrl($sortToggle('box_id_asc', 'box_id_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['box_id_asc', 'box_id_desc'], true) ? 'is-active' : '' }}">
-                                            <i class="bi bi-upc-scan"></i>
-                                            <span>ID Box</span>
-                                            <i class="bi {{ $sortIcon($sortMode, 'box_id_asc', 'box_id_desc') }} stock-sort-icon"></i>
-                                        </a>
-                                    </th>
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('box_number_asc', 'box_number_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['box_number_asc', 'box_number_desc'], true) ? 'is-active' : '' }}">
-                                            <i class="bi bi-tags"></i>
-                                            <span>No Box</span>
+                                            <i class="bi bi-upc-scan"></i>
+                                            <span>ID Box</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'box_number_asc', 'box_number_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
@@ -328,7 +321,7 @@
                                     <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('box_number_asc', 'box_number_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['box_number_asc', 'box_number_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-upc-scan"></i>
-                                            <span>No Box</span>
+                                            <span>ID Box</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'box_number_asc', 'box_number_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
@@ -414,14 +407,9 @@
                                 @endphp
                                 @foreach($groupedByBoxId as $boxData)
                                     <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;" onmouseenter="this.style.backgroundColor='#f9fafb';" onmouseleave="this.style.backgroundColor='transparent';">
-                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center;">
+                                        <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">
                                             <span style="background: linear-gradient(135deg, #f0f4f8 0%, #e0f2fe 100%); color: #0C7779; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; display: inline-block; box-shadow: 0 2px 4px rgba(12, 119, 121, 0.1);">
-                                                {{ $boxData['box_id'] ?? 'Legacy' }}
-                                            </span>
-                                        </td>
-                                        <td style="padding: 16px 20px; color: #9a3412; font-weight: 700;">
-                                            <span style="background: #fff7ed; padding: 6px 12px; border-radius: 8px; display: inline-block;">
-                                                {{ $boxData['box_number'] ?? '-' }}
+                                                {{ $boxData['box_number'] ?? 'Legacy' }}
                                             </span>
                                         </td>
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">

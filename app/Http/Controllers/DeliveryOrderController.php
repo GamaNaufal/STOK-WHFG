@@ -67,7 +67,7 @@ class DeliveryOrderController extends Controller
 
         $boxRowsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
@@ -125,7 +125,7 @@ class DeliveryOrderController extends Controller
 
         $boxTotals = $this->applyStoredLocationExistsFilter(DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
@@ -160,7 +160,7 @@ class DeliveryOrderController extends Controller
                 DB::raw('SUM(boxes.pcs_quantity) as total')
             )
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number')
             ->get();

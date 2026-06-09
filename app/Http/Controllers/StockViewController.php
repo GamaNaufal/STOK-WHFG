@@ -463,7 +463,7 @@ class StockViewController extends Controller
                 // Prefer active boxes as source of truth
                 $activeBoxes = $pallet->boxes
                     ->where('is_withdrawn', false)
-                    ->whereNotIn('expired_status', ['handled', 'expired'])
+                    ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
                     ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
                         $boxId = (int) $box->id;
                         $canonicalPalletId = (int) ($canonicalPalletByBoxId[$boxId] ?? $pallet->id);
@@ -708,7 +708,7 @@ class StockViewController extends Controller
         if ($pallet->boxes->count() > 0) {
             $boxIds = $pallet->boxes
                 ->where('is_withdrawn', false)
-                ->whereNotIn('expired_status', ['handled', 'expired'])
+                ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
                 ->pluck('id');
             $originLogs = AuditLog::where('type', 'box_pallet_moved')
                 ->where('model', 'Box')
@@ -722,7 +722,7 @@ class StockViewController extends Controller
 
             $items = $pallet->boxes
                 ->where('is_withdrawn', false)
-                ->whereNotIn('expired_status', ['handled', 'expired'])
+                ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
                 ->map(function ($box) use ($originLogs) {
                 $log = $originLogs->get($box->id);
                 $origin = $log?->getOldValuesArray()['from_pallet'] ?? null;
@@ -1010,7 +1010,7 @@ class StockViewController extends Controller
                     ->where('pallet_boxes.pallet_id', $palletId)
                     ->whereNull('boxes.deleted_at')
                     ->where('boxes.is_withdrawn', false)
-                    ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+                    ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
                     ->lockForUpdate()
                     ->count();
 
@@ -1057,7 +1057,7 @@ class StockViewController extends Controller
                     ->where('pallet_boxes.pallet_id', $palletId)
                     ->whereNull('boxes.deleted_at')
                     ->where('boxes.is_withdrawn', false)
-                    ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+                    ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
                     ->select('boxes.part_number', DB::raw('COUNT(*) as box_count'), DB::raw('SUM(boxes.pcs_quantity) as pcs_total'))
                     ->groupBy('boxes.part_number')
                     ->get();

@@ -107,7 +107,7 @@ class DeliveryPickController extends Controller
 
         $rowsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
@@ -132,7 +132,7 @@ class DeliveryPickController extends Controller
     {
         $rows = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full')
@@ -1361,7 +1361,7 @@ class DeliveryPickController extends Controller
         $hasActiveBoxes = $pallet->boxes()
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->exists();
 
         if ($hasActiveBoxes) {
@@ -1735,7 +1735,7 @@ class DeliveryPickController extends Controller
             ->with(['pallets.stockLocation'])
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->whereNotIn('boxes.expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->where('boxes.assigned_delivery_order_id', $orderId)
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
@@ -1760,7 +1760,7 @@ class DeliveryPickController extends Controller
         $query = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
-            ->whereNotIn('expired_status', ['handled', 'expired'])
+            ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')

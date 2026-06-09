@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Box;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class BoxController extends Controller
 {
@@ -25,7 +26,10 @@ class BoxController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'box_number' => ['required', 'string', 'size:8', 'regex:/^\d+$/', 'unique:boxes,box_number'],
+            'box_number' => [
+                'required', 'string', 'size:8', 'regex:/^\d+$/', 
+                Rule::unique('boxes')->whereNull('deleted_at')
+            ],
             'part_number' => [
                 'required',
                 'string',
