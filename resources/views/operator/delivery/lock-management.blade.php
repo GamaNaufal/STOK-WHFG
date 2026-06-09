@@ -107,20 +107,26 @@
 <script>
     document.querySelectorAll('.js-terminate-lock-form').forEach((form) => {
         form.addEventListener('submit', function (event) {
+            event.preventDefault();
+
             const reasonInput = form.querySelector('input[name="reason"]');
             const reason = String(reasonInput?.value || '').trim();
 
             if (!reason) {
-                event.preventDefault();
                 reasonInput?.focus();
-                alert('Alasan terminate wajib diisi.');
+                WarehouseAlert.error({ title: 'Input Tidak Valid', message: 'Alasan terminate wajib diisi.' });
                 return;
             }
 
-            const confirmed = confirm('Terminate sesi ini dan lepas lock sekarang?');
-            if (!confirmed) {
-                event.preventDefault();
-            }
+            WarehouseAlert.confirm({
+                title: 'Terminate Lock?',
+                message: 'Terminate sesi ini dan lepas lock sekarang?',
+                confirmText: 'Ya, Terminate',
+                confirmColor: '#DC2626',
+                onConfirm: () => {
+                    form.submit();
+                }
+            });
         });
     });
 </script>

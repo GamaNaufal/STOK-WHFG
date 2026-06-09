@@ -120,27 +120,25 @@
                                     </td>
                                     <td>
                                         <div class="d-flex gap-1 justify-content-center flex-wrap">
-                                            <form method="POST" action="{{ route('box-not-full.approve', $req->id) }}" class="d-inline">
+                                            <form method="POST" action="{{ route('box-not-full.approve', $req->id) }}" class="d-inline js-approve-form">
                                                 @csrf
                                                 <x-button 
                                                     type="submit" 
                                                     variant="success"
                                                     size="sm"
                                                     title="Setujui permintaan ini"
-                                                    onclick="return confirm('Apakah Anda yakin ingin menyetujui permintaan ini?')"
                                                 >
                                                     <i class="bi bi-check-circle"></i>
                                                     <span class="d-none d-lg-inline">Approve</span>
                                                 </x-button>
                                             </form>
-                                            <form method="POST" action="{{ route('box-not-full.reject', $req->id) }}" class="d-inline">
+                                            <form method="POST" action="{{ route('box-not-full.reject', $req->id) }}" class="d-inline js-reject-form">
                                                 @csrf
                                                 <x-button 
                                                     type="submit" 
                                                     variant="danger"
                                                     size="sm"
                                                     title="Tolak permintaan ini"
-                                                    onclick="return confirm('Apakah Anda yakin ingin menolak permintaan ini?')"
                                                 >
                                                     <i class="bi bi-x-circle"></i>
                                                     <span class="d-none d-lg-inline">Reject</span>
@@ -234,3 +232,33 @@
     </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+    document.querySelectorAll('.js-approve-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            WarehouseAlert.confirm({
+                title: 'Setujui Permintaan?',
+                message: 'Apakah Anda yakin ingin menyetujui permintaan ini?',
+                confirmText: 'Ya, Setujui',
+                confirmColor: '#10B981',
+                onConfirm: () => form.submit()
+            });
+        });
+    });
+
+    document.querySelectorAll('.js-reject-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            WarehouseAlert.confirm({
+                title: 'Tolak Permintaan?',
+                message: 'Apakah Anda yakin ingin menolak permintaan ini?',
+                confirmText: 'Ya, Tolak',
+                confirmColor: '#DC2626',
+                onConfirm: () => form.submit()
+            });
+        });
+    });
+</script>
+@endpush

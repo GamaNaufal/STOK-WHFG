@@ -5,11 +5,11 @@
     body {
         background-color: #f5f7fa;
         max-width: 100%;
-        overflow-x: hidden;
+        overflow-x: clip;
     }
     html {
         max-width: 100%;
-        overflow-x: hidden;
+        overflow-x: clip;
     }
     :root {
         --top-navbar-height: 64px;

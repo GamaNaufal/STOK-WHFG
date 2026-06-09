@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             PartSettingSeeder::class,
             MasterLocationSeeder::class,
+            StockInputSeeder::class,
         ]);
     }
 }

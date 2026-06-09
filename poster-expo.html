@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Poster Expo - STOK WHFG | Sistem Manajemen Stok Warehouse Finished Goods</title>
+    <meta name="description" content="Poster Expo PKL - Sistem Manajemen Stok Warehouse Finished Goods PT. Yamatogomu Indonesia">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /*
+         * =============================================
+         *  POSTER EXPO — STOK WHFG
+         *  Target Cetak: 60 cm × 160 cm
+         *
+         *  CARA KERJA:
+         *  - Semua ukuran menggunakan satuan rem
+         *  - Di layar (screen): 1rem = 16px → poster 700px
+         *  - Di cetak (print):  1rem = 51.83px → poster 60cm
+         *  - Untuk mencetak: Ctrl+P → pilih ukuran kertas
+         *    "Custom 600mm × 1600mm" → margin 0
+         * =============================================
+         */
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --navy: #0F1B3D;
+            --navy-dark: #0A1229;
+            --navy-light: #1A2D5A;
+            --teal: #0C7779;
+            --teal-light: #249E94;
+            --teal-dark: #095A5C;
+            --gold: #D4A843;
+            --gold-light: #E8C86A;
+            --gold-dark: #B8912E;
+            --white: #FFFFFF;
+            --off-white: #F0F2F8;
+            --light-gray: #E8EAF0;
+            --text-dark: #1A1A2E;
+            --text-muted: #6B7280;
+            --success: #10B981;
+            --danger: #EF4444;
+            --info: #3B82F6;
+            --warning: #F59E0B;
+        }
+
+        html {
+            font-size: 16px; /* Screen: 1rem = 16px → poster = 700px */
+        }
+
+        body {
+            font-family: 'Inter', 'Poppins', sans-serif;
+            background-color: #2D3748;
+            display: flex;
+            justify-content: center;
+            padding: 1.25rem;
+        }
+
+        /* ===========================================
+           POSTER CONTAINER
+           43.75rem × ~114rem
+           Screen: 700px × ~1824px
+           Print:  2268px(60cm) × ~5909px(~156cm)
+           =========================================== */
+        .poster {
+            width: 43.75rem;
+            min-height: 116.67rem; /* 160cm di cetak */
+            background: var(--navy);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ===========================================
+           CORNER DECORATIONS
+           =========================================== */
+        .corner-decor {
+            position: absolute;
+            width: 7.5rem;
+            height: 7.5rem;
+            z-index: 1;
+        }
+        .corner-decor.top-left { top: 0; left: 0; }
+        .corner-decor.top-right { top: 0; right: 0; transform: scaleX(-1); }
+        .corner-decor.bottom-left { bottom: 0; left: 0; transform: scaleY(-1); }
+        .corner-decor.bottom-right { bottom: 0; right: 0; transform: scale(-1); }
+        .corner-decor svg { width: 100%; height: 100%; }
+
+        /* ===========================================
+           GOLD SEPARATOR LINES
+           =========================================== */
+        .gold-line {
+            height: 0.1875rem;
+            background: linear-gradient(90deg, transparent, var(--gold), var(--gold-light), var(--gold), transparent);
+        }
+        .gold-line-thin {
+            height: 0.09375rem;
+            background: linear-gradient(90deg, transparent, var(--gold-light), transparent);
+        }
+
+        /* ===========================================
+           SECTION 1: HEADER INSTITUSI
+           =========================================== */
+        .header-section {
+            background: linear-gradient(180deg, var(--navy-dark) 0%, var(--navy) 100%);
+            text-align: center;
+            padding: 1.6rem 2.5rem 1rem;
+            position: relative;
+        }
+        .header-section h2 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 800;
+            font-size: 1.05rem;
+            color: var(--white);
+            letter-spacing: 0.1875rem;
+            text-transform: uppercase;
+            line-height: 1.6;
+            text-shadow: 0 0.125rem 0.625rem rgba(0, 0, 0, 0.3);
+        }
+        .header-section .subtitle-label {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 0.65rem;
+            color: var(--gold-light);
+            letter-spacing: 0.125rem;
+            text-transform: uppercase;
+            margin-top: 0.625rem;
+            opacity: 0.9;
+        }
+
+        /* ===========================================
+           SECTION 2: JUDUL PROYEK
+           =========================================== */
+        .title-section {
+            background: var(--navy);
+            text-align: center;
+            padding: 1.25rem 2.5rem 1rem;
+        }
+        .title-section .project-icon {
+            font-size: 2rem;
+            margin-bottom: 0.375rem;
+        }
+        .title-section h1 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 900;
+            font-size: 2.4rem;
+            color: var(--white);
+            letter-spacing: 0.125rem;
+            line-height: 1.1;
+            text-shadow: 0 0.25rem 1.25rem rgba(12, 119, 121, 0.3);
+        }
+        .title-section .project-subtitle {
+            font-family: 'Inter', sans-serif;
+            font-weight: 400;
+            font-size: 0.82rem;
+            color: var(--light-gray);
+            margin-top: 0.5rem;
+            line-height: 1.5;
+            max-width: 31.25rem;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* ===========================================
+           SECTION 3: ANGGOTA TIM
+           =========================================== */
+        .team-section {
+            display: flex;
+            gap: 0.75rem;
+            padding: 0.75rem 1.875rem;
+            background: var(--navy);
+        }
+        .team-card {
+            flex: 1;
+            background: linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%);
+            border: 0.0625rem solid rgba(212, 168, 67, 0.25);
+            border-radius: 0.75rem;
+            padding: 0.875rem 1rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .team-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 0.1875rem;
+            background: linear-gradient(90deg, var(--gold), var(--gold-light));
+        }
+        .team-card-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .team-card-header .icon {
+            width: 1.625rem;
+            height: 1.625rem;
+            background: linear-gradient(135deg, var(--teal), var(--teal-light));
+            border-radius: 0.375rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+        }
+        .team-card-header h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 0.7rem;
+            color: var(--white);
+            text-transform: uppercase;
+            letter-spacing: 0.09375rem;
+        }
+        .team-card ul {
+            list-style: none;
+        }
+        .team-card ul li {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.68rem;
+            color: var(--light-gray);
+            padding: 0.1875rem 0 0.1875rem 0.875rem;
+            position: relative;
+            line-height: 1.5;
+        }
+        .team-card ul li::before {
+            content: '◆';
+            position: absolute;
+            left: 0;
+            color: var(--gold);
+            font-size: 0.3125rem;
+            top: 0.375rem;
+        }
+        .team-card .dosen-name {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            color: var(--white);
+            font-weight: 500;
+            line-height: 1.6;
+        }
+
+        /* ===========================================
+           CONTENT SECTIONS (shared)
+           =========================================== */
+        .content-section {
+            padding: 0.75rem 1.875rem;
+            background: var(--navy);
+        }
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 0.625rem;
+            margin-bottom: 0.625rem;
+            background: linear-gradient(135deg, var(--teal-dark), var(--teal), var(--teal-light));
+            padding: 0.5rem 1rem;
+            border-radius: 0.625rem;
+            position: relative;
+            overflow: hidden;
+        }
+        .section-header::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 3.75rem;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08));
+        }
+        .section-header .icon-wrapper {
+            width: 2rem;
+            height: 2rem;
+            background: rgba(255,255,255,0.2);
+            border-radius: 0.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            flex-shrink: 0;
+        }
+        .section-header h2 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 0.78rem;
+            color: var(--white);
+            text-transform: uppercase;
+            letter-spacing: 0.125rem;
+        }
+        .section-body {
+            background: rgba(255,255,255,0.04);
+            border: 0.0625rem solid rgba(255,255,255,0.08);
+            border-radius: 0.625rem;
+            padding: 0.75rem 1rem;
+        }
+        .section-body p {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            color: var(--light-gray);
+            line-height: 1.65;
+            text-align: justify;
+        }
+        .section-body ul {
+            list-style: none;
+        }
+        .section-body ul li {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.72rem;
+            color: var(--light-gray);
+            line-height: 1.65;
+            padding: 0.15rem 0 0.15rem 1.125rem;
+            position: relative;
+        }
+        .section-body ul li::before {
+            content: '●';
+            position: absolute;
+            left: 0;
+            color: var(--teal-light);
+            font-size: 0.375rem;
+            top: 0.4rem;
+        }
+
+        /* ===========================================
+           SECTION 6: FITUR UTAMA
+           =========================================== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+        }
+        .feature-card {
+            background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+            border: 0.0625rem solid rgba(255,255,255,0.08);
+            border-radius: 0.625rem;
+            padding: 0.625rem 0.5rem;
+            text-align: center;
+        }
+        .feature-icon {
+            width: 2.25rem;
+            height: 2.25rem;
+            background: linear-gradient(135deg, var(--teal), var(--teal-light));
+            border-radius: 0.625rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            margin: 0 auto 0.375rem;
+            box-shadow: 0 0.25rem 0.9375rem rgba(12, 119, 121, 0.3);
+        }
+        .feature-card h4 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 0.62rem;
+            color: var(--white);
+            margin-bottom: 0.25rem;
+            line-height: 1.3;
+        }
+        .feature-card p {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.52rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ===========================================
+           SECTION 7: TEKNOLOGI
+           =========================================== */
+        .tech-grid {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.875rem;
+        }
+        .tech-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.375rem;
+            width: 5rem;
+        }
+        .tech-logo {
+            width: 2.875rem;
+            height: 2.875rem;
+            border-radius: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+            font-weight: 800;
+            box-shadow: 0 0.375rem 1.25rem rgba(0, 0, 0, 0.25);
+        }
+        .tech-logo.laravel { background: linear-gradient(135deg, #FF2D20, #E7342A); color: white; }
+        .tech-logo.mysql { background: linear-gradient(135deg, #00758F, #F29111); color: white; }
+        .tech-logo.bootstrap { background: linear-gradient(135deg, #7952B3, #6D3FAF); color: white; }
+        .tech-logo.tailwind { background: linear-gradient(135deg, #06B6D4, #38BDF8); color: white; }
+        .tech-logo.vite { background: linear-gradient(135deg, #646CFF, #BD34FE); color: white; }
+        .tech-logo.php { background: linear-gradient(135deg, #777BB4, #8892BF); color: white; }
+        .tech-name {
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            font-size: 0.58rem;
+            color: var(--white);
+            text-align: center;
+        }
+
+        /* ===========================================
+           SECTION 8: ALUR BISNIS
+           =========================================== */
+        .flow-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+        }
+        .flow-box {
+            background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+            border: 0.0625rem solid rgba(255,255,255,0.08);
+            border-radius: 0.625rem;
+            padding: 0.625rem;
+            position: relative;
+        }
+        .flow-box::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 0.1875rem;
+            border-radius: 0.625rem 0.625rem 0 0;
+        }
+        .flow-box.inbound::before { background: linear-gradient(90deg, var(--success), #34D399); }
+        .flow-box.outbound::before { background: linear-gradient(90deg, var(--info), #60A5FA); }
+        .flow-box.monitoring::before { background: linear-gradient(90deg, var(--gold), var(--gold-light)); }
+        .flow-box h4 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 0.68rem;
+            margin-bottom: 0.125rem;
+            text-transform: uppercase;
+            letter-spacing: 0.0625rem;
+        }
+        .flow-box.inbound h4 { color: var(--success); }
+        .flow-box.outbound h4 { color: var(--info); }
+        .flow-box.monitoring h4 { color: var(--gold); }
+        .flow-box .flow-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.45rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.09375rem;
+            margin-bottom: 0.375rem;
+        }
+        .flow-box ul { list-style: none; }
+        .flow-box ul li {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.56rem;
+            color: var(--light-gray);
+            padding: 0.125rem 0 0.125rem 0.875rem;
+            position: relative;
+            line-height: 1.4;
+        }
+        .flow-box ul li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            font-weight: 700;
+        }
+        .flow-box.inbound ul li::before { color: var(--success); }
+        .flow-box.outbound ul li::before { color: var(--info); }
+        .flow-box.monitoring ul li::before { color: var(--gold); }
+
+        /* ===========================================
+           SECTION 9: IMPLEMENTASI
+           =========================================== */
+        .impl-description {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 0.625rem;
+            line-height: 1.5;
+        }
+        .impl-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.625rem;
+        }
+        .impl-item { text-align: center; }
+        .impl-item .screenshot {
+            width: 100%;
+            height: 6.5rem;
+            background: var(--navy-dark);
+            border: 0.125rem solid rgba(212, 168, 67, 0.2);
+            border-radius: 0.5rem;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .impl-item .screenshot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: top left;
+        }
+        .impl-item .screenshot .placeholder-text {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.55rem;
+            color: var(--text-muted);
+            text-align: center;
+            padding: 0.5rem;
+        }
+        .impl-item .caption {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 600;
+            font-size: 0.62rem;
+            color: var(--white);
+            margin-top: 0.375rem;
+        }
+        .impl-note {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.5rem;
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 0.5rem;
+            font-style: italic;
+        }
+
+        /* ===========================================
+           SECTION 10: ARSITEKTUR
+           =========================================== */
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        .arch-box {
+            background: linear-gradient(135deg, rgba(12, 119, 121, 0.3), rgba(36, 158, 148, 0.15));
+            border: 0.0625rem solid var(--teal);
+            border-radius: 0.625rem;
+            padding: 0.625rem 0.75rem;
+            text-align: center;
+            min-width: 7.5rem;
+        }
+        .arch-box h5 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 0.6rem;
+            color: var(--teal-light);
+            margin-bottom: 0.1875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.0625rem;
+        }
+        .arch-box p {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.5rem;
+            color: var(--light-gray);
+            line-height: 1.4;
+        }
+        .arch-arrow {
+            font-size: 1.2rem;
+            color: var(--gold);
+            font-weight: 700;
+        }
+
+        /* ===========================================
+           SECTION 11: RBAC TABLE
+           =========================================== */
+        .rbac-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 0.625rem;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.58rem;
+        }
+        .rbac-table thead th {
+            background: linear-gradient(135deg, var(--teal-dark), var(--teal));
+            color: var(--white);
+            font-weight: 600;
+            padding: 0.4rem 0.375rem;
+            text-align: center;
+            font-size: 0.55rem;
+            letter-spacing: 0.03125rem;
+        }
+        .rbac-table thead th:first-child {
+            text-align: left;
+            padding-left: 0.75rem;
+        }
+        .rbac-table tbody td {
+            padding: 0.35rem 0.375rem;
+            text-align: center;
+            color: var(--light-gray);
+            border-bottom: 0.0625rem solid rgba(255,255,255,0.05);
+        }
+        .rbac-table tbody td:first-child {
+            text-align: left;
+            font-weight: 600;
+            color: var(--white);
+            padding-left: 0.75rem;
+            font-size: 0.55rem;
+        }
+        .rbac-table tbody tr { background: rgba(255,255,255,0.02); }
+        .rbac-table tbody tr:nth-child(even) { background: rgba(255,255,255,0.04); }
+        .check { color: var(--success); font-size: 0.8rem; }
+        .cross { color: rgba(255,255,255,0.15); font-size: 0.7rem; }
+
+        /* ===========================================
+           SECTION 12: QR CODE
+           =========================================== */
+        .qr-section {
+            padding: 0.75rem 1.875rem 1rem;
+            background: var(--navy);
+        }
+        .qr-content {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: linear-gradient(135deg, rgba(212, 168, 67, 0.08), rgba(212, 168, 67, 0.03));
+            border: 0.0625rem solid rgba(212, 168, 67, 0.2);
+            border-radius: 0.75rem;
+            padding: 0.75rem 1.125rem;
+        }
+        .qr-placeholder {
+            width: 5rem;
+            height: 5rem;
+            background: var(--white);
+            border-radius: 0.625rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            position: relative;
+            overflow: hidden;
+        }
+        .qr-placeholder .qr-pattern {
+            width: 4rem;
+            height: 4rem;
+            background:
+                linear-gradient(var(--navy) 0.125rem, transparent 0.125rem) 0 0 / 0.5rem 0.5rem,
+                linear-gradient(90deg, var(--navy) 0.125rem, transparent 0.125rem) 0 0 / 0.5rem 0.5rem;
+            opacity: 0.3;
+        }
+        .qr-placeholder .qr-label {
+            position: absolute;
+            font-family: 'Poppins', sans-serif;
+            font-size: 0.45rem;
+            font-weight: 700;
+            color: var(--navy);
+            text-align: center;
+        }
+        .qr-info h3 {
+            font-family: 'Poppins', sans-serif;
+            font-weight: 700;
+            font-size: 0.7rem;
+            color: var(--gold);
+            text-transform: uppercase;
+            letter-spacing: 0.125rem;
+            margin-bottom: 0.375rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .qr-info p {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.62rem;
+            color: var(--light-gray);
+            line-height: 1.6;
+        }
+
+        /* ===========================================
+           FOOTER
+           =========================================== */
+        .footer-note {
+            text-align: center;
+            padding: 0.5rem 1.875rem 0.75rem;
+            background: var(--navy-dark);
+        }
+        .footer-note p {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.45rem;
+            color: var(--text-muted);
+            font-style: italic;
+            line-height: 1.5;
+        }
+
+        /* ===========================================
+           PRINT STYLES — 60 cm × 160 cm
+           =========================================== */
+        @page {
+            size: 60cm 160cm;
+            margin: 0;
+        }
+
+        @media print {
+            html {
+                /* Scale semua rem ke ukuran cetak 60cm */
+                /* 60cm = 2267.7px; poster = 43.75rem */
+                /* 2267.7 / 43.75 = 51.83 */
+                font-size: 51.83px;
+            }
+            body {
+                background: none;
+                padding: 0;
+                display: block;
+            }
+            .poster {
+                width: 43.75rem;
+                min-height: 116.67rem; /* ≈ 160cm */
+                box-shadow: none;
+            }
+        }
+
+        /* ===========================================
+           SCREEN-ONLY STYLES
+           =========================================== */
+        @media screen {
+            .poster {
+                box-shadow: 0 0.5rem 2.5rem rgba(0, 0, 0, 0.4);
+            }
+        }
+
+        /* ===========================================
+           RESPONSIVE (screen only)
+           =========================================== */
+        @media screen and (max-width: 750px) {
+            .poster {
+                width: 100%;
+            }
+            .features-grid,
+            .impl-grid,
+            .flow-container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="poster" id="poster">
+
+    <!-- Corner Decorations -->
+    <div class="corner-decor top-left">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 0 L80 0 L0 80 Z" fill="rgba(212,168,67,0.15)"/>
+            <path d="M0 0 L50 0 L0 50 Z" fill="rgba(212,168,67,0.1)"/>
+            <line x1="0" y1="0" x2="100" y2="100" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+        </svg>
+    </div>
+    <div class="corner-decor top-right">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 0 L80 0 L0 80 Z" fill="rgba(212,168,67,0.15)"/>
+            <path d="M0 0 L50 0 L0 50 Z" fill="rgba(212,168,67,0.1)"/>
+            <line x1="0" y1="0" x2="100" y2="100" stroke="rgba(212,168,67,0.2)" stroke-width="1"/>
+        </svg>
+    </div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 1: HEADER INSTITUSI
+         ═══════════════════════════════════════ -->
+    <section class="header-section">
+        <h2>
+            DEPARTEMEN INFORMATIKA<br>
+            FAKULTAS SAINS DAN MATEMATIKA<br>
+            UNIVERSITAS DIPONEGORO
+        </h2>
+        <p class="subtitle-label">Praktik Kerja Lapangan — PT. Yamatogomu Indonesia</p>
+    </section>
+
+    <div class="gold-line"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 2: JUDUL PROYEK
+         ═══════════════════════════════════════ -->
+    <section class="title-section">
+        <div class="project-icon">🏭</div>
+        <h1>STOK WHFG</h1>
+        <p class="project-subtitle">
+            Sistem Manajemen Stok Warehouse Finished Goods<br>
+            Berbasis Web untuk PT. Yamatogomu Indonesia
+        </p>
+    </section>
+
+    <div class="gold-line-thin"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 3: ANGGOTA TIM & DOSEN
+         ═══════════════════════════════════════ -->
+    <section class="team-section">
+        <div class="team-card">
+            <div class="team-card-header">
+                <div class="icon">👥</div>
+                <h3>Anggota Tim</h3>
+            </div>
+            <ul>
+                <!-- ✏️ GANTI DENGAN DATA ANDA -->
+                <li>Ega Aryabima        — 24060123140116</li>
+                <li>Gama Naufal Afiyah  — 24060123120015</li>
+            </ul>
+        </div>
+        <div class="team-card" style="flex: 0.8;">
+            <div class="team-card-header">
+                <div class="icon">🎓</div>
+                <h3>Dosen Pembimbing</h3>
+            </div>
+            <p class="dosen-name">
+                <!-- ✏️ GANTI DENGAN DATA ANDA -->
+                Satriawan Rasyid Purnama, S.Kom., M.Cs. 
+            </p>
+        </div>
+    </section>
+
+    <div class="gold-line-thin"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 4: LATAR BELAKANG MASALAH
+         ═══════════════════════════════════════ -->
+    <section class="content-section">
+        <div class="section-header">
+            <div class="icon-wrapper">📋</div>
+            <h2>Latar Belakang Masalah</h2>
+        </div>
+        <div class="section-body">
+            <p>
+                PT. Yamatogomu Indonesia merupakan perusahaan manufaktur karet yang memproduksi part otomotif. 
+                Pengelolaan stok gudang barang jadi (<em>Warehouse Finished Goods</em>) sebelumnya masih dilakukan 
+                secara manual, menyebabkan pencatatan stok rawan kesalahan (<em>human error</em>) dan <em>double counting</em>, 
+                pelacakan lokasi pallet dan box tidak akurat, proses delivery order dari sales ke warehouse lambat 
+                dan tidak transparan, tidak adanya <em>audit trail</em> untuk memantau aktivitas gudang, serta 
+                laporan stok tidak <em>real-time</em> sehingga menyulitkan pengambilan keputusan.
+            </p>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 5: TUJUAN PROYEK
+         ═══════════════════════════════════════ -->
+    <section class="content-section" style="padding-top: 0;">
+        <div class="section-header">
+            <div class="icon-wrapper">🎯</div>
+            <h2>Tujuan Proyek</h2>
+        </div>
+        <div class="section-body">
+            <ul>
+                <li>Membangun sistem manajemen gudang berbasis web yang mengotomasi proses pencatatan stok masuk (<em>inbound</em>) dan stok keluar (<em>outbound</em>).</li>
+                <li>Menyediakan fitur pelacakan lokasi pallet dan box secara <em>real-time</em> dengan dukungan <em>barcode scanning</em>.</li>
+                <li>Mengimplementasikan alur kerja delivery order multi-role (Sales → PPC → Warehouse) yang terstruktur dan transparan.</li>
+                <li>Menyediakan laporan operasional yang akurat dengan dukungan export ke format PDF dan Excel.</li>
+                <li>Menerapkan <em>Role-Based Access Control</em> (RBAC) dengan 6 role pengguna untuk menjamin keamanan dan pembagian akses yang tepat.</li>
+            </ul>
+        </div>
+    </section>
+
+    <div class="gold-line-thin"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 6: FITUR UTAMA
+         ═══════════════════════════════════════ -->
+    <section class="content-section">
+        <div class="section-header">
+            <div class="icon-wrapper">⚙️</div>
+            <h2>Fitur Utama / Rancangan Solusi</h2>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">📦</div>
+                <h4>Stock Input</h4>
+                <p>Input stok dengan scan barcode, manajemen pallet otomatis & pencatatan lokasi</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📊</div>
+                <h4>Stock View & Monitoring</h4>
+                <p>Monitoring stok real-time berdasarkan part, pallet, dan lokasi gudang</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🚚</div>
+                <h4>Delivery Order</h4>
+                <p>Alur delivery multi-role: Sales → PPC → Warehouse fulfillment</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📤</div>
+                <h4>Stock Withdrawal</h4>
+                <p>Pengambilan stok dengan metode FIFO, preview & fitur undo</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <h4>Merge Pallet</h4>
+                <p>Penggabungan pallet untuk efisiensi ruang penyimpanan gudang</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📑</div>
+                <h4>Reporting & Export</h4>
+                <p>Laporan komprehensif dengan export ke PDF dan Excel</p>
+            </div>
+        </div>
+    </section>
+
+    <div class="gold-line-thin"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 7: TEKNOLOGI
+         ═══════════════════════════════════════ -->
+    <section class="content-section">
+        <div class="section-header">
+            <div class="icon-wrapper">💻</div>
+            <h2>Teknologi yang Digunakan</h2>
+        </div>
+        <div class="section-body">
+            <div class="tech-grid">
+                <div class="tech-item">
+                    <div class="tech-logo laravel">
+                        <svg width="60%" height="60%" viewBox="0 0 50 52" fill="none">
+                            <path d="M49.626 11.564a.809.809 0 01.028.209v10.972a.8.8 0 01-.402.694l-9.209 5.302V39.25c0 .286-.152.55-.4.694L20.42 51.01c-.044.025-.092.04-.14.058-.018.006-.035.017-.054.022a.805.805 0 01-.41 0c-.022-.006-.042-.018-.063-.026-.044-.016-.09-.03-.132-.054L.402 39.944A.801.801 0 010 39.25V6.334c0-.072.01-.142.028-.21.006-.023.02-.044.028-.067.015-.042.029-.085.051-.124.015-.026.037-.047.055-.071.023-.032.044-.065.071-.093.02-.02.047-.033.071-.05.03-.024.056-.05.088-.069h.001L9.836.678a.8.8 0 01.8 0l9.543 5.5h.001c.032.02.058.045.088.068.024.018.05.032.071.051.027.028.048.06.071.093.018.024.04.045.055.071.022.04.036.082.051.124.009.023.022.044.028.068a.809.809 0 01.028.209v20.559l8.008-4.611v-10.51c0-.07.01-.141.028-.208.007-.024.02-.045.028-.068.016-.042.03-.085.052-.124.014-.026.036-.047.054-.071.024-.032.044-.065.072-.093.02-.019.047-.033.07-.05.032-.024.057-.05.089-.069h.001l9.543-5.5a.8.8 0 01.8 0l9.543 5.5c.032.02.058.045.089.069.023.017.05.031.07.05.028.028.048.06.072.093.018.024.04.045.054.071.023.04.036.082.052.124.008.023.022.044.028.068z" fill="white"/>
+                        </svg>
+                    </div>
+                    <span class="tech-name">Laravel 12</span>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-logo mysql">
+                        <svg width="60%" height="60%" viewBox="0 0 24 24" fill="white">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+                        </svg>
+                    </div>
+                    <span class="tech-name">MySQL</span>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-logo bootstrap">
+                        <span style="font-family: 'Poppins'; font-weight: 900; font-size: 1.4rem;">B</span>
+                    </div>
+                    <span class="tech-name">Bootstrap</span>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-logo tailwind">
+                        <svg width="60%" height="60%" viewBox="0 0 24 24" fill="white">
+                            <path d="M12.001 4.8c-3.2 0-5.2 1.6-6 4.8 1.2-1.6 2.6-2.2 4.2-1.8.913.228 1.565.89 2.288 1.624C13.666 10.618 15.027 12 18.001 12c3.2 0 5.2-1.6 6-4.8-1.2 1.6-2.6 2.2-4.2 1.8-.913-.228-1.565-.89-2.288-1.624C16.337 6.182 14.976 4.8 12.001 4.8zm-6 7.2c-3.2 0-5.2 1.6-6 4.8 1.2-1.6 2.6-2.2 4.2-1.8.913.228 1.565.89 2.288 1.624 1.177 1.194 2.538 2.576 5.512 2.576 3.2 0 5.2-1.6 6-4.8-1.2 1.6-2.6 2.2-4.2 1.8-.913-.228-1.565-.89-2.288-1.624C10.337 13.382 8.976 12 6.001 12z"/>
+                        </svg>
+                    </div>
+                    <span class="tech-name">Tailwind v4</span>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-logo vite">
+                        <span style="font-family: 'Poppins'; font-weight: 900; font-size: 1.2rem;">⚡</span>
+                    </div>
+                    <span class="tech-name">Vite</span>
+                </div>
+                <div class="tech-item">
+                    <div class="tech-logo php">
+                        <span style="font-family: 'Poppins'; font-weight: 800; font-size: 0.7rem;">PHP</span>
+                    </div>
+                    <span class="tech-name">PHP 8.2</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="gold-line-thin"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 8: ALUR BISNIS UTAMA
+         ═══════════════════════════════════════ -->
+    <section class="content-section">
+        <div class="section-header">
+            <div class="icon-wrapper">🔀</div>
+            <h2>Alur Bisnis Utama</h2>
+        </div>
+        <div class="flow-container">
+            <div class="flow-box inbound">
+                <h4>Stock Input</h4>
+                <div class="flow-label">Inbound</div>
+                <ul>
+                    <li>Scan Box / Part Number</li>
+                    <li>Attach ke Pallet</li>
+                    <li>Tentukan Lokasi Gudang</li>
+                    <li>Simpan & Audit Log</li>
+                </ul>
+            </div>
+            <div class="flow-box outbound">
+                <h4>Delivery Order</h4>
+                <div class="flow-label">Outbound</div>
+                <ul>
+                    <li>Sales Buat Order</li>
+                    <li>PPC Approve / Reject</li>
+                    <li>Warehouse Pick & Scan</li>
+                    <li>Complete & Withdrawal</li>
+                </ul>
+            </div>
+            <div class="flow-box monitoring">
+                <h4>Monitoring</h4>
+                <div class="flow-label">Reporting</div>
+                <ul>
+                    <li>Laporan Stok Real-time</li>
+                    <li>Export PDF & Excel</li>
+                    <li>Audit Trail Aktivitas</li>
+                    <li>Dashboard Analitik</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <div class="gold-line-thin"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 9: IMPLEMENTASI
+         ═══════════════════════════════════════ -->
+    <section class="content-section">
+        <div class="section-header">
+            <div class="icon-wrapper">🖥️</div>
+            <h2>Hasil Implementasi / Desain Solusi</h2>
+        </div>
+        <p class="impl-description">
+            Berikut adalah beberapa tampilan utama (fitur inti) dari sistem.
+        </p>
+        <div class="impl-grid">
+            <div class="impl-item">
+                <div class="screenshot">
+                    <!-- ✏️ GANTI DENGAN SCREENSHOT ASLI -->
+                    <p class="placeholder-text">📸<br>Screenshot<br>Dashboard</p>
+                </div>
+                <p class="caption">Dashboard</p>
+            </div>
+            <div class="impl-item">
+                <div class="screenshot">
+                    <!-- ✏️ GANTI DENGAN SCREENSHOT ASLI -->
+                    <p class="placeholder-text">📸<br>Screenshot<br>Stock Input</p>
+                </div>
+                <p class="caption">Stock Input</p>
+            </div>
+            <div class="impl-item">
+                <div class="screenshot">
+                    <!-- ✏️ GANTI DENGAN SCREENSHOT ASLI -->
+                    <p class="placeholder-text">📸<br>Screenshot<br>Delivery Order</p>
+                </div>
+                <p class="caption">Delivery Order</p>
+            </div>
+        </div>
+        <p class="impl-note">* Tampilan di atas hanya contoh dan menampilkan fitur utama.</p>
+    </section>
+
+    <div class="gold-line-thin"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 10: ARSITEKTUR SISTEM
+         ═══════════════════════════════════════ -->
+    <section class="content-section">
+        <div class="section-header">
+            <div class="icon-wrapper">🏗️</div>
+            <h2>Arsitektur Sistem</h2>
+        </div>
+        <div class="section-body" style="padding: 0.75rem;">
+            <div class="arch-flow">
+                <div class="arch-box">
+                    <h5>Frontend</h5>
+                    <p>Blade + Bootstrap<br>+ Tailwind CSS v4</p>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-box">
+                    <h5>Backend</h5>
+                    <p>Laravel 12<br>Controllers + Services</p>
+                </div>
+                <span class="arch-arrow">→</span>
+                <div class="arch-box">
+                    <h5>Database</h5>
+                    <p>MySQL<br>15+ Tabel Relasional</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 11: RBAC
+         ═══════════════════════════════════════ -->
+    <section class="content-section" style="padding-top: 0;">
+        <div class="section-header">
+            <div class="icon-wrapper">🔐</div>
+            <h2>Role-Based Access Control</h2>
+        </div>
+        <div class="section-body" style="padding: 0; overflow: hidden;">
+            <table class="rbac-table">
+                <thead>
+                    <tr>
+                        <th>Role</th>
+                        <th>Stock Input</th>
+                        <th>Stock View</th>
+                        <th>Delivery</th>
+                        <th>Reports</th>
+                        <th>Manage</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Admin</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>Admin Warehouse</td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                    </tr>
+                    <tr>
+                        <td>WH Operator</td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td>Sales</td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td>PPC</td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                    <tr>
+                        <td>Supervisi</td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                        <td><span class="check">✓</span></td>
+                        <td><span class="cross">—</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <div class="gold-line-thin"></div>
+
+    <!-- ═══════════════════════════════════════
+         SECTION 12: QR CODE
+         ═══════════════════════════════════════ -->
+    <section class="qr-section">
+        <div class="section-header" style="margin-bottom: 0.625rem;">
+            <div class="icon-wrapper">📱</div>
+            <h2>QR Code Dokumentasi / Repository</h2>
+        </div>
+        <div class="qr-content">
+            <div class="qr-placeholder">
+                <div class="qr-pattern"></div>
+                <span class="qr-label">QR<br>CODE</span>
+            </div>
+            <div class="qr-info">
+                <h3>📱 Scan untuk Akses</h3>
+                <p>
+                    Scan QR code di samping untuk melihat dokumentasi lengkap, 
+                    demo aplikasi, atau mengakses repository proyek. Terima kasih.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <div class="gold-line"></div>
+
+    <!-- FOOTER -->
+    <footer class="footer-note">
+        <p>
+            Catatan: Ini adalah poster expo PKL. Konten dapat disesuaikan dengan kebutuhan proyek Anda.<br>
+            © 2026 — STOK WHFG | PT. Yamatogomu Indonesia
+        </p>
+    </footer>
+
+    <!-- Corner decorations bottom -->
+    <div class="corner-decor bottom-left">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 0 L80 0 L0 80 Z" fill="rgba(212,168,67,0.15)"/>
+            <path d="M0 0 L50 0 L0 50 Z" fill="rgba(212,168,67,0.1)"/>
+        </svg>
+    </div>
+    <div class="corner-decor bottom-right">
+        <svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0 0 L80 0 L0 80 Z" fill="rgba(212,168,67,0.15)"/>
+            <path d="M0 0 L50 0 L0 50 Z" fill="rgba(212,168,67,0.1)"/>
+        </svg>
+    </div>
+
+</div>
+
+</body>
+</html>

@@ -181,22 +181,22 @@
                         <table class="table table-sm table-hover align-middle">
                             <thead class="bg-light">
                                 <tr>
-                                    <th>Tanggal</th>
-                                    <th>Pallet Hasil Merge</th>
-                                    <th>Sumber Pallet</th>
-                                    <th>Operator</th>
+                                    <th class="text-nowrap">Tanggal</th>
+                                    <th class="text-nowrap">Pallet Hasil Merge</th>
+                                    <th style="min-width: 250px;">Sumber Pallet</th>
+                                    <th class="text-nowrap">Operator</th>
                                     <th>Keterangan</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($mergeHistory as $history)
                                     <tr>
-                                        <td>
+                                        <td class="text-nowrap">
                                             <span class="badge bg-light text-dark border">
                                                 {{ $history->created_at->format('d M Y H:i') }}
                                             </span>
                                         </td>
-                                        <td>
+                                        <td class="text-nowrap">
                                             @php
                                                 $resultPallet = \App\Models\Pallet::find($history->model_id);
                                             @endphp
@@ -210,14 +210,16 @@
                                                 $palletNumbers = $matches[1] ?? '';
                                             @endphp
                                             @if($palletNumbers)
-                                                @foreach(explode(',', $palletNumbers) as $num)
-                                                    <span class="badge bg-warning text-dark">{{ trim($num) }}</span>
-                                                @endforeach
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    @foreach(explode(',', $palletNumbers) as $num)
+                                                        <span class="badge bg-warning text-dark">{{ trim($num) }}</span>
+                                                    @endforeach
+                                                </div>
                                             @else
                                                 <span class="text-muted">-</span>
                                             @endif
                                         </td>
-                                        <td>
+                                        <td class="text-nowrap">
                                             @if($history->user)
                                                 <small>{{ $history->user->name }}</small>
                                             @else

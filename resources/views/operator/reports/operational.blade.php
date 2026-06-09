@@ -761,15 +761,15 @@
 <script src="https://code.highcharts.com/highcharts.js"></script>
 <script src="https://code.highcharts.com/modules/pattern-fill.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script type="application/json" id="throughput-labels">{{ json_encode(collect($throughputDays)->pluck('date')) }}</script>
-<script type="application/json" id="throughput-inbound">{{ json_encode(collect($throughputDays)->pluck('inbound_pcs')) }}</script>
-<script type="application/json" id="throughput-outbound">{{ json_encode(collect($throughputDays)->pluck('outbound_pcs')) }}</script>
-<script type="application/json" id="peak-labels">{{ json_encode($peakHours->pluck('hour')) }}</script>
-<script type="application/json" id="peak-inbound">{{ json_encode($peakHours->pluck('inbound_pcs')) }}</script>
-<script type="application/json" id="peak-outbound">{{ json_encode($peakHours->pluck('outbound_pcs')) }}</script>
-<script type="application/json" id="delivery-labels">{{ json_encode(collect($deliveryTrend)->pluck('label')) }}</script>
-<script type="application/json" id="delivery-plan">{{ json_encode(collect($deliveryTrend)->pluck('planned_qty')) }}</script>
-<script type="application/json" id="delivery-actual">{{ json_encode(collect($deliveryTrend)->pluck('actual_qty')) }}</script>
+<script type="application/json" id="throughput-labels">{!! json_encode(collect($throughputDays)->pluck('date')) !!}</script>
+<script type="application/json" id="throughput-inbound">{!! json_encode(collect($throughputDays)->pluck('inbound_pcs')) !!}</script>
+<script type="application/json" id="throughput-outbound">{!! json_encode(collect($throughputDays)->pluck('outbound_pcs')) !!}</script>
+<script type="application/json" id="peak-labels">{!! json_encode($peakHours->pluck('hour')) !!}</script>
+<script type="application/json" id="peak-inbound">{!! json_encode($peakHours->pluck('inbound_pcs')) !!}</script>
+<script type="application/json" id="peak-outbound">{!! json_encode($peakHours->pluck('outbound_pcs')) !!}</script>
+<script type="application/json" id="delivery-labels">{!! json_encode(collect($deliveryTrend)->pluck('label')) !!}</script>
+<script type="application/json" id="delivery-plan">{!! json_encode(collect($deliveryTrend)->pluck('planned_qty')) !!}</script>
+<script type="application/json" id="delivery-actual">{!! json_encode(collect($deliveryTrend)->pluck('actual_qty')) !!}</script>
 <script>
     const throughputLabels = JSON.parse(document.getElementById('throughput-labels').textContent || '[]');
     const inboundData = JSON.parse(document.getElementById('throughput-inbound').textContent || '[]');

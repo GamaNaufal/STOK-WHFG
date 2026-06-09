@@ -237,28 +237,31 @@
             return;
         }
 
-        const confirmed = confirm('Batalkan proses scan ini? Box yang terkunci akan dilepas.');
-        if (!confirmed) {
-            return;
-        }
-
-        fetch("{{ route('delivery.pick.cancel', $session->id) }}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        WarehouseAlert.confirm({
+            title: 'Batalkan Scan?',
+            message: 'Batalkan proses scan ini? Box yang terkunci akan dilepas.',
+            confirmText: 'Ya, Batalkan',
+            confirmColor: '#DC2626',
+            onConfirm: () => {
+                fetch("{{ route('delivery.pick.cancel', $session->id) }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        showToast(data.message || 'Proses scan dibatalkan.', 'success');
+                        window.location.href = "{{ route('delivery.index') }}";
+                    } else {
+                        showToast(data.message || 'Gagal membatalkan scan.', 'danger');
+                    }
+                })
+                .catch(() => showToast('Gagal koneksi.', 'danger'));
             }
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.success) {
-                showToast(data.message || 'Proses scan dibatalkan.', 'success');
-                window.location.href = "{{ route('delivery.index') }}";
-            } else {
-                showToast(data.message || 'Gagal membatalkan scan.', 'danger');
-            }
-        })
-        .catch(() => showToast('Gagal koneksi.', 'danger'));
+        });
     });
 
     hydrateScannedRows();

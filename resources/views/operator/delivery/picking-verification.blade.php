@@ -167,7 +167,7 @@
                 if (typeof showToast === 'function') {
                     showToast(data.message || 'Gagal membuat sesi picking.', 'danger');
                 } else {
-                    alert(data.message || 'Gagal membuat sesi picking.');
+                    WarehouseAlert.error({ message: data.message || 'Gagal membuat sesi picking.' });
                 }
             })
             .catch(() => {
@@ -175,7 +175,7 @@
                 if (typeof showToast === 'function') {
                     showToast('Gagal koneksi.', 'danger');
                 } else {
-                    alert('Gagal koneksi.');
+                    WarehouseAlert.error({ message: 'Gagal koneksi.' });
                 }
             });
         });
