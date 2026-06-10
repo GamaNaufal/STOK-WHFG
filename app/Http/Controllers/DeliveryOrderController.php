@@ -317,6 +317,16 @@ class DeliveryOrderController extends Controller
                     }
                 }
 
+                if ($remainingNeeded > 0) {
+                    foreach ($pool as $box) {
+                        $nextBoxQty = is_array($box) ? (int) $box['qty'] : (int) $box;
+                        if ($nextBoxQty > $remainingNeeded) {
+                            $needsNotFull = true;
+                            break;
+                        }
+                    }
+                }
+
                 $fifoPools[$partNumber] = $pool;
 
                 $strictFulfillable = min($requiredQty, $reservedForOrder + $takenFromFifo);

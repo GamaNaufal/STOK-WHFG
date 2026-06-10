@@ -1014,12 +1014,10 @@ class StockViewController extends Controller
                     ->lockForUpdate()
                     ->count();
 
-                PalletItem::where('pallet_id', $palletId)->delete();
-
                 if ($remainingActiveBoxes === 0) {
                     $palletNumber = (string) $pallet->pallet_number;
 
-                    MasterLocation::where('current_pallet_id', $palletId)
+                    \App\Models\MasterLocation::where('current_pallet_id', $palletId)
                         ->update([
                             'is_occupied' => false,
                             'current_pallet_id' => null,
@@ -1032,7 +1030,7 @@ class StockViewController extends Controller
                         'pallet_number' => $palletNumber,
                     ]);
 
-                    AuditService::log(
+                    \App\Services\AuditService::log(
                         'other',
                         'pallet_deleted_by_stock_view',
                         'Pallet',
@@ -1052,24 +1050,8 @@ class StockViewController extends Controller
                     continue;
                 }
 
-                $remainingBoxes = DB::table('pallet_boxes')
-                    ->join('boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-                    ->where('pallet_boxes.pallet_id', $palletId)
-                    ->whereNull('boxes.deleted_at')
-                    ->where('boxes.is_withdrawn', false)
-                    ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
-                    ->select('boxes.part_number', DB::raw('COUNT(*) as box_count'), DB::raw('SUM(boxes.pcs_quantity) as pcs_total'))
-                    ->groupBy('boxes.part_number')
-                    ->get();
-
-                foreach ($remainingBoxes as $row) {
-                    PalletItem::create([
-                        'pallet_id' => $palletId,
-                        'part_number' => (string) $row->part_number,
-                        'box_quantity' => (int) $row->box_count,
-                        'pcs_quantity' => (int) $row->pcs_total,
-                    ]);
-                }
+                // Removed wipe-and-rebuild logic to preserve legacy stock.
+                // PalletItem updates are handled incrementally above.
             }
 
             AuditService::log(

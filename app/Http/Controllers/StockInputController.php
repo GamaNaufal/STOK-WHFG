@@ -646,8 +646,18 @@ class StockInputController extends Controller
                 $this->updateDeliveryOrderForNotFull($scannedBox, $deliveryOrdersById);
             }
 
-            $pallet->boxes()->syncWithoutDetaching([$box->id]);
+            $syncResult = $pallet->boxes()->syncWithoutDetaching([$box->id]);
             $attachedBoxIds[] = (int) $box->id;
+
+            if (in_array($box->id, $syncResult['attached'] ?? [])) {
+                $palletItem = \App\Models\PalletItem::firstOrNew([
+                    'pallet_id' => $pallet->id,
+                    'part_number' => $box->part_number,
+                ]);
+                $palletItem->box_quantity = (int) $palletItem->box_quantity + 1;
+                $palletItem->pcs_quantity = (int) $palletItem->pcs_quantity + (int) $box->pcs_quantity;
+                $palletItem->save();
+            }
         }
 
         return array_values(array_unique(array_filter($attachedBoxIds)));
@@ -767,30 +777,8 @@ class StockInputController extends Controller
 
     private function syncPalletItemsWithActiveBoxes(Pallet $pallet): void
     {
-        $activeByPart = DB::table('pallet_boxes')
-            ->join('boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-            ->where('pallet_boxes.pallet_id', $pallet->id)
-            ->whereNull('boxes.deleted_at')
-            ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
-            ->select('boxes.part_number', DB::raw('COUNT(*) as box_quantity'), DB::raw('SUM(boxes.pcs_quantity) as pcs_quantity'))
-            ->groupBy('boxes.part_number')
-            ->get();
-
-        $pallet->items()->delete();
-
-        foreach ($activeByPart as $row) {
-            if (empty($row->part_number)) {
-                continue;
-            }
-
-            PalletItem::create([
-                'pallet_id' => $pallet->id,
-                'part_number' => (string) $row->part_number,
-                'box_quantity' => (int) $row->box_quantity,
-                'pcs_quantity' => (int) $row->pcs_quantity,
-            ]);
-        }
+        // Removed. PalletItem updates are now handled incrementally in attachScannedBoxes
+        // to prevent wiping out Legacy Stock (stock without physical boxes).
     }
 
     private function createStockInputRecord(Pallet $pallet, array $attachedBoxIds, ?string $locationCode): StockInput
@@ -923,8 +911,8 @@ class StockInputController extends Controller
                 ]);
             }
 
-            // Rebuild pallet_items from active boxes so preview stage never mutates persistent stock data.
-            $this->syncPalletItemsWithActiveBoxes($pallet);
+            // Removed to preserve legacy stock. Updates are done incrementally in attachScannedBoxes.
+            // $this->syncPalletItemsWithActiveBoxes($pallet);
 
             // Simpan lokasi bila pallet belum punya lokasi, atau gunakan lokasi existing
             $locationCode = $pallet->stockLocation?->warehouse_location;
