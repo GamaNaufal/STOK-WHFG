@@ -191,7 +191,7 @@ class ReportController extends Controller
             'boxes' => function ($boxQuery) {
                 $boxQuery
                     ->withTrashed()
-                    ->select('boxes.id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_withdrawn', 'boxes.deleted_at');
+                    ->select('boxes.id', 'boxes.box_number', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_withdrawn', 'boxes.deleted_at');
             },
         ]);
 
@@ -293,7 +293,7 @@ class ReportController extends Controller
                 'notes',
                 'warehouse_location',
             ])
-            ->with('user:id,name');
+            ->with(['user:id,name', 'box:id,box_number']);
 
         if ($request->filled('start_date')) {
             $query->whereDate('withdrawn_at', '>=', $request->input('start_date'));
@@ -335,7 +335,7 @@ class ReportController extends Controller
                 'boxes' => function ($boxQuery) {
                     $boxQuery
                         ->withTrashed()
-                        ->select('boxes.id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_withdrawn', 'boxes.deleted_at');
+                        ->select('boxes.id', 'boxes.box_number', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_withdrawn', 'boxes.deleted_at');
                 },
             ]);
 
@@ -379,11 +379,12 @@ class ReportController extends Controller
         return $input->boxes
             ->map(function ($box) {
                 $boxId = (int) $box->id;
+                $boxNumber = (string) $box->box_number;
                 $isDeleted = $box->deleted_at !== null;
                 $isWithdrawn = (bool) ($box->is_withdrawn ?? false);
 
                 $status = 'active';
-                $label = (string) $boxId;
+                $label = $boxNumber ?: (string) $boxId;
 
                 if ($isDeleted && !$isWithdrawn) {
                     $status = 'deleted_not_shipped';

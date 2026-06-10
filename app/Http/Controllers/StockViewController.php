@@ -708,7 +708,7 @@ class StockViewController extends Controller
         if ($pallet->boxes->count() > 0) {
             $boxIds = $pallet->boxes
                 ->where('is_withdrawn', false)
-                ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
+                ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
                 ->pluck('id');
             $originLogs = AuditLog::where('type', 'box_pallet_moved')
                 ->where('model', 'Box')
@@ -722,7 +722,7 @@ class StockViewController extends Controller
 
             $items = $pallet->boxes
                 ->where('is_withdrawn', false)
-                ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
+                ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
                 ->map(function ($box) use ($originLogs) {
                 $log = $originLogs->get($box->id);
                 $origin = $log?->getOldValuesArray()['from_pallet'] ?? null;

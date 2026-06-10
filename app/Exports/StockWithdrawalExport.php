@@ -35,7 +35,7 @@ class StockWithdrawalExport implements FromCollection, WithHeadings, WithStyles
                 'Qty (PCS)' => (int)$withdrawal->pcs_quantity,
                 'Qty (Box)' => (int)ceil($withdrawal->box_quantity),
                 'Part Number' => $withdrawal->part_number ?? '-',
-                'ID Box' => $withdrawal->box_id ?? '-',
+                'ID Box' => $withdrawal->box->box_number ?? $withdrawal->box_id ?? '-',
                 'Keterangan' => $withdrawal->notes ?? '-',
                 'Lokasi Simpan' => $withdrawal->warehouse_location ?? '-',
             ]);

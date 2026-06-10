@@ -161,7 +161,7 @@
                                     </span>
                                 </td>
                                 <td style="padding: 16px 20px;">
-                                    <small style="color: #6b7280;">{{ $withdrawal->box_id ?? '-' }}</small>
+                                    <small style="color: #6b7280;">{{ $withdrawal->box->box_number ?? $withdrawal->box_id ?? '-' }}</small>
                                 </td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">{{ (int) $withdrawal->box_quantity }} Box</td>
                                 <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">{{ $withdrawal->pcs_quantity }} PCS</td>

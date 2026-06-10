@@ -570,8 +570,8 @@
                                         <i class="bi bi-box-seam"></i> Process
                                     </button>
                                 @else
-                                    <button class="btn-insufficient" disabled>
-                                        <i class="bi bi-x-circle"></i> Stock Kurang
+                                    <button class="btn-process" style="background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;" onclick="openFulfillModal('{{ $order->id }}')">
+                                        <i class="bi bi-info-circle"></i> Detail FIFO
                                     </button>
                                 @endif
                                 @if(in_array(Auth::user()->role, ['admin', 'admin_warehouse'], true))
@@ -1079,7 +1079,7 @@
                     loadingEl.style.display = 'none';
                     if (data.success) {
                         tableBody.innerHTML = '';
-                        if (!data.locations || data.locations.length === 0) {
+                        if ((!data.locations || data.locations.length === 0) && !data.needs_not_full) {
                             item.hasFifoError = true;
                             errorEl.textContent = 'Tidak ada rekomendasi. Butuh box not full.';
                             errorEl.style.display = 'block';
@@ -1087,27 +1087,38 @@
                             return;
                         }
 
-                        item.hasFifoError = false;
+                        item.hasFifoError = !!data.needs_not_full;
                         item.plannedQty = data.planned_qty || qty;
-                        data.locations.forEach(loc => {
-                            const labels = `${loc.is_not_full ? '<span class="badge bg-warning text-dark ms-1">Not Full</span>' : ''}${loc.is_reserved ? '<span class="badge bg-info text-dark ms-1">Reserved</span>' : ''}`;
-                            tableBody.innerHTML += `
-                                <tr>
-                                    <td>${loc.box_number} ${labels}</td>
-                                    <td>${loc.pallet_number}</td>
-                                    <td>${loc.warehouse_location}</td>
-                                    <td>${loc.stored_date}</td>
-                                    <td>${loc.available_pcs}</td>
-                                    <td class="fw-bold text-primary">${loc.will_take_pcs}</td>
-                                </tr>
-                            `;
-                        });
-                        if (data.is_partial) {
+                        
+                        if (data.locations && data.locations.length > 0) {
+                            data.locations.forEach(loc => {
+                                const labels = `${loc.is_not_full ? '<span class="badge bg-warning text-dark ms-1">Not Full</span>' : ''}${loc.is_reserved ? '<span class="badge bg-info text-dark ms-1">Reserved</span>' : ''}`;
+                                tableBody.innerHTML += `
+                                    <tr>
+                                        <td>${loc.box_number} ${labels}</td>
+                                        <td>${loc.pallet_number}</td>
+                                        <td>${loc.warehouse_location}</td>
+                                        <td>${loc.stored_date}</td>
+                                        <td>${loc.available_pcs}</td>
+                                        <td class="fw-bold text-primary">${loc.will_take_pcs}</td>
+                                    </tr>
+                                `;
+                            });
+                            tableWrap.style.display = 'block';
+                        } else {
+                            tableWrap.style.display = 'none';
+                        }
+                        
+                        if (data.needs_not_full) {
+                            errorEl.className = 'fifo-error alert alert-warning mt-2';
+                            errorEl.textContent = `Kekurangan: Butuh Box Not Full (${data.not_full_pcs_needed} Pcs). Proses pengambilan dikunci sampai box not-full tersedia.`;
+                            errorEl.style.display = 'block';
+                        } else if (data.is_partial) {
                             errorEl.className = 'fifo-error alert alert-warning mt-2';
                             errorEl.textContent = `Stok tersedia hanya ${data.planned_qty} PCS dari ${qty} PCS. Delivery akan diproses sebagian.`;
                             errorEl.style.display = 'block';
                         }
-                        tableWrap.style.display = 'block';
+                        
                         updateProcessButton();
                     } else {
                         item.hasFifoError = true;

@@ -296,13 +296,17 @@ class StockWithdrawalController extends Controller
             $plannedQty += (int) collect($locations)->sum('will_take_pcs');
             $isPartial = $allowPartial && $remainingQty > 0 && $plannedQty < $requestedQty;
 
-            if ($remainingQty > 0 && $plannedQty < $remainingQty && !$allowPartial) {
+            if ($remainingQty > 0 && $plannedQty < $requestedQty && !$allowPartial) {
+                // Diubah agar tetap mengembalikan data lokasi yang ada namun dengan flag needs_not_full
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Stok tidak cukup untuk sisa kebutuhan. Butuh box not full.',
-                    'available' => $plannedQty,
-                    'requested' => $requestedQty,
-                ], 422);
+                    'success' => true,
+                    'part_number' => $partNumber,
+                    'requested_qty' => $requestedQty,
+                    'planned_qty' => $plannedQty,
+                    'needs_not_full' => true,
+                    'not_full_pcs_needed' => $requestedQty - $plannedQty,
+                    'locations' => array_merge($reservedLocations, $locations),
+                ]);
             }
 
             if ($remainingQty > 0 && $plannedQty <= 0) {
