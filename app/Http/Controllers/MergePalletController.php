@@ -117,7 +117,7 @@ class MergePalletController extends Controller
         return $normalized !== '' ? $normalized : null;
     }
 
-    private function attachBoxesAndCreateItems(Pallet $newPallet, array $allBoxes, array $boxOrigins, Request $request): void
+    private function attachBoxesAndCreateItems(Pallet $newPallet, array $allBoxes, array $boxOrigins, Request $request, array $sourcePallets): void
     {
         $allBoxIds = array_values(array_unique(array_map('intval', array_column($allBoxes, 'id'))));
         if (empty($allBoxIds)) {
@@ -146,31 +146,29 @@ class MergePalletController extends Controller
         }
 
         $itemsByPart = [];
-        foreach ($allBoxes as $box) {
-            $partNumber = $this->normalizePartNumber($box['part_number'] ?? '');
-            if ($partNumber === null) {
-                continue;
-            }
+        foreach ($sourcePallets as $sourcePallet) {
+            foreach ($sourcePallet->items as $item) {
+                $partNumber = $this->normalizePartNumber($item->part_number);
+                if ($partNumber === null) {
+                    continue;
+                }
+                
+                if (!isset($itemsByPart[$partNumber])) {
+                    $itemsByPart[$partNumber] = [
+                        'part_number' => $partNumber,
+                        'box_quantity' => 0,
+                        'pcs_quantity' => 0,
+                        'created_at' => time(),
+                    ];
+                }
 
-            $timestamp = isset($box['created_at']) ? strtotime((string) $box['created_at']) : false;
-            if ($timestamp === false) {
-                $timestamp = time();
-            }
+                $itemsByPart[$partNumber]['box_quantity'] += (int) $item->box_quantity;
+                $itemsByPart[$partNumber]['pcs_quantity'] += (int) $item->pcs_quantity;
 
-            if (!isset($itemsByPart[$partNumber])) {
-                $itemsByPart[$partNumber] = [
-                    'part_number' => $partNumber,
-                    'box_quantity' => 0,
-                    'pcs_quantity' => 0,
-                    'created_at' => $timestamp,
-                ];
-            }
-
-            $itemsByPart[$partNumber]['box_quantity']++;
-            $itemsByPart[$partNumber]['pcs_quantity'] += (int) ($box['pcs_quantity'] ?? 0);
-
-            if ($timestamp < $itemsByPart[$partNumber]['created_at']) {
-                $itemsByPart[$partNumber]['created_at'] = $timestamp;
+                $timestamp = $item->created_at ? strtotime((string) $item->created_at) : time();
+                if ($timestamp < $itemsByPart[$partNumber]['created_at']) {
+                    $itemsByPart[$partNumber]['created_at'] = $timestamp;
+                }
             }
         }
 
@@ -425,7 +423,7 @@ class MergePalletController extends Controller
             }
 
             // 3. Attach all boxes to new pallet and group items by part_number
-            $this->attachBoxesAndCreateItems($newPallet, $allBoxes, $boxOrigins, $request);
+            $this->attachBoxesAndCreateItems($newPallet, $allBoxes, $boxOrigins, $request, $sourcePallets);
 
             // 4. Clean up source pallets
             $this->cleanupSourcePallets($sourcePallets, $newPallet);
