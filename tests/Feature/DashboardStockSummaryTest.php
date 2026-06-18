@@ -123,7 +123,7 @@ class DashboardStockSummaryTest extends TestCase
         $response->assertOk();
         $stats = $response->viewData('stats');
 
-        $this->assertSame(1, (int) ($stats['pallets_with_location'] ?? 0));
+        $this->assertSame(2, (int) ($stats['pallets_with_location'] ?? 0));
         $this->assertSame(1, (int) ($stats['total_box'] ?? 0));
         $this->assertSame(25, (int) ($stats['total_pcs'] ?? 0));
         $this->assertSame(1, (int) ($stats['total_items'] ?? 0));

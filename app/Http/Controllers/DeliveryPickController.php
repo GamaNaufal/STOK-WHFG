@@ -574,6 +574,14 @@ class DeliveryPickController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
+        $session = DeliveryPickSession::find($sessionId);
+        if ($session && $this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE
+            ], 423);
+        }
+
         $request->validate([
             'box_number' => 'required|digits:8',
         ], [
@@ -684,6 +692,14 @@ class DeliveryPickController extends Controller
         $user = Auth::user();
         if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $session = DeliveryPickSession::find($sessionId);
+        if ($session && $this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id)) {
+            return response()->json([
+                'success' => false,
+                'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE
+            ], 423);
         }
 
         $request->validate([
@@ -941,7 +957,6 @@ class DeliveryPickController extends Controller
                             if ($pallet->stockLocation) {
                                 $pallet->stockLocation->delete();
                             }
-                            $pallet->delete();
                         }
                     }
                 }
@@ -1030,7 +1045,7 @@ class DeliveryPickController extends Controller
                     $requestedRelocations[(int) $targetPalletIds[0]] = $singleRelocationCode;
                 }
 
-                $locationCheck = $this->resolveRedoLocationAssignments($targetPalletIds, $requestedRelocations);
+                $locationCheck = $this->resolveRedoLocationAssignments($targetPalletIds, $requestedRelocations, $redoContext);
                 if (!($locationCheck['success'] ?? false)) {
                     DB::rollBack();
                     return redirect()->back()->with('error', (string) ($locationCheck['message'] ?? 'Redo gagal karena konflik lokasi.'));
@@ -1138,7 +1153,7 @@ class DeliveryPickController extends Controller
                 continue;
             }
 
-            $defaultCode = strtoupper((string) ($pallet->stockLocation?->warehouse_location ?? ''));
+            $defaultCode = strtoupper((string) ($pallet->stockLocation?->warehouse_location ?: $this->getHistoricalLocationForPallet((int) $pallet->id, $redoContext)));
             if ($defaultCode === '' || $defaultCode === 'UNKNOWN') {
                 $targets[] = [
                     'pallet_id' => (int) $pallet->id,
@@ -1224,7 +1239,7 @@ class DeliveryPickController extends Controller
         return array_values(array_unique(array_filter($palletIds)));
     }
 
-    private function resolveRedoLocationAssignments(array $targetPalletIds, array $requestedRelocations): array
+    private function resolveRedoLocationAssignments(array $targetPalletIds, array $requestedRelocations, array $redoContext): array
     {
         if (empty($targetPalletIds)) {
             return [
@@ -1261,7 +1276,7 @@ class DeliveryPickController extends Controller
             }
 
             $requestedCode = $requestedRelocations[(int) $palletId] ?? null;
-            $targetCode = $requestedCode ?: ($pallet->stockLocation?->warehouse_location ?: null);
+            $targetCode = $requestedCode ?: ($pallet->stockLocation?->warehouse_location ?: $this->getHistoricalLocationForPallet((int) $palletId, $redoContext));
             if (!$targetCode || strtoupper($targetCode) === 'UNKNOWN') {
                 continue;
             }
@@ -1310,6 +1325,27 @@ class DeliveryPickController extends Controller
             'success' => true,
             'assignments' => $assignments,
         ];
+    }
+
+    private function getHistoricalLocationForPallet(int $palletId, array $redoContext): ?string
+    {
+        $withdrawals = $redoContext['withdrawals'] ?? collect();
+        $palletItemsById = $redoContext['palletItemsById'] ?? collect();
+        $boxPalletIdsByBoxId = $redoContext['boxPalletIdsByBoxId'] ?? collect();
+
+        foreach ($withdrawals as $w) {
+            if ($w->pallet_item_id) {
+                $palletItem = $palletItemsById->get((int) $w->pallet_item_id);
+                if ($palletItem && (int) $palletItem->pallet_id === $palletId) {
+                    return $w->warehouse_location;
+                }
+            }
+            $boxId = (int) $w->box_id;
+            if ($boxPalletIdsByBoxId->get($boxId) === $palletId) {
+                return $w->warehouse_location;
+            }
+        }
+        return null;
     }
 
     private function evaluateLocationConflictState(MasterLocation $masterLocation, int $targetPalletId, bool $cleanupStale): array

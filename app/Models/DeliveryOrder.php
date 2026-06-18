@@ -74,6 +74,11 @@ class DeliveryOrder extends Model
         return $query->where('status', 'approved');
     }
 
+    public function scopePartial($query)
+    {
+        return $query->where('status', 'partial');
+    }
+
     public function scopeCompleted($query)
     {
         return $query->where('status', 'completed');

@@ -105,24 +105,24 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
 
         $box = Box::create([
-            'box_number' => '10001',
+            'box_number' => '10001000',
             'part_number' => 'P-BOUND-01',
             'part_name' => 'Boundary Part',
             'pcs_quantity' => 60,
             'qty_box' => 100,
-            'qr_code' => '10001|P-BOUND-01|60',
+            'qr_code' => '10001000|P-BOUND-01|60',
             'user_id' => $user->id,
             'assigned_delivery_order_id' => $order->id,
         ]);
         $pallet->boxes()->attach($box->id);
 
         Box::create([
-            'box_number' => '10002',
+            'box_number' => '10002000',
             'part_number' => 'P-BOUND-02',
             'part_name' => 'Boundary Part 2',
             'pcs_quantity' => 30,
             'qty_box' => 100,
-            'qr_code' => '10002|P-BOUND-02|30',
+            'qr_code' => '10002000|P-BOUND-02|30',
             'user_id' => $user->id,
             'assigned_delivery_order_id' => $order->id,
         ]);
@@ -193,12 +193,12 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
 
         $box = Box::create([
-            'box_number' => '20001',
+            'box_number' => '20001000',
             'part_number' => 'P-NOT-REQ',
             'part_name' => 'Not Requested Part',
             'pcs_quantity' => 20,
             'qty_box' => 100,
-            'qr_code' => '20001|P-NOT-REQ|20',
+            'qr_code' => '20001000|P-NOT-REQ|20',
             'user_id' => $user->id,
         ]);
         $pallet->boxes()->attach($box->id);
@@ -248,12 +248,12 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
 
         $box = Box::create([
-            'box_number' => '22001',
+            'box_number' => '22001000',
             'part_number' => 'P-PENDING-01',
             'part_name' => 'Pending Part',
             'pcs_quantity' => 10,
             'qty_box' => 10,
-            'qr_code' => '22001|P-PENDING-01|10',
+            'qr_code' => '22001000|P-PENDING-01|10',
             'user_id' => $user->id,
         ]);
         $pallet->boxes()->attach($box->id);
@@ -301,7 +301,7 @@ class DeliveryAssignBoundaryTest extends TestCase
             'pallet_ids' => [],
             'new_boxes' => [
                 [
-                    'box_number' => '99001',
+                    'box_number' => '99001000',
                     'part_number' => 'P-NEW-01',
                     'pcs_quantity' => 5,
                 ],
@@ -350,7 +350,7 @@ class DeliveryAssignBoundaryTest extends TestCase
             'pallet_ids' => [],
             'new_boxes' => [
                 [
-                    'box_number' => '99002',
+                    'box_number' => '99002000',
                     'part_number' => 'P-NEW-02',
                     'pcs_quantity' => 5,
                 ],
@@ -382,13 +382,13 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('boxes', [
-            'box_number' => '99002',
+            'box_number' => '99002000',
             'part_number' => 'P-NEW-02',
             'pcs_quantity' => 5,
             'assigned_delivery_order_id' => $order->id,
         ]);
 
-        $boxId = Box::query()->where('box_number', '99002')->value('id');
+        $boxId = Box::query()->where('box_number', '99002000')->value('id');
         $this->assertNotNull($boxId);
 
         $this->assertDatabaseHas('pallet_boxes', [
@@ -437,7 +437,7 @@ class DeliveryAssignBoundaryTest extends TestCase
             'pallet_ids' => [],
             'new_boxes' => [
                 [
-                    'box_number' => '23001',
+                    'box_number' => '23001000',
                     'part_number' => 'P-NOT-IN-ORDER',
                     'pcs_quantity' => 20,
                 ],
@@ -490,7 +490,7 @@ class DeliveryAssignBoundaryTest extends TestCase
             'pallet_ids' => [],
             'new_boxes' => [
                 [
-                    'box_number' => '24001',
+                    'box_number' => '24001000',
                     'part_number' => 'P-MASTER-QTY',
                     'pcs_quantity' => 150,
                 ],
@@ -502,7 +502,7 @@ class DeliveryAssignBoundaryTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('created_new_count', 1);
         $this->assertDatabaseHas('boxes', [
-            'box_number' => '24001',
+            'box_number' => '24001000',
             'assigned_delivery_order_id' => $order->id,
             'pcs_quantity' => 150,
         ]);
@@ -543,12 +543,12 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
 
         $box = Box::create([
-            'box_number' => '30001',
+            'box_number' => '30001000',
             'part_number' => 'P-OVERFLOW',
             'part_name' => 'Overflow Part',
             'pcs_quantity' => 60,
             'qty_box' => 100,
-            'qr_code' => '30001|P-OVERFLOW|60',
+            'qr_code' => '30001000|P-OVERFLOW|60',
             'user_id' => $user->id,
         ]);
         $pallet->boxes()->attach($box->id);
@@ -559,7 +559,7 @@ class DeliveryAssignBoundaryTest extends TestCase
             'pallet_ids' => [],
             'new_boxes' => [
                 [
-                    'box_number' => '30002',
+                    'box_number' => '30002000',
                     'part_number' => 'P-OVERFLOW',
                     'pcs_quantity' => 50,
                 ],
@@ -571,7 +571,7 @@ class DeliveryAssignBoundaryTest extends TestCase
         $firstResponse->assertStatus(409);
         $firstResponse->assertJsonPath('requires_overage_confirmation', true);
         $this->assertDatabaseMissing('boxes', [
-            'box_number' => '30002',
+            'box_number' => '30002000',
             'assigned_delivery_order_id' => $order->id,
         ]);
         $this->assertDatabaseMissing('boxes', [
@@ -586,7 +586,7 @@ class DeliveryAssignBoundaryTest extends TestCase
             'confirm_overage' => true,
             'new_boxes' => [
                 [
-                    'box_number' => '30002',
+                    'box_number' => '30002000',
                     'part_number' => 'P-OVERFLOW',
                     'pcs_quantity' => 50,
                 ],
@@ -609,7 +609,7 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
 
         $this->assertDatabaseHas('boxes', [
-            'box_number' => '30002',
+            'box_number' => '30002000',
             'assigned_delivery_order_id' => $order->id,
         ]);
     }
@@ -649,12 +649,12 @@ class DeliveryAssignBoundaryTest extends TestCase
         ]);
 
         $box = Box::create([
-            'box_number' => '40001',
+            'box_number' => '40001000',
             'part_number' => 'P-PREVIEW',
             'part_name' => 'Preview Part',
             'pcs_quantity' => 100,
             'qty_box' => 100,
-            'qr_code' => '40001|P-PREVIEW|100',
+            'qr_code' => '40001000|P-PREVIEW|100',
             'user_id' => $user->id,
             'assigned_delivery_order_id' => $order->id, // Pre-assigned
         ]);
@@ -675,6 +675,6 @@ class DeliveryAssignBoundaryTest extends TestCase
         $locations = $response->json('locations');
         $this->assertCount(1, $locations, 'Should have 1 location');
         $this->assertTrue($locations[0]['is_reserved'], 'Assigned box should be marked as reserved');
-        $this->assertEquals('40001', $locations[0]['box_number']);
+        $this->assertEquals('40001000', $locations[0]['box_number']);
     }
 }

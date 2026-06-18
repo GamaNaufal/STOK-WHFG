@@ -51,7 +51,7 @@ class PartNumberAndBoxIdValidationTest extends TestCase
         $response->assertStatus(422);
         $response->assertJson([
             'success' => false,
-            'message' => 'ID Box hanya boleh berisi angka.',
+            'message' => 'ID Box harus 8 angka.',
         ]);
     }
 }

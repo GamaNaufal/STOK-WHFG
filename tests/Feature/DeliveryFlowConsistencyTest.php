@@ -15,6 +15,7 @@ use App\Models\PalletItem;
 use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
+use App\Models\PartSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -469,22 +470,22 @@ class DeliveryFlowConsistencyTest extends TestCase
         ]);
 
         $boxExpected = Box::create([
-            'box_number' => 'BOX-EXPECTED',
+            'box_number' => '11111111',
             'part_number' => 'P-001',
             'part_name' => 'Part A',
             'pcs_quantity' => 100,
             'qty_box' => 1,
-            'qr_code' => 'BOX-EXPECTED|P-001|100',
+            'qr_code' => '11111111|P-001|100',
             'user_id' => $operator->id,
         ]);
 
         $boxMismatch = Box::create([
-            'box_number' => 'BOX-MISMATCH',
+            'box_number' => '22222222',
             'part_number' => 'P-001',
             'part_name' => 'Part A',
             'pcs_quantity' => 100,
             'qty_box' => 1,
-            'qr_code' => 'BOX-MISMATCH|P-001|100',
+            'qr_code' => '22222222|P-001|100',
             'user_id' => $operator->id,
         ]);
 
@@ -1178,6 +1179,8 @@ class DeliveryFlowConsistencyTest extends TestCase
 
     public function test_verify_scan_is_blocked_when_additional_not_full_request_pending(): void
     {
+        PartSetting::create(['part_number' => 'P-GATE-VERIFY', 'qty_box' => 20]);
+
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $sales = User::factory()->create(['role' => 'sales']);
 
@@ -1221,6 +1224,8 @@ class DeliveryFlowConsistencyTest extends TestCase
 
     public function test_legacy_fulfill_and_confirm_are_blocked_when_additional_not_full_request_pending(): void
     {
+        PartSetting::create(['part_number' => 'P-GATE-LEGACY', 'qty_box' => 10]);
+
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $sales = User::factory()->create(['role' => 'sales']);
 

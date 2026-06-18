@@ -89,6 +89,11 @@ class StockAvailabilityDeduplicationTest extends TestCase
             'expired_status' => 'active',
         ]);
 
+        \App\Models\PartSetting::create([
+            'part_number' => 'P-DEDUP-PREVIEW',
+            'qty_box' => 100,
+        ]);
+
         $palletA = Pallet::create(['pallet_number' => 'PLT-DEDUP-PREV-A']);
         $palletB = Pallet::create(['pallet_number' => 'PLT-DEDUP-PREV-B']);
 
@@ -144,6 +149,11 @@ class StockAvailabilityDeduplicationTest extends TestCase
             'expired_status' => 'active',
             'created_at' => now()->subDay(),
             'updated_at' => now()->subDay(),
+        ]);
+
+        \App\Models\PartSetting::create([
+            'part_number' => 'P-STRICT-PREVIEW',
+            'qty_box' => 100,
         ]);
 
         $palletA = Pallet::create(['pallet_number' => 'PLT-STRICT-A']);

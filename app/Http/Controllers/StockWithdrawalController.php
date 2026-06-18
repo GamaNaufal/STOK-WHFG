@@ -422,6 +422,21 @@ class StockWithdrawalController extends Controller
                     if ($masterLocation) {
                         $masterLocation->autoVacateIfEmpty();
                     }
+
+                    $remainingItems = \Illuminate\Support\Facades\DB::table('pallet_items')
+                        ->where('pallet_id', $pallet->id)
+                        ->where(function($q) {
+                            $q->where('pcs_quantity', '>', 0)
+                              ->orWhere('box_quantity', '>', 0);
+                        })
+                        ->count();
+
+                    if ($remainingItems === 0) {
+                        if ($pallet->stockLocation) {
+                            $pallet->stockLocation->delete();
+                        }
+                        $pallet->delete();
+                    }
                 }
 
                 if ($deliveryItem) {
@@ -541,6 +556,20 @@ class StockWithdrawalController extends Controller
                         $masterLocation = MasterLocation::where('current_pallet_id', $pallet->id)->lockForUpdate()->first();
                         if ($masterLocation) {
                             $masterLocation->autoVacateIfEmpty();
+                        }
+
+                        $remainingItems = \Illuminate\Support\Facades\DB::table('pallet_items')
+                            ->where('pallet_id', $pallet->id)
+                            ->where(function($q) {
+                                $q->where('pcs_quantity', '>', 0)
+                                  ->orWhere('box_quantity', '>', 0);
+                            })
+                            ->count();
+
+                        if ($remainingItems === 0) {
+                            if ($pallet->stockLocation) {
+                                $pallet->stockLocation->delete();
+                            }
                         }
                     }
                 }

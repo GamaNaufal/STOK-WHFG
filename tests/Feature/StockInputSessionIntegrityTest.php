@@ -34,22 +34,22 @@ class StockInputSessionIntegrityTest extends TestCase
         ]);
 
         $boxA = Box::create([
-            'box_number' => '970101',
+            'box_number' => '97010100',
             'part_number' => 'P-SI-A',
             'pcs_quantity' => 10,
             'qty_box' => 1,
-            'qr_code' => '970101|P-SI-A|10',
+            'qr_code' => '97010100|P-SI-A|10',
             'user_id' => $operator->id,
             'is_withdrawn' => false,
             'expired_status' => 'active',
         ]);
 
         $boxB = Box::create([
-            'box_number' => '970102',
+            'box_number' => '97010200',
             'part_number' => 'P-SI-B',
             'pcs_quantity' => 20,
             'qty_box' => 1,
-            'qr_code' => '970102|P-SI-B|20',
+            'qr_code' => '97010200|P-SI-B|20',
             'user_id' => $operator->id,
             'is_withdrawn' => false,
             'expired_status' => 'active',
@@ -123,7 +123,7 @@ class StockInputSessionIntegrityTest extends TestCase
                 'current_pallet_source' => 'existing',
             ])
             ->postJson(route('stock-input.scan-barcode'), [
-                'barcode' => '970201',
+                'barcode' => '97020100',
             ]);
 
         $scanBox->assertOk()->assertJson(['success' => true]);
@@ -135,7 +135,7 @@ class StockInputSessionIntegrityTest extends TestCase
         $scanPart->assertOk()->assertJson(['success' => true]);
 
         $this->assertDatabaseMissing('boxes', [
-            'box_number' => '970201',
+            'box_number' => '97020100',
         ]);
         $this->assertDatabaseMissing('pallet_items', [
             'pallet_id' => $pallet->id,
@@ -145,7 +145,7 @@ class StockInputSessionIntegrityTest extends TestCase
         $this->actingAs($operator)->postJson(route('stock-input.clear-session'))->assertOk();
 
         $this->assertDatabaseMissing('boxes', [
-            'box_number' => '970201',
+            'box_number' => '97020100',
         ]);
         $this->assertDatabaseMissing('pallet_items', [
             'pallet_id' => $pallet->id,
@@ -165,11 +165,11 @@ class StockInputSessionIntegrityTest extends TestCase
         ]);
 
         $box = Box::create([
-            'box_number' => '970301',
+            'box_number' => '97030100',
             'part_number' => 'P-SI-QR',
             'pcs_quantity' => 30,
             'qty_box' => 1,
-            'qr_code' => '970301|P-SI-QR|30',
+            'qr_code' => '97030100|P-SI-QR|30',
             'user_id' => $operator->id,
             'is_withdrawn' => false,
             'expired_status' => 'active',
@@ -181,7 +181,7 @@ class StockInputSessionIntegrityTest extends TestCase
                 'current_pallet_source' => 'existing',
             ])
             ->postJson(route('stock-input.scan-box'), [
-                'qr_data' => '970301|P-SI-QR|30',
+                'qr_data' => '97030100|P-SI-QR|30',
             ]);
 
         $response->assertOk()->assertJson(['success' => true]);
@@ -220,7 +220,7 @@ class StockInputSessionIntegrityTest extends TestCase
                 'current_pallet_source' => 'existing',
                 'scanned_boxes' => [
                     [
-                        'box_number' => '970401',
+                        'box_number' => '97040100',
                         'part_number' => 'P-SI-MISMATCH',
                         'pcs_quantity' => 40,
                         'qty_box' => 40,
@@ -238,7 +238,7 @@ class StockInputSessionIntegrityTest extends TestCase
         ]);
 
         $this->assertDatabaseMissing('boxes', [
-            'box_number' => '970401',
+            'box_number' => '97040100',
         ]);
         $this->assertDatabaseCount('stock_inputs', 0);
     }
@@ -265,7 +265,7 @@ class StockInputSessionIntegrityTest extends TestCase
                 'current_pallet_source' => 'existing',
                 'scanned_boxes' => [
                     [
-                        'box_number' => '970501',
+                        'box_number' => '97050100',
                         'part_number' => 'P-SI-OVERRIDE',
                         'pcs_quantity' => 50,
                         'qty_box' => 50,
@@ -285,7 +285,7 @@ class StockInputSessionIntegrityTest extends TestCase
         ]);
 
         $this->assertDatabaseMissing('boxes', [
-            'box_number' => '970501',
+            'box_number' => '97050100',
         ]);
         $this->assertDatabaseHas('master_locations', [
             'id' => $targetLocation->id,

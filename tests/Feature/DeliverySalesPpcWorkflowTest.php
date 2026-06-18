@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
+use App\Models\PartSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -81,6 +82,9 @@ class DeliverySalesPpcWorkflowTest extends TestCase
 
     public function test_sales_can_submit_delivery_order_with_multiple_items(): void
     {
+        PartSetting::create(['part_number' => 'P-001', 'qty_box' => 100]);
+        PartSetting::create(['part_number' => 'P-002', 'qty_box' => 50]);
+
         $sales = User::factory()->create(['role' => 'sales']);
 
         $response = $this->actingAs($sales)->post(route('delivery.store'), [
