@@ -391,6 +391,15 @@ class StockInputAndNotFullWorkflowTest extends TestCase
             'warehouse_location' => 'B1',
         ]);
 
+        $stockInputId = (int) \App\Models\StockInput::query()
+            ->where('pallet_id', $targetPallet->id)
+            ->latest('id')
+            ->value('id');
+        $this->assertDatabaseHas('stock_input_boxes', [
+            'stock_input_id' => $stockInputId,
+            'box_id' => $boxId,
+        ]);
+
         $this->assertDatabaseHas('delivery_order_items', [
             'id' => $orderItem->id,
             'quantity' => 130,

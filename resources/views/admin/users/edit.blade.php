@@ -54,6 +54,17 @@
         </div>
 
         <div class="mb-3">
+            <label class="form-label fw-semibold">Status Akun</label>
+            <select name="is_active" class="form-select" required>
+                <option value="1" {{ old('is_active', $user->is_active ? '1' : '0') === '1' ? 'selected' : '' }}>Aktif</option>
+                <option value="0" {{ old('is_active', $user->is_active ? '1' : '0') === '0' ? 'selected' : '' }}>Nonaktif</option>
+            </select>
+            @error('is_active')
+                <div class="text-danger small">{{ $message }}</div>
+            @enderror
+        </div>
+
+        <div class="mb-3">
             <label class="form-label fw-semibold">Kata Sandi Baru (Kosongkan jika tidak diubah)</label>
             <input type="password" name="password" class="form-control" placeholder="Masukkan kata sandi baru">
             @error('password')

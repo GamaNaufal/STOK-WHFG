@@ -1141,6 +1141,10 @@ class StockViewController extends Controller
                     'updated_at' => now(),
                 ]);
 
+            if ($pallet->stockLocation) {
+                $pallet->stockLocation->delete();
+            }
+
             $pallet->delete();
 
             AuditService::log(

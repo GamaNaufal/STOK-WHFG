@@ -138,6 +138,7 @@ Box dapat terhubung ke lebih dari satu palet pada data tertentu. Perhitungan sto
 
 - User login melalui email dan password.
 - Semua halaman utama dilindungi middleware `auth`.
+- Akun dengan `is_active = false` ditolak saat login dan pada request terautentikasi berikutnya.
 - Hak akses dibatasi berdasarkan role.
 - Role `admin` selalu diizinkan oleh middleware role.
 - Semua user yang login dapat memperbarui profil.
@@ -151,7 +152,7 @@ File utama:
 
 ### 2. Pengelolaan master data
 
-Admin mengelola user dan role.
+Admin mengelola user, role, dan status aktif akun. Aksi hapus user menonaktifkan akun agar histori transaksi tidak ikut terhapus.
 
 Admin Warehouse/Admin mengelola:
 
@@ -277,7 +278,7 @@ Admin Warehouse/Admin dapat mengubah:
 - tanggal penyimpanan box;
 - alasan koreksi wajib.
 
-Supervisi/Admin Warehouse/Admin dapat menghapus box atau palet dari stok aktif. Penghapusan box menggunakan soft delete agar histori transaksi tetap tersedia. Jika box terakhir dihapus, palet dan occupancy lokasinya ikut dibersihkan.
+Supervisi/Admin Warehouse/Admin dapat menghapus box atau palet dari stok aktif. Penghapusan box dan palet menggunakan soft delete agar histori transaksi tetap tersedia. Jika box terakhir dihapus, palet dan occupancy lokasinya ikut dibersihkan.
 
 File utama:
 
@@ -428,6 +429,7 @@ Aturan:
 
 - order hasil split tidak dapat di-split lagi;
 - order yang sedang memiliki sesi picking aktif tidak dapat di-split;
+- nomor part dalam payload split harus unik;
 - quantity split harus lebih kecil dari quantity parent;
 - child order dibuat dengan status `approved`;
 - quantity parent dikurangi;
@@ -437,7 +439,7 @@ Restore split:
 
 - child belum boleh `completed` atau `deleted`;
 - child tidak boleh sedang diproses;
-- quantity child dikembalikan ke parent;
+- seluruh quantity setiap part pada child dikembalikan ke parent;
 - child di-soft-delete;
 - parent kembali `approved` bila tidak ada child aktif lain.
 
@@ -481,7 +483,7 @@ File utama:
 
 ### 16. Expired box
 
-Umur box dihitung dari waktu penyimpanan awal.
+Umur box dihitung dari transaksi `stock_input_boxes -> stock_inputs.stored_at` milik box tersebut. Jika mapping legacy tidak tersedia, sistem memakai `boxes.created_at`.
 
 Status:
 
@@ -568,6 +570,9 @@ Status yang digunakan:
 
 - Operasi stok dan delivery kritis dijalankan dalam database transaction.
 - Row locking digunakan untuk mencegah double assignment, double scan, dan race condition lokasi.
+- Endpoint withdrawal hanya dapat diakses Warehouse Operator, Admin Warehouse, dan Admin.
+- Withdrawal exact di-rollback jika quantity box aktual tidak sama dengan quantity request.
+- `fulfilled_quantity` diperbarui dari quantity yang benar-benar berhasil di-withdraw.
 - Box ID bersifat unik dan umumnya harus delapan digit.
 - `stock_input_boxes` adalah sumber mapping audit transaksi input yang paling akurat.
 - Box aktif adalah sumber utama perhitungan stok.
@@ -575,17 +580,18 @@ Status yang digunakan:
 - Box yang sama harus dihitung satu kali walaupun memiliki relasi ke lebih dari satu palet.
 - Box dalam sesi picking aktif tidak boleh dialokasikan ke order lain.
 - Lokasi hanya boleh ditempati satu palet aktif.
-- Soft delete digunakan agar histori stock input dan delivery tetap dapat diaudit.
+- Soft delete digunakan untuk box, palet, stock input, withdrawal, dan delivery agar histori tetap dapat diaudit.
+- User dinonaktifkan melalui `is_active`, bukan dihapus, sehingga foreign key dan histori tetap utuh.
 
 ## Catatan yang Belum Diputuskan
 
 Catatan berikut sengaja disimpan untuk pembahasan berikutnya dan bukan instruksi untuk langsung diperbaiki:
 
-1. Dokumentasi `docs/BACKORDER_GUIDE.md` menjelaskan backorder otomatis, tetapi implementasi aktif belum menjalankan flow tersebut secara penuh.
+1. Dokumentasi `docs/BACKORDER_GUIDE.md` menjelaskan rancangan backorder, tetapi fitur ditandai belum aktif.
 2. Migration memiliki kolom `delivery_pick_sessions.allow_partial`, tetapi `DeliveryPickController::createSessionItems()` saat ini menetapkan `$allowPartial = false`.
 3. Completion picking tetap mewajibkan quantity penuh dan kemudian menetapkan order sebagai `completed`.
 4. Proses partial yang benar-benar aktif saat ini adalah split delivery manual dengan parent/child order.
-5. Laporan memiliki filter dan label Backorder, tetapi builder fulfillment saat ini hanya menghasilkan status `Full` atau `Partial`, sehingga row `Backorder` tidak terbentuk.
+5. Filter, kartu, dan label Backorder pada laporan operasional disembunyikan sampai flow tersebut selesai dibuat.
 6. Terdapat dua flow box not full:
    - flow langsung dari stock input tanpa approval Supervisi;
    - flow request khusus dengan approval Supervisi.
@@ -603,4 +609,3 @@ Jangan mengubah area tersebut hanya karena membaca catatan ini. Tunggu perintah 
   - tugas lintas domain memang membutuhkannya;
   - implementasi yang ditemukan bertentangan dengan memo.
 - Setelah perubahan proses bisnis yang signifikan, perbarui bagian terkait dan tanggal verifikasi memo.
-

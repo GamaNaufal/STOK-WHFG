@@ -18,7 +18,7 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Protected Routes
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Profile Routes - Available to all authenticated users
@@ -33,7 +33,8 @@ Route::middleware('auth')->group(function () {
 
     // Master Locations - Admin Warehouse + Admin IT
     Route::middleware('role:admin_warehouse,admin')->group(function () {
-        Route::resource('locations', \App\Http\Controllers\MasterLocationController::class);
+        Route::resource('locations', \App\Http\Controllers\MasterLocationController::class)
+            ->except(['show', 'create']);
     });
 
     // Admin Warehouse Routes - Master Part & Qty
@@ -89,9 +90,15 @@ Route::middleware('auth')->group(function () {
         Route::delete('/delivery-stock/{id}', [\App\Http\Controllers\DeliveryOrderController::class, 'destroy'])->name('delivery.destroy');
         
         // Warehouse Execution (Fulfillment) - Uses StockWithdrawalController logic
-        Route::get('/delivery-stock/{id}/fulfill', [StockWithdrawalController::class, 'fulfillOrder'])->name('delivery.fulfill');
-        Route::get('/delivery-stock/{id}/fulfill-data', [\App\Http\Controllers\DeliveryOrderController::class, 'fulfillData'])->name('delivery.fulfill-data');
-        Route::post('/delivery-stock/confirm-withdrawal', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm'); // Keep logic
+        Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
+            Route::get('/delivery-stock/{id}/fulfill', [StockWithdrawalController::class, 'fulfillOrder'])->name('delivery.fulfill');
+            Route::get('/delivery-stock/{id}/fulfill-data', [\App\Http\Controllers\DeliveryOrderController::class, 'fulfillData'])->name('delivery.fulfill-data');
+            Route::post('/delivery-stock/confirm-withdrawal', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm');
+
+            // Legacy/Utility routes for withdrawal logic (Search, Preview)
+            Route::post('/stock-withdrawal/search', [StockWithdrawalController::class, 'searchParts'])->name('stock-withdrawal.search');
+            Route::post('/stock-withdrawal/preview', [StockWithdrawalController::class, 'preview'])->name('stock-withdrawal.preview');
+        });
 
         // Picklist + Scan Flow
         Route::get('/delivery-stock/picking-verification', [DeliveryPickController::class, 'verificationIndex'])->name('delivery.pick.verification');
@@ -106,9 +113,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/delivery-pick/{session}/scan', [DeliveryPickController::class, 'scanBox'])->name('delivery.pick.scan.submit');
         Route::post('/delivery-pick/{session}/complete', [DeliveryPickController::class, 'complete'])->name('delivery.pick.complete');
         
-        // Legacy/Utility routes for withdrawal logic (Search, Preview)
-        Route::post('/stock-withdrawal/search', [StockWithdrawalController::class, 'searchParts'])->name('stock-withdrawal.search');
-        Route::post('/stock-withdrawal/preview', [StockWithdrawalController::class, 'preview'])->name('stock-withdrawal.preview');
     });
 
     // Merge Pallet Routes (Warehouse Operator + Admin)
@@ -184,5 +188,3 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable']); // Search Available Locations
 
 });
-
-

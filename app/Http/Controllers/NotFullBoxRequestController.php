@@ -265,6 +265,14 @@ class NotFullBoxRequestController extends Controller
                     'stored_at' => now(),
                     'part_numbers' => [$request->part_number],
                 ]);
+
+                DB::table('stock_input_boxes')->insert([
+                    'stock_input_id' => $stockInput->id,
+                    'box_id' => $box->id,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
                 AuditService::logStockInput($stockInput, 'created');
 
                 $request->status = 'approved';

@@ -128,16 +128,26 @@ class ExpiredBoxService
 
     public function getExpirableBoxesQuery()
     {
-        $storedAtSub = DB::table('pallet_boxes as pb')
-            ->join('stock_inputs as si', 'si.pallet_id', '=', 'pb.pallet_id')
-            ->select('pb.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
+        $storedAtSub = DB::table('stock_input_boxes as sib')
+            ->join('stock_inputs as si', 'si.id', '=', 'sib.stock_input_id')
+            ->whereNull('si.deleted_at')
+            ->select('sib.box_id', DB::raw('MIN(si.stored_at) as stored_at'))
+            ->groupBy('sib.box_id');
+
+        $canonicalPalletSub = DB::table('pallet_boxes as pb')
+            ->join('pallets as p', 'p.id', '=', 'pb.pallet_id')
+            ->whereNull('p.deleted_at')
+            ->select('pb.box_id', DB::raw('MAX(pb.id) as pivot_id'))
             ->groupBy('pb.box_id');
 
         return DB::table('boxes')
-            ->joinSub($storedAtSub, 'stock_in', function ($join) {
+            ->leftJoinSub($storedAtSub, 'stock_in', function ($join) {
                 $join->on('stock_in.box_id', '=', 'boxes.id');
             })
-            ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
+            ->joinSub($canonicalPalletSub, 'canonical_pallet', function ($join) {
+                $join->on('canonical_pallet.box_id', '=', 'boxes.id');
+            })
+            ->join('pallet_boxes', 'pallet_boxes.id', '=', 'canonical_pallet.pivot_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->leftJoin('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
             ->whereNull('boxes.deleted_at')
@@ -147,7 +157,7 @@ class ExpiredBoxService
                 'boxes.box_number',
                 'boxes.part_number',
                 'boxes.expired_status',
-                'stock_in.stored_at',
+                DB::raw('COALESCE(stock_in.stored_at, boxes.created_at) as stored_at'),
                 'pallets.id as pallet_id',
                 'pallets.pallet_number',
                 'stock_locations.warehouse_location'

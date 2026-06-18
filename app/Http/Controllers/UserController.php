@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
@@ -91,11 +92,15 @@ class UserController extends Controller
             'email' => 'required|email|max:255|unique:users,email,' . $user->id,
             'role' => 'required|in:admin,admin_warehouse,warehouse_operator,sales,ppc,supervisi',
             'password' => 'nullable|string|min:6|confirmed',
+            'is_active' => 'sometimes|boolean',
         ]);
 
         $user->name = $validated['name'];
         $user->email = $validated['email'];
         $user->role = $validated['role'];
+        if (array_key_exists('is_active', $validated)) {
+            $user->is_active = (bool) $validated['is_active'];
+        }
 
         if (!empty($validated['password'])) {
             $user->password = Hash::make($validated['password']);
@@ -115,8 +120,13 @@ class UserController extends Controller
             return redirect()->route('users.index')->with('error', 'Tidak bisa menghapus akun sendiri.');
         }
 
-        $user->delete();
+        $user->forceFill([
+            'is_active' => false,
+            'remember_token' => null,
+        ])->save();
 
-        return redirect()->route('users.index')->with('success', 'User berhasil dihapus.');
+        DB::table('sessions')->where('user_id', $user->id)->delete();
+
+        return redirect()->route('users.index')->with('success', 'User berhasil dinonaktifkan. Histori aktivitas tetap tersimpan.');
     }
 }

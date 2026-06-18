@@ -1,5 +1,7 @@
 # Panduan Fitur Pengiriman Sebagian dan Backorder
 
+> Status: belum aktif untuk operasional. Antarmuka laporan backorder disembunyikan sampai aturan bisnis dan implementasi partial delivery diselesaikan end-to-end.
+
 Panduan ini dibuat untuk user operasional yang memakai sistem
 
 ## Fitur Ini Untuk Apa

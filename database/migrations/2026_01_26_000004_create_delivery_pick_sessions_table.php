@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('delivery_order_id')->constrained('delivery_orders')->onDelete('cascade');
             $table->foreignId('created_by')->constrained('users')->onDelete('cascade');
-            $table->enum('status', ['pending', 'scanning', 'blocked', 'approved', 'completed', 'cancelled'])->default('pending');
+            $table->enum('status', ['pending', 'scanning', 'blocked', 'approved', 'stale', 'completed', 'cancelled'])->default('pending');
             $table->dateTime('started_at')->nullable();
             $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
             $table->dateTime('approved_at')->nullable();

@@ -451,13 +451,13 @@ class DeliveryOrderController extends Controller
 
         $validated = $request->validate([
             'items' => 'required|array|min:1',
-            'items.*.part_number' => 'required|string',
+            'items.*.part_number' => 'required|string|distinct',
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
         try {
             DB::transaction(function () use ($id, $validated) {
-                $order = DeliveryOrder::with(['items'])->lockForUpdate()->findOrFail($id);
+                $order = DeliveryOrder::lockForUpdate()->findOrFail($id);
 
                 if (!empty($order->parent_delivery_order_id)) {
                     throw new \RuntimeException('Delivery hasil split tidak dapat di-split lagi.');
@@ -476,14 +476,26 @@ class DeliveryOrderController extends Controller
                     throw new \RuntimeException('Delivery sedang diproses dan tidak bisa di-split.');
                 }
 
-                $itemsToSplit = $validated['items'];
-                // Validate each requested part exists and quantity is valid
+                $sourceItems = DeliveryOrderItem::query()
+                    ->where('delivery_order_id', (int) $order->id)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('part_number');
+
+                $itemsToSplit = collect($validated['items'])
+                    ->groupBy(fn ($entry) => trim((string) ($entry['part_number'] ?? '')))
+                    ->map(fn ($entries, $partNumber) => [
+                        'part_number' => (string) $partNumber,
+                        'quantity' => (int) $entries->sum(fn ($entry) => (int) ($entry['quantity'] ?? 0)),
+                    ])
+                    ->values();
+
                 $childItems = [];
                 foreach ($itemsToSplit as $entry) {
                     $partNumber = trim((string) ($entry['part_number'] ?? ''));
                     $splitQuantity = (int) ($entry['quantity'] ?? 0);
 
-                    $sourceItem = $order->items->firstWhere('part_number', $partNumber);
+                    $sourceItem = $sourceItems->get($partNumber);
                     if (!$sourceItem) {
                         throw new \RuntimeException("Part {$partNumber} tidak ditemukan pada delivery ini.");
                     }
@@ -566,22 +578,31 @@ class DeliveryOrderController extends Controller
                     throw new \RuntimeException('Delivery hasil split sedang diproses dan tidak bisa dikembalikan.');
                 }
 
-                $childItem = $childOrder->items->first();
-                if (!$childItem) {
+                if ($childOrder->items->isEmpty()) {
                     throw new \RuntimeException('Item split tidak ditemukan.');
                 }
 
-                $parentItem = $parentOrder->items->firstWhere('part_number', $childItem->part_number);
-                if ($parentItem) {
-                    $parentItem->quantity = (int) $parentItem->quantity + (int) $childItem->quantity;
-                    $parentItem->save();
-                } else {
-                    DeliveryOrderItem::create([
+                $parentItems = DeliveryOrderItem::query()
+                    ->where('delivery_order_id', (int) $parentOrder->id)
+                    ->lockForUpdate()
+                    ->get()
+                    ->keyBy('part_number');
+
+                foreach ($childOrder->items as $childItem) {
+                    $parentItem = $parentItems->get((string) $childItem->part_number);
+                    if ($parentItem) {
+                        $parentItem->quantity = (int) $parentItem->quantity + (int) $childItem->quantity;
+                        $parentItem->save();
+                        continue;
+                    }
+
+                    $parentItem = DeliveryOrderItem::create([
                         'delivery_order_id' => $parentOrder->id,
                         'part_number' => $childItem->part_number,
                         'quantity' => (int) $childItem->quantity,
                         'fulfilled_quantity' => 0,
                     ]);
+                    $parentItems->put((string) $childItem->part_number, $parentItem);
                 }
 
                 $childOrder->status = 'deleted';
@@ -780,7 +801,7 @@ class DeliveryOrderController extends Controller
             'customer_name' => 'required|string',
             'delivery_date' => 'required|date',
             'items' => 'required|array|min:1',
-            'items.*.part_number' => 'required|string',
+            'items.*.part_number' => 'required|string|distinct',
             'items.*.quantity' => 'required|integer|min:1'
         ]);
 
@@ -831,7 +852,7 @@ class DeliveryOrderController extends Controller
             'customer_name' => 'required|string',
             'delivery_date' => 'required|date',
             'items' => 'required|array|min:1',
-            'items.*.part_number' => 'required|string',
+            'items.*.part_number' => 'required|string|distinct',
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 

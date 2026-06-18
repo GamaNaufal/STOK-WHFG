@@ -16,7 +16,7 @@ class ExpiredBoxController extends Controller
 
         $boxesQuery = $service->getExpirableBoxesQuery()
             ->whereIn('boxes.expired_status', ['warning', 'expired'])
-            ->orderBy('stock_in.stored_at', 'asc')
+            ->orderBy('stored_at', 'asc')
             ->get();
 
         $warningBoxes = $boxesQuery->filter(fn ($row) => $row->expired_status === 'warning');

@@ -70,7 +70,7 @@ class OperationalReportService
 
     private function normalizeFulfillmentFilter(string $filter): string
     {
-        if (!in_array($filter, ['all', 'full', 'partial', 'backorder'], true)) {
+        if (!in_array($filter, ['all', 'full', 'partial'], true)) {
             return 'all';
         }
 
@@ -347,16 +347,14 @@ class OperationalReportService
         $fulfillmentRows = match ($fulfillmentFilter) {
             'full' => $fulfillmentRows->where('status', 'Full')->values(),
             'partial' => $fulfillmentRows->where('status', 'Partial')->values(),
-            'backorder' => $fulfillmentRows->where('status', 'Backorder')->values(),
             default => $fulfillmentRows->values(),
         };
 
         $fullCount = $fulfillmentRows->where('status', 'Full')->count();
-        $backorderCount = $fulfillmentRows->where('status', 'Backorder')->count();
         $totalCount = $fulfillmentRows->whereIn('status', ['Full', 'Partial'])->count();
         $fulfillmentRate = $totalCount > 0 ? round(($fullCount / $totalCount) * 100, 1) : 0;
 
-        return [$fulfillmentRows, $fulfillmentRate, $backorderCount];
+        return [$fulfillmentRows, $fulfillmentRate];
     }
 
     private function buildAuditReport(Request $request, ?Carbon $start, ?Carbon $end, bool $forExport): array
@@ -433,7 +431,7 @@ class OperationalReportService
         $peakHours = $this->buildPeakHours($inboundQuery, $outboundQuery);
 
         [$issueSummary, $issueList] = $this->buildIssueReport($start, $end);
-        [$fulfillmentRows, $fulfillmentRate, $backorderCount] = $this->buildFulfillmentReport($start, $end, $fulfillmentFilter);
+        [$fulfillmentRows, $fulfillmentRate] = $this->buildFulfillmentReport($start, $end, $fulfillmentFilter);
         [$auditSummary, $auditLogs, $auditTypes, $auditActions, $auditUserOptions] = $this->buildAuditReport($request, $start, $end, $forExport);
 
         return [
@@ -451,7 +449,6 @@ class OperationalReportService
             'issueList' => $issueList,
             'fulfillmentRows' => $fulfillmentRows,
             'fulfillmentRate' => $fulfillmentRate,
-            'backorderCount' => $backorderCount,
             'fulfillmentFilter' => $fulfillmentFilter,
             'auditSummary' => $auditSummary,
             'auditLogs' => $auditLogs,

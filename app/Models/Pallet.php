@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * @property int $id
@@ -11,10 +12,18 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Pallet extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'pallet_number',
         'created_at',
         'updated_at',
+    ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+        'deleted_at' => 'datetime',
     ];
 
     public function items()

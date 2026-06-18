@@ -270,8 +270,8 @@ class MergePalletFlowTest extends TestCase
 
         $this->assertNotNull($newPallet);
 
-        $this->assertDatabaseMissing('pallets', ['id' => $pallet1->id]);
-        $this->assertDatabaseMissing('pallets', ['id' => $pallet2->id]);
+        $this->assertSoftDeleted('pallets', ['id' => $pallet1->id]);
+        $this->assertSoftDeleted('pallets', ['id' => $pallet2->id]);
 
         $this->assertDatabaseHas('master_locations', [
             'id' => $location1->id,

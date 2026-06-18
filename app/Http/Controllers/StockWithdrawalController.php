@@ -20,6 +20,12 @@ use Illuminate\Support\Str;
 class StockWithdrawalController extends Controller
 {
     private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
+    private const WAREHOUSE_ROLES = ['warehouse_operator', 'admin_warehouse', 'admin'];
+
+    private function ensureWarehouseRole(): void
+    {
+        abort_unless(Auth::check() && in_array(Auth::user()->role, self::WAREHOUSE_ROLES, true), 403);
+    }
 
     private function applyStoredLocationExistsFilter($query)
     {
@@ -149,6 +155,8 @@ class StockWithdrawalController extends Controller
      */
     public function fulfillOrder($id)
     {
+        $this->ensureWarehouseRole();
+
         $order = DeliveryOrder::with('items')->findOrFail($id);
 
         if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $order->id)) {
@@ -163,6 +171,8 @@ class StockWithdrawalController extends Controller
      */
     public function searchParts(Request $request)
     {
+        $this->ensureWarehouseRole();
+
         $query = $request->input('q', '');
 
         $boxPartsQuery = DB::table('boxes')
@@ -213,6 +223,8 @@ class StockWithdrawalController extends Controller
      */
     public function preview(Request $request)
     {
+        $this->ensureWarehouseRole();
+
         $request->validate([
             'part_number' => 'required|string',
             'pcs_quantity' => 'required|integer|min:1',
@@ -337,15 +349,27 @@ class StockWithdrawalController extends Controller
      */
     public function confirm(Request $request)
     {
+        $this->ensureWarehouseRole();
+
         $request->validate([
             'part_number' => 'required|string',
             'pcs_quantity' => 'required|integer|min:1',
             'notes' => 'nullable|string',
+            'delivery_order_id' => 'nullable|integer|exists:delivery_orders,id',
+            'delivery_order_item_id' => 'nullable|integer|exists:delivery_order_items,id',
+            'allow_partial' => 'nullable|boolean',
         ]);
 
         $partNumber = $request->input('part_number');
         $requestedQty = (int) $request->input('pcs_quantity');
         $notes = $request->input('notes');
+
+        if ($request->boolean('allow_partial', false)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Partial withdrawal belum didukung pada flow ini. Gunakan quantity exact.',
+            ], 422);
+        }
 
         if (!$this->findExactPartSetting($partNumber)) {
             return response()->json([
@@ -357,7 +381,6 @@ class StockWithdrawalController extends Controller
         try {
             $withdrawals = DB::transaction(function () use ($partNumber, $requestedQty, $notes, $request) {
                 $batchId = Str::uuid();
-                $allowPartial = $request->boolean('allow_partial', false);
                 $withdrawals = [];
                 $deliveryItem = null;
                 $deliveryOrderItemId = (int) $request->input('delivery_order_item_id');
@@ -371,21 +394,58 @@ class StockWithdrawalController extends Controller
                 if ($deliveryOrderId <= 0 && $deliveryItem) {
                     $deliveryOrderId = (int) $deliveryItem->delivery_order_id;
                 }
+
+                if ($deliveryItem) {
+                    if ((string) $deliveryItem->part_number !== $partNumber) {
+                        throw new \RuntimeException('Part withdrawal tidak sesuai dengan item delivery.');
+                    }
+
+                    if ($deliveryOrderId > 0 && (int) $deliveryItem->delivery_order_id !== $deliveryOrderId) {
+                        throw new \RuntimeException('Item delivery tidak sesuai dengan delivery order.');
+                    }
+
+                    $remainingDeliveryQty = max(
+                        0,
+                        (int) $deliveryItem->quantity - (int) $deliveryItem->fulfilled_quantity
+                    );
+                    if ($requestedQty > $remainingDeliveryQty) {
+                        throw new \RuntimeException(
+                            "Quantity withdrawal melebihi sisa delivery ({$remainingDeliveryQty} PCS)."
+                        );
+                    }
+                }
+
                 if ($deliveryOrderId > 0 && $this->hasPendingAdditionalNotFullRequestForOrder($deliveryOrderId, true)) {
                     throw new \RuntimeException(self::DELIVERY_APPROVAL_PENDING_MESSAGE);
                 }
 
+                if ($deliveryOrderId > 0 && !$deliveryItem) {
+                    throw new \RuntimeException('Item delivery wajib dipilih untuk withdrawal delivery.');
+                }
+
                 $selectedBoxes = $this->selectBoxesForWithdrawal($partNumber, $requestedQty, $deliveryOrderId > 0 ? $deliveryOrderId : null);
+                $selectedQty = (int) $selectedBoxes->sum('pcs_quantity');
+                if ($selectedQty !== $requestedQty) {
+                    throw new \RuntimeException(
+                        "Kombinasi box tidak memenuhi quantity exact. Terpilih {$selectedQty} dari {$requestedQty} PCS."
+                    );
+                }
+
+                $actualWithdrawnQty = 0;
 
                 foreach ($selectedBoxes as $selectedBox) {
                     $box = Box::whereKey($selectedBox->id)->lockForUpdate()->first();
-                    if (!$box || $box->is_withdrawn) {
-                        continue;
+                    if (
+                        !$box
+                        || $box->is_withdrawn
+                        || in_array($box->expired_status, ['handled', 'expired'], true)
+                    ) {
+                        throw new \RuntimeException('Stok berubah saat withdrawal. Silakan hitung ulang FIFO.');
                     }
 
                     $pallet = $box->pallets()->whereHas('stockLocation')->first();
                     if (!$pallet) {
-                        continue;
+                        throw new \RuntimeException('Lokasi box tidak lagi tersedia. Silakan hitung ulang FIFO.');
                     }
 
                     $palletItem = PalletItem::where('pallet_id', $pallet->id)
@@ -408,6 +468,7 @@ class StockWithdrawalController extends Controller
                     ]);
 
                     $withdrawals[] = $withdrawal;
+                    $actualWithdrawnQty += (int) $box->pcs_quantity;
 
                     $box->is_withdrawn = true;
                     $box->withdrawn_at = now();
@@ -439,8 +500,17 @@ class StockWithdrawalController extends Controller
                     }
                 }
 
+                if ($actualWithdrawnQty !== $requestedQty) {
+                    throw new \RuntimeException(
+                        "Withdrawal dibatalkan karena quantity aktual {$actualWithdrawnQty} tidak sama dengan request {$requestedQty} PCS."
+                    );
+                }
+
                 if ($deliveryItem) {
-                    $deliveryItem->fulfilled_quantity = (int) $deliveryItem->fulfilled_quantity + $requestedQty;
+                    $deliveryItem->fulfilled_quantity = min(
+                        (int) $deliveryItem->quantity,
+                        (int) $deliveryItem->fulfilled_quantity + $actualWithdrawnQty
+                    );
                     $deliveryItem->save();
 
                     $order = DeliveryOrder::whereKey($deliveryItem->delivery_order_id)
@@ -467,19 +537,26 @@ class StockWithdrawalController extends Controller
                     }
                 }
 
-                return $withdrawals;
+                return [
+                    'withdrawals' => $withdrawals,
+                    'actual_withdrawn_qty' => $actualWithdrawnQty,
+                ];
             });
 
             return response()->json([
                 'success' => true,
-                'message' => "Pengambilan stok berhasil! {$requestedQty} PCS {$partNumber} telah diambil",
-                'withdrawals' => $withdrawals,
+                'message' => "Pengambilan stok berhasil! {$withdrawals['actual_withdrawn_qty']} PCS {$partNumber} telah diambil",
+                'actual_withdrawn_qty' => $withdrawals['actual_withdrawn_qty'],
+                'withdrawals' => $withdrawals['withdrawals'],
             ]);
         } catch (\Throwable $e) {
-            $statusCode = str_contains((string) $e->getMessage(), self::DELIVERY_APPROVAL_PENDING_MESSAGE) ? 423 : 500;
+            $message = (string) $e->getMessage();
+            $statusCode = str_contains($message, self::DELIVERY_APPROVAL_PENDING_MESSAGE)
+                ? 423
+                : ($e instanceof \RuntimeException ? 422 : 500);
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
+                'message' => 'Terjadi kesalahan: ' . $message,
             ], $statusCode);
         }
     }

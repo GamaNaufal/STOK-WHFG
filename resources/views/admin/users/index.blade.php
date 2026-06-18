@@ -46,6 +46,7 @@
                                     <th class="ps-3" style="padding: 15px;">Name</th>
                                     <th style="padding: 15px;">Email</th>
                                     <th style="padding: 15px;">Role</th>
+                                    <th style="padding: 15px;">Status</th>
                                     <th style="padding: 15px;">Created At</th>
                                     <th class="text-center" style="padding: 15px; width: 180px;">Aksi</th>
                                 </tr>
@@ -60,6 +61,11 @@
                                     <td style="padding: 15px;">
                                         <span class="badge" style="background-color: #0C7779; color: white; padding: 6px 12px; border-radius: 6px; font-weight: 500;">
                                             {{ ucfirst(str_replace('_', ' ', $user->role)) }}
+                                        </span>
+                                    </td>
+                                    <td style="padding: 15px;">
+                                        <span class="badge {{ $user->is_active ? 'bg-success' : 'bg-secondary' }}">
+                                            {{ $user->is_active ? 'Aktif' : 'Nonaktif' }}
                                         </span>
                                     </td>
                                     <td style="padding: 15px; color: #6b7280;">
@@ -79,14 +85,15 @@
                                             onmouseover="this.style.backgroundColor='#fecaca'"
                                             onmouseout="this.style.backgroundColor='#fee2e2'"
                                             data-delete-url="{{ route('users.destroy', $user) }}"
-                                            data-user-name="{{ $user->name }}">
-                                            <i class="bi bi-trash"></i> Hapus
+                                            data-user-name="{{ $user->name }}"
+                                            {{ !$user->is_active ? 'disabled' : '' }}>
+                                            <i class="bi bi-person-x"></i> Nonaktifkan
                                         </button>
                                     </td>
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="5" class="text-center py-5" style="color: #9ca3af;">
+                                    <td colspan="6" class="text-center py-5" style="color: #9ca3af;">
                                         <i class="bi bi-inbox display-4 d-block mb-3" style="opacity: 0.3;"></i>
                                         <p class="mb-0">Belum ada data user</p>
                                     </td>
@@ -112,14 +119,14 @@
                 const userName = btn.getAttribute('data-user-name') || 'user';
 
                 WarehouseAlert.delete({
-                    title: 'Hapus User?',
+                    title: 'Nonaktifkan User?',
                     itemName: `user <strong>${userName}</strong>`,
                     warningItems: [
                         'User tidak akan bisa login lagi',
                         'Semua data aktivitas tetap tersimpan',
-                        'Tindakan ini <strong>tidak dapat dibatalkan</strong>'
+                        'Akun dapat diaktifkan kembali dari halaman Edit'
                     ],
-                    confirmText: 'Ya, Hapus User',
+                    confirmText: 'Ya, Nonaktifkan',
                     onConfirm: () => {
                         const form = document.createElement('form');
                         form.method = 'POST';

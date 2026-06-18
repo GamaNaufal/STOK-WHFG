@@ -30,7 +30,7 @@ class StockInput extends Model
 
     public function pallet()
     {
-        return $this->belongsTo(Pallet::class);
+        return $this->belongsTo(Pallet::class)->withTrashed();
     }
 
     public function palletItem()

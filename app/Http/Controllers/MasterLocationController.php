@@ -18,14 +18,6 @@ class MasterLocationController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        return view('admin.locations.create');
-    }
-
-    /**
      * Show the form for editing the specified resource.
      */
     public function edit(MasterLocation $location)
