@@ -18,7 +18,7 @@ Sebagai gantinya:
 Ubah method `preview` agar tidak langsung mengembalikan error `422` ketika sisa stok tidak cukup. Sebaliknya, kembalikan daftar box yang *ada* (tersedia) beserta flag penanda `needs_not_full` dan jumlah kuantitas deficit:
 
 ```php
-            if ($remainingQty > 0 && $plannedQty < $remainingQty && !$allowPartial) {
+            if ($remainingQty > 0 && $plannedQty < $remainingQty) {
                 // Diubah agar tetap mengembalikan data lokasi yang ada namun dengan flag needs_not_full
                 return response()->json([
                     'success' => true,

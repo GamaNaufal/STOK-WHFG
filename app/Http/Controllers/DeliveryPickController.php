@@ -305,8 +305,6 @@ class DeliveryPickController extends Controller
 
     private function createSessionItems(DeliveryOrder $order, DeliveryPickSession $session): void
     {
-        $allowPartial = false;
-
         foreach ($order->items as $item) {
             $remainingQty = max(0, (int) $item->quantity - (int) $item->fulfilled_quantity);
             if ($remainingQty <= 0) {
@@ -338,7 +336,7 @@ class DeliveryPickController extends Controller
                 continue;
             }
 
-            if ($totalPcs < $remainingQty && !$allowPartial) {
+            if ($totalPcs < $remainingQty) {
                 throw new \RuntimeException('Stok box tidak cukup untuk part ' . $item->part_number);
             }
 

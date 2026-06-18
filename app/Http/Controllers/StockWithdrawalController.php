@@ -229,13 +229,11 @@ class StockWithdrawalController extends Controller
             'part_number' => 'required|string',
             'pcs_quantity' => 'required|integer|min:1',
             'delivery_order_id' => 'nullable|integer',
-            'allow_partial' => 'nullable|boolean',
         ]);
 
         $partNumber = $request->input('part_number');
         $requestedQty = (int) $request->input('pcs_quantity');
         $orderId = $request->input('delivery_order_id');
-        $allowPartial = $request->boolean('allow_partial', false);
 
         if (!$this->findExactPartSetting($partNumber)) {
             return response()->json([
@@ -273,7 +271,6 @@ class StockWithdrawalController extends Controller
 
         $remainingQty = max(0, $requestedQty - $reservedTotal);
         $plannedQty = $reservedTotal;
-        $isPartial = false;
 
         if (!$orderId) {
             // Get total available stock (exclude reserved boxes)
@@ -306,10 +303,8 @@ class StockWithdrawalController extends Controller
                 : [];
 
             $plannedQty += (int) collect($locations)->sum('will_take_pcs');
-            $isPartial = $allowPartial && $remainingQty > 0 && $plannedQty < $requestedQty;
 
-            if ($remainingQty > 0 && $plannedQty < $requestedQty && !$allowPartial) {
-                // Diubah agar tetap mengembalikan data lokasi yang ada namun dengan flag needs_not_full
+            if ($remainingQty > 0 && $plannedQty < $requestedQty) {
                 return response()->json([
                     'success' => true,
                     'part_number' => $partNumber,
@@ -338,7 +333,6 @@ class StockWithdrawalController extends Controller
             'part_number' => $partNumber,
             'requested_qty' => $requestedQty,
             'planned_qty' => $plannedQty,
-            'is_partial' => $isPartial,
             'total_available' => $orderId ? ($reservedTotal + $this->getTotalStockForPart($partNumber, true)) : $this->getTotalStockForPart($partNumber, true),
             'locations' => $locations,
         ]);
@@ -357,19 +351,11 @@ class StockWithdrawalController extends Controller
             'notes' => 'nullable|string',
             'delivery_order_id' => 'nullable|integer|exists:delivery_orders,id',
             'delivery_order_item_id' => 'nullable|integer|exists:delivery_order_items,id',
-            'allow_partial' => 'nullable|boolean',
         ]);
 
         $partNumber = $request->input('part_number');
         $requestedQty = (int) $request->input('pcs_quantity');
         $notes = $request->input('notes');
-
-        if ($request->boolean('allow_partial', false)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Partial withdrawal belum didukung pada flow ini. Gunakan quantity exact.',
-            ], 422);
-        }
 
         if (!$this->findExactPartSetting($partNumber)) {
             return response()->json([

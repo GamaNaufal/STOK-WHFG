@@ -583,21 +583,23 @@ Status yang digunakan:
 - Soft delete digunakan untuk box, palet, stock input, withdrawal, dan delivery agar histori tetap dapat diaudit.
 - User dinonaktifkan melalui `is_active`, bukan dihapus, sehingga foreign key dan histori tetap utuh.
 
+## Keputusan Bisnis
+
+- Fitur backorder dan partial withdrawal telah dihapus.
+- Kekurangan stok tidak boleh dikirim sebagian melalui picking atau withdrawal.
+- Delivery dengan kebutuhan yang akan dipisahkan harus memakai fitur split order.
+- Status delivery `partial` tetap dipakai khusus untuk parent order yang memiliki child hasil split.
+
 ## Catatan yang Belum Diputuskan
 
-Catatan berikut sengaja disimpan untuk pembahasan berikutnya dan bukan instruksi untuk langsung diperbaiki:
+Terdapat dua flow box not full:
 
-1. Dokumentasi `docs/BACKORDER_GUIDE.md` menjelaskan rancangan backorder, tetapi fitur ditandai belum aktif.
-2. Migration memiliki kolom `delivery_pick_sessions.allow_partial`, tetapi `DeliveryPickController::createSessionItems()` saat ini menetapkan `$allowPartial = false`.
-3. Completion picking tetap mewajibkan quantity penuh dan kemudian menetapkan order sebagai `completed`.
-4. Proses partial yang benar-benar aktif saat ini adalah split delivery manual dengan parent/child order.
-5. Filter, kartu, dan label Backorder pada laporan operasional disembunyikan sampai flow tersebut selesai dibuat.
-6. Terdapat dua flow box not full:
-   - flow langsung dari stock input tanpa approval Supervisi;
-   - flow request khusus dengan approval Supervisi.
-   Perbedaan ini perlu dikonfirmasi sebagai keputusan bisnis.
+- flow langsung dari stock input tanpa approval Supervisi;
+- flow request khusus dengan approval Supervisi.
 
-Jangan mengubah area tersebut hanya karena membaca catatan ini. Tunggu perintah eksplisit dari user.
+Perbedaan ini masih perlu dikonfirmasi sebagai keputusan bisnis.
+
+Jangan mengubah perbedaan flow box not full hanya karena membaca catatan ini. Tunggu perintah eksplisit dari user.
 
 ## Panduan Agent Saat Menerima Tugas
 

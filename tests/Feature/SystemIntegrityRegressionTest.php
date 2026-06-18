@@ -16,6 +16,7 @@ use App\Services\ExpiredBoxService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 class SystemIntegrityRegressionTest extends TestCase
@@ -330,6 +331,11 @@ class SystemIntegrityRegressionTest extends TestCase
     {
         $this->assertFalse(Route::has('locations.show'));
         $this->assertFalse(Route::has('locations.create'));
+    }
+
+    public function test_partial_withdrawal_session_column_is_removed(): void
+    {
+        $this->assertFalse(Schema::hasColumn('delivery_pick_sessions', 'allow_partial'));
     }
 
     private function createStoredBox(

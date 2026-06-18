@@ -1113,10 +1113,6 @@
                             errorEl.className = 'fifo-error alert alert-warning mt-2';
                             errorEl.textContent = `Kekurangan: Butuh Box Not Full (${data.not_full_pcs_needed} Pcs). Proses pengambilan dikunci sampai box not-full tersedia.`;
                             errorEl.style.display = 'block';
-                        } else if (data.is_partial) {
-                            errorEl.className = 'fifo-error alert alert-warning mt-2';
-                            errorEl.textContent = `Stok tersedia hanya ${data.planned_qty} PCS dari ${qty} PCS. Delivery akan diproses sebagian.`;
-                            errorEl.style.display = 'block';
                         }
                         
                         updateProcessButton();

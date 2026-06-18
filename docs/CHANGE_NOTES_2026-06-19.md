@@ -13,7 +13,7 @@ Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integri
 - Withdrawal legacy sekarang wajib memenuhi quantity exact.
 - Perubahan stok di tengah transaksi menyebabkan rollback.
 - `fulfilled_quantity` diperbarui dari quantity aktual yang berhasil di-withdraw.
-- Partial withdrawal pada flow legacy ditolak sampai desain backorder selesai.
+- Withdrawal hanya menerima quantity exact; partial withdrawal tidak tersedia.
 
 ### Delivery Split
 
@@ -42,8 +42,11 @@ Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integri
 ### Route dan Laporan
 
 - Route location `show` dan `create` yang tidak memiliki implementasi dihapus.
-- Filter, kartu, dan detail Backorder disembunyikan dari laporan operasional.
-- `docs/BACKORDER_GUIDE.md` ditandai belum aktif.
+- Fitur backorder dihapus karena kebutuhan pemisahan delivery ditangani oleh split order.
+- Parameter dan response partial withdrawal dihapus.
+- Kolom legacy `delivery_pick_sessions.allow_partial` dihapus melalui migration.
+- Filter, kartu, dan detail Backorder dihapus dari laporan operasional.
+- `docs/BACKORDER_GUIDE.md` dihapus.
 
 ## Regression Test
 
