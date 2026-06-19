@@ -121,6 +121,7 @@ class DeliveryAssignController extends Controller
                 ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
                 ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
                 ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->whereNull('pallets.deleted_at')
                 ->where('stock_locations.warehouse_location', '!=', 'Unknown');
         });
     }
@@ -143,6 +144,7 @@ class DeliveryAssignController extends Controller
             ->join('pallets as p', 'p.id', '=', 'pb.pallet_id')
             ->join('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
             ->join('boxes as b', 'b.id', '=', 'pb.box_id')
+            ->whereNull('p.deleted_at')
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
             ->where(function ($q) {
@@ -151,7 +153,7 @@ class DeliveryAssignController extends Controller
             })
             ->where('sl.warehouse_location', '!=', 'Unknown')
             ->groupBy('pb.box_id')
-            ->select('pb.box_id', DB::raw('MIN(pb.pallet_id) as canonical_pallet_id'));
+            ->select('pb.box_id', DB::raw('MAX(pb.id) as canonical_pivot_id'));
     }
 
     private function hasActivePickSession(int $deliveryOrderId): bool
@@ -417,7 +419,7 @@ class DeliveryAssignController extends Controller
             }
         }
 
-        $existingBoxNumbers = Box::query()
+        $existingBoxNumbers = Box::withTrashed()
             ->whereIn('box_number', $boxNumbers)
             ->pluck('box_number')
             ->map(fn ($value) => (string) $value)
@@ -703,7 +705,8 @@ class DeliveryAssignController extends Controller
             ->joinSub($canonicalSubquery, 'canon', function ($join) {
                 $join->on('canon.box_id', '=', 'b.id');
             })
-            ->join('pallets as p', 'p.id', '=', 'canon.canonical_pallet_id')
+            ->join('pallet_boxes as canonical_pb', 'canonical_pb.id', '=', 'canon.canonical_pivot_id')
+            ->join('pallets as p', 'p.id', '=', 'canonical_pb.pallet_id')
             ->join('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
@@ -1369,4 +1372,3 @@ class DeliveryAssignController extends Controller
         ]);
     }
 }
-

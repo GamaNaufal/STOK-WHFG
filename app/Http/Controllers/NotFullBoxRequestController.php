@@ -86,7 +86,7 @@ class NotFullBoxRequestController extends Controller
             'box_number.regex' => 'ID Box hanya boleh berisi angka.',
         ]);
 
-        if (Box::where('box_number', $request->box_number)->exists()) {
+        if (Box::withTrashed()->where('box_number', $request->box_number)->exists()) {
             return redirect()->back()->with('error', 'ID Box sudah terdaftar di sistem.')->withInput();
         }
 
@@ -113,6 +113,14 @@ class NotFullBoxRequestController extends Controller
 
         if ($request->target_type === 'pallet' && empty($request->target_pallet_id)) {
             return redirect()->back()->with('error', 'Pilih pallet tujuan.')->withInput();
+        }
+
+        if ($request->target_type === 'pallet') {
+            $targetPallet = Pallet::with('stockLocation')->find($request->target_pallet_id);
+            $targetLocationCode = $targetPallet?->stockLocation?->warehouse_location;
+            if (!$targetPallet || !$targetLocationCode || $targetLocationCode === 'Unknown') {
+                return redirect()->back()->with('error', 'Pallet tujuan belum memiliki lokasi tersimpan yang valid.')->withInput();
+            }
         }
 
         if ($request->target_type === 'location' && empty($request->target_location_id)) {
@@ -207,10 +215,13 @@ class NotFullBoxRequestController extends Controller
                     ]);
                 } else {
                     $pallet = Pallet::whereKey($pallet->id)->lockForUpdate()->firstOrFail();
-                    $locationCode = $pallet->stockLocation?->warehouse_location ?? 'Unknown';
+                    $locationCode = $pallet->stockLocation?->warehouse_location;
+                    if (!$locationCode || $locationCode === 'Unknown') {
+                        throw new \RuntimeException('Pallet tujuan belum memiliki lokasi tersimpan yang valid.');
+                    }
                 }
 
-                if (Box::where('box_number', $request->box_number)->lockForUpdate()->exists()) {
+                if (Box::withTrashed()->where('box_number', $request->box_number)->lockForUpdate()->exists()) {
                     throw new \RuntimeException('ID Box sudah terdaftar di sistem.');
                 }
 

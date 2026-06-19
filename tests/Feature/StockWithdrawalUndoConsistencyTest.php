@@ -31,16 +31,16 @@ class StockWithdrawalUndoConsistencyTest extends TestCase
             'pcs_quantity' => 0,
         ]);
 
-        StockLocation::create([
-            'pallet_id' => $pallet->id,
-            'warehouse_location' => 'UNDO-A1',
-            'stored_at' => now(),
-        ]);
-
         MasterLocation::create([
             'code' => 'UNDO-A1',
             'is_occupied' => false,
             'current_pallet_id' => null,
+        ]);
+
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'UNDO-A1',
+            'stored_at' => now(),
         ]);
 
         $box = Box::create([
@@ -68,6 +68,11 @@ class StockWithdrawalUndoConsistencyTest extends TestCase
             'withdrawn_at' => now(),
         ]);
 
+        $pallet->stockLocation()->delete();
+        $pallet->delete();
+        $this->assertSoftDeleted('pallets', ['id' => $pallet->id]);
+
+        $this->actingAs($operator);
         $response = app(StockWithdrawalController::class)->undo($withdrawal->id);
 
         $this->assertSame(200, $response->status());
@@ -95,6 +100,16 @@ class StockWithdrawalUndoConsistencyTest extends TestCase
             'code' => 'UNDO-A1',
             'is_occupied' => 1,
             'current_pallet_id' => $pallet->id,
+        ]);
+
+        $this->assertDatabaseHas('pallets', [
+            'id' => $pallet->id,
+            'deleted_at' => null,
+        ]);
+
+        $this->assertDatabaseHas('stock_locations', [
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'UNDO-A1',
         ]);
     }
 }

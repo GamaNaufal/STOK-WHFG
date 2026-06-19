@@ -90,6 +90,48 @@ class StockViewController extends Controller
         return $user && in_array($user->role, ['admin_warehouse', 'supervisi', 'admin'], true);
     }
 
+    private function isBoxLockedByActivePicking(int $boxId): bool
+    {
+        return DB::table('delivery_pick_items')
+            ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+            ->where('delivery_pick_items.box_id', $boxId)
+            ->whereIn('delivery_pick_sessions.status', ['pending', 'scanning', 'blocked', 'approved'])
+            ->exists();
+    }
+
+    private function syncStockInputHeadersForBox(int $boxId): void
+    {
+        $stockInputIds = DB::table('stock_input_boxes')
+            ->where('box_id', $boxId)
+            ->pluck('stock_input_id')
+            ->map(fn ($id) => (int) $id)
+            ->unique();
+
+        foreach ($stockInputIds as $stockInputId) {
+            $mappedBoxes = DB::table('stock_input_boxes as sib')
+                ->join('boxes', 'boxes.id', '=', 'sib.box_id')
+                ->where('sib.stock_input_id', $stockInputId)
+                ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.created_at')
+                ->get();
+
+            if ($mappedBoxes->isEmpty()) {
+                continue;
+            }
+
+            DB::table('stock_inputs')
+                ->where('id', $stockInputId)
+                ->update([
+                    'pcs_quantity' => (int) $mappedBoxes->sum('pcs_quantity'),
+                    'box_quantity' => $mappedBoxes->count(),
+                    'part_numbers' => json_encode(
+                        $mappedBoxes->pluck('part_number')->filter()->unique()->values()->all()
+                    ),
+                    'stored_at' => $mappedBoxes->min('created_at'),
+                    'updated_at' => now(),
+                ]);
+        }
+    }
+
     private function getDefaultSortMode(string $viewMode): string
     {
         return match ($viewMode) {
@@ -825,6 +867,10 @@ class StockViewController extends Controller
                 throw new \RuntimeException('Box tidak bisa diedit karena statusnya tidak aktif.');
             }
 
+            if ($this->isBoxLockedByActivePicking((int) $box->id)) {
+                throw new \RuntimeException('Box sedang digunakan dalam sesi picking dan tidak dapat diedit.');
+            }
+
             $pallets = $box->pallets()->lockForUpdate()->get();
 
             foreach ($pallets as $pallet) {
@@ -872,8 +918,11 @@ class StockViewController extends Controller
 
             $box->part_number = $newPartNumber;
             $box->pcs_quantity = $newPcsQuantity;
+            $box->qr_code = $box->box_number . '|' . $newPartNumber . '|' . $newPcsQuantity;
             $box->created_at = $newStoredAt;
             $box->save();
+
+            $this->syncStockInputHeadersForBox((int) $box->id);
 
             $newValues = [
                 'part_number' => $box->part_number,
@@ -898,7 +947,7 @@ class StockViewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal memperbarui box: ' . $e->getMessage(),
-            ], 500);
+            ], $e instanceof \RuntimeException ? 422 : 500);
         }
 
         return response()->json([
@@ -961,6 +1010,10 @@ class StockViewController extends Controller
 
         try {
             $box = Box::whereKey($boxId)->lockForUpdate()->firstOrFail();
+            if ($this->isBoxLockedByActivePicking((int) $box->id)) {
+                throw new \RuntimeException('Box sedang digunakan dalam sesi picking dan tidak dapat dihapus.');
+            }
+
             $pallets = $box->pallets()->lockForUpdate()->get();
             $affectedPalletIds = $pallets->pluck('id')->map(fn ($id) => (int) $id)->values();
 
@@ -1024,6 +1077,7 @@ class StockViewController extends Controller
                             'updated_at' => now(),
                         ]);
 
+                    $pallet->stockLocation()->delete();
                     $pallet->delete();
                     $autoDeletedPallets->push([
                         'id' => $palletId,
@@ -1074,7 +1128,7 @@ class StockViewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menghapus box: ' . $e->getMessage(),
-            ], 500);
+            ], $e instanceof \RuntimeException ? 422 : 500);
         }
 
         return response()->json([
@@ -1095,6 +1149,15 @@ class StockViewController extends Controller
         try {
             $pallet = Pallet::with(['stockLocation', 'boxes', 'items'])->whereKey($palletId)->lockForUpdate()->firstOrFail();
             $attachedBoxes = $pallet->boxes;
+
+            $lockedBox = $attachedBoxes->first(
+                fn ($box) => $this->isBoxLockedByActivePicking((int) $box->id)
+            );
+            if ($lockedBox) {
+                throw new \RuntimeException(
+                    "Box {$lockedBox->box_number} sedang digunakan dalam sesi picking. Pallet tidak dapat dihapus."
+                );
+            }
 
             $oldValues = [
                 'pallet_id' => $pallet->id,
@@ -1169,7 +1232,7 @@ class StockViewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menghapus pallet: ' . $e->getMessage(),
-            ], 500);
+            ], $e instanceof \RuntimeException ? 422 : 500);
         }
 
         return response()->json([

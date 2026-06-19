@@ -157,7 +157,7 @@ class ExpiredBoxService
                 'boxes.box_number',
                 'boxes.part_number',
                 'boxes.expired_status',
-                DB::raw('COALESCE(stock_in.stored_at, boxes.created_at) as stored_at'),
+                DB::raw('COALESCE(boxes.created_at, stock_in.stored_at) as stored_at'),
                 'pallets.id as pallet_id',
                 'pallets.pallet_number',
                 'stock_locations.warehouse_location'

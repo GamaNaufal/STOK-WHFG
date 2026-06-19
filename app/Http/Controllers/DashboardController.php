@@ -23,6 +23,7 @@ class DashboardController extends Controller
                 ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
                 ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
                 ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->whereNull('pallets.deleted_at')
                 ->where('stock_locations.warehouse_location', '!=', 'Unknown');
         });
     }
@@ -48,6 +49,7 @@ class DashboardController extends Controller
         $legacyItemsQuery = DB::table('pallet_items')
             ->join('pallets', 'pallets.id', '=', 'pallet_items.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->whereNull('pallets.deleted_at')
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->where('pallet_items.pcs_quantity', '>', 0)
             ->whereNotExists(function ($sub) {
@@ -67,6 +69,8 @@ class DashboardController extends Controller
 
         // 3. Pallets with Location that contain stock
         $palletsWithLocation = DB::table('stock_locations')
+            ->join('pallets', 'pallets.id', '=', 'stock_locations.pallet_id')
+            ->whereNull('pallets.deleted_at')
             ->where('warehouse_location', '!=', 'Unknown')
             ->where(function ($q) {
                 $q->whereExists(function ($sub) {
@@ -202,4 +206,3 @@ class DashboardController extends Controller
         return view('shared.dashboard', compact('stats', 'userRole'));
     }
 }
-

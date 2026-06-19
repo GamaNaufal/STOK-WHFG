@@ -37,8 +37,63 @@ class DeliveryPickController extends Controller
                 ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
                 ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
                 ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->whereNull('pallets.deleted_at')
                 ->where('stock_locations.warehouse_location', '!=', 'Unknown');
         });
+    }
+
+    private function resolveStoredPalletForBox(int $boxId, bool $lockRows = false): ?Pallet
+    {
+        $query = Pallet::query()
+            ->select('pallets.*')
+            ->join('pallet_boxes', 'pallet_boxes.pallet_id', '=', 'pallets.id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('pallet_boxes.box_id', $boxId)
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderByDesc('pallet_boxes.id')
+            ->with('stockLocation');
+
+        if ($lockRows) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
+    }
+
+    private function syncLinkedPalletsAfterBoxDeactivation(Box $box): void
+    {
+        $linkedPallets = $box->pallets()
+            ->with('stockLocation')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($linkedPallets as $linkedPallet) {
+            $activeForPart = $linkedPallet->activeBoxes()
+                ->where('boxes.part_number', $box->part_number)
+                ->get(['boxes.id', 'boxes.pcs_quantity']);
+
+            $item = PalletItem::where('pallet_id', $linkedPallet->id)
+                ->where('part_number', $box->part_number)
+                ->lockForUpdate()
+                ->first();
+
+            if ($item) {
+                $item->box_quantity = $activeForPart->count();
+                $item->pcs_quantity = (int) $activeForPart->sum('pcs_quantity');
+                $item->save();
+            }
+
+            $masterLocation = MasterLocation::where('current_pallet_id', $linkedPallet->id)
+                ->lockForUpdate()
+                ->first();
+            if ($masterLocation) {
+                $masterLocation->autoVacateIfEmpty();
+            }
+
+            if (!$linkedPallet->activeBoxes()->exists() && $linkedPallet->stockLocation) {
+                $linkedPallet->stockLocation->delete();
+            }
+        }
     }
 
     private function getVerificationActiveLockedBoxIds(): array
@@ -115,7 +170,7 @@ class DeliveryPickController extends Controller
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full');
 
-        $rows = $rowsQuery->get();
+        $rows = $this->applyStoredLocationExistsFilter($rowsQuery)->get();
 
         $pools = [];
         foreach ($rows as $row) {
@@ -130,13 +185,14 @@ class DeliveryPickController extends Controller
 
     private function buildVerificationReservedPoolsByOrderPart(): array
     {
-        $rows = DB::table('boxes')
+        $rowsQuery = DB::table('boxes')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->orderBy('boxes.created_at', 'asc')
-            ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full')
-            ->get();
+            ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full');
+
+        $rows = $this->applyStoredLocationExistsFilter($rowsQuery)->get();
 
         $pools = [];
         foreach ($rows as $row) {
@@ -311,8 +367,20 @@ class DeliveryPickController extends Controller
                 continue;
             }
 
+            $remainingToSelect = $remainingQty;
             $reservedBoxes = $this->getReservedBoxesForOrder($order->id, $item->part_number, $order->delivery_date, true);
+            $selectedReservedBoxes = collect();
+
             foreach ($reservedBoxes as $box) {
+                if ((int) $box->pcs_quantity > $remainingToSelect) {
+                    continue;
+                }
+
+                $selectedReservedBoxes->push($box);
+                $remainingToSelect -= (int) $box->pcs_quantity;
+            }
+
+            foreach ($selectedReservedBoxes as $box) {
                 DeliveryPickItem::firstOrCreate(
                     [
                         'pick_session_id' => $session->id,
@@ -326,17 +394,14 @@ class DeliveryPickController extends Controller
                 );
             }
 
-            $reservedTotal = $reservedBoxes->sum('pcs_quantity');
-            $remainingAfterReserved = max(0, $remainingQty - (int) $reservedTotal);
-
-            $boxes = $this->getBoxesByFIFO($item->part_number, $remainingAfterReserved, $order->delivery_date, true);
-            $totalPcs = $boxes->sum('pcs_quantity') + (int) $reservedTotal;
+            $boxes = $this->getBoxesByFIFO($item->part_number, $remainingToSelect, $order->delivery_date, true);
+            $totalPcs = (int) $selectedReservedBoxes->sum('pcs_quantity') + (int) $boxes->sum('pcs_quantity');
 
             if ($totalPcs <= 0) {
-                continue;
+                throw new \RuntimeException('Stok box tidak cukup untuk part ' . $item->part_number);
             }
 
-            if ($totalPcs < $remainingQty) {
+            if ($totalPcs !== $remainingQty) {
                 throw new \RuntimeException('Stok box tidak cukup untuk part ' . $item->part_number);
             }
 
@@ -855,10 +920,31 @@ class DeliveryPickController extends Controller
                 }
 
                 $order = DeliveryOrder::with('items')->whereKey($session->delivery_order_id)->lockForUpdate()->firstOrFail();
-                $sessionItems = DeliveryPickItem::with(['box.pallets.stockLocation'])
+                $sessionItems = DeliveryPickItem::query()
                     ->where('pick_session_id', $session->id)
                     ->lockForUpdate()
                     ->get();
+
+                $requiredByPart = $order->items
+                    ->mapWithKeys(fn ($item) => [
+                        (string) $item->part_number => max(
+                            0,
+                            (int) $item->quantity - (int) $item->fulfilled_quantity
+                        ),
+                    ]);
+                $pickedByPart = $sessionItems
+                    ->groupBy('part_number')
+                    ->map(fn ($items) => (int) $items->sum('pcs_quantity'));
+
+                foreach ($pickedByPart as $partNumber => $pickedQty) {
+                    if (!$requiredByPart->has((string) $partNumber) || (int) $requiredByPart->get((string) $partNumber) === 0) {
+                        return [
+                            'success' => false,
+                            'message' => 'Picklist mengandung part yang sudah tidak dibutuhkan. Hitung ulang sesi picking.',
+                            'status' => 409,
+                        ];
+                    }
+                }
 
                 foreach ($order->items as $orderItem) {
                     $requiredQty = max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity);
@@ -866,35 +952,77 @@ class DeliveryPickController extends Controller
                         continue;
                     }
 
-                    $pickedQty = (int) $sessionItems
-                        ->where('part_number', (string) $orderItem->part_number)
-                        ->sum('pcs_quantity');
+                    $pickedQty = (int) ($pickedByPart[(string) $orderItem->part_number] ?? 0);
 
-                    if ($pickedQty < $requiredQty) {
+                    if ($pickedQty !== $requiredQty) {
                         return [
                             'success' => false,
-                            'message' => 'Qty part ' . $orderItem->part_number . ' belum cukup untuk complete.',
+                            'message' => $pickedQty < $requiredQty
+                                ? 'Qty part ' . $orderItem->part_number . ' belum cukup untuk complete.'
+                                : 'Qty part ' . $orderItem->part_number . ' melebihi kebutuhan delivery. Hitung ulang sesi picking.',
                             'status' => 422,
                         ];
                     }
+                }
 
-                    $orderItem->fulfilled_quantity = min(
-                        (int) $orderItem->quantity,
-                        (int) $orderItem->fulfilled_quantity + min($requiredQty, $pickedQty)
-                    );
+                $validatedStock = [];
+                foreach ($sessionItems as $pickItem) {
+                    $box = Box::whereKey($pickItem->box_id)->lockForUpdate()->first();
+                    if (
+                        !$box
+                        || $box->is_withdrawn
+                        || in_array($box->expired_status, ['handled', 'expired'], true)
+                        || (string) $box->part_number !== (string) $pickItem->part_number
+                        || (int) $box->pcs_quantity !== (int) $pickItem->pcs_quantity
+                    ) {
+                        return [
+                            'success' => false,
+                            'message' => 'Data box pada sesi picking sudah berubah. Batalkan dan hitung ulang sesi picking.',
+                            'status' => 409,
+                        ];
+                    }
+
+                    if (
+                        $box->assigned_delivery_order_id !== null
+                        && (int) $box->assigned_delivery_order_id !== (int) $order->id
+                    ) {
+                        return [
+                            'success' => false,
+                            'message' => 'Assignment box sudah berpindah ke delivery lain. Hitung ulang sesi picking.',
+                            'status' => 409,
+                        ];
+                    }
+
+                    $pallet = $this->resolveStoredPalletForBox((int) $box->id, true);
+                    if (!$pallet) {
+                        return [
+                            'success' => false,
+                            'message' => 'Lokasi box pada sesi picking sudah tidak valid. Hitung ulang sesi picking.',
+                            'status' => 409,
+                        ];
+                    }
+
+                    $validatedStock[(int) $pickItem->id] = [
+                        'box' => $box,
+                        'pallet' => $pallet,
+                    ];
+                }
+
+                foreach ($order->items as $orderItem) {
+                    $requiredQty = max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity);
+                    if ($requiredQty <= 0) {
+                        continue;
+                    }
+
+                    $orderItem->fulfilled_quantity = (int) $orderItem->quantity;
                     $orderItem->save();
                 }
 
                 $batchId = (string) Str::uuid();
 
                 foreach ($sessionItems as $pickItem) {
-                    $box = Box::whereKey($pickItem->box_id)->lockForUpdate()->first();
-
-                    if (!$box) {
-                        continue;
-                    }
-
-                    $pallet = $box->pallets()->first();
+                    $box = $validatedStock[(int) $pickItem->id]['box'];
+                    $pallet = $validatedStock[(int) $pickItem->id]['pallet'];
                     $palletItem = null;
 
                     if ($pallet) {
@@ -925,38 +1053,11 @@ class DeliveryPickController extends Controller
                         ]);
                     }
 
-                    if (!$box->is_withdrawn) {
-                        $box->is_withdrawn = true;
-                        $box->withdrawn_at = now();
-                        $box->save();
+                    $box->is_withdrawn = true;
+                    $box->withdrawn_at = now();
+                    $box->save();
 
-                        if ($palletItem) {
-                            $palletItem->pcs_quantity = max(0, $palletItem->pcs_quantity - (int) $box->pcs_quantity);
-                            $palletItem->box_quantity = max(0, $palletItem->box_quantity - 1);
-                            $palletItem->save();
-                        }
-                    }
-
-                    if ($pallet) {
-                        $masterLocation = \App\Models\MasterLocation::where('current_pallet_id', $pallet->id)->lockForUpdate()->first();
-                        if ($masterLocation) {
-                            $masterLocation->autoVacateIfEmpty();
-                        }
-
-                        $remainingItems = \Illuminate\Support\Facades\DB::table('pallet_items')
-                            ->where('pallet_id', $pallet->id)
-                            ->where(function($q) {
-                                $q->where('pcs_quantity', '>', 0)
-                                  ->orWhere('box_quantity', '>', 0);
-                            })
-                            ->count();
-
-                        if ($remainingItems === 0) {
-                            if ($pallet->stockLocation) {
-                                $pallet->stockLocation->delete();
-                            }
-                        }
-                    }
+                    $this->syncLinkedPalletsAfterBoxDeactivation($box);
                 }
 
                 $session = DeliveryPickSession::with('items')->findOrFail($session->id);
@@ -1800,7 +1901,7 @@ class DeliveryPickController extends Controller
             $query->lockForUpdate();
         }
 
-        return $query->get();
+        return $this->applyStoredLocationExistsFilter($query)->get();
     }
 
     private function getBoxesByFIFO(string $partNumber, int $requestedPcs, $deliveryDate = null, bool $lockRows = false)

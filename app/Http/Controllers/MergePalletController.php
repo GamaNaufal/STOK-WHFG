@@ -146,29 +146,31 @@ class MergePalletController extends Controller
         }
 
         $itemsByPart = [];
-        foreach ($sourcePallets as $sourcePallet) {
-            foreach ($sourcePallet->items as $item) {
-                $partNumber = $this->normalizePartNumber($item->part_number);
-                if ($partNumber === null) {
-                    continue;
-                }
-                
-                if (!isset($itemsByPart[$partNumber])) {
-                    $itemsByPart[$partNumber] = [
-                        'part_number' => $partNumber,
-                        'box_quantity' => 0,
-                        'pcs_quantity' => 0,
-                        'created_at' => time(),
-                    ];
-                }
+        $uniqueBoxes = collect($allBoxes)->unique('id');
 
-                $itemsByPart[$partNumber]['box_quantity'] += (int) $item->box_quantity;
-                $itemsByPart[$partNumber]['pcs_quantity'] += (int) $item->pcs_quantity;
+        foreach ($uniqueBoxes as $box) {
+            $partNumber = $this->normalizePartNumber($box['part_number'] ?? null);
+            if ($partNumber === null) {
+                continue;
+            }
 
-                $timestamp = $item->created_at ? strtotime((string) $item->created_at) : time();
-                if ($timestamp < $itemsByPart[$partNumber]['created_at']) {
-                    $itemsByPart[$partNumber]['created_at'] = $timestamp;
-                }
+            if (!isset($itemsByPart[$partNumber])) {
+                $itemsByPart[$partNumber] = [
+                    'part_number' => $partNumber,
+                    'box_quantity' => 0,
+                    'pcs_quantity' => 0,
+                    'created_at' => time(),
+                ];
+            }
+
+            $itemsByPart[$partNumber]['box_quantity']++;
+            $itemsByPart[$partNumber]['pcs_quantity'] += (int) ($box['pcs_quantity'] ?? 0);
+
+            $timestamp = !empty($box['created_at'])
+                ? strtotime((string) $box['created_at'])
+                : time();
+            if ($timestamp < $itemsByPart[$partNumber]['created_at']) {
+                $itemsByPart[$partNumber]['created_at'] = $timestamp;
             }
         }
 

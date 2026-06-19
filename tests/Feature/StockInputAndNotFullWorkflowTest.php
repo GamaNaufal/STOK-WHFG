@@ -107,6 +107,11 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         ]);
 
         $targetPallet = Pallet::create(['pallet_number' => 'PLT-REJ-01']);
+        \App\Models\StockLocation::create([
+            'pallet_id' => $targetPallet->id,
+            'warehouse_location' => 'NF-REJ-1',
+            'stored_at' => now(),
+        ]);
 
         $create = $this->actingAs($adminWarehouse)->post(route('box-not-full.store'), [
             'box_number' => '91000002',
@@ -155,6 +160,11 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         ]);
 
         $targetPallet = Pallet::create(['pallet_number' => 'PLT-GUARD-01']);
+        \App\Models\StockLocation::create([
+            'pallet_id' => $targetPallet->id,
+            'warehouse_location' => 'NF-GUARD-1',
+            'stored_at' => now(),
+        ]);
 
         $create = $this->actingAs($adminWarehouse)->post(route('box-not-full.store'), [
             'box_number' => '91000003',

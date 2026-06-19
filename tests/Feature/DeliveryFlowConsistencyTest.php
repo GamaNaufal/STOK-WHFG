@@ -188,7 +188,7 @@ class DeliveryFlowConsistencyTest extends TestCase
         ]);
     }
 
-    public function test_start_pick_prioritizes_assigned_box_even_without_pallet_location(): void
+    public function test_start_pick_rejects_assigned_box_without_pallet_location(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $sales = User::factory()->create(['role' => 'sales']);
@@ -223,19 +223,13 @@ class DeliveryFlowConsistencyTest extends TestCase
         $response = $this->actingAs($operator)
             ->postJson(route('delivery.pick.start', $order->id));
 
-        $response->assertOk()->assertJsonStructure([
-            'session_id',
-            'pdf_url',
-            'scan_url',
+        $response->assertStatus(422)->assertJson([
+            'message' => 'Stok box tidak cukup untuk part P-ASSIGNED-NO-LOC',
         ]);
 
-        $sessionId = (int) $response->json('session_id');
-
-        $this->assertDatabaseHas('delivery_pick_items', [
-            'pick_session_id' => $sessionId,
-            'part_number' => 'P-ASSIGNED-NO-LOC',
-            'pcs_quantity' => 10,
-            'status' => 'pending',
+        $this->assertDatabaseMissing('delivery_pick_sessions', [
+            'delivery_order_id' => $order->id,
+            'status' => 'scanning',
         ]);
     }
 

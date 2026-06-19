@@ -67,7 +67,18 @@ class MasterLocation extends Model
             return true;
         }
 
-        // Cek apakah masih ada items dengan quantity > 0
+        if ($pallet->activeBoxes()->exists()) {
+            return false;
+        }
+
+        // Jika pallet pernah memiliki box fisik, status box aktif adalah sumber
+        // kebenaran. PalletItem tidak boleh mempertahankan occupancy karena
+        // ringkasannya bisa tertinggal setelah withdrawal/expired/delete.
+        if ($pallet->boxes()->withTrashed()->exists()) {
+            return true;
+        }
+
+        // Fallback khusus data legacy yang memang tidak memiliki histori box.
         return !$pallet->items()
             ->where(function ($q) {
                 $q->where('pcs_quantity', '>', 0)

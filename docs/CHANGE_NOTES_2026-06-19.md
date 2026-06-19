@@ -2,7 +2,7 @@
 
 ## Ringkasan
 
-Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integritas split, akurasi expired box, dan preservasi histori operasional.
+Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integritas split, akurasi expired box, preservasi histori operasional, dan sumber kebenaran stok per box.
 
 ## Perubahan
 
@@ -25,10 +25,36 @@ Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integri
 
 ### Expired Box dan Audit Input
 
-- Umur box dihitung dari mapping `stock_input_boxes -> stock_inputs`.
-- `boxes.created_at` dipakai sebagai fallback legacy.
+- Umur box menggunakan `boxes.created_at` agar koreksi tanggal per box langsung berlaku.
+- Mapping `stock_input_boxes -> stock_inputs` dipakai sebagai fallback legacy.
 - Shared box hanya menghasilkan satu row expired.
 - Approval box not full sekarang membuat mapping `stock_input_boxes`.
+
+### Konsistensi Stok Aktual
+
+- Merge pallet membangun `pallet_items` dari box aktif unik, bukan ringkasan sumber yang mungkin basi.
+- Occupancy lokasi menggunakan box aktif sebagai sumber utama.
+- Box withdrawn, expired, handled, atau archived tidak dapat dimasukkan ulang.
+- ID box yang pernah di-soft-delete tidak dapat digunakan ulang sehingga histori inbound tidak terputus.
+- Koreksi box memperbarui QR, header stock input, part, PCS, dan tanggal umur box.
+- Box yang sedang berada dalam sesi picking tidak dapat diedit atau dihapus.
+- Query stok aktif mengabaikan pallet soft-deleted.
+- Target pallet approval not-full wajib memiliki lokasi valid.
+
+### Delivery Picking dan Shared Box
+
+- Reserved box tanpa lokasi tidak lagi dianggap siap picking.
+- Reserved box dipilih hanya sampai quantity exact dan tidak boleh melebihi sisa order.
+- Completion memvalidasi ulang status, part, PCS, assignment, dan lokasi setiap box.
+- Picklist dengan quantity kurang, lebih, atau part yang tidak dibutuhkan ditolak.
+- Canonical pallet shared box menggunakan pivot lokasi valid terbaru.
+- Saat shared box di-withdraw, ringkasan seluruh pallet terkait disinkronkan dari box aktif.
+
+### Undo Withdrawal
+
+- Undo memulihkan pallet yang ter-soft-delete.
+- `stock_locations` dan occupancy master location dibuat kembali.
+- Undo ditolak apabila lokasi asal sudah ditempati pallet lain.
 
 ### Preservasi Histori
 
@@ -63,9 +89,20 @@ Ditambahkan `tests/Feature/SystemIntegrityRegressionTest.php` untuk:
 - penolakan akun nonaktif;
 - route lokasi yang tidak digunakan.
 
+Ditambahkan `tests/Feature/StockTruthRegressionTest.php` untuk:
+
+- merge dengan `pallet_items` sumber yang basi;
+- reserved box berlebih;
+- perubahan snapshot box setelah scan;
+- canonical pallet untuk shared box;
+- sinkronisasi koreksi QR, stock input, dan expiry;
+- penolakan rescan box withdrawn.
+
 ## Validasi
 
-- Full suite: 108 tests.
+- Full suite: 115 tests, 592 assertions.
 - Migration chain SQLite in-memory: berhasil.
 - PHP syntax check: berhasil.
-- MySQL migration lokal belum dijalankan karena server MySQL lokal tidak aktif saat validasi.
+- Seluruh migration telah dijalankan pada MySQL lokal.
+- Backup pra-migration: `storage/app/backups/db_stock_before_stock_consistency_2026-06-19.sql`.
+- Audit data setelah migration: tidak ditemukan anomali stok/lokasi/header transaksi.

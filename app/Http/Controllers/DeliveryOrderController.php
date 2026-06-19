@@ -28,6 +28,7 @@ class DeliveryOrderController extends Controller
                 ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
                 ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
                 ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->whereNull('pallets.deleted_at')
                 ->where('stock_locations.warehouse_location', '!=', 'Unknown');
         });
     }

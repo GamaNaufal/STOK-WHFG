@@ -203,8 +203,25 @@ class StockInputController extends Controller
         }
 
         // Jika box sudah ada di DB dan sudah tersimpan, tolak
-        $existingBox = Box::where('box_number', $barcode)->first();
+        $existingBox = Box::withTrashed()->where('box_number', $barcode)->first();
         if ($existingBox) {
+            if ($existingBox->trashed()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'ID Box ini sudah pernah digunakan dan telah diarsipkan. Gunakan ID Box baru.'
+                ], 400);
+            }
+
+            if (
+                $existingBox->is_withdrawn
+                || in_array($existingBox->expired_status, ['handled', 'expired'], true)
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Box ini sudah tidak aktif dan tidak dapat dimasukkan ulang.'
+                ], 400);
+            }
+
             $existingPallet = $existingBox->pallets()
                 ->whereHas('stockLocation')
                 ->first();
@@ -387,13 +404,30 @@ class StockInputController extends Controller
         }
 
         // Verify box exists in database
-        $box = Box::where('box_number', $box_number)->first();
+        $box = Box::withTrashed()->where('box_number', $box_number)->first();
 
-        if (!$box) {
+        if (!$box || $box->trashed()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Box tidak ditemukan di sistem'
             ], 404);
+        }
+
+        if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Box sudah tidak aktif dan tidak dapat dimasukkan ulang.'
+            ], 422);
+        }
+
+        if (
+            (string) $box->part_number !== (string) $part_number
+            || (int) $box->pcs_quantity !== $pcs_quantity
+        ) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Data QR tidak sesuai dengan data box terbaru. Cetak ulang QR box.'
+            ], 422);
         }
 
         // Check if box already attached to a pallet with stock location (SUDAH TERSIMPAN)
@@ -607,7 +641,7 @@ class StockInputController extends Controller
 
         $existingBoxesByNumber = $boxNumbers->isEmpty()
             ? collect()
-            : Box::whereIn('box_number', $boxNumbers)->get()->keyBy('box_number');
+            : Box::withTrashed()->whereIn('box_number', $boxNumbers)->get()->keyBy('box_number');
 
         $notFullDeliveryOrderIds = collect($scannedBoxes)
             ->filter(fn ($box) => !empty($box['is_not_full']) && !empty($box['delivery_order_id']))
@@ -625,6 +659,14 @@ class StockInputController extends Controller
         foreach ($scannedBoxes as $scannedBox) {
             $boxNumber = (string) ($scannedBox['box_number'] ?? '');
             $box = $existingBoxesByNumber->get($boxNumber);
+            if ($box && (
+                $box->trashed()
+                || $box->is_withdrawn
+                || in_array($box->expired_status, ['handled', 'expired'], true)
+            )) {
+                throw new \RuntimeException("Box {$boxNumber} sudah tidak aktif dan tidak dapat dimasukkan ulang.");
+            }
+
             if (!$box) {
                 if (!empty($scannedBox['is_not_full']) && empty($scannedBox['delivery_order_id'])) {
                     throw new \Exception('Box not full wajib disisipkan ke delivery.');
@@ -785,7 +827,7 @@ class StockInputController extends Controller
     {
         $attachedBoxes = Box::query()
             ->whereIn('id', $attachedBoxIds)
-            ->get(['id', 'part_number', 'pcs_quantity']);
+            ->get(['id', 'part_number', 'pcs_quantity', 'created_at']);
 
         if ($attachedBoxes->isEmpty()) {
             throw new \RuntimeException('Tidak ada box transaksi valid untuk membuat stock input.');
@@ -810,7 +852,7 @@ class StockInputController extends Controller
             'warehouse_location' => $locationCode ?? 'Unknown',
             'pcs_quantity' => $totalPcs,
             'box_quantity' => $attachedBoxes->count(),
-            'stored_at' => now(),
+            'stored_at' => $attachedBoxes->min('created_at') ?? now(),
             'part_numbers' => $partNumbers,
         ]);
     }

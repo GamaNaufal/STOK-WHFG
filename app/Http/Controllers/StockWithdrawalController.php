@@ -7,8 +7,10 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\MasterLocation;
 use App\Models\NotFullBoxRequest;
+use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
+use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -35,6 +37,7 @@ class StockWithdrawalController extends Controller
                 ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
                 ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
                 ->whereColumn('pallet_boxes.box_id', 'boxes.id')
+                ->whereNull('pallets.deleted_at')
                 ->where('stock_locations.warehouse_location', '!=', 'Unknown');
         });
     }
@@ -44,9 +47,70 @@ class StockWithdrawalController extends Controller
         return DB::table('pallet_boxes as pb')
             ->join('pallets', 'pallets.id', '=', 'pb.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->whereNull('pallets.deleted_at')
             ->where('stock_locations.warehouse_location', '!=', 'Unknown')
             ->select('pb.box_id', DB::raw('MAX(pb.id) as pivot_id'))
             ->groupBy('pb.box_id');
+    }
+
+    private function resolveStoredPalletForBox(int $boxId, bool $lockRows = false): ?Pallet
+    {
+        $query = Pallet::query()
+            ->select('pallets.*')
+            ->join('pallet_boxes', 'pallet_boxes.pallet_id', '=', 'pallets.id')
+            ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->where('pallet_boxes.box_id', $boxId)
+            ->where('stock_locations.warehouse_location', '!=', 'Unknown')
+            ->orderByDesc('pallet_boxes.id')
+            ->with('stockLocation');
+
+        if ($lockRows) {
+            $query->lockForUpdate();
+        }
+
+        return $query->first();
+    }
+
+    private function syncLinkedPalletsAfterBoxDeactivation(Box $box, bool $deleteEmptyPallet): void
+    {
+        $linkedPallets = $box->pallets()
+            ->with('stockLocation')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($linkedPallets as $linkedPallet) {
+            $activeForPart = $linkedPallet->activeBoxes()
+                ->where('boxes.part_number', $box->part_number)
+                ->get(['boxes.id', 'boxes.pcs_quantity']);
+
+            $item = PalletItem::where('pallet_id', $linkedPallet->id)
+                ->where('part_number', $box->part_number)
+                ->lockForUpdate()
+                ->first();
+
+            if ($item) {
+                $item->box_quantity = $activeForPart->count();
+                $item->pcs_quantity = (int) $activeForPart->sum('pcs_quantity');
+                $item->save();
+            }
+
+            $masterLocation = MasterLocation::where('current_pallet_id', $linkedPallet->id)
+                ->lockForUpdate()
+                ->first();
+            if ($masterLocation) {
+                $masterLocation->autoVacateIfEmpty();
+            }
+
+            if (!$linkedPallet->activeBoxes()->exists()) {
+                if ($linkedPallet->stockLocation) {
+                    $linkedPallet->stockLocation->delete();
+                }
+
+                if ($deleteEmptyPallet) {
+                    $linkedPallet->delete();
+                }
+            }
+        }
     }
 
     private function selectBoxesForWithdrawal(string $partNumber, int $requestedQty, ?int $deliveryOrderId = null)
@@ -248,7 +312,7 @@ class StockWithdrawalController extends Controller
         if ($orderId) {
             $reservedBoxes = $this->getReservedBoxesForOrder((int) $orderId, $partNumber);
             foreach ($reservedBoxes as $box) {
-                $pallet = $box->pallets->first();
+                $pallet = $this->resolveStoredPalletForBox((int) $box->id);
                 $stockLocation = $pallet?->stockLocation;
                 $reservedLocations[] = [
                     'pallet_id' => $pallet?->id,
@@ -429,7 +493,7 @@ class StockWithdrawalController extends Controller
                         throw new \RuntimeException('Stok berubah saat withdrawal. Silakan hitung ulang FIFO.');
                     }
 
-                    $pallet = $box->pallets()->whereHas('stockLocation')->first();
+                    $pallet = $this->resolveStoredPalletForBox((int) $box->id, true);
                     if (!$pallet) {
                         throw new \RuntimeException('Lokasi box tidak lagi tersedia. Silakan hitung ulang FIFO.');
                     }
@@ -460,30 +524,7 @@ class StockWithdrawalController extends Controller
                     $box->withdrawn_at = now();
                     $box->save();
 
-                    if ($palletItem) {
-                        $palletItem->pcs_quantity = max(0, (int) $palletItem->pcs_quantity - (int) $box->pcs_quantity);
-                        $palletItem->box_quantity = max(0, (int) $palletItem->box_quantity - 1);
-                        $palletItem->save();
-                    }
-                    $masterLocation = MasterLocation::where('current_pallet_id', $pallet->id)->lockForUpdate()->first();
-                    if ($masterLocation) {
-                        $masterLocation->autoVacateIfEmpty();
-                    }
-
-                    $remainingItems = \Illuminate\Support\Facades\DB::table('pallet_items')
-                        ->where('pallet_id', $pallet->id)
-                        ->where(function($q) {
-                            $q->where('pcs_quantity', '>', 0)
-                              ->orWhere('box_quantity', '>', 0);
-                        })
-                        ->count();
-
-                    if ($remainingItems === 0) {
-                        if ($pallet->stockLocation) {
-                            $pallet->stockLocation->delete();
-                        }
-                        $pallet->delete();
-                    }
+                    $this->syncLinkedPalletsAfterBoxDeactivation($box, true);
                 }
 
                 if ($actualWithdrawnQty !== $requestedQty) {
@@ -575,16 +616,26 @@ class StockWithdrawalController extends Controller
                     $requestedQty = (int) $cartItem['pcs_quantity'];
 
                     $selectedBoxes = $this->selectBoxesForWithdrawal($partNumber, $requestedQty, null);
+                    $selectedQty = (int) $selectedBoxes->sum('pcs_quantity');
+                    if ($selectedQty !== $requestedQty) {
+                        throw new \RuntimeException(
+                            "Kombinasi box tidak memenuhi quantity exact. Terpilih {$selectedQty} dari {$requestedQty} PCS."
+                        );
+                    }
 
                     foreach ($selectedBoxes as $selectedBox) {
                         $box = Box::whereKey($selectedBox->id)->lockForUpdate()->first();
-                        if (!$box || $box->is_withdrawn) {
-                            continue;
+                        if (
+                            !$box
+                            || $box->is_withdrawn
+                            || in_array($box->expired_status, ['handled', 'expired'], true)
+                        ) {
+                            throw new \RuntimeException('Stok berubah saat withdrawal. Silakan hitung ulang FIFO.');
                         }
 
-                        $pallet = $box->pallets()->whereHas('stockLocation')->first();
+                        $pallet = $this->resolveStoredPalletForBox((int) $box->id, true);
                         if (!$pallet) {
-                            continue;
+                            throw new \RuntimeException('Lokasi box tidak lagi tersedia. Silakan hitung ulang FIFO.');
                         }
 
                         $palletItem = PalletItem::where('pallet_id', $pallet->id)
@@ -610,30 +661,7 @@ class StockWithdrawalController extends Controller
                         $box->withdrawn_at = now();
                         $box->save();
 
-                        if ($palletItem) {
-                            $palletItem->pcs_quantity = max(0, (int) $palletItem->pcs_quantity - (int) $box->pcs_quantity);
-                            $palletItem->box_quantity = max(0, (int) $palletItem->box_quantity - 1);
-                            $palletItem->save();
-                        }
-
-                        $masterLocation = MasterLocation::where('current_pallet_id', $pallet->id)->lockForUpdate()->first();
-                        if ($masterLocation) {
-                            $masterLocation->autoVacateIfEmpty();
-                        }
-
-                        $remainingItems = \Illuminate\Support\Facades\DB::table('pallet_items')
-                            ->where('pallet_id', $pallet->id)
-                            ->where(function($q) {
-                                $q->where('pcs_quantity', '>', 0)
-                                  ->orWhere('box_quantity', '>', 0);
-                            })
-                            ->count();
-
-                        if ($remainingItems === 0) {
-                            if ($pallet->stockLocation) {
-                                $pallet->stockLocation->delete();
-                            }
-                        }
+                        $this->syncLinkedPalletsAfterBoxDeactivation($box, false);
                     }
                 }
             });
@@ -723,6 +751,8 @@ class StockWithdrawalController extends Controller
      */
     public function undo($withdrawalId)
     {
+        $this->ensureWarehouseRole();
+
         try {
             $result = DB::transaction(function () use ($withdrawalId) {
                 $withdrawal = StockWithdrawal::whereKey($withdrawalId)->lockForUpdate()->firstOrFail();
@@ -774,17 +804,8 @@ class StockWithdrawalController extends Controller
                         continue;
                     }
 
-                    if ($batchWithdrawal->pallet_item_id) {
-                        $palletItem = $palletItemsById->get((int) $batchWithdrawal->pallet_item_id);
-
-                        if ($palletItem) {
-                            $palletItem->pcs_quantity = (int) $palletItem->pcs_quantity + (int) $batchWithdrawal->pcs_quantity;
-                            $palletItem->box_quantity = (int) $palletItem->box_quantity + (int) $batchWithdrawal->box_quantity;
-                            $palletItem->save();
-                        }
-                    }
-
                     $restoredPalletId = null;
+                    $palletItem = null;
 
                     if ($batchWithdrawal->pallet_item_id) {
                         $palletItem = $palletItemsById->get((int) $batchWithdrawal->pallet_item_id);
@@ -793,30 +814,100 @@ class StockWithdrawalController extends Controller
                         }
                     }
 
+                    $box = null;
                     if ($batchWithdrawal->box_id) {
                         $box = $boxesById->get((int) $batchWithdrawal->box_id);
-                        if ($box) {
-                            $box->is_withdrawn = false;
-                            $box->withdrawn_at = null;
-                            $box->save();
+                        if (!$box) {
+                            throw new \RuntimeException('Box withdrawal tidak ditemukan dan tidak dapat dipulihkan.');
+                        }
 
-                            if (!$restoredPalletId) {
-                                $pallet = $box->pallets()->select('pallets.id')->first();
-                                $restoredPalletId = $pallet ? (int) $pallet->id : null;
-                            }
+                        if (!$restoredPalletId) {
+                            $restoredPalletId = (int) DB::table('pallet_boxes')
+                                ->where('box_id', $box->id)
+                                ->orderByDesc('id')
+                                ->value('pallet_id');
                         }
                     }
 
-                    if ($restoredPalletId && !empty($batchWithdrawal->warehouse_location) && $batchWithdrawal->warehouse_location !== 'Unknown') {
+                    if (!$restoredPalletId) {
+                        throw new \RuntimeException('Pallet asal withdrawal tidak ditemukan.');
+                    }
+
+                    $pallet = Pallet::withTrashed()
+                        ->whereKey($restoredPalletId)
+                        ->lockForUpdate()
+                        ->first();
+                    if (!$pallet) {
+                        throw new \RuntimeException('Pallet asal withdrawal sudah tidak tersedia.');
+                    }
+
+                    if ($pallet->trashed()) {
+                        $pallet->restore();
+                    }
+
+                    if ($box) {
+                        $box->is_withdrawn = false;
+                        $box->withdrawn_at = null;
+                        $box->save();
+                    }
+
+                    if (!$palletItem) {
+                        $palletItem = PalletItem::firstOrCreate(
+                            [
+                                'pallet_id' => $restoredPalletId,
+                                'part_number' => $batchWithdrawal->part_number,
+                            ],
+                            [
+                                'pcs_quantity' => 0,
+                                'box_quantity' => 0,
+                            ]
+                        );
+                        $palletItem = PalletItem::whereKey($palletItem->id)->lockForUpdate()->firstOrFail();
+                    }
+
+                    $palletItem->pcs_quantity = (int) $palletItem->pcs_quantity + (int) $batchWithdrawal->pcs_quantity;
+                    $palletItem->box_quantity = (int) $palletItem->box_quantity + (int) $batchWithdrawal->box_quantity;
+                    $palletItem->save();
+
+                    if (!empty($batchWithdrawal->warehouse_location) && $batchWithdrawal->warehouse_location !== 'Unknown') {
                         $masterLocation = MasterLocation::where('code', $batchWithdrawal->warehouse_location)
                             ->lockForUpdate()
                             ->first();
 
-                        if ($masterLocation) {
-                            $masterLocation->is_occupied = true;
-                            $masterLocation->current_pallet_id = $restoredPalletId;
-                            $masterLocation->save();
+                        if (!$masterLocation) {
+                            throw new \RuntimeException('Master lokasi asal withdrawal tidak ditemukan.');
                         }
+
+                        if (
+                            $masterLocation->is_occupied
+                            && $masterLocation->current_pallet_id
+                            && (int) $masterLocation->current_pallet_id !== $restoredPalletId
+                        ) {
+                            throw new \RuntimeException(
+                                "Lokasi {$batchWithdrawal->warehouse_location} sudah ditempati pallet lain."
+                            );
+                        }
+
+                        $stockLocation = StockLocation::where('pallet_id', $restoredPalletId)
+                            ->lockForUpdate()
+                            ->first();
+
+                        if ($stockLocation) {
+                            $stockLocation->warehouse_location = $batchWithdrawal->warehouse_location;
+                            $stockLocation->master_location_id = $masterLocation->id;
+                            $stockLocation->save();
+                        } else {
+                            StockLocation::create([
+                                'pallet_id' => $restoredPalletId,
+                                'master_location_id' => $masterLocation->id,
+                                'warehouse_location' => $batchWithdrawal->warehouse_location,
+                                'stored_at' => $box?->created_at ?? now(),
+                            ]);
+                        }
+
+                        $masterLocation->is_occupied = true;
+                        $masterLocation->current_pallet_id = $restoredPalletId;
+                        $masterLocation->save();
                     }
 
                     $batchWithdrawal->status = 'reversed';
@@ -924,6 +1015,7 @@ class StockWithdrawalController extends Controller
             ->join('pallet_boxes as pb', 'pb.id', '=', 'stored_box.pivot_id')
             ->join('pallets', 'pallets.id', '=', 'pb.pallet_id')
             ->join('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->whereNull('pallets.deleted_at')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
@@ -1053,7 +1145,7 @@ class StockWithdrawalController extends Controller
             $query->lockForUpdate();
         }
 
-        return $query->get();
+        return $this->applyStoredLocationExistsFilter($query)->get();
     }
 
     /**

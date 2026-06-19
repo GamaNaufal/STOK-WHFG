@@ -25,16 +25,6 @@ class Box extends Model
 {
     use SoftDeletes;
 
-    protected static function booted()
-    {
-        static::creating(function ($box) {
-            $trashed = static::onlyTrashed()->where('box_number', $box->box_number)->first();
-            if ($trashed) {
-                $trashed->forceDelete();
-            }
-        });
-    }
-
     protected $fillable = [
         'box_number',
         'part_number',

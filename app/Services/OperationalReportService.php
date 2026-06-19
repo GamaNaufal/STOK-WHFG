@@ -85,6 +85,7 @@ class OperationalReportService
             ->join('pallet_boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
             ->join('pallets', 'pallets.id', '=', 'pallet_boxes.pallet_id')
             ->leftJoin('stock_locations', 'stock_locations.pallet_id', '=', 'pallets.id')
+            ->whereNull('pallets.deleted_at')
             ->where(function ($q) {
                 $q->whereNull('stock_locations.warehouse_location')
                   ->orWhere('stock_locations.warehouse_location', '!=', 'Unknown');

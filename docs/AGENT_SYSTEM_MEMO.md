@@ -132,6 +132,8 @@ Untuk data lama, beberapa tampilan dan ringkasan masih menggunakan `pallet_items
 
 Box dapat terhubung ke lebih dari satu palet pada data tertentu. Perhitungan stok harus melakukan deduplikasi box dan menggunakan canonical pallet agar tidak terjadi double count.
 
+Canonical pallet untuk box shared ditentukan dari relasi `pallet_boxes` paling baru yang masih memiliki lokasi valid. Saat box dinonaktifkan karena withdrawal, ringkasan seluruh palet yang masih terhubung disinkronkan ulang dari box aktif agar tidak meninggalkan phantom stock.
+
 ## Proses Bisnis
 
 ### 1. Login, profil, dan otorisasi
@@ -192,7 +194,9 @@ Alur normal:
 Aturan penting:
 
 - ID box harus delapan angka.
+- ID box yang pernah dipakai tidak boleh digunakan ulang, termasuk jika box lama sudah di-soft-delete.
 - Box yang sudah tersimpan di palet berlokasi tidak dapat dimasukkan ulang.
+- Box withdrawn, expired, handled, atau archived tidak dapat dimasukkan ulang melalui scan.
 - Nomor part wajib terdaftar di master part.
 - PCS tidak boleh melebihi kapasitas standar box.
 - Palet existing yang sudah memiliki lokasi tidak boleh dipindahkan dari flow stock input.
@@ -277,6 +281,8 @@ Admin Warehouse/Admin dapat mengubah:
 - PCS;
 - tanggal penyimpanan box;
 - alasan koreksi wajib.
+
+Koreksi box juga memperbarui QR, header transaksi stock input yang terhubung, dan tanggal umur box. Box yang sedang dipakai sesi picking aktif tidak dapat diedit atau dihapus.
 
 Supervisi/Admin Warehouse/Admin dapat menghapus box atau palet dari stok aktif. Penghapusan box dan palet menggunakan soft delete agar histori transaksi tetap tersedia. Jika box terakhir dihapus, palet dan occupancy lokasinya ikut dibersihkan.
 
@@ -368,6 +374,8 @@ Alur:
 
 Lock aktif menggunakan status `scanning` dan `blocked`.
 
+Reserved box hanya dimasukkan selama totalnya tidak melebihi sisa kebutuhan order. Box reserved tanpa lokasi valid tidak dianggap sebagai stok yang dapat dipicking.
+
 Satu operator tidak boleh memulai delivery lain sebelum sesi aktifnya diselesaikan atau dibatalkan. Operator lain juga tidak dapat mengambil alih sesi tanpa tindakan admin.
 
 File utama:
@@ -402,6 +410,9 @@ Delivery hanya dapat diselesaikan apabila:
 - tidak ada pending issue;
 - tidak ada pick item berstatus pending;
 - quantity hasil scan memenuhi seluruh sisa quantity setiap part.
+- quantity hasil scan sama persis dengan seluruh sisa quantity setiap part;
+- snapshot part dan PCS pick item masih sama dengan data box aktif saat completion;
+- seluruh box masih berada pada canonical pallet dengan lokasi valid.
 
 Saat completion:
 
@@ -477,13 +488,15 @@ Alur:
 - palet baru ditempatkan pada lokasi tujuan;
 - perpindahan box dan merge dicatat di audit log.
 
+Ringkasan pallet hasil merge dibangun ulang dari box aktif unik yang benar-benar dipindahkan, bukan menjumlahkan `pallet_items` sumber yang mungkin sudah basi.
+
 File utama:
 
 - `app/Http/Controllers/MergePalletController.php`
 
 ### 16. Expired box
 
-Umur box dihitung dari transaksi `stock_input_boxes -> stock_inputs.stored_at` milik box tersebut. Jika mapping legacy tidak tersedia, sistem memakai `boxes.created_at`.
+Umur box menggunakan `boxes.created_at` sebagai tanggal penyimpanan per box. Mapping `stock_input_boxes -> stock_inputs.stored_at` tetap menjadi fallback untuk data legacy yang tidak memiliki tanggal box.
 
 Status:
 
@@ -577,9 +590,14 @@ Status yang digunakan:
 - `stock_input_boxes` adalah sumber mapping audit transaksi input yang paling akurat.
 - Box aktif adalah sumber utama perhitungan stok.
 - `pallet_items` merupakan ringkasan/fallback legacy, bukan satu-satunya sumber kebenaran.
+- Status lokasi kosong ditentukan dari box aktif; `pallet_items` hanya dipakai untuk pallet legacy yang tidak pernah memiliki histori box.
 - Box yang sama harus dihitung satu kali walaupun memiliki relasi ke lebih dari satu palet.
+- Canonical pallet box shared adalah relasi lokasi valid paling baru.
 - Box dalam sesi picking aktif tidak boleh dialokasikan ke order lain.
+- Box dalam sesi picking aktif tidak boleh diedit atau dihapus.
+- Completion delivery wajib exact dan membatalkan transaksi jika snapshot box, status, quantity, assignment, atau lokasi telah berubah.
 - Lokasi hanya boleh ditempati satu palet aktif.
+- Undo withdrawal memulihkan pallet soft-deleted dan `stock_locations`; undo ditolak jika lokasi asal sudah ditempati pallet lain.
 - Soft delete digunakan untuk box, palet, stock input, withdrawal, dan delivery agar histori tetap dapat diaudit.
 - User dinonaktifkan melalui `is_active`, bukan dihapus, sehingga foreign key dan histori tetap utuh.
 
@@ -589,6 +607,13 @@ Status yang digunakan:
 - Kekurangan stok tidak boleh dikirim sebagian melalui picking atau withdrawal.
 - Delivery dengan kebutuhan yang akan dipisahkan harus memakai fitur split order.
 - Status delivery `partial` tetap dipakai khusus untuk parent order yang memiliki child hasil split.
+
+## Status Schema dan Validasi Terakhir
+
+- Seluruh migration sampai `2026_06_19_000003_remove_partial_withdrawal_column` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
+- Backup sebelum migration tersimpan di `storage/app/backups/db_stock_before_stock_consistency_2026-06-19.sql`.
+- Audit setelah migration tidak menemukan box aktif tanpa lokasi, shared box aktif, mismatch `pallet_items`, mismatch occupancy lokasi, atau mismatch header `stock_inputs`.
+- Full regression suite terakhir: 115 test, 592 assertion, seluruhnya lulus.
 
 ## Catatan yang Belum Diputuskan
 

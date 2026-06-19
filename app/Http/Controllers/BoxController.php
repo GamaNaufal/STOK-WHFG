@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Box;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class BoxController extends Controller
@@ -28,7 +29,7 @@ class BoxController extends Controller
         $validated = $request->validate([
             'box_number' => [
                 'required', 'string', 'size:8', 'regex:/^\d+$/', 
-                Rule::unique('boxes')->whereNull('deleted_at')
+                Rule::unique('boxes')
             ],
             'part_number' => [
                 'required',
@@ -81,6 +82,16 @@ class BoxController extends Controller
 
     public function destroy(Box $box)
     {
+        $isLocked = DB::table('delivery_pick_items')
+            ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+            ->where('delivery_pick_items.box_id', $box->id)
+            ->whereIn('delivery_pick_sessions.status', ['pending', 'scanning', 'blocked', 'approved'])
+            ->exists();
+
+        if ($isLocked) {
+            return redirect()->back()->with('error', 'Box sedang digunakan dalam sesi picking dan tidak dapat dihapus.');
+        }
+
         $box->delete();
 
         return redirect()->route('boxes.index')->with('success', 'Box berhasil dihapus.');
