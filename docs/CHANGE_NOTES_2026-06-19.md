@@ -49,12 +49,26 @@ Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integri
 - Picklist dengan quantity kurang, lebih, atau part yang tidak dibutuhkan ditolak.
 - Canonical pallet shared box menggunakan pivot lokasi valid terbaru.
 - Saat shared box di-withdraw, ringkasan seluruh pallet terkait disinkronkan dari box aktif.
+- Sesi assignment `pending` dipakai ulang saat picking dimulai; item dibangun ulang dari snapshot stok terkini dan sesi pending duplikat dibatalkan.
+- Start picking diserialisasi dengan row lock global agar dua order tidak membuka sesi aktif bersamaan.
+- Assignment mengunci ulang order dan box serta memvalidasi status, lokasi, lock picking, quantity, dan overage di dalam transaction.
+- Split/restore split ditolak jika order sudah memiliki assignment atau sesi `pending/scanning/blocked/approved`.
+- Picklist PDF/print dibatasi untuk role warehouse; Warehouse Operator hanya dapat melihat sesi miliknya.
 
 ### Undo Withdrawal
 
 - Undo memulihkan pallet yang ter-soft-delete.
 - `stock_locations` dan occupancy master location dibuat kembali.
 - Undo ditolak apabila lokasi asal sudah ditempati pallet lain.
+
+### Expiry, Redo, dan Lokasi
+
+- Perubahan box menjadi `expired` atau `handled` langsung menyinkronkan `pallet_items`, menghapus `stock_locations` yang kosong, dan mengosongkan master location.
+- Redo hanya dapat dijalankan satu kali pada session `completed` dengan `completion_status=completed` dan periode redo yang masih aktif.
+- Redo shared box memprioritaskan pallet dari withdrawal, menormalkan pivot box, dan membangun ulang ringkasan seluruh pallet terdampak.
+- Sesi assignment `pending` yatim dibatalkan otomatis saat redo.
+- `stock_locations.pallet_id` dan `stock_locations.master_location_id` sekarang memiliki unique constraint.
+- Semua pembuatan/pemulihan stock location mengisi `master_location_id` saat master location tersedia.
 
 ### Preservasi Histori
 
@@ -64,6 +78,9 @@ Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integri
 - User menggunakan status `is_active`; aksi hapus menjadi nonaktifkan.
 - Akun nonaktif ditolak saat login maupun request terautentikasi.
 - Session database user yang dinonaktifkan dibersihkan.
+- Delivery yang sudah memiliki completion atau withdrawal tidak dapat dihapus.
+- Master part yang telah direferensikan transaksi/histori tidak dapat diubah nomor part-nya atau dihapus.
+- Sales hanya dapat memperbaiki order `correction`; PPC hanya dapat memutuskan order `pending`.
 
 ### Route dan Laporan
 
@@ -98,11 +115,23 @@ Ditambahkan `tests/Feature/StockTruthRegressionTest.php` untuk:
 - sinkronisasi koreksi QR, stock input, dan expiry;
 - penolakan rescan box withdrawn.
 
+Ditambahkan `tests/Feature/RemainingIntegrityRegressionTest.php` untuk:
+
+- sinkronisasi expiry dengan ringkasan dan occupancy;
+- reuse sesi assignment pending;
+- lock split setelah assignment;
+- guard transisi status dan preservasi histori completed;
+- perlindungan master part;
+- authorization picklist;
+- one-shot redo dan normalisasi shared box;
+- penolakan phantom stock dari box soft-deleted;
+- unique stock location per pallet.
+
 ## Validasi
 
-- Full suite: 115 tests, 592 assertions.
+- Full suite: 126 tests, 628 assertions.
 - Migration chain SQLite in-memory: berhasil.
 - PHP syntax check: berhasil.
 - Seluruh migration telah dijalankan pada MySQL lokal.
-- Backup pra-migration: `storage/app/backups/db_stock_before_stock_consistency_2026-06-19.sql`.
-- Audit data setelah migration: tidak ditemukan anomali stok/lokasi/header transaksi.
+- Backup pra-migration terbaru: `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
+- Audit data setelah migration: tidak ditemukan duplicate lokasi, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, sesi pending yatim, assignment invalid, atau lebih dari satu sesi picking aktif.

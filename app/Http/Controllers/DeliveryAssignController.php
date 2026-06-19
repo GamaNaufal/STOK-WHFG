@@ -327,6 +327,7 @@ class DeliveryAssignController extends Controller
         return DB::table('boxes')
             ->join('pallet_boxes', 'pallet_boxes.box_id', '=', 'boxes.id')
             ->whereIn('pallet_boxes.pallet_id', $palletIds)
+            ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
@@ -349,6 +350,67 @@ class DeliveryAssignController extends Controller
             'part_number' => $box?->part_number,
             'reason' => $reason,
         ];
+    }
+
+    private function lockAssignableBoxesOrFail(array $boxIds, int $deliveryOrderId)
+    {
+        $boxIds = collect($boxIds)
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values();
+
+        if ($boxIds->isEmpty()) {
+            return collect();
+        }
+
+        $boxes = Box::query()
+            ->with(['pallets.stockLocation'])
+            ->whereIn('id', $boxIds->all())
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id');
+
+        if ($boxes->count() !== $boxIds->count()) {
+            throw new \RuntimeException('Sebagian box sudah tidak tersedia. Muat ulang data assignment.');
+        }
+
+        $activeLockedBoxIds = DB::table('delivery_pick_items')
+            ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+            ->whereIn('delivery_pick_sessions.status', self::ACTIVE_LOCK_STATUSES)
+            ->whereIn('delivery_pick_items.box_id', $boxIds->all())
+            ->pluck('delivery_pick_items.box_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+        $activeLockedLookup = array_fill_keys($activeLockedBoxIds, true);
+
+        foreach ($boxIds as $boxId) {
+            /** @var Box $box */
+            $box = $boxes->get($boxId);
+            $assignedOrderId = $box->assigned_delivery_order_id
+                ? (int) $box->assigned_delivery_order_id
+                : null;
+
+            $hasStoredLocation = $box->pallets->contains(function ($pallet) {
+                return $pallet->stockLocation
+                    && $pallet->stockLocation->warehouse_location !== 'Unknown';
+            });
+
+            if (
+                $box->is_withdrawn
+                || in_array((string) $box->expired_status, ['handled', 'expired'], true)
+                || $assignedOrderId !== null
+                || !empty($activeLockedLookup[$boxId])
+                || !$hasStoredLocation
+            ) {
+                throw new \RuntimeException(
+                    'Box ' . ($box->box_number ?: ('#' . $boxId))
+                    . ' berubah atau sudah tidak tersedia. Muat ulang data assignment.'
+                );
+            }
+        }
+
+        return $boxIds->map(fn ($boxId) => $boxes->get($boxId))->values();
     }
 
     private function addNewBoxError(array &$errors, int $index, ?string $boxNumber, ?string $partNumber, string $reason): void
@@ -566,10 +628,46 @@ class DeliveryAssignController extends Controller
             &$assignedBoxIds,
             &$sessionId
         ) {
+            $order = DeliveryOrder::whereKey($deliveryOrderId)->lockForUpdate()->firstOrFail();
+            if ((string) $order->status !== 'approved') {
+                throw new \RuntimeException('Delivery tidak lagi berstatus approved.');
+            }
+
+            if (DeliveryPickSession::where('delivery_order_id', $deliveryOrderId)
+                ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+                ->lockForUpdate()
+                ->exists()) {
+                throw new \RuntimeException('Delivery sedang dalam proses picking aktif.');
+            }
+
+            $eligibleBoxes = $this->lockAssignableBoxesOrFail(
+                collect($eligibleBoxes)->pluck('id')->all(),
+                $deliveryOrderId
+            );
+
+            $coverage = $this->validateDeliveryOrderPartCoverage(
+                $deliveryOrderId,
+                $eligibleBoxes->all(),
+                []
+            );
+            $coverageErrors = array_merge(
+                $coverage['errors'] ?? [],
+                collect($coverage['overages'] ?? [])
+                    ->map(fn ($overage) => sprintf(
+                        'Part %s melebihi sisa request delivery.',
+                        (string) ($overage['part_number'] ?? '-')
+                    ))
+                    ->all()
+            );
+            if (!empty($coverageErrors)) {
+                throw new \RuntimeException((string) $coverageErrors[0]);
+            }
+
             $session = DeliveryPickSession::query()
                 ->where('delivery_order_id', $deliveryOrderId)
                 ->where('status', 'pending')
                 ->orderByDesc('id')
+                ->lockForUpdate()
                 ->first();
 
             if (!$session) {
@@ -1094,30 +1192,65 @@ class DeliveryAssignController extends Controller
         $overageAdjustments = [];
         $userId = (int) Auth::id();
 
-        DB::transaction(function () use (
-            $deliveryOrderId,
-            $eligibleBoxes,
-            $validNewBoxes,
-            $newBoxesPalletMode,
-            $newBoxesPalletId,
-            $newBoxesPalletNumber,
-            $newBoxesLocationId,
-            $userId,
-            &$assignedExistingBoxIds,
-            &$createdNewBoxIds,
-            &$createdStockInputIdForNewBoxes,
-            &$sessionId,
-            &$overageAdjustments,
-            $partOverages
-        ) {
-            if (!empty($partOverages)) {
-                $overageAdjustments = $this->applyOverageAdjustments($deliveryOrderId, $partOverages);
+        try {
+            DB::transaction(function () use (
+                $deliveryOrderId,
+                $eligibleBoxes,
+                $validNewBoxes,
+                $newBoxesPalletMode,
+                $newBoxesPalletId,
+                $newBoxesPalletNumber,
+                $newBoxesLocationId,
+                $userId,
+                &$assignedExistingBoxIds,
+                &$createdNewBoxIds,
+                &$createdStockInputIdForNewBoxes,
+                &$sessionId,
+                &$overageAdjustments,
+                $confirmOverage
+            ) {
+            $order = DeliveryOrder::whereKey($deliveryOrderId)->lockForUpdate()->firstOrFail();
+            if ((string) $order->status !== 'approved') {
+                throw new \RuntimeException('Delivery tidak lagi berstatus approved.');
+            }
+
+            if (DeliveryPickSession::where('delivery_order_id', $deliveryOrderId)
+                ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+                ->lockForUpdate()
+                ->exists()) {
+                throw new \RuntimeException('Delivery sedang dalam proses picking aktif.');
+            }
+
+            $eligibleBoxes = $this->lockAssignableBoxesOrFail(
+                collect($eligibleBoxes)->pluck('id')->all(),
+                $deliveryOrderId
+            );
+
+            $currentCoverage = $this->validateDeliveryOrderPartCoverage(
+                $deliveryOrderId,
+                $eligibleBoxes->all(),
+                $validNewBoxes
+            );
+            $currentCoverageErrors = $currentCoverage['errors'] ?? [];
+            $currentPartOverages = $currentCoverage['overages'] ?? [];
+
+            if (!empty($currentCoverageErrors)) {
+                throw new \RuntimeException((string) $currentCoverageErrors[0]);
+            }
+
+            if (!empty($currentPartOverages) && !$confirmOverage) {
+                throw new \RuntimeException('Qty assign berubah dan kini melebihi sisa request. Muat ulang lalu konfirmasi kembali.');
+            }
+
+            if (!empty($currentPartOverages)) {
+                $overageAdjustments = $this->applyOverageAdjustments($deliveryOrderId, $currentPartOverages);
             }
 
             $session = DeliveryPickSession::query()
                 ->where('delivery_order_id', $deliveryOrderId)
                 ->where('status', 'pending')
                 ->orderByDesc('id')
+                ->lockForUpdate()
                 ->first();
 
             if (!$session) {
@@ -1268,7 +1401,10 @@ class DeliveryAssignController extends Controller
                     }
                 }
             }
-        });
+            });
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
 
         if (!empty($assignedExistingBoxIds) || !empty($createdNewBoxIds)) {
             AuditService::log(
@@ -1361,7 +1497,11 @@ class DeliveryAssignController extends Controller
             ], 422);
         }
 
-        $result = $this->assignBoxesToDelivery($deliveryOrderId, $boxIds);
+        try {
+            $result = $this->assignBoxesToDelivery($deliveryOrderId, $boxIds);
+        } catch (\RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 409);
+        }
 
         return response()->json([
             'assigned_count' => count($result['assigned_box_ids']),

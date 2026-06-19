@@ -29,6 +29,19 @@ class DeliveryPickController extends Controller
     private const SESSION_RECALC_MESSAGE = 'Sesi picking ini perlu dihitung ulang karena ada order dengan prioritas tanggal lebih awal.';
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
 
+    private function authorizePickSessionView(DeliveryPickSession $session): void
+    {
+        $user = Auth::user();
+        abort_unless(
+            $user && in_array($user->role, ['warehouse_operator', 'admin_warehouse', 'admin'], true),
+            403
+        );
+
+        if ($user->role === 'warehouse_operator') {
+            abort_unless((int) $session->created_by === (int) $user->id, 403);
+        }
+    }
+
     private function applyStoredLocationExistsFilter($query)
     {
         return $query->whereExists(function ($sub) {
@@ -161,6 +174,7 @@ class DeliveryPickController extends Controller
         $lockedBoxIds = $this->getVerificationActiveLockedBoxIds();
 
         $rowsQuery = DB::table('boxes')
+            ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
@@ -186,6 +200,7 @@ class DeliveryPickController extends Controller
     private function buildVerificationReservedPoolsByOrderPart(): array
     {
         $rowsQuery = DB::table('boxes')
+            ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNotNull('boxes.assigned_delivery_order_id')
@@ -424,20 +439,34 @@ class DeliveryPickController extends Controller
     private function startOrReusePickSession(DeliveryOrder $order, int $userId): DeliveryPickSession
     {
         return DB::transaction(function () use ($order, $userId) {
-            DeliveryOrder::whereKey($order->id)->lockForUpdate()->firstOrFail();
-            $this->assertOrderDeliveryGateOpenOrFail((int) $order->id, true);
+            DB::table('operation_locks')
+                ->where('name', 'global_delivery_pick')
+                ->lockForUpdate()
+                ->first();
+
+            $lockedOrder = DeliveryOrder::with('items')
+                ->whereKey($order->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (!in_array((string) $lockedOrder->status, ['approved', 'processing', 'partial'], true)) {
+                throw new \RuntimeException('Delivery ini tidak dapat memulai picking pada status saat ini.');
+            }
+
+            $this->assertOrderDeliveryGateOpenOrFail((int) $lockedOrder->id, true);
 
             $activeSession = DeliveryPickSession::with('creator')
                 ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
                 ->orderByDesc('updated_at')
                 ->orderByDesc('id')
+                ->lockForUpdate()
                 ->first();
 
             if ($activeSession) {
                 $activeOrderId = (int) $activeSession->delivery_order_id;
                 $isOwner = (int) $activeSession->created_by === $userId;
 
-                if ($activeOrderId === (int) $order->id) {
+                if ($activeOrderId === (int) $lockedOrder->id) {
                     if (!$isOwner) {
                         $ownerName = trim((string) optional($activeSession->creator)->name);
                         throw new \RuntimeException('Order ini sedang diproses oleh ' . ($ownerName !== '' ? $ownerName : 'operator lain') . '.');
@@ -454,14 +483,48 @@ class DeliveryPickController extends Controller
                 throw new \RuntimeException('Delivery sedang diproses oleh ' . ($ownerName !== '' ? $ownerName : 'operator lain') . '.');
             }
 
-            $session = DeliveryPickSession::create([
-                'delivery_order_id' => $order->id,
-                'created_by' => $userId,
-                'status' => 'scanning',
-                'started_at' => now(),
-            ]);
+            $pendingSessions = DeliveryPickSession::where('delivery_order_id', (int) $lockedOrder->id)
+                ->where('status', 'pending')
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->get();
 
-            $this->createSessionItems($order, $session);
+            /** @var DeliveryPickSession|null $session */
+            $session = $pendingSessions->first();
+
+            foreach ($pendingSessions as $pendingSession) {
+                DeliveryPickItem::where('pick_session_id', (int) $pendingSession->id)
+                    ->lockForUpdate()
+                    ->delete();
+
+                if ($session && (int) $pendingSession->id !== (int) $session->id) {
+                    $pendingSession->status = 'cancelled';
+                    $pendingSession->approval_notes = 'Sesi pending duplikat dibatalkan otomatis saat picking dimulai.';
+                    $pendingSession->save();
+                }
+            }
+
+            if ($session) {
+                $session->created_by = $userId;
+                $session->status = 'scanning';
+                $session->started_at = now();
+                $session->completed_at = null;
+                $session->approved_by = null;
+                $session->approved_at = null;
+                $session->verification_box_ids = null;
+                $session->completion_status = 'pending';
+                $session->redo_until = null;
+                $session->save();
+            } else {
+                $session = DeliveryPickSession::create([
+                    'delivery_order_id' => $lockedOrder->id,
+                    'created_by' => $userId,
+                    'status' => 'scanning',
+                    'started_at' => now(),
+                ]);
+            }
+
+            $this->createSessionItems($lockedOrder, $session);
 
             if (!$session->items()->exists()) {
                 throw new \RuntimeException('Stok tidak cukup atau tidak ada rekomendasi FIFO yang tersedia.');
@@ -1103,8 +1166,8 @@ class DeliveryPickController extends Controller
 
         $session = DeliveryPickSession::with('order', 'items')->findOrFail($sessionId);
 
-        if (now()->greaterThan($session->redo_until)) {
-            return redirect()->back()->with('error', 'Redo sudah kadaluarsa.');
+        if ($error = $this->getRedoEligibilityError($session)) {
+            return redirect()->back()->with('error', $error);
         }
 
         $requestedRelocations = collect((array) $request->input('relocation_locations', []))
@@ -1119,6 +1182,15 @@ class DeliveryPickController extends Controller
 
         DB::beginTransaction();
         try {
+            $session = DeliveryPickSession::with(['order', 'items'])
+                ->whereKey($sessionId)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($error = $this->getRedoEligibilityError($session)) {
+                throw new \RuntimeException($error);
+            }
+
             // Find all boxes from pick session items and get their withdrawals
             $boxIds = $session->items()->pluck('box_id')->toArray();
             $notFullBoxCount = 0;
@@ -1150,7 +1222,7 @@ class DeliveryPickController extends Controller
                     return redirect()->back()->with('error', (string) ($locationCheck['message'] ?? 'Redo gagal karena konflik lokasi.'));
                 }
 
-                $this->restoreBoxesToPallets(
+                $affectedPalletIds = $this->restoreBoxesToPallets(
                     $redoContext['allSessionBoxes'],
                     $withdrawals,
                     $redoContext['palletItemsById'],
@@ -1158,8 +1230,10 @@ class DeliveryPickController extends Controller
                 );
 
                 $this->reverseWithdrawalsAndRestorePalletItems($withdrawals, $redoContext['palletItemsById']);
+                $this->syncPalletSummariesFromActiveBoxes($affectedPalletIds);
                 $notFullBoxCount = $this->resetSessionBoxAssignments($session, $redoContext['allSessionBoxes']);
                 $notFullRequestsCount = $this->cancelNotFullRequestsForOrder((int) $session->order->id);
+                $this->cancelPendingSessionsForOrder((int) $session->order->id);
 
                 // Log not_full boxes restoration if any were affected
                 if ($notFullBoxCount > 0 || $notFullRequestsCount > 0) {
@@ -1216,10 +1290,10 @@ class DeliveryPickController extends Controller
 
         $session = DeliveryPickSession::with('items')->findOrFail($sessionId);
 
-        if (now()->greaterThan($session->redo_until)) {
+        if ($error = $this->getRedoEligibilityError($session)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Redo sudah kadaluarsa.',
+                'message' => $error,
             ], 422);
         }
 
@@ -1312,26 +1386,15 @@ class DeliveryPickController extends Controller
                 continue;
             }
 
-            $existingPalletId = (int) optional($box->pallets->first())->id;
-            if ($existingPalletId > 0) {
-                $palletIds[] = $existingPalletId;
-                continue;
-            }
-
             $boxId = (int) $box->getKey();
-            $boxWithdrawal = $withdrawals->firstWhere('box_id', $boxId);
-
-            if ($boxWithdrawal instanceof StockWithdrawal && $boxWithdrawal->getAttribute('pallet_item_id')) {
-                $palletItem = $palletItemsById->get((int) $boxWithdrawal->getAttribute('pallet_item_id'));
-                if ($palletItem) {
-                    $palletIds[] = (int) $palletItem->pallet_id;
-                    continue;
-                }
-            }
-
-            $mappedPalletId = (int) $boxPalletIdsByBoxId->get($boxId);
-            if ($mappedPalletId > 0) {
-                $palletIds[] = $mappedPalletId;
+            $palletId = $this->resolveRedoPalletIdForBox(
+                $box,
+                $withdrawals,
+                $palletItemsById,
+                $boxPalletIdsByBoxId
+            );
+            if ($palletId > 0) {
+                $palletIds[] = $palletId;
             }
         }
 
@@ -1548,6 +1611,8 @@ class DeliveryPickController extends Controller
                     'updated_at' => now(),
                 ]);
 
+            $masterLocationId = MasterLocation::where('code', $locationCode)->value('id');
+
             MasterLocation::where('code', $locationCode)
                 ->update([
                     'is_occupied' => true,
@@ -1555,9 +1620,19 @@ class DeliveryPickController extends Controller
                     'updated_at' => now(),
                 ]);
 
+            if ($masterLocationId) {
+                StockLocation::where('master_location_id', $masterLocationId)
+                    ->where('pallet_id', '!=', $palletId)
+                    ->update([
+                        'master_location_id' => null,
+                        'updated_at' => now(),
+                    ]);
+            }
+
             StockLocation::updateOrCreate(
                 ['pallet_id' => $palletId],
                 [
+                    'master_location_id' => $masterLocationId,
                     'warehouse_location' => $locationCode,
                     'stored_at' => now(),
                 ]
@@ -1609,15 +1684,20 @@ class DeliveryPickController extends Controller
         ];
     }
 
-    private function restoreBoxesToPallets($allSessionBoxes, $withdrawals, $palletItemsById, $boxPalletIdsByBoxId): void
+    private function restoreBoxesToPallets($allSessionBoxes, $withdrawals, $palletItemsById, $boxPalletIdsByBoxId): array
     {
+        $affectedPalletIds = [];
+
         foreach ($allSessionBoxes as $box) {
             if (!$box instanceof Box) {
                 continue;
             }
 
             $boxId = (int) $box->getKey();
-            $boxWithdrawal = $withdrawals->firstWhere('box_id', $boxId);
+            $affectedPalletIds = array_merge(
+                $affectedPalletIds,
+                $box->pallets->pluck('id')->map(fn ($id) => (int) $id)->all()
+            );
 
             if ($box->is_withdrawn) {
                 $box->is_withdrawn = false;
@@ -1625,25 +1705,27 @@ class DeliveryPickController extends Controller
                 $box->save();
             }
 
-            if ($box->pallets->isEmpty()) {
-                $palletId = null;
+            $palletId = $this->resolveRedoPalletIdForBox(
+                $box,
+                $withdrawals,
+                $palletItemsById,
+                $boxPalletIdsByBoxId
+            );
 
-                if ($boxWithdrawal instanceof StockWithdrawal && $boxWithdrawal->getAttribute('pallet_item_id')) {
-                    $palletItem = $palletItemsById->get((int) $boxWithdrawal->getAttribute('pallet_item_id'));
-                    if ($palletItem) {
-                        $palletId = $palletItem->pallet_id;
-                    }
+            if ($palletId > 0) {
+                $pallet = Pallet::withTrashed()->whereKey($palletId)->lockForUpdate()->first();
+                if ($pallet && $pallet->trashed()) {
+                    $pallet->restore();
                 }
 
-                if (!$palletId) {
-                    $palletId = $boxPalletIdsByBoxId->get($boxId);
-                }
-
-                if ($palletId) {
-                    $box->pallets()->attach($palletId);
+                if ($pallet) {
+                    $box->pallets()->sync([$palletId]);
+                    $affectedPalletIds[] = $palletId;
                 }
             }
         }
+
+        return array_values(array_unique(array_filter($affectedPalletIds)));
     }
 
     private function reverseWithdrawalsAndRestorePalletItems($withdrawals, $palletItemsById): void
@@ -1653,18 +1735,99 @@ class DeliveryPickController extends Controller
                 continue;
             }
 
-            if ($withdrawal->getAttribute('pallet_item_id')) {
-                $palletItem = $palletItemsById->get((int) $withdrawal->getAttribute('pallet_item_id'));
-                if ($palletItem) {
-                    $palletItem->pcs_quantity += $withdrawal->pcs_quantity;
-                    $palletItem->box_quantity += $withdrawal->box_quantity;
-                    $palletItem->save();
-                }
-            }
-
             $withdrawal->status = 'reversed';
             $withdrawal->save();
         }
+    }
+
+    private function resolveRedoPalletIdForBox($box, $withdrawals, $palletItemsById, $boxPalletIdsByBoxId): int
+    {
+        $boxId = (int) $box->getKey();
+        $boxWithdrawal = $withdrawals->firstWhere('box_id', $boxId);
+
+        if ($boxWithdrawal instanceof StockWithdrawal && $boxWithdrawal->getAttribute('pallet_item_id')) {
+            $palletItem = $palletItemsById->get((int) $boxWithdrawal->getAttribute('pallet_item_id'));
+            if ($palletItem) {
+                return (int) $palletItem->pallet_id;
+            }
+        }
+
+        $mappedPalletId = (int) $boxPalletIdsByBoxId->get($boxId);
+        if ($mappedPalletId > 0) {
+            return $mappedPalletId;
+        }
+
+        return (int) optional($box->pallets->sortByDesc('pivot.id')->first())->id;
+    }
+
+    private function syncPalletSummariesFromActiveBoxes(array $palletIds): void
+    {
+        foreach (array_values(array_unique(array_filter($palletIds))) as $palletId) {
+            $pallet = Pallet::withTrashed()->whereKey((int) $palletId)->lockForUpdate()->first();
+            if (!$pallet || $pallet->trashed()) {
+                continue;
+            }
+
+            $activeByPart = $pallet->activeBoxes()
+                ->get(['boxes.id', 'boxes.part_number', 'boxes.pcs_quantity'])
+                ->groupBy('part_number');
+
+            $existingItems = PalletItem::where('pallet_id', $pallet->id)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('part_number');
+
+            foreach ($existingItems as $partNumber => $item) {
+                $boxes = $activeByPart->get($partNumber, collect());
+                $item->box_quantity = $boxes->count();
+                $item->pcs_quantity = (int) $boxes->sum('pcs_quantity');
+                $item->save();
+            }
+
+            foreach ($activeByPart as $partNumber => $boxes) {
+                if ($existingItems->has($partNumber)) {
+                    continue;
+                }
+
+                PalletItem::create([
+                    'pallet_id' => $pallet->id,
+                    'part_number' => $partNumber,
+                    'box_quantity' => $boxes->count(),
+                    'pcs_quantity' => (int) $boxes->sum('pcs_quantity'),
+                ]);
+            }
+        }
+    }
+
+    private function cancelPendingSessionsForOrder(int $orderId): void
+    {
+        $pendingSessions = DeliveryPickSession::where('delivery_order_id', $orderId)
+            ->where('status', 'pending')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($pendingSessions as $pendingSession) {
+            DeliveryPickItem::where('pick_session_id', (int) $pendingSession->id)
+                ->lockForUpdate()
+                ->delete();
+
+            $pendingSession->status = 'cancelled';
+            $pendingSession->approval_notes = 'Sesi assignment pending dibatalkan otomatis oleh redo.';
+            $pendingSession->save();
+        }
+    }
+
+    private function getRedoEligibilityError(DeliveryPickSession $session): ?string
+    {
+        if ((string) $session->status !== 'completed' || (string) $session->completion_status !== 'completed') {
+            return 'Redo hanya dapat dilakukan satu kali pada sesi delivery yang sudah completed.';
+        }
+
+        if (!$session->redo_until || now()->greaterThan($session->redo_until)) {
+            return 'Redo sudah kadaluarsa.';
+        }
+
+        return null;
     }
 
     private function resetSessionBoxAssignments(DeliveryPickSession $session, $allSessionBoxes): int
@@ -1753,6 +1916,8 @@ class DeliveryPickController extends Controller
                 ]);
             }
         ])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
+
+        $this->authorizePickSessionView($session);
         
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
@@ -1781,6 +1946,8 @@ class DeliveryPickController extends Controller
                 ]);
             }
         ])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
+
+        $this->authorizePickSessionView($session);
 
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 

@@ -237,6 +237,7 @@ class MergePalletController extends Controller
     {
         $locationId = $request->input('location_id');
         $locationCode = $request->input('warehouse_location');
+        $masterLocationId = null;
 
         if ($locationId) {
             $masterLocation = MasterLocation::find($locationId);
@@ -257,10 +258,14 @@ class MergePalletController extends Controller
             }
 
             $locationCode = $masterLocation->code;
+            $masterLocationId = (int) $masterLocation->id;
+        } elseif ($locationCode) {
+            $masterLocationId = MasterLocation::where('code', $locationCode)->value('id');
         }
 
         StockLocation::create([
             'pallet_id' => $newPallet->id,
+            'master_location_id' => $masterLocationId,
             'warehouse_location' => $locationCode ?? 'Unknown',
             'stored_at' => now(),
         ]);

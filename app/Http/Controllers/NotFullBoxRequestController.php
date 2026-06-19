@@ -210,6 +210,7 @@ class NotFullBoxRequestController extends Controller
 
                     StockLocation::create([
                         'pallet_id' => $pallet->id,
+                        'master_location_id' => $location->id,
                         'warehouse_location' => $locationCode,
                         'stored_at' => now(),
                     ]);

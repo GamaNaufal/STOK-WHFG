@@ -12,6 +12,7 @@ use App\Models\DeliveryPickSession;
 use App\Models\NotFullBoxRequest;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
+use App\Models\StockWithdrawal;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,7 @@ class DeliveryOrderController extends Controller
         $lockedBoxIds = $this->getActivePickLockedBoxIds();
 
         $boxRowsQuery = DB::table('boxes')
+            ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
@@ -82,7 +84,7 @@ class DeliveryOrderController extends Controller
         $legacyRows = PalletItem::where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation')
-                  ->doesntHave('boxes');
+                  ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
             })
             ->select('part_number', 'pcs_quantity', 'created_at')
             ->get();
@@ -125,6 +127,7 @@ class DeliveryOrderController extends Controller
         $lockedBoxIds = $this->getActivePickLockedBoxIds();
 
         $boxTotals = $this->applyStoredLocationExistsFilter(DB::table('boxes')
+            ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNull('boxes.assigned_delivery_order_id')
@@ -139,7 +142,7 @@ class DeliveryOrderController extends Controller
             ->where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation')
-                  ->doesntHave('boxes');
+                  ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
             })
             ->groupBy('part_number')
             ->pluck('total', 'part_number');
@@ -154,16 +157,19 @@ class DeliveryOrderController extends Controller
 
     private function getReservedStockByOrder(): array
     {
-        $rows = DB::table('boxes')
+        $rowsQuery = DB::table('boxes')
             ->select(
                 'boxes.assigned_delivery_order_id',
                 'boxes.part_number',
                 DB::raw('SUM(boxes.pcs_quantity) as total')
             )
+            ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
             ->whereNotNull('boxes.assigned_delivery_order_id')
-            ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number')
+            ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number');
+
+        $rows = $this->applyStoredLocationExistsFilter($rowsQuery)
             ->get();
 
         $reserved = [];
@@ -241,6 +247,21 @@ class DeliveryOrderController extends Controller
 
         $pendingAdditionalApprovalByOrderId = array_fill_keys($pendingAdditionalApprovalOrderIds, true);
 
+        $splitLockedOrderIds = DeliveryPickSession::query()
+            ->whereIn('status', ['pending', 'scanning', 'blocked', 'approved'])
+            ->whereIn('delivery_order_id', $approvedOrders->pluck('id')->all())
+            ->pluck('delivery_order_id')
+            ->merge(
+                Box::query()
+                    ->whereNotNull('assigned_delivery_order_id')
+                    ->whereIn('assigned_delivery_order_id', $approvedOrders->pluck('id')->all())
+                    ->pluck('assigned_delivery_order_id')
+            )
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->all();
+        $splitLockedByOrderId = array_fill_keys($splitLockedOrderIds, true);
+
         // Precompute available stock per part (PCS)
         $availableByPart = $this->getAvailableStockByPart();
         $reservedByOrder = $this->getReservedStockByOrder();
@@ -250,7 +271,7 @@ class DeliveryOrderController extends Controller
 
         $partSettings = PartSetting::pluck('qty_box', 'part_number');
 
-        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $activeLockedByOrderPart, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId, $globalActiveSession, $currentUserId) {
+        $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $activeLockedByOrderPart, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId, $splitLockedByOrderId, $globalActiveSession, $currentUserId) {
             $allAvailable = true;
             $hasAnyFulfillable = false;
             $hasPendingAdditionalApproval = !empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
@@ -363,9 +384,10 @@ class DeliveryOrderController extends Controller
             $order->global_pick_lock_order_id = $hasGlobalLock ? (int) $globalActiveSession->delivery_order_id : null;
             $order->is_split_child = !empty($order->parent_delivery_order_id);
             $order->has_split_children = ((int) ($order->split_children_count ?? 0)) > 0;
+            $order->has_split_operation_lock = !empty($splitLockedByOrderId[(int) $order->id]);
             $order->can_split_delivery = !$order->is_split_child
                 && in_array($order->status, ['approved', 'partial'], true)
-                && empty($order->has_active_pick_session)
+                && empty($order->has_split_operation_lock)
                 && empty($order->has_pending_additional_approval)
                 && $order->items->contains(fn ($item) => (int) $item->quantity > 1);
             $order->split_disabled_reason = null;
@@ -375,8 +397,8 @@ class DeliveryOrderController extends Controller
                     $order->split_disabled_reason = 'Order ini adalah hasil split dan tidak bisa di-split lagi.';
                 } elseif (!in_array($order->status, ['approved', 'partial'], true)) {
                     $order->split_disabled_reason = 'Split hanya tersedia untuk order berstatus approved atau partial.';
-                } elseif (!empty($order->has_active_pick_session)) {
-                    $order->split_disabled_reason = 'Order sedang diproses, split sementara tidak bisa dilakukan.';
+                } elseif (!empty($order->has_split_operation_lock)) {
+                    $order->split_disabled_reason = 'Order sudah memiliki assignment atau sesi picking dan tidak bisa di-split.';
                 } elseif (!empty($order->has_pending_additional_approval)) {
                     $order->split_disabled_reason = 'Masih ada pending approval not full tambahan.';
                 } elseif (!$order->items->contains(fn ($item) => (int) $item->quantity > 1)) {
@@ -468,13 +490,17 @@ class DeliveryOrderController extends Controller
                     throw new \RuntimeException('Delivery hanya bisa di-split dari status approved atau partial.');
                 }
 
-                $hasActivePickSession = DeliveryPickSession::where('delivery_order_id', (int) $order->id)
-                    ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+                $hasOperationalPickSession = DeliveryPickSession::where('delivery_order_id', (int) $order->id)
+                    ->whereIn('status', ['pending', 'scanning', 'blocked', 'approved'])
                     ->lockForUpdate()
                     ->exists();
 
-                if ($hasActivePickSession) {
-                    throw new \RuntimeException('Delivery sedang diproses dan tidak bisa di-split.');
+                $hasAssignedBoxes = Box::where('assigned_delivery_order_id', (int) $order->id)
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($hasOperationalPickSession || $hasAssignedBoxes) {
+                    throw new \RuntimeException('Delivery sudah memiliki assignment atau sesi picking dan tidak bisa di-split.');
                 }
 
                 $sourceItems = DeliveryOrderItem::query()
@@ -570,13 +596,17 @@ class DeliveryOrderController extends Controller
 
                 $parentOrder = DeliveryOrder::with(['items'])->lockForUpdate()->findOrFail((int) $childOrder->parent_delivery_order_id);
 
-                $hasActivePickSession = DeliveryPickSession::where('delivery_order_id', (int) $childOrder->id)
-                    ->whereIn('status', self::ACTIVE_LOCK_STATUSES)
+                $hasOperationalPickSession = DeliveryPickSession::where('delivery_order_id', (int) $childOrder->id)
+                    ->whereIn('status', ['pending', 'scanning', 'blocked', 'approved'])
                     ->lockForUpdate()
                     ->exists();
 
-                if ($hasActivePickSession) {
-                    throw new \RuntimeException('Delivery hasil split sedang diproses dan tidak bisa dikembalikan.');
+                $hasAssignedBoxes = Box::where('assigned_delivery_order_id', (int) $childOrder->id)
+                    ->lockForUpdate()
+                    ->exists();
+
+                if ($hasOperationalPickSession || $hasAssignedBoxes) {
+                    throw new \RuntimeException('Delivery hasil split sudah memiliki assignment atau sesi picking dan tidak bisa dikembalikan.');
                 }
 
                 if ($childOrder->items->isEmpty()) {
@@ -815,6 +845,16 @@ class DeliveryOrderController extends Controller
 
         DB::beginTransaction();
         try {
+            $order = DeliveryOrder::with('items')->whereKey($id)->lockForUpdate()->firstOrFail();
+
+            if ($order->sales_user_id !== $user->id && $user->role !== 'admin') {
+                throw new \RuntimeException('Order ini bukan milik Anda.');
+            }
+
+            if ((string) $order->status !== 'correction') {
+                throw new \RuntimeException('Order hanya dapat diedit saat berstatus correction.');
+            }
+
             $order->customer_name = $request->customer_name;
             $order->delivery_date = $request->delivery_date;
             $order->status = 'pending';
@@ -913,17 +953,25 @@ class DeliveryOrderController extends Controller
                 ->withInput();
         }
 
-        DB::transaction(function () use ($request, $id) {
-            $order = DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
-            $order->status = $request->status;
+        try {
+            DB::transaction(function () use ($request, $id) {
+                $order = DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
+                if ((string) $order->status !== 'pending') {
+                    throw new \RuntimeException('Order ini sudah diproses dan tidak lagi berstatus pending.');
+                }
 
-            $ppcNotes = trim((string) $request->notes);
-            if ($ppcNotes !== '') {
-                $order->notes = $ppcNotes;
-            }
+                $order->status = $request->status;
 
-            $order->save();
-        });
+                $ppcNotes = trim((string) $request->notes);
+                if ($ppcNotes !== '') {
+                    $order->notes = $ppcNotes;
+                }
+
+                $order->save();
+            });
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         $msg = 'Order status updated to ' . ucfirst($request->status);
         if($request->status == 'correction') $msg .= '. Sent back to Sales.';
@@ -938,23 +986,35 @@ class DeliveryOrderController extends Controller
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
-        DB::transaction(function () use ($id, $user) {
-            $order = DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
+        try {
+            DB::transaction(function () use ($id, $user) {
+                $order = DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
 
-            Box::where('assigned_delivery_order_id', (int) $order->id)
-                ->lockForUpdate()
-                ->update([
-                    'assigned_delivery_order_id' => null,
-                    'updated_at' => now(),
-                ]);
+                /** @var \Illuminate\Database\Eloquent\Collection<int, DeliveryPickSession> $sessions */
+                $sessions = DeliveryPickSession::where('delivery_order_id', (int) $order->id)
+                    ->lockForUpdate()
+                    ->get();
 
-            /** @var \Illuminate\Database\Eloquent\Collection<int, DeliveryPickSession> $sessions */
-            $sessions = DeliveryPickSession::where('delivery_order_id', (int) $order->id)
-                ->lockForUpdate()
-                ->get();
-
-            if ($sessions->isNotEmpty()) {
                 $sessionIds = $sessions->pluck('id')->map(fn ($sessionId) => (int) $sessionId)->all();
+                $hasCompletedHistory = (string) $order->status === 'completed'
+                    || $sessions->contains(function (DeliveryPickSession $session) {
+                        return (string) $session->status === 'completed'
+                            || in_array((string) $session->completion_status, ['completed', 'redone'], true);
+                    })
+                    || (!empty($sessionIds) && StockWithdrawal::whereIn('pick_session_id', $sessionIds)->exists());
+
+                if ($hasCompletedHistory) {
+                    throw new \RuntimeException('Delivery yang sudah memiliki histori completion/withdrawal tidak dapat dihapus.');
+                }
+
+                Box::where('assigned_delivery_order_id', (int) $order->id)
+                    ->lockForUpdate()
+                    ->update([
+                        'assigned_delivery_order_id' => null,
+                        'updated_at' => now(),
+                    ]);
+
+                if ($sessions->isNotEmpty()) {
 
                 DeliveryPickItem::whereIn('pick_session_id', $sessionIds)
                     ->lockForUpdate()
@@ -978,10 +1038,13 @@ class DeliveryOrderController extends Controller
                 }
             }
 
-            $order->status = 'deleted';
-            $order->save();
-            $order->delete();
-        });
+                $order->status = 'deleted';
+                $order->save();
+                $order->delete();
+            });
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
 
         return redirect()->back()->with('success', 'Delivery schedule deleted.');
     }

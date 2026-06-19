@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\Box;
 use App\Models\ExpiredBoxReport;
+use App\Models\MasterLocation;
+use App\Models\PalletItem;
 use App\Models\User;
 use App\Mail\ExpiredBoxSummaryMail;
 use Illuminate\Support\Carbon;
@@ -40,7 +42,20 @@ class ExpiredBoxService
                     }
 
                     if ($row->expired_status !== $nextStatus) {
-                        Box::where('id', $row->id)->update(['expired_status' => $nextStatus]);
+                        DB::transaction(function () use ($row, $nextStatus): void {
+                            $box = Box::whereKey($row->id)->lockForUpdate()->first();
+                            if (!$box || $box->expired_status === 'handled') {
+                                return;
+                            }
+
+                            $wasInactive = in_array((string) $box->expired_status, ['expired', 'handled'], true);
+                            $box->expired_status = $nextStatus;
+                            $box->save();
+
+                            if ($nextStatus === 'expired' && !$wasInactive) {
+                                $this->syncLinkedPalletsAfterBoxDeactivation($box);
+                            }
+                        });
                     }
 
                     if ($nextStatus === 'expired') {
@@ -74,6 +89,8 @@ class ExpiredBoxService
             $box->handled_by = $userId;
             $box->save();
 
+            $this->syncLinkedPalletsAfterBoxDeactivation($box);
+
             if ($this->canUseExpiredReports() && $row) {
                 ExpiredBoxReport::updateOrCreate(
                     [
@@ -94,6 +111,42 @@ class ExpiredBoxService
                 );
             }
         });
+    }
+
+    private function syncLinkedPalletsAfterBoxDeactivation(Box $box): void
+    {
+        $linkedPallets = $box->pallets()
+            ->with('stockLocation')
+            ->lockForUpdate()
+            ->get();
+
+        foreach ($linkedPallets as $linkedPallet) {
+            $activeForPart = $linkedPallet->activeBoxes()
+                ->where('boxes.part_number', $box->part_number)
+                ->get(['boxes.id', 'boxes.pcs_quantity']);
+
+            $item = PalletItem::where('pallet_id', $linkedPallet->id)
+                ->where('part_number', $box->part_number)
+                ->lockForUpdate()
+                ->first();
+
+            if ($item) {
+                $item->box_quantity = $activeForPart->count();
+                $item->pcs_quantity = (int) $activeForPart->sum('pcs_quantity');
+                $item->save();
+            }
+
+            $masterLocation = MasterLocation::where('current_pallet_id', $linkedPallet->id)
+                ->lockForUpdate()
+                ->first();
+            if ($masterLocation) {
+                $masterLocation->autoVacateIfEmpty();
+            }
+
+            if (!$linkedPallet->activeBoxes()->exists() && $linkedPallet->stockLocation) {
+                $linkedPallet->stockLocation->delete();
+            }
+        }
     }
 
     public function sendDailySummary(): void

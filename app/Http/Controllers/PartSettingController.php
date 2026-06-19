@@ -4,9 +4,19 @@ namespace App\Http\Controllers;
 
 use App\Models\PartSetting;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PartSettingController extends Controller
 {
+    private function isPartReferenced(string $partNumber): bool
+    {
+        return DB::table('boxes')->where('part_number', $partNumber)->exists()
+            || DB::table('pallet_items')->where('part_number', $partNumber)->exists()
+            || DB::table('delivery_order_items')->where('part_number', $partNumber)->exists()
+            || DB::table('not_full_box_requests')->where('part_number', $partNumber)->exists()
+            || DB::table('stock_withdrawals')->where('part_number', $partNumber)->exists();
+    }
+
     public function index()
     {
         $parts = PartSetting::orderBy('part_number')->paginate(10);
@@ -59,6 +69,15 @@ class PartSettingController extends Controller
             'qty_box' => 'required|integer|min:1|max:4294967295',
         ]);
 
+        if (
+            (string) $partSetting->part_number !== (string) $validated['part_number']
+            && $this->isPartReferenced((string) $partSetting->part_number)
+        ) {
+            return redirect()->back()
+                ->withInput()
+                ->with('error', 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat diganti. Qty per box tetap dapat diperbarui.');
+        }
+
         $partSetting->update($validated);
 
         return redirect()->route('part-settings.index')->with('success', 'No Part berhasil diperbarui.');
@@ -66,6 +85,10 @@ class PartSettingController extends Controller
 
     public function destroy(PartSetting $partSetting)
     {
+        if ($this->isPartReferenced((string) $partSetting->part_number)) {
+            return redirect()->back()->with('error', 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat dihapus.');
+        }
+
         $partSetting->delete();
 
         return redirect()->route('part-settings.index')->with('success', 'No Part berhasil dihapus.');

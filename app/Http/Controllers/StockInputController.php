@@ -810,8 +810,13 @@ class StockInputController extends Controller
 
     private function createStockLocationRecord(Pallet $pallet, ?string $locationCode): void
     {
+        $masterLocationId = $locationCode
+            ? MasterLocation::where('code', $locationCode)->value('id')
+            : null;
+
         StockLocation::create([
             'pallet_id' => $pallet->id,
+            'master_location_id' => $masterLocationId,
             'warehouse_location' => $locationCode ?? 'Unknown',
             'stored_at' => now(),
         ]);

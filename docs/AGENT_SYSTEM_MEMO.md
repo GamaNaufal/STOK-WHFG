@@ -134,6 +134,8 @@ Box dapat terhubung ke lebih dari satu palet pada data tertentu. Perhitungan sto
 
 Canonical pallet untuk box shared ditentukan dari relasi `pallet_boxes` paling baru yang masih memiliki lokasi valid. Saat box dinonaktifkan karena withdrawal, ringkasan seluruh palet yang masih terhubung disinkronkan ulang dari box aktif agar tidak meninggalkan phantom stock.
 
+Query stok mentah wajib mengabaikan `boxes.deleted_at`. Fallback `pallet_items` hanya boleh digunakan untuk pallet yang benar-benar tidak pernah memiliki histori box, termasuk histori box soft-deleted.
+
 ## Proses Bisnis
 
 ### 1. Login, profil, dan otorisasi
@@ -354,6 +356,8 @@ Jika jumlah box yang dipilih melebihi sisa permintaan, sistem meminta konfirmasi
 
 Assignment membuat atau menggunakan pick session `pending` dan membuat `delivery_pick_items`.
 
+Saat picking dimulai, session pending terbaru dipakai ulang, itemnya dibangun ulang berdasarkan kondisi stok terkini, dan session pending duplikat dibatalkan. Order dan box dikunci serta divalidasi ulang di dalam transaction untuk mencegah race condition.
+
 File utama:
 
 - `app/Http/Controllers/DeliveryAssignController.php`
@@ -375,6 +379,8 @@ Alur:
 Lock aktif menggunakan status `scanning` dan `blocked`.
 
 Reserved box hanya dimasukkan selama totalnya tidak melebihi sisa kebutuhan order. Box reserved tanpa lokasi valid tidak dianggap sebagai stok yang dapat dipicking.
+
+Start picking menggunakan lock serialisasi global sehingga sistem hanya dapat memiliki satu session `scanning/blocked` aktif pada satu waktu.
 
 Satu operator tidak boleh memulai delivery lain sebelum sesi aktifnya diselesaikan atau dibatalkan. Operator lain juga tidak dapat mengambil alih sesi tanpa tindakan admin.
 
@@ -439,7 +445,7 @@ Admin Warehouse/Admin dapat membagi quantity dari order berstatus `approved` ata
 Aturan:
 
 - order hasil split tidak dapat di-split lagi;
-- order yang sedang memiliki sesi picking aktif tidak dapat di-split;
+- order yang sudah memiliki assignment box atau sesi `pending/scanning/blocked/approved` tidak dapat di-split;
 - nomor part dalam payload split harus unik;
 - quantity split harus lebih kecil dari quantity parent;
 - child order dibuat dengan status `approved`;
@@ -449,7 +455,7 @@ Aturan:
 Restore split:
 
 - child belum boleh `completed` atau `deleted`;
-- child tidak boleh sedang diproses;
+- child tidak boleh memiliki assignment box atau sesi `pending/scanning/blocked/approved`;
 - seluruh quantity setiap part pada child dikembalikan ke parent;
 - child di-soft-delete;
 - parent kembali `approved` bila tidak ada child aktif lain.
@@ -470,6 +476,8 @@ Redo:
 - menandai completion sebagai `redone`;
 - mengubah order menjadi `processing`;
 - membuat audit redo.
+
+Redo hanya berlaku satu kali untuk session `completed` dengan `completion_status=completed` dan `redo_until` yang belum lewat. Untuk shared box, pallet dari withdrawal menjadi sumber kanonik; pivot box dinormalkan ke pallet tersebut dan ringkasan pallet terdampak dihitung ulang. Session assignment pending yang tersisa dibatalkan saat redo.
 
 ### 15. Merge palet
 
@@ -506,6 +514,8 @@ Status:
 - setelah ditangani: `handled`.
 
 Box `expired` atau `handled` tidak termasuk stok aktif dan tidak boleh dipakai untuk delivery.
+
+Saat status berubah menjadi `expired` atau `handled`, sistem langsung menghitung ulang `pallet_items`, menghapus stock location pallet yang sudah kosong, dan mengosongkan master location terkait.
 
 Supervisi/Admin dapat menandai box sebagai handled. Sistem menyimpan histori penanganannya.
 
@@ -583,6 +593,7 @@ Status yang digunakan:
 
 - Operasi stok dan delivery kritis dijalankan dalam database transaction.
 - Row locking digunakan untuk mencegah double assignment, double scan, dan race condition lokasi.
+- Start picking diserialisasi melalui row `operation_locks.global_delivery_pick`.
 - Endpoint withdrawal hanya dapat diakses Warehouse Operator, Admin Warehouse, dan Admin.
 - Withdrawal exact di-rollback jika quantity box aktual tidak sama dengan quantity request.
 - `fulfilled_quantity` diperbarui dari quantity yang benar-benar berhasil di-withdraw.
@@ -597,9 +608,14 @@ Status yang digunakan:
 - Box dalam sesi picking aktif tidak boleh diedit atau dihapus.
 - Completion delivery wajib exact dan membatalkan transaksi jika snapshot box, status, quantity, assignment, atau lokasi telah berubah.
 - Lokasi hanya boleh ditempati satu palet aktif.
+- Database menjamin satu `stock_locations` per pallet dan satu relasi `master_location_id` aktif melalui unique constraint.
 - Undo withdrawal memulihkan pallet soft-deleted dan `stock_locations`; undo ditolak jika lokasi asal sudah ditempati pallet lain.
 - Soft delete digunakan untuk box, palet, stock input, withdrawal, dan delivery agar histori tetap dapat diaudit.
 - User dinonaktifkan melalui `is_active`, bukan dihapus, sehingga foreign key dan histori tetap utuh.
+- Master part yang sudah digunakan histori/transaksi tidak boleh diubah nomor part-nya atau dihapus.
+- Sales hanya boleh mengubah order berstatus `correction`; PPC hanya boleh memutuskan order berstatus `pending`.
+- Delivery yang sudah memiliki completion atau withdrawal tidak boleh dihapus.
+- Picklist PDF/print hanya dapat diakses role warehouse; Warehouse Operator hanya dapat mengakses session miliknya.
 
 ## Keputusan Bisnis
 
@@ -610,10 +626,10 @@ Status yang digunakan:
 
 ## Status Schema dan Validasi Terakhir
 
-- Seluruh migration sampai `2026_06_19_000003_remove_partial_withdrawal_column` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
-- Backup sebelum migration tersimpan di `storage/app/backups/db_stock_before_stock_consistency_2026-06-19.sql`.
-- Audit setelah migration tidak menemukan box aktif tanpa lokasi, shared box aktif, mismatch `pallet_items`, mismatch occupancy lokasi, atau mismatch header `stock_inputs`.
-- Full regression suite terakhir: 115 test, 592 assertion, seluruhnya lulus.
+- Seluruh migration sampai `2026_06_19_000004_harden_location_and_pick_serialization` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
+- Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
+- Audit setelah migration tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, atau lebih dari satu session picking aktif.
+- Full regression suite terakhir: 126 test, 628 assertion, seluruhnya lulus.
 
 ## Catatan yang Belum Diputuskan
 
@@ -625,6 +641,10 @@ Terdapat dua flow box not full:
 Perbedaan ini masih perlu dikonfirmasi sebagai keputusan bisnis.
 
 Jangan mengubah perbedaan flow box not full hanya karena membaca catatan ini. Tunggu perintah eksplisit dari user.
+
+Status `warning` (umur 9 sampai kurang dari 12 bulan) saat ini masih dapat ditandai `handled`, sama seperti box `expired`. Perlu keputusan bisnis apakah handling boleh dilakukan sejak warning atau hanya setelah status expired.
+
+Jangan mengubah aturan handling warning sampai ada keputusan eksplisit dari user.
 
 ## Panduan Agent Saat Menerima Tugas
 

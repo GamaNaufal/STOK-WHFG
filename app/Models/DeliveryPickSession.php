@@ -32,6 +32,7 @@ class DeliveryPickSession extends Model
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
         'approved_at' => 'datetime',
+        'redo_until' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'verification_box_ids' => 'array',
