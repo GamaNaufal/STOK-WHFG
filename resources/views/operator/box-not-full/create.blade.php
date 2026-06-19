@@ -53,7 +53,7 @@
                     <i class="bi bi-exclamation-circle"></i> Input Box Not Full
                 </h1>
                 <p style="margin: 0; opacity: 0.95; font-size: 14px;">
-                    Input 1 box not full, pilih delivery dan lokasi/pallet tujuan.
+                    Ajukan 1 box not full untuk approval Supervisi, lalu pilih delivery dan lokasi/pallet tujuan.
                 </p>
             </div>
         </div>

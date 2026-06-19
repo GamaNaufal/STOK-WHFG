@@ -62,6 +62,7 @@ Entry point penting:
 
 - Melakukan stock input.
 - Memilih atau membuat palet.
+- Mengajukan request box not full untuk approval Supervisi.
 - Melakukan assignment box ke delivery.
 - Menjalankan picking, verification scan, dan scan pengiriman.
 - Melakukan merge palet.
@@ -71,7 +72,7 @@ Entry point penting:
 
 - Mengelola master lokasi dan master nomor part.
 - Mengajukan box not full.
-- Melakukan assignment delivery, termasuk direct input box baru.
+- Melakukan assignment delivery, termasuk direct input box baru dengan PCS sesuai fixed qty Master Part.
 - Mengoreksi detail box aktif.
 - Menangani delivery scan issue.
 - Melakukan split/restore split dan redo delivery.
@@ -212,28 +213,25 @@ File utama:
 - `app/Models/Box.php`
 - `app/Models/Pallet.php`
 
-### 4. Box not full melalui stock input
+### 4. Aturan PCS pada stock input dan direct assignment
 
-Jika PCS aktual berbeda dari kapasitas standar:
-
-- box ditandai `is_not_full`;
-- alasan wajib diisi;
-- delivery order tujuan wajib dipilih;
-- delivery harus berstatus `approved`, `processing`, atau `partial`;
-- box langsung di-assign ke delivery;
-- quantity item delivery dapat ditambah sesuai PCS box tersebut.
-
-Flow ini berada di `StockInputController` dan tidak menggunakan approval Supervisi.
+- PCS full box mengikuti `qty_box` pada Master Part sesuai nomor part.
+- Stock Input tidak menerima PCS di bawah atau di atas fixed qty.
+- Direct input box baru pada Delivery Assignment juga hanya menerima PCS yang sama dengan fixed qty.
+- Jika PCS aktual lebih kecil, user wajib memakai menu Request Box Not Full.
+- Tidak ada jalur direct yang boleh membuat box not full menjadi stok aktif tanpa approval Supervisi.
+- Fitur Edit Box juga tidak boleh mengubah full box menjadi not-full atau mengubah identitas/PCS not-full tanpa request approved yang cocok.
 
 ### 5. Pengajuan box not full dengan approval
 
-Flow khusus Admin Warehouse:
+Flow Warehouse Operator/Admin Warehouse/Admin:
 
-1. Admin Warehouse mengisi ID box, nomor part, PCS aktual, alasan, delivery, dan tujuan.
+1. Requester mengisi ID box, nomor part, PCS aktual, alasan, delivery, dan tujuan.
 2. PCS aktual harus lebih kecil dari kapasitas standar.
 3. Tujuan dapat berupa palet existing atau lokasi kosong untuk palet baru.
 4. Request dibuat dengan status `pending`.
 5. Supervisi/Admin menyetujui atau menolak.
+6. Box belum menjadi stok aktif selama request masih `pending`.
 
 Jika disetujui:
 
@@ -517,7 +515,7 @@ Box `expired` atau `handled` tidak termasuk stok aktif dan tidak boleh dipakai u
 
 Saat status berubah menjadi `expired` atau `handled`, sistem langsung menghitung ulang `pallet_items`, menghapus stock location pallet yang sudah kosong, dan mengosongkan master location terkait.
 
-Supervisi/Admin dapat menandai box sebagai handled. Sistem menyimpan histori penanganannya.
+Supervisi/Admin dapat menandai box berstatus `warning` maupun `expired` sebagai `handled`. Sistem menyimpan histori penanganannya.
 
 Setiap hari pukul 07.00 sistem:
 
@@ -623,28 +621,20 @@ Status yang digunakan:
 - Kekurangan stok tidak boleh dikirim sebagian melalui picking atau withdrawal.
 - Delivery dengan kebutuhan yang akan dipisahkan harus memakai fitur split order.
 - Status delivery `partial` tetap dipakai khusus untuk parent order yang memiliki child hasil split.
+- Semua box not full wajib melalui request dan approval Supervisi; Stock Input dan Delivery Assignment tidak boleh membuat box not full secara langsung.
+- PCS direct input wajib sama dengan fixed qty Master Part.
+- Box berstatus `warning` (9 sampai kurang dari 12 bulan) boleh langsung ditandai `handled`.
 
 ## Status Schema dan Validasi Terakhir
 
 - Seluruh migration sampai `2026_06_19_000004_harden_location_and_pick_serialization` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
-- Audit setelah migration tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, atau lebih dari satu session picking aktif.
-- Full regression suite terakhir: 126 test, 628 assertion, seluruhnya lulus.
+- Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.
+- Full regression suite terakhir: 128 test, 633 assertion, seluruhnya lulus.
 
 ## Catatan yang Belum Diputuskan
 
-Terdapat dua flow box not full:
-
-- flow langsung dari stock input tanpa approval Supervisi;
-- flow request khusus dengan approval Supervisi.
-
-Perbedaan ini masih perlu dikonfirmasi sebagai keputusan bisnis.
-
-Jangan mengubah perbedaan flow box not full hanya karena membaca catatan ini. Tunggu perintah eksplisit dari user.
-
-Status `warning` (umur 9 sampai kurang dari 12 bulan) saat ini masih dapat ditandai `handled`, sama seperti box `expired`. Perlu keputusan bisnis apakah handling boleh dilakukan sejak warning atau hanya setelah status expired.
-
-Jangan mengubah aturan handling warning sampai ada keputusan eksplisit dari user.
+Tidak ada catatan terbuka terkait approval box not full atau handling status warning. Keputusan final tercatat pada bagian Keputusan Bisnis.
 
 ## Panduan Agent Saat Menerima Tugas
 

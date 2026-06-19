@@ -189,6 +189,10 @@ class DeliveryAssignController extends Controller
             $assignedLookup[(string) $row->part_number] = (int) $row->assigned_quantity;
         }
 
+        $partSettings = PartSetting::query()
+            ->whereIn('part_number', $requestedRows->pluck('part_number')->all())
+            ->pluck('qty_box', 'part_number');
+
         $availability = [];
         foreach ($requestedRows as $row) {
             $partNumber = (string) $row->part_number;
@@ -201,6 +205,7 @@ class DeliveryAssignController extends Controller
                 'requested_quantity' => $requestedQuantity,
                 'assigned_quantity' => $assignedQuantity,
                 'remaining_quantity' => $remainingQuantity,
+                'qty_box' => (int) ($partSettings[$partNumber] ?? 0),
             ];
         }
 
@@ -525,8 +530,33 @@ class DeliveryAssignController extends Controller
                 continue;
             }
 
+            $fixedQty = (int) ($partSetting->qty_box ?? 0);
+            if ($entry['pcs_quantity'] < $fixedQty) {
+                $this->addNewBoxError(
+                    $errors,
+                    $index,
+                    $entry['box_number'],
+                    $entry['part_number'],
+                    'Box not full wajib diajukan melalui menu Request Box Not Full dan menunggu approval Supervisi.'
+                );
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
+            if ($entry['pcs_quantity'] > $fixedQty) {
+                $this->addNewBoxError(
+                    $errors,
+                    $index,
+                    $entry['box_number'],
+                    $entry['part_number'],
+                    'Qty PCS harus sama dengan fixed qty Master Part.'
+                );
+                $invalidIndexes[$index] = true;
+                continue;
+            }
+
             $validEntries[] = array_merge($entry, [
-                'qty_box' => (int) ($partSetting->qty_box ?? 0) > 0 ? (int) $partSetting->qty_box : null,
+                'qty_box' => $fixedQty,
             ]);
         }
 
@@ -1346,8 +1376,8 @@ class DeliveryAssignController extends Controller
                         'qr_code' => $entry['box_number'] . '|' . $entry['part_number'] . '|' . $entry['pcs_quantity'],
                         'user_id' => $userId,
                         'qty_box' => $entry['qty_box'],
-                        'is_not_full' => $entry['qty_box'] ? $entry['pcs_quantity'] < $entry['qty_box'] : false,
-                        'not_full_reason' => $entry['qty_box'] && $entry['pcs_quantity'] < $entry['qty_box'] ? 'Direct delivery input' : null,
+                        'is_not_full' => false,
+                        'not_full_reason' => null,
                         'assigned_delivery_order_id' => $deliveryOrderId,
                         'created_at' => $now,
                         'updated_at' => $now,

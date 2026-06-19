@@ -7,6 +7,12 @@
     </a>
 </li>
 <li class="nav-item">
+    <a class="nav-link {{ request()->routeIs('box-not-full.create') ? 'active' : '' }}"
+       href="{{ route('box-not-full.create') }}">
+        <i class="bi bi-exclamation-circle"></i> Request Box Not Full
+    </a>
+</li>
+<li class="nav-item">
     <a class="nav-link {{ request()->routeIs('delivery.index') ? 'active' : '' }}"
        href="{{ route('delivery.index') }}">
         <i class="bi bi-truck"></i> Delivery

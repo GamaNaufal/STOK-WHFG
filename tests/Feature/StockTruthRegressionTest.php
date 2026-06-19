@@ -212,7 +212,7 @@ class StockTruthRegressionTest extends TestCase
     public function test_box_correction_updates_qr_inbound_header_and_expiry_date(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
-        PartSetting::create(['part_number' => 'P-CORRECTED', 'qty_box' => 100]);
+        PartSetting::create(['part_number' => 'P-CORRECTED', 'qty_box' => 80]);
         [$pallet, $box] = $this->createStoredBox($adminWarehouse, '93000007', 'P-ORIGINAL', 100, 'COR-1');
 
         $palletItem = PalletItem::where('pallet_id', $pallet->id)->firstOrFail();

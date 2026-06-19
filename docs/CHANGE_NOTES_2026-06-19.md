@@ -64,6 +64,7 @@ Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integri
 ### Expiry, Redo, dan Lokasi
 
 - Perubahan box menjadi `expired` atau `handled` langsung menyinkronkan `pallet_items`, menghapus `stock_locations` yang kosong, dan mengosongkan master location.
+- Box berstatus `warning` tetap boleh ditandai `handled` oleh Supervisi/Admin.
 - Redo hanya dapat dijalankan satu kali pada session `completed` dengan `completion_status=completed` dan periode redo yang masih aktif.
 - Redo shared box memprioritaskan pallet dari withdrawal, menormalkan pivot box, dan membangun ulang ringkasan seluruh pallet terdampak.
 - Sesi assignment `pending` yatim dibatalkan otomatis saat redo.
@@ -90,6 +91,16 @@ Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integri
 - Kolom legacy `delivery_pick_sessions.allow_partial` dihapus melalui migration.
 - Filter, kartu, dan detail Backorder dihapus dari laporan operasional.
 - `docs/BACKORDER_GUIDE.md` dihapus.
+
+### Keputusan Bisnis Box Not Full
+
+- Semua box not full wajib melalui request dan approval Supervisi.
+- Jalur direct not-full pada Stock Input ditutup.
+- Direct input box baru pada Delivery Assignment wajib memakai PCS yang sama dengan fixed qty Master Part.
+- Input di bawah fixed qty ditolak dan diarahkan ke menu Request Box Not Full.
+- Warehouse Operator diberi akses untuk membuat request; box baru hanya dibuat setelah approval.
+- Approval memvalidasi ulang status delivery dan fixed qty Master Part.
+- Edit Box tidak dapat dipakai untuk membuat/mengubah box not-full tanpa request approved yang cocok.
 
 ## Regression Test
 
@@ -125,13 +136,21 @@ Ditambahkan `tests/Feature/RemainingIntegrityRegressionTest.php` untuk:
 - authorization picklist;
 - one-shot redo dan normalisasi shared box;
 - penolakan phantom stock dari box soft-deleted;
-- unique stock location per pallet.
+- unique stock location per pallet;
+- handling box sejak status warning.
+
+Test workflow not-full dan delivery assignment juga mencakup:
+
+- penolakan direct not-full dari Stock Input;
+- penolakan direct not-full dari Delivery Assignment;
+- akses request untuk Warehouse Operator;
+- direct box baru wajib sama dengan fixed qty Master Part.
 
 ## Validasi
 
-- Full suite: 126 tests, 628 assertions.
+- Full suite: 128 tests, 633 assertions.
 - Migration chain SQLite in-memory: berhasil.
 - PHP syntax check: berhasil.
 - Seluruh migration telah dijalankan pada MySQL lokal.
 - Backup pra-migration terbaru: `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
-- Audit data setelah migration: tidak ditemukan duplicate lokasi, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, sesi pending yatim, assignment invalid, atau lebih dari satu sesi picking aktif.
+- Audit data aktif: tidak ditemukan duplicate lokasi, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, sesi pending yatim, assignment invalid, lebih dari satu sesi picking aktif, atau mismatch PCS Master Part tanpa approval not-full.

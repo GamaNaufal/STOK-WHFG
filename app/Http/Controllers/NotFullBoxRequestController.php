@@ -180,6 +180,25 @@ class NotFullBoxRequestController extends Controller
                     throw new \RuntimeException('Status permintaan sudah diproses.');
                 }
 
+                $deliveryOrder = DeliveryOrder::whereKey($request->delivery_order_id)
+                    ->lockForUpdate()
+                    ->first();
+                if (!$deliveryOrder || !in_array((string) $deliveryOrder->status, ['approved', 'processing', 'partial'], true)) {
+                    throw new \RuntimeException('Delivery tujuan sudah tidak dapat menerima box not full.');
+                }
+
+                $partSetting = PartSetting::where('part_number', $request->part_number)
+                    ->lockForUpdate()
+                    ->first();
+                $currentFixedQty = (int) ($partSetting?->qty_box ?? 0);
+                if (!$partSetting || (int) $request->pcs_quantity >= $currentFixedQty) {
+                    throw new \RuntimeException('PCS request tidak lagi lebih kecil dari fixed qty Master Part saat ini.');
+                }
+
+                if ((int) $request->fixed_qty !== $currentFixedQty) {
+                    $request->fixed_qty = $currentFixedQty;
+                }
+
                 $pallet = $request->targetPallet;
                 $locationCode = null;
 

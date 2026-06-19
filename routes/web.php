@@ -56,8 +56,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/stock-input/store', [StockInputController::class, 'store'])->name('stock-input.store');
     });
 
-    // Box Not Full (Admin Warehouse & Admin)
-    Route::middleware('role:admin_warehouse,admin')->group(function () {
+    // Box Not Full Request (Warehouse Operator/Admin Warehouse/Admin)
+    Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
         Route::get('/box-not-full', [\App\Http\Controllers\NotFullBoxRequestController::class, 'create'])->name('box-not-full.create');
         Route::post('/box-not-full', [\App\Http\Controllers\NotFullBoxRequestController::class, 'store'])->name('box-not-full.store');
     });

@@ -66,6 +66,54 @@ class RemainingIntegrityRegressionTest extends TestCase
         ]);
     }
 
+    public function test_warning_box_can_be_handled_and_removed_from_active_stock(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-WARNING-HANDLE']);
+        $location = MasterLocation::create([
+            'code' => 'WARNING-HANDLE',
+            'is_occupied' => true,
+            'current_pallet_id' => $pallet->id,
+        ]);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'master_location_id' => $location->id,
+            'warehouse_location' => $location->code,
+            'stored_at' => now()->subMonths(10),
+        ]);
+        $box = $this->createBox($operator, '94000006', 'P-WARNING-HANDLE', 20, [
+            'created_at' => now()->subMonths(10),
+            'updated_at' => now()->subMonths(10),
+        ]);
+        $pallet->boxes()->attach($box->id);
+        PalletItem::create([
+            'pallet_id' => $pallet->id,
+            'part_number' => $box->part_number,
+            'box_quantity' => 1,
+            'pcs_quantity' => 20,
+        ]);
+
+        $service = app(ExpiredBoxService::class);
+        $service->syncStatuses();
+        $this->assertDatabaseHas('boxes', ['id' => $box->id, 'expired_status' => 'warning']);
+
+        $service->handleBox($box->id, $supervisi->id);
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'expired_status' => 'handled',
+            'handled_by' => $supervisi->id,
+        ]);
+        $this->assertDatabaseHas('pallet_items', [
+            'pallet_id' => $pallet->id,
+            'part_number' => $box->part_number,
+            'box_quantity' => 0,
+            'pcs_quantity' => 0,
+        ]);
+        $this->assertDatabaseMissing('stock_locations', ['pallet_id' => $pallet->id]);
+    }
+
     public function test_start_pick_reuses_pending_assignment_session_without_orphan_lock(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);

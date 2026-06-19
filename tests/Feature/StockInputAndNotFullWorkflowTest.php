@@ -197,7 +197,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         ]);
     }
 
-    public function test_stock_input_not_full_scan_requires_reason_and_delivery_then_persists_on_store(): void
+    public function test_stock_input_not_full_must_use_supervisor_approval_flow(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $sales = User::factory()->create(['role' => 'sales']);
@@ -209,7 +209,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
             'status' => 'approved',
         ]);
 
-        $orderItem = DeliveryOrderItem::create([
+        DeliveryOrderItem::create([
             'delivery_order_id' => $order->id,
             'part_number' => 'P-NF-01',
             'quantity' => 100,
@@ -237,69 +237,38 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         ]);
         $scanBox->assertOk()->assertJson(['success' => true]);
 
-        $missingReason = $this->actingAs($operator)->postJson(route('stock-input.scan-part'), [
+        $directNotFull = $this->actingAs($operator)->postJson(route('stock-input.scan-part'), [
             'part_number' => 'P-NF-01',
             'pcs_quantity' => 90,
         ]);
-        $missingReason->assertStatus(422)->assertJson(['success' => false]);
-
-        $missingDelivery = $this->actingAs($operator)->postJson(route('stock-input.scan-part'), [
-            'part_number' => 'P-NF-01',
-            'pcs_quantity' => 90,
-            'not_full_reason' => 'Kurang dari standar',
+        $directNotFull->assertStatus(422)->assertJson([
+            'success' => false,
+            'requires_not_full_approval' => true,
         ]);
-        $missingDelivery->assertStatus(422)->assertJson(['success' => false]);
+        $this->assertStringContainsString('approval Supervisi', (string) $directNotFull->json('message'));
+        $this->assertSame(route('box-not-full.create'), $directNotFull->json('not_full_request_url'));
 
-        $scanPart = $this->actingAs($operator)->postJson(route('stock-input.scan-part'), [
-            'part_number' => 'P-NF-01',
-            'pcs_quantity' => 90,
-            'not_full_reason' => 'Kurang dari standar',
-            'delivery_order_id' => $order->id,
-        ]);
-        $scanPart->assertOk()->assertJson(['success' => true]);
+        $this->actingAs($operator)->get(route('box-not-full.create'))->assertOk();
 
-        $palletData = $this->actingAs($operator)->getJson(route('stock-input.get-pallet-data'));
-        $palletData->assertOk()->assertJson(['success' => true]);
-        $palletId = (int) $palletData->json('pallet.id');
-
-        $store = $this->actingAs($operator)->postJson(route('stock-input.store'), [
-            'pallet_id' => $palletId,
-            'warehouse_location' => 'A1',
-        ]);
-
-        $store->assertOk();
-
-        $this->assertDatabaseHas('boxes', [
+        $requestResponse = $this->actingAs($operator)->post(route('box-not-full.store'), [
             'box_number' => '91000004',
             'part_number' => 'P-NF-01',
             'pcs_quantity' => 90,
-            'is_not_full' => 1,
-            'assigned_delivery_order_id' => $order->id,
+            'delivery_order_id' => $order->id,
+            'reason' => 'Kurang dari standar',
+            'request_type' => 'supplement',
+            'target_type' => 'location',
+            'target_location_id' => MasterLocation::where('code', 'A1')->value('id'),
         ]);
+        $requestResponse->assertRedirect()->assertSessionHas('success');
 
-        $this->assertDatabaseHas('delivery_order_items', [
-            'id' => $orderItem->id,
-            'quantity' => 190,
-            'fulfilled_quantity' => 0,
+        $this->assertDatabaseHas('not_full_box_requests', [
+            'box_number' => '91000004',
+            'requested_by' => $operator->id,
+            'status' => 'pending',
         ]);
-
-        $this->assertDatabaseHas('stock_locations', [
-            'pallet_id' => $palletId,
-            'warehouse_location' => 'A1',
-        ]);
-
-        $this->assertDatabaseHas('master_locations', [
-            'code' => 'A1',
-            'is_occupied' => 1,
-            'current_pallet_id' => $palletId,
-        ]);
-
-        $this->assertDatabaseHas('stock_inputs', [
-            'pallet_id' => $palletId,
-            'pcs_quantity' => 90,
-            'box_quantity' => 1,
-            'warehouse_location' => 'A1',
-        ]);
+        $this->assertDatabaseMissing('boxes', ['box_number' => '91000004']);
+        $this->assertDatabaseMissing('stock_inputs', ['pallet_id' => $activePallet->id]);
     }
 
     public function test_admin_warehouse_can_create_and_supervisi_can_approve_not_full_request_to_existing_pallet(): void

@@ -303,7 +303,7 @@ class DeliveryAssignBoundaryTest extends TestCase
                 [
                     'box_number' => '99001000',
                     'part_number' => 'P-NEW-01',
-                    'pcs_quantity' => 5,
+                    'pcs_quantity' => 100,
                 ],
             ],
         ]);
@@ -312,6 +312,54 @@ class DeliveryAssignBoundaryTest extends TestCase
         $response->assertJsonFragment([
             'message' => 'Pilih pallet untuk input box baru terlebih dahulu.',
         ]);
+    }
+
+    public function test_assign_rejects_direct_not_full_box_and_requires_supervisor_flow(): void
+    {
+        $user = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Direct Not Full Guard',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-NF-GUARD-DIRECT',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+        PartSetting::create([
+            'part_number' => 'P-NF-GUARD-DIRECT',
+            'qty_box' => 100,
+        ]);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-NF-GUARD-DIRECT']);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'NF-DIRECT',
+            'stored_at' => now(),
+        ]);
+
+        $response = $this->actingAs($user)->postJson(route('delivery-assign.assign'), [
+            'delivery_order_id' => $order->id,
+            'box_ids' => [],
+            'pallet_ids' => [],
+            'new_boxes' => [[
+                'box_number' => '99001001',
+                'part_number' => 'P-NF-GUARD-DIRECT',
+                'pcs_quantity' => 90,
+            ]],
+            'new_boxes_pallet_mode' => 'existing',
+            'new_boxes_pallet_id' => $pallet->id,
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertStringContainsString(
+            'approval Supervisi',
+            (string) $response->json('new_box_errors.0.reason')
+        );
+        $this->assertDatabaseMissing('boxes', ['box_number' => '99001001']);
     }
 
     public function test_assign_creates_new_boxes_under_new_pallet_with_location(): void
@@ -335,7 +383,7 @@ class DeliveryAssignBoundaryTest extends TestCase
 
         PartSetting::create([
             'part_number' => 'P-NEW-02',
-            'qty_box' => 100,
+            'qty_box' => 10,
         ]);
 
         $location = MasterLocation::create([
@@ -352,7 +400,7 @@ class DeliveryAssignBoundaryTest extends TestCase
                 [
                     'box_number' => '99002000',
                     'part_number' => 'P-NEW-02',
-                    'pcs_quantity' => 5,
+                    'pcs_quantity' => 10,
                 ],
             ],
             'new_boxes_pallet_mode' => 'new',
@@ -384,7 +432,7 @@ class DeliveryAssignBoundaryTest extends TestCase
         $this->assertDatabaseHas('boxes', [
             'box_number' => '99002000',
             'part_number' => 'P-NEW-02',
-            'pcs_quantity' => 5,
+            'pcs_quantity' => 10,
             'assigned_delivery_order_id' => $order->id,
         ]);
 
@@ -450,7 +498,7 @@ class DeliveryAssignBoundaryTest extends TestCase
         $response->assertJsonPath('new_box_errors.0.reason', 'No Part tidak ada dalam delivery order yang dipilih.');
     }
 
-    public function test_assign_allows_new_box_over_master_qty_box_when_delivery_qty_is_still_available(): void
+    public function test_assign_rejects_new_box_quantity_above_master_qty_box(): void
     {
         $user = User::factory()->create(['role' => 'warehouse_operator']);
         $sales = User::factory()->create(['role' => 'sales']);
@@ -499,13 +547,9 @@ class DeliveryAssignBoundaryTest extends TestCase
             'new_boxes_pallet_id' => $pallet->id,
         ]);
 
-        $response->assertOk();
-        $response->assertJsonPath('created_new_count', 1);
-        $this->assertDatabaseHas('boxes', [
-            'box_number' => '24001000',
-            'assigned_delivery_order_id' => $order->id,
-            'pcs_quantity' => 150,
-        ]);
+        $response->assertStatus(422);
+        $response->assertJsonPath('new_box_errors.0.reason', 'Qty PCS harus sama dengan fixed qty Master Part.');
+        $this->assertDatabaseMissing('boxes', ['box_number' => '24001000']);
     }
 
     public function test_assign_overflow_requires_confirmation_and_updates_delivery_item_quantity(): void
@@ -561,7 +605,7 @@ class DeliveryAssignBoundaryTest extends TestCase
                 [
                     'box_number' => '30002000',
                     'part_number' => 'P-OVERFLOW',
-                    'pcs_quantity' => 50,
+                    'pcs_quantity' => 100,
                 ],
             ],
             'new_boxes_pallet_mode' => 'existing',
@@ -588,7 +632,7 @@ class DeliveryAssignBoundaryTest extends TestCase
                 [
                     'box_number' => '30002000',
                     'part_number' => 'P-OVERFLOW',
-                    'pcs_quantity' => 50,
+                    'pcs_quantity' => 100,
                 ],
             ],
             'new_boxes_pallet_mode' => 'existing',
@@ -600,7 +644,7 @@ class DeliveryAssignBoundaryTest extends TestCase
         $this->assertDatabaseHas('delivery_order_items', [
             'delivery_order_id' => $order->id,
             'part_number' => 'P-OVERFLOW',
-            'quantity' => 110,
+            'quantity' => 160,
         ]);
 
         $this->assertDatabaseHas('boxes', [

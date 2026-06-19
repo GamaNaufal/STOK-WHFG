@@ -8,6 +8,7 @@ use App\Exports\StockViewByPartExport;
 use App\Models\AuditLog;
 use App\Models\Box;
 use App\Models\MasterLocation;
+use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
@@ -862,6 +863,34 @@ class StockViewController extends Controller
 
         try {
             $box = Box::whereKey($boxId)->lockForUpdate()->firstOrFail();
+            $partSetting = PartSetting::where('part_number', $newPartNumber)
+                ->lockForUpdate()
+                ->first();
+            $fixedQty = (int) ($partSetting?->qty_box ?? 0);
+
+            if (!$partSetting || $fixedQty <= 0) {
+                throw new \RuntimeException('Fixed qty Master Part tidak valid.');
+            }
+
+            if ($newPcsQuantity > $fixedQty) {
+                throw new \RuntimeException('Qty PCS tidak boleh melebihi fixed qty Master Part.');
+            }
+
+            $isApprovedNotFull = false;
+            if ($newPcsQuantity < $fixedQty) {
+                $isApprovedNotFull = NotFullBoxRequest::where('box_id', (int) $box->id)
+                    ->where('status', 'approved')
+                    ->where('part_number', $newPartNumber)
+                    ->where('pcs_quantity', $newPcsQuantity)
+                    ->lockForUpdate()
+                    ->exists();
+
+                if (!$isApprovedNotFull) {
+                    throw new \RuntimeException(
+                        'Perubahan ini akan membuat atau mengubah box not full. Ajukan Request Box Not Full dan tunggu approval Supervisi.'
+                    );
+                }
+            }
 
             if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
                 throw new \RuntimeException('Box tidak bisa diedit karena statusnya tidak aktif.');
@@ -918,6 +947,11 @@ class StockViewController extends Controller
 
             $box->part_number = $newPartNumber;
             $box->pcs_quantity = $newPcsQuantity;
+            $box->qty_box = $fixedQty;
+            $box->is_not_full = $isApprovedNotFull;
+            if (!$isApprovedNotFull) {
+                $box->not_full_reason = null;
+            }
             $box->qr_code = $box->box_number . '|' . $newPartNumber . '|' . $newPcsQuantity;
             $box->created_at = $newStoredAt;
             $box->save();

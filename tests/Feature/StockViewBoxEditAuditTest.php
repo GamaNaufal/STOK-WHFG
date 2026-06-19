@@ -23,10 +23,12 @@ class StockViewBoxEditAuditTest extends TestCase
 
     private function seedMasterParts(array $partNumbers): void
     {
-        foreach ($partNumbers as $partNumber) {
+        foreach ($partNumbers as $key => $value) {
+            $partNumber = is_string($key) ? $key : $value;
+            $qtyBox = is_string($key) ? (int) $value : 100;
             PartSetting::firstOrCreate(
                 ['part_number' => $partNumber],
-                ['qty_box' => 1]
+                ['qty_box' => $qtyBox]
             );
         }
     }
@@ -34,7 +36,7 @@ class StockViewBoxEditAuditTest extends TestCase
     public function test_admin_warehouse_can_update_box_and_audit_is_logged(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
-        $this->seedMasterParts(['P-OLD', 'P-NEW']);
+        $this->seedMasterParts(['P-OLD' => 100, 'P-NEW' => 120]);
 
         $pallet = Pallet::create(['pallet_number' => 'PLT-BOX-EDIT-01']);
         StockLocation::create([
@@ -47,7 +49,7 @@ class StockViewBoxEditAuditTest extends TestCase
             'box_number' => 'BOX-EDIT-01',
             'part_number' => 'P-OLD',
             'pcs_quantity' => 100,
-            'qty_box' => 1,
+            'qty_box' => 100,
             'qr_code' => 'BOX-EDIT-01|P-OLD|100',
             'user_id' => $adminWarehouse->id,
         ]);
@@ -97,7 +99,7 @@ class StockViewBoxEditAuditTest extends TestCase
             'box_number' => 'BOX-EDIT-02',
             'part_number' => 'P-LOCK',
             'pcs_quantity' => 100,
-            'qty_box' => 1,
+            'qty_box' => 100,
             'qr_code' => 'BOX-EDIT-02|P-LOCK|100',
             'user_id' => $owner->id,
         ]);
@@ -129,7 +131,7 @@ class StockViewBoxEditAuditTest extends TestCase
             'box_number' => 'BOX-NO-CHANGE-01',
             'part_number' => 'P-NO-CHANGE',
             'pcs_quantity' => 100,
-            'qty_box' => 1,
+            'qty_box' => 100,
             'qr_code' => 'BOX-NO-CHANGE-01|P-NO-CHANGE|100',
             'user_id' => $adminWarehouse->id,
             'created_at' => $storedAt,
@@ -170,7 +172,7 @@ class StockViewBoxEditAuditTest extends TestCase
             'box_number' => 'BOX-INVALID-PART-01',
             'part_number' => 'P-MASTER-ONLY',
             'pcs_quantity' => 100,
-            'qty_box' => 1,
+            'qty_box' => 100,
             'qr_code' => 'BOX-INVALID-PART-01|P-MASTER-ONLY|100',
             'user_id' => $adminWarehouse->id,
         ]);
@@ -234,7 +236,7 @@ class StockViewBoxEditAuditTest extends TestCase
         ]);
     }
 
-    public function test_box_edit_keeps_not_full_flag_and_syncs_pallet_items(): void
+    public function test_box_edit_cannot_bypass_not_full_approval(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
         $this->seedMasterParts(['P-NF-OLD', 'P-NF-NEW']);
@@ -250,9 +252,9 @@ class StockViewBoxEditAuditTest extends TestCase
             'box_number' => 'BOX-NF-01',
             'part_number' => 'P-NF-OLD',
             'pcs_quantity' => 100,
-            'qty_box' => 1,
-            'is_not_full' => true,
-            'not_full_reason' => 'Sisa pemenuhan',
+            'qty_box' => 100,
+            'is_not_full' => false,
+            'not_full_reason' => null,
             'qr_code' => 'BOX-NF-01|P-NF-OLD|100',
             'user_id' => $adminWarehouse->id,
         ]);
@@ -272,32 +274,30 @@ class StockViewBoxEditAuditTest extends TestCase
             'reason' => 'Koreksi untuk rekomendasi',
         ]);
 
-        $response->assertOk()->assertJson(['success' => true]);
+        $response->assertStatus(422)->assertJson(['success' => false]);
+        $this->assertStringContainsString('approval Supervisi', (string) $response->json('message'));
 
         $this->assertDatabaseHas('boxes', [
             'id' => $box->id,
-            'part_number' => 'P-NF-NEW',
-            'pcs_quantity' => 80,
-            'is_not_full' => 1,
-            'not_full_reason' => 'Sisa pemenuhan',
+            'part_number' => 'P-NF-OLD',
+            'pcs_quantity' => 100,
+            'is_not_full' => 0,
         ]);
 
         $this->assertDatabaseHas('pallet_items', [
             'pallet_id' => $pallet->id,
             'part_number' => 'P-NF-OLD',
-            'box_quantity' => 0,
-            'pcs_quantity' => 0,
+            'box_quantity' => 1,
+            'pcs_quantity' => 100,
         ]);
 
-        $this->assertDatabaseHas('pallet_items', [
+        $this->assertDatabaseMissing('pallet_items', [
             'pallet_id' => $pallet->id,
             'part_number' => 'P-NF-NEW',
-            'box_quantity' => 1,
-            'pcs_quantity' => 80,
         ]);
     }
 
-    public function test_box_edit_changes_pre_fulfillment_schedule_recommendation(): void
+    public function test_box_edit_cannot_reduce_stock_by_creating_unapproved_not_full_box(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
         $ppc = User::factory()->create(['role' => 'ppc']);
@@ -315,7 +315,7 @@ class StockViewBoxEditAuditTest extends TestCase
             'box_number' => 'BOX-FIFO-01',
             'part_number' => 'P-FIFO-01',
             'pcs_quantity' => 100,
-            'qty_box' => 1,
+            'qty_box' => 100,
             'is_not_full' => false,
             'qr_code' => 'BOX-FIFO-01|P-FIFO-01|100',
             'user_id' => $adminWarehouse->id,
@@ -348,11 +348,12 @@ class StockViewBoxEditAuditTest extends TestCase
             'stored_at' => now()->subHours(4)->format('Y-m-d H:i:s'),
             'reason' => 'Penyesuaian sebelum pemenuhan',
         ]);
-        $update->assertOk();
+        $update->assertStatus(422);
+        $this->assertStringContainsString('approval Supervisi', (string) $update->json('message'));
 
         $after = $this->actingAs($ppc)->get(route('delivery.index'));
         $after->assertOk();
-        $after->assertSee('60 / 100', false);
+        $after->assertSee('100 / 100', false);
     }
 
     public function test_delete_box_soft_deletes_box_and_report_marks_deleted_not_shipped(): void

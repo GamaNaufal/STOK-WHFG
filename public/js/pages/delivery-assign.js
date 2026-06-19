@@ -224,6 +224,10 @@
         }
 
         newBoxPartSelect.innerHTML = "";
+        if (newBoxQtyInput) {
+            newBoxQtyInput.value = "";
+            newBoxQtyInput.readOnly = true;
+        }
 
         if (!Array.isArray(parts) || parts.length === 0) {
             newBoxPartSelect.innerHTML =
@@ -254,13 +258,15 @@
             const requestedQuantity = Number(part.requested_quantity || 0);
             const assignedQuantity = Number(part.assigned_quantity || 0);
             const remainingQuantity = Number(part.remaining_quantity || 0);
+            const fixedQuantity = Number(part.qty_box || 0);
 
             const option = document.createElement("option");
             option.value = partNumber;
-            option.textContent = `${partNumber} (sisa ${remainingQuantity}/${requestedQuantity})`;
+            option.textContent = `${partNumber} (fixed ${fixedQuantity}, sisa ${remainingQuantity}/${requestedQuantity})`;
             option.dataset.requestedQuantity = String(requestedQuantity);
             option.dataset.assignedQuantity = String(assignedQuantity);
             option.dataset.remainingQuantity = String(remainingQuantity);
+            option.dataset.fixedQuantity = String(fixedQuantity);
             newBoxPartSelect.appendChild(option);
         });
     }
@@ -1079,6 +1085,12 @@
             return;
         }
 
+        const fixedQuantity = Number(partInfo.qty_box || 0);
+        if (!Number.isFinite(fixedQuantity) || fixedQuantity <= 0) {
+            showNewBoxError("Fixed qty Master Part tidak valid.");
+            return;
+        }
+
         const boxNumber = String(newBoxNumberInput?.value || "").trim();
         const qtyValue = String(newBoxQtyInput?.value || "").trim();
 
@@ -1100,6 +1112,15 @@
         const pcsQuantity = Number(qtyValue);
         if (!Number.isFinite(pcsQuantity) || pcsQuantity <= 0) {
             showNewBoxError("Qty PCS harus lebih dari 0.");
+            return;
+        }
+
+        if (pcsQuantity !== fixedQuantity) {
+            showNewBoxError(
+                pcsQuantity < fixedQuantity
+                    ? "Box not full wajib diajukan melalui menu Request Box Not Full dan menunggu approval Supervisi."
+                    : `Qty PCS harus sama dengan fixed qty Master Part (${fixedQuantity}).`,
+            );
             return;
         }
 
@@ -1536,6 +1557,20 @@
             }
 
             applyChange().catch(() => null);
+        });
+    }
+
+    if (newBoxPartSelect && newBoxQtyInput) {
+        newBoxPartSelect.addEventListener("change", () => {
+            const partInfo = deliveryOrderParts.get(
+                String(newBoxPartSelect.value || ""),
+            );
+            const fixedQuantity = Number(partInfo?.qty_box || 0);
+            newBoxQtyInput.value =
+                Number.isFinite(fixedQuantity) && fixedQuantity > 0
+                    ? String(fixedQuantity)
+                    : "";
+            newBoxQtyInput.readOnly = fixedQuantity > 0;
         });
     }
 

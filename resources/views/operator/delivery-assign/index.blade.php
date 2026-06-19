@@ -111,7 +111,7 @@
                 </div>
                 <div class="col-lg-3">
                     <label class="form-label fw-semibold">Qty PCS</label>
-                    <input type="number" class="form-control" id="deliveryAssignNewBoxQty" min="1" placeholder="Qty" autocomplete="off">
+                    <input type="number" class="form-control" id="deliveryAssignNewBoxQty" min="1" placeholder="Mengikuti Master Part" autocomplete="off" readonly>
                 </div>
                 <div class="col-lg-1 d-grid">
                     <button type="button" class="btn btn-success" id="deliveryAssignAddNewBox">
@@ -119,6 +119,10 @@
                     </button>
                 </div>
             </div>
+            <small class="text-muted d-block mt-2">
+                Qty box baru mengikuti fixed qty Master Part. Untuk box not full, gunakan
+                <a href="{{ route('box-not-full.create') }}">Request Box Not Full</a> dan tunggu approval Supervisi.
+            </small>
             <div id="deliveryAssignNewBoxError" class="alert alert-danger mt-3" style="display: none;"></div>
         </div>
     </div>
