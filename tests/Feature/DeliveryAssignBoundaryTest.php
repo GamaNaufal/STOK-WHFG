@@ -436,6 +436,14 @@ class DeliveryAssignBoundaryTest extends TestCase
             'assigned_delivery_order_id' => $order->id,
         ]);
 
+        $this->assertDatabaseHas('audit_logs', [
+            'type' => 'delivery_assignment',
+            'action' => 'created',
+            'model' => 'DeliveryOrder',
+            'model_id' => $order->id,
+            'user_id' => $user->id,
+        ]);
+
         $boxId = Box::query()->where('box_number', '99002000')->value('id');
         $this->assertNotNull($boxId);
 
@@ -714,7 +722,7 @@ class DeliveryAssignBoundaryTest extends TestCase
         $response->assertStatus(200);
         $response->assertJsonPath('success', true);
         $response->assertJsonPath('planned_qty', 100);
-        
+
         // Check that locations include our assigned box (as reserved)
         $locations = $response->json('locations');
         $this->assertCount(1, $locations, 'Should have 1 location');

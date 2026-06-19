@@ -640,10 +640,11 @@ Status yang digunakan:
 
 ## Status Schema dan Validasi Terakhir
 
-- Seluruh migration sampai `2026_06_19_000004_harden_location_and_pick_serialization` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
+- Seluruh migration sampai `2026_06_19_000005_make_audit_log_type_extensible` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.
-- Full regression suite terakhir: 139 test, 671 assertion, seluruhnya lulus.
+- Full regression suite terakhir: 139 test, 672 assertion, seluruhnya lulus.
+- Kolom `audit_logs.type` menggunakan string terindeks, bukan enum tertutup, sehingga audit fitur baru seperti `delivery_assignment` dapat disimpan tanpa melanggar constraint.
 
 ## Catatan yang Belum Diputuskan
 

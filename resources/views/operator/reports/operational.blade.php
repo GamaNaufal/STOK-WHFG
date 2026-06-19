@@ -656,6 +656,7 @@
                                 'stock_withdrawal' => 'Pengambilan Stok',
                                 'delivery_pickup' => 'Delivery Pickup',
                                 'delivery_redo' => 'Delivery Redo',
+                                'delivery_assignment' => 'Delivery Assignment',
                                 'pallet_merged' => 'Pallet Merge',
                                 'box_pallet_moved' => 'Box Dipindahkan',
                                 'other' => 'Lainnya',

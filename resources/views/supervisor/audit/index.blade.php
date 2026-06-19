@@ -106,6 +106,7 @@
                     <option value="">-- Semua Tipe --</option>
                     <option value="stock_input" {{ $filters['type'] === 'stock_input' ? 'selected' : '' }}>Input Stok</option>
                     <option value="stock_withdrawal" {{ $filters['type'] === 'stock_withdrawal' ? 'selected' : '' }}>Pengambilan Stok</option>
+                    <option value="delivery_assignment" {{ $filters['type'] === 'delivery_assignment' ? 'selected' : '' }}>Assignment Delivery</option>
                     <option value="delivery_redo" {{ $filters['type'] === 'delivery_redo' ? 'selected' : '' }}>Redo Delivery</option>
                     <option value="other" {{ $filters['type'] === 'other' ? 'selected' : '' }}>Perubahan Box</option>
                 </select>
@@ -196,6 +197,9 @@
                                             @break
                                         @case('delivery_redo')
                                             <span class="badge" style="background-color: #fecaca; color: #7f1d1d;">Redo</span>
+                                            @break
+                                        @case('delivery_assignment')
+                                            <span class="badge" style="background-color: #e0e7ff; color: #3730a3;">Assignment Delivery</span>
                                             @break
                                         @case('other')
                                             @if($log->action === 'box_updated_by_admin_warehouse')
