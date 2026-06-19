@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
+use App\Mail\ExpiredBoxSummaryMail;
 use App\Models\Box;
 use App\Models\ExpiredBoxReport;
 use App\Models\MasterLocation;
 use App\Models\PalletItem;
 use App\Models\User;
-use App\Mail\ExpiredBoxSummaryMail;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -23,11 +23,13 @@ class ExpiredBoxService
     public function syncStatuses(): void
     {
         $this->getExpirableBoxesQuery()
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled']);
+            })
             ->orderBy('boxes.id')
             ->chunkById(500, function ($rows): void {
                 foreach ($rows as $row) {
-                    if (!$row->stored_at) {
+                    if (! $row->stored_at) {
                         continue;
                     }
 
@@ -44,7 +46,7 @@ class ExpiredBoxService
                     if ($row->expired_status !== $nextStatus) {
                         DB::transaction(function () use ($row, $nextStatus): void {
                             $box = Box::whereKey($row->id)->lockForUpdate()->first();
-                            if (!$box || $box->expired_status === 'handled') {
+                            if (! $box || $box->expired_status === 'handled') {
                                 return;
                             }
 
@@ -52,7 +54,7 @@ class ExpiredBoxService
                             $box->expired_status = $nextStatus;
                             $box->save();
 
-                            if ($nextStatus === 'expired' && !$wasInactive) {
+                            if ($nextStatus === 'expired' && ! $wasInactive) {
                                 $this->syncLinkedPalletsAfterBoxDeactivation($box);
                             }
                         });
@@ -67,22 +69,55 @@ class ExpiredBoxService
 
     public function handleBox(int $boxId, int $userId): void
     {
+        $this->syncStatuses();
+
         DB::transaction(function () use ($boxId, $userId) {
             $box = Box::whereKey($boxId)->lockForUpdate()->first();
-            if (!$box) {
-                return;
+            if (! $box) {
+                throw new \RuntimeException('Box tidak ditemukan.');
             }
 
             if ($box->expired_status === 'handled') {
                 return;
             }
 
+            if (! in_array((string) $box->expired_status, ['warning', 'expired'], true)) {
+                throw new \RuntimeException('Hanya box berstatus warning atau expired yang dapat ditangani.');
+            }
+
+            if ($box->assigned_delivery_order_id !== null) {
+                throw new \RuntimeException(
+                    'Box masih di-assign ke delivery. Lepaskan atau selesaikan proses delivery sebelum menangani box.'
+                );
+            }
+
+            $isPickLocked = DB::table('delivery_pick_items')
+                ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
+                ->where('delivery_pick_items.box_id', $box->id)
+                ->whereIn('delivery_pick_sessions.status', ['pending', 'scanning', 'blocked', 'approved'])
+                ->lockForUpdate()
+                ->exists();
+
+            if ($isPickLocked) {
+                throw new \RuntimeException(
+                    'Box sedang digunakan dalam sesi picking dan belum dapat ditangani.'
+                );
+            }
+
             $row = $this->getExpirableBoxesQuery()
                 ->where('boxes.id', $boxId)
                 ->first();
 
+            if (! $row || ! $row->stored_at) {
+                throw new \RuntimeException('Riwayat penyimpanan box tidak valid.');
+            }
+
             $storedAt = $row?->stored_at ? Carbon::parse($row->stored_at) : null;
             $ageMonths = $storedAt ? $storedAt->diffInMonths(now()) : 0;
+
+            if ($ageMonths < 9) {
+                throw new \RuntimeException('Box belum memasuki periode warning.');
+            }
 
             $box->expired_status = 'handled';
             $box->handled_at = now();
@@ -143,7 +178,7 @@ class ExpiredBoxService
                 $masterLocation->autoVacateIfEmpty();
             }
 
-            if (!$linkedPallet->activeBoxes()->exists() && $linkedPallet->stockLocation) {
+            if (! $linkedPallet->activeBoxes()->exists() && $linkedPallet->stockLocation) {
                 $linkedPallet->stockLocation->delete();
             }
         }
@@ -219,7 +254,7 @@ class ExpiredBoxService
 
     private function ensureReportExists(object $row, int $ageMonths, string $status): void
     {
-        if (!$this->canUseExpiredReports()) {
+        if (! $this->canUseExpiredReports()) {
             return;
         }
 

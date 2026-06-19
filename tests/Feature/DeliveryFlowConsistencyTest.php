@@ -12,10 +12,10 @@ use App\Models\MasterLocation;
 use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
 use App\Models\PalletItem;
+use App\Models\PartSetting;
 use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
-use App\Models\PartSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -695,7 +695,44 @@ class DeliveryFlowConsistencyTest extends TestCase
 
         $response->assertStatus(423)
             ->assertJson([
-                'message' => 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
+                'message' => 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.',
+            ]);
+    }
+
+    public function test_start_verification_is_also_blocked_when_supplement_not_full_request_pending(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Pending Supplement Gate',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-GATE-SUPPLEMENT',
+            'quantity' => 10,
+            'fulfilled_quantity' => 0,
+        ]);
+        NotFullBoxRequest::create([
+            'box_number' => 'NF-PENDING-SUPPLEMENT',
+            'part_number' => 'P-GATE-SUPPLEMENT',
+            'pcs_quantity' => 10,
+            'fixed_qty' => 20,
+            'reason' => 'Need supplement pending approval',
+            'request_type' => 'supplement',
+            'delivery_order_id' => $order->id,
+            'requested_by' => $operator->id,
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($operator)
+            ->postJson(route('delivery.pick.start-verification', $order->id))
+            ->assertStatus(423)
+            ->assertJson([
+                'message' => 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.',
             ]);
     }
 
@@ -1212,7 +1249,7 @@ class DeliveryFlowConsistencyTest extends TestCase
         $response->assertStatus(423)
             ->assertJson([
                 'success' => false,
-                'message' => 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
+                'message' => 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.',
             ]);
     }
 
@@ -1246,7 +1283,7 @@ class DeliveryFlowConsistencyTest extends TestCase
             ->get(route('delivery.fulfill', $order->id));
 
         $fulfillResponse->assertRedirect(route('delivery.index'));
-        $fulfillResponse->assertSessionHas('error', 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.');
+        $fulfillResponse->assertSessionHas('error', 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.');
 
         $confirmResponse = $this->actingAs($operator)
             ->postJson(route('stock-withdrawal.confirm'), [
@@ -1258,7 +1295,7 @@ class DeliveryFlowConsistencyTest extends TestCase
         $confirmResponse->assertStatus(423)
             ->assertJson([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
+                'message' => 'Terjadi kesalahan: Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.',
             ]);
     }
 
@@ -1303,7 +1340,7 @@ class DeliveryFlowConsistencyTest extends TestCase
         $this->assertNotNull($renderedOrder);
         $this->assertTrue((bool) ($renderedOrder->has_pending_additional_approval ?? false));
         $this->assertFalse((bool) ($renderedOrder->has_sufficient_stock ?? true));
-        $this->assertSame('Pending approval not full tambahan', (string) ($renderedOrder->readiness_reason ?? ''));
+        $this->assertSame('Pending approval box not full', (string) ($renderedOrder->readiness_reason ?? ''));
     }
 
     public function test_fulfill_data_marks_order_blocked_when_additional_not_full_request_pending(): void
@@ -1344,7 +1381,7 @@ class DeliveryFlowConsistencyTest extends TestCase
             ->assertJson([
                 'order_id' => $order->id,
                 'is_blocked' => true,
-                'blocked_reason' => 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.',
+                'blocked_reason' => 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.',
             ]);
     }
 

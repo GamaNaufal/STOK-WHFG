@@ -3,6 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Box;
+use App\Models\DeliveryOrder;
+use App\Models\DeliveryOrderItem;
+use App\Models\DeliveryPickItem;
+use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Models\PalletItem;
@@ -309,5 +313,164 @@ class MergePalletFlowTest extends TestCase
             2,
             StockInput::where('pallet_id', $newPallet->id)->count()
         );
+    }
+
+    public function test_merge_rejects_pallet_containing_assigned_box(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Merge Assigned Guard',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-MERGE-GUARD',
+            'quantity' => 20,
+            'fulfilled_quantity' => 0,
+        ]);
+        $target = MasterLocation::create([
+            'code' => 'MERGE-GUARD-TARGET',
+            'is_occupied' => false,
+        ]);
+
+        $pallet1 = Pallet::create(['pallet_number' => 'PLT-MERGE-GUARD-1']);
+        $pallet2 = Pallet::create(['pallet_number' => 'PLT-MERGE-GUARD-2']);
+        StockLocation::create(['pallet_id' => $pallet1->id, 'warehouse_location' => 'MG-1', 'stored_at' => now()]);
+        StockLocation::create(['pallet_id' => $pallet2->id, 'warehouse_location' => 'MG-2', 'stored_at' => now()]);
+
+        $assignedBox = Box::create([
+            'box_number' => '92000001',
+            'part_number' => 'P-MERGE-GUARD',
+            'pcs_quantity' => 20,
+            'qty_box' => 20,
+            'qr_code' => '92000001|P-MERGE-GUARD|20',
+            'user_id' => $operator->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $freeBox = Box::create([
+            'box_number' => '92000002',
+            'part_number' => 'P-MERGE-GUARD',
+            'pcs_quantity' => 20,
+            'qty_box' => 20,
+            'qr_code' => '92000002|P-MERGE-GUARD|20',
+            'user_id' => $operator->id,
+        ]);
+        $pallet1->boxes()->attach($assignedBox->id);
+        $pallet2->boxes()->attach($freeBox->id);
+
+        $response = $this->actingAs($operator)->postJson(route('merge-pallet.store'), [
+            'pallet_ids' => [$pallet1->id, $pallet2->id],
+            'location_id' => $target->id,
+            'warehouse_location' => $target->code,
+        ]);
+
+        $response->assertStatus(422)->assertJson(['success' => false]);
+        $this->assertDatabaseHas('pallets', ['id' => $pallet1->id, 'deleted_at' => null]);
+        $this->assertDatabaseHas('pallet_boxes', ['pallet_id' => $pallet1->id, 'box_id' => $assignedBox->id]);
+    }
+
+    public function test_merge_rejects_pallet_containing_pick_locked_box(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Merge Pick Guard',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-MERGE-PICK',
+            'quantity' => 20,
+            'fulfilled_quantity' => 0,
+        ]);
+        $target = MasterLocation::create([
+            'code' => 'MERGE-PICK-TARGET',
+            'is_occupied' => false,
+        ]);
+        $pallet1 = Pallet::create(['pallet_number' => 'PLT-MERGE-PICK-1']);
+        $pallet2 = Pallet::create(['pallet_number' => 'PLT-MERGE-PICK-2']);
+        StockLocation::create(['pallet_id' => $pallet1->id, 'warehouse_location' => 'MP-1', 'stored_at' => now()]);
+        StockLocation::create(['pallet_id' => $pallet2->id, 'warehouse_location' => 'MP-2', 'stored_at' => now()]);
+        $lockedBox = Box::create([
+            'box_number' => '92000003',
+            'part_number' => 'P-MERGE-PICK',
+            'pcs_quantity' => 20,
+            'qty_box' => 20,
+            'qr_code' => '92000003|P-MERGE-PICK|20',
+            'user_id' => $operator->id,
+        ]);
+        $freeBox = Box::create([
+            'box_number' => '92000004',
+            'part_number' => 'P-MERGE-PICK',
+            'pcs_quantity' => 20,
+            'qty_box' => 20,
+            'qr_code' => '92000004|P-MERGE-PICK|20',
+            'user_id' => $operator->id,
+        ]);
+        $pallet1->boxes()->attach($lockedBox->id);
+        $pallet2->boxes()->attach($freeBox->id);
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+        ]);
+        DeliveryPickItem::create([
+            'pick_session_id' => $session->id,
+            'box_id' => $lockedBox->id,
+            'part_number' => $lockedBox->part_number,
+            'pcs_quantity' => 20,
+            'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($operator)->postJson(route('merge-pallet.store'), [
+            'pallet_ids' => [$pallet1->id, $pallet2->id],
+            'location_id' => $target->id,
+            'warehouse_location' => $target->code,
+        ]);
+
+        $response->assertStatus(422)->assertJson(['success' => false]);
+        $this->assertDatabaseHas('pallet_boxes', ['pallet_id' => $pallet1->id, 'box_id' => $lockedBox->id]);
+    }
+
+    public function test_merge_rejects_free_text_target_location_without_master_id(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $pallet1 = Pallet::create(['pallet_number' => 'PLT-MERGE-FREE-1']);
+        $pallet2 = Pallet::create(['pallet_number' => 'PLT-MERGE-FREE-2']);
+        StockLocation::create(['pallet_id' => $pallet1->id, 'warehouse_location' => 'MF-1', 'stored_at' => now()]);
+        StockLocation::create(['pallet_id' => $pallet2->id, 'warehouse_location' => 'MF-2', 'stored_at' => now()]);
+        $box1 = Box::create([
+            'box_number' => '92000005',
+            'part_number' => 'P-MERGE-FREE',
+            'pcs_quantity' => 20,
+            'qty_box' => 20,
+            'qr_code' => '92000005|P-MERGE-FREE|20',
+            'user_id' => $operator->id,
+        ]);
+        $box2 = Box::create([
+            'box_number' => '92000006',
+            'part_number' => 'P-MERGE-FREE',
+            'pcs_quantity' => 20,
+            'qty_box' => 20,
+            'qr_code' => '92000006|P-MERGE-FREE|20',
+            'user_id' => $operator->id,
+        ]);
+        $pallet1->boxes()->attach($box1->id);
+        $pallet2->boxes()->attach($box2->id);
+
+        $response = $this->actingAs($operator)->postJson(route('merge-pallet.store'), [
+            'pallet_ids' => [$pallet1->id, $pallet2->id],
+            'warehouse_location' => 'LOKASI-FIKTIF',
+        ]);
+
+        $response->assertStatus(422)->assertJson(['success' => false]);
+        $this->assertDatabaseMissing('stock_locations', [
+            'warehouse_location' => 'LOKASI-FIKTIF',
+        ]);
     }
 }

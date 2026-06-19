@@ -13,8 +13,8 @@ use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
 use App\Services\AuditService;
-use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
@@ -60,7 +60,7 @@ class StockViewController extends Controller
 
     private function matchesGlobalSearch(?string $search, ?string $location, ?string $partNumber, ?string $palletNumber, ?string $boxNumber = null, $boxId = null): bool
     {
-        if (!filled($search)) {
+        if (! filled($search)) {
             return true;
         }
 
@@ -98,6 +98,19 @@ class StockViewController extends Controller
             ->where('delivery_pick_items.box_id', $boxId)
             ->whereIn('delivery_pick_sessions.status', ['pending', 'scanning', 'blocked', 'approved'])
             ->exists();
+    }
+
+    private function getBoxMutationBlockReason(Box $box): ?string
+    {
+        if ($box->assigned_delivery_order_id !== null) {
+            return 'Box sudah di-assign ke delivery dan tidak dapat diubah atau dihapus.';
+        }
+
+        if ($this->isBoxLockedByActivePicking((int) $box->id)) {
+            return 'Box sedang digunakan dalam sesi picking dan tidak dapat diubah atau dihapus.';
+        }
+
+        return null;
     }
 
     private function syncStockInputHeadersForBox(int $boxId): void
@@ -214,7 +227,7 @@ class StockViewController extends Controller
         $sortOptions = $this->getSortOptionsByViewMode($viewMode);
         $defaultSortMode = $this->getDefaultSortMode($viewMode);
 
-        if (!$sortMode || !array_key_exists($sortMode, $sortOptions)) {
+        if (! $sortMode || ! array_key_exists($sortMode, $sortOptions)) {
             return $defaultSortMode;
         }
 
@@ -233,6 +246,7 @@ class StockViewController extends Controller
 
         if (is_string($value) && trim($value) !== '') {
             $timestamp = strtotime($value);
+
             return $timestamp !== false ? $timestamp : null;
         }
 
@@ -263,8 +277,8 @@ class StockViewController extends Controller
 
     private function compareNullableNumber($left, $right, string $direction = 'asc'): int
     {
-        $leftIsMissing = !is_numeric($left);
-        $rightIsMissing = !is_numeric($right);
+        $leftIsMissing = ! is_numeric($left);
+        $rightIsMissing = ! is_numeric($right);
 
         if ($leftIsMissing && $rightIsMissing) {
             return 0;
@@ -510,6 +524,7 @@ class StockViewController extends Controller
                     ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
                         $boxId = (int) $box->id;
                         $canonicalPalletId = (int) ($canonicalPalletByBoxId[$boxId] ?? $pallet->id);
+
                         return $canonicalPalletId === (int) $pallet->id;
                     });
 
@@ -543,7 +558,7 @@ class StockViewController extends Controller
                             'not_full_reason' => $box->not_full_reason,
                         ];
                     }
-                } elseif (!$hasAnyBoxHistory) {
+                } elseif (! $hasAnyBoxHistory) {
                     // Fallback only for legacy pallets that truly have no box history.
                     $legacyItems = $pallet->items->filter(function ($item) {
                         return $item->pcs_quantity > 0 || $item->box_quantity > 0;
@@ -593,7 +608,7 @@ class StockViewController extends Controller
         $items = $this->buildStockItems($search);
         $directBoxTarget = filled($search) ? $this->resolveDirectBoxTarget((string) $search, $items) : null;
         if ($viewMode === 'not_full') {
-            $items = $items->filter(fn ($item) => !empty($item['is_not_full']))->values();
+            $items = $items->filter(fn ($item) => ! empty($item['is_not_full']))->values();
         }
         // Calculate total pallets from the filtered items
         $totalPallets = $items->pluck('pallet_id')->unique()->count();
@@ -627,7 +642,7 @@ class StockViewController extends Controller
         if ($viewMode === 'not_full') {
             $notFullBoxes = $this->sortRowsForView('not_full', $this->buildNotFullRows($items), $sortMode);
         }
-        
+
         // Calculate totals for summary cards regardless of view mode
         // We use the raw items collection to calculate these compatible with both views
         $summaryTotalBox = $items->sum('box_quantity');
@@ -652,12 +667,12 @@ class StockViewController extends Controller
             ->values();
 
         return view('shared.stock-view.index', compact(
-            'groupedByPart', 
+            'groupedByPart',
             'groupedByBoxId',
             'groupedByPallet',
             'notFullBoxes',
-            'search', 
-            'viewMode', 
+            'search',
+            'viewMode',
             'totalPallets',
             'summaryTotalBox',
             'summaryTotalPcs',
@@ -668,8 +683,7 @@ class StockViewController extends Controller
             'allLocations',
             'allSearchTerms',
             'directBoxTarget',
-            'masterPartNumbers'
-            , 'sortMode',
+            'masterPartNumbers', 'sortMode',
             'sortOptions'
         ));
     }
@@ -728,10 +742,9 @@ class StockViewController extends Controller
             ];
         });
 
-
         return response()->json([
             'part_number' => $partNumber,
-            'total_box' => (int)$totalBox,
+            'total_box' => (int) $totalBox,
             'total_pcs' => $totalPcs,
             'pallet_count' => $items->pluck('pallet_id')->unique()->count(),
             'pallets' => $palletDetails,
@@ -743,7 +756,7 @@ class StockViewController extends Controller
     {
         $pallet = Pallet::with(['items', 'boxes', 'stockLocation'])->find($palletId);
 
-        if (!$pallet) {
+        if (! $pallet) {
             return response()->json(['error' => 'Pallet not found'], 404);
         }
 
@@ -767,33 +780,33 @@ class StockViewController extends Controller
                 ->where('is_withdrawn', false)
                 ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
                 ->map(function ($box) use ($originLogs) {
-                $log = $originLogs->get($box->id);
-                $origin = $log?->getOldValuesArray()['from_pallet'] ?? null;
+                    $log = $originLogs->get($box->id);
+                    $origin = $log?->getOldValuesArray()['from_pallet'] ?? null;
 
-                return [
-                    'box_id' => $box->id,
-                    'part_number' => $box->part_number,
-                    'box_number' => $box->box_number,
-                    'box_quantity' => 1,
-                    'pcs_quantity' => (int)$box->pcs_quantity,
-                    'created_at' => $box->created_at->format('d M Y H:i'),
-                    'stored_at_raw' => $box->created_at->format('Y-m-d H:i:s'),
-                    'origin_pallet' => $origin,
-                    'is_not_full' => (bool) $box->is_not_full,
-                    'not_full_reason' => $box->not_full_reason,
-                ];
-            });
+                    return [
+                        'box_id' => $box->id,
+                        'part_number' => $box->part_number,
+                        'box_number' => $box->box_number,
+                        'box_quantity' => 1,
+                        'pcs_quantity' => (int) $box->pcs_quantity,
+                        'created_at' => $box->created_at->format('d M Y H:i'),
+                        'stored_at_raw' => $box->created_at->format('Y-m-d H:i:s'),
+                        'origin_pallet' => $origin,
+                        'is_not_full' => (bool) $box->is_not_full,
+                        'not_full_reason' => $box->not_full_reason,
+                    ];
+                });
         } else {
             // Priority 2: Fallback using PalletItem (Legacy / No Box Data)
             $items = $pallet->items->where(function ($q) {
-                 return $q->pcs_quantity > 0 || $q->box_quantity > 0;
+                return $q->pcs_quantity > 0 || $q->box_quantity > 0;
             })->map(function ($item) {
                 return [
                     'box_id' => null,
                     'part_number' => $item->part_number,
                     'box_number' => '-',
-                    'box_quantity' => (int)$item->box_quantity,
-                    'pcs_quantity' => (int)$item->pcs_quantity,
+                    'box_quantity' => (int) $item->box_quantity,
+                    'pcs_quantity' => (int) $item->pcs_quantity,
                     'created_at' => $item->created_at->format('d M Y H:i'),
                     'stored_at_raw' => $item->created_at->format('Y-m-d H:i:s'),
                     'origin_pallet' => null,
@@ -806,14 +819,14 @@ class StockViewController extends Controller
         return response()->json([
             'pallet_number' => $pallet->pallet_number,
             'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
-            'items' => $items->values() 
+            'items' => $items->values(),
         ]);
     }
 
     public function updateBox(Request $request, $boxId)
     {
         $user = Auth::user();
-        if (!$user || !in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! $user || ! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -823,7 +836,7 @@ class StockViewController extends Controller
                 'string',
                 'max:100',
                 function ($attribute, $value, $fail) {
-                    if (!$this->findExactPartSetting($value)) {
+                    if (! $this->findExactPartSetting($value)) {
                         $fail('No Part tidak ditemukan di Master Part.');
                     }
                 },
@@ -842,7 +855,7 @@ class StockViewController extends Controller
         if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box tidak bisa diedit karena statusnya tidak aktif.'
+                'message' => 'Box tidak bisa diedit karena statusnya tidak aktif.',
             ], 422);
         }
 
@@ -868,7 +881,7 @@ class StockViewController extends Controller
                 ->first();
             $fixedQty = (int) ($partSetting?->qty_box ?? 0);
 
-            if (!$partSetting || $fixedQty <= 0) {
+            if (! $partSetting || $fixedQty <= 0) {
                 throw new \RuntimeException('Fixed qty Master Part tidak valid.');
             }
 
@@ -885,7 +898,7 @@ class StockViewController extends Controller
                     ->lockForUpdate()
                     ->exists();
 
-                if (!$isApprovedNotFull) {
+                if (! $isApprovedNotFull) {
                     throw new \RuntimeException(
                         'Perubahan ini akan membuat atau mengubah box not full. Ajukan Request Box Not Full dan tunggu approval Supervisi.'
                     );
@@ -896,8 +909,8 @@ class StockViewController extends Controller
                 throw new \RuntimeException('Box tidak bisa diedit karena statusnya tidak aktif.');
             }
 
-            if ($this->isBoxLockedByActivePicking((int) $box->id)) {
-                throw new \RuntimeException('Box sedang digunakan dalam sesi picking dan tidak dapat diedit.');
+            if ($blockReason = $this->getBoxMutationBlockReason($box)) {
+                throw new \RuntimeException($blockReason);
             }
 
             $pallets = $box->pallets()->lockForUpdate()->get();
@@ -949,10 +962,10 @@ class StockViewController extends Controller
             $box->pcs_quantity = $newPcsQuantity;
             $box->qty_box = $fixedQty;
             $box->is_not_full = $isApprovedNotFull;
-            if (!$isApprovedNotFull) {
+            if (! $isApprovedNotFull) {
                 $box->not_full_reason = null;
             }
-            $box->qr_code = $box->box_number . '|' . $newPartNumber . '|' . $newPcsQuantity;
+            $box->qr_code = $box->box_number.'|'.$newPartNumber.'|'.$newPcsQuantity;
             $box->created_at = $newStoredAt;
             $box->save();
 
@@ -978,9 +991,10 @@ class StockViewController extends Controller
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal memperbarui box: ' . $e->getMessage(),
+                'message' => 'Gagal memperbarui box: '.$e->getMessage(),
             ], $e instanceof \RuntimeException ? 422 : 500);
         }
 
@@ -1000,7 +1014,7 @@ class StockViewController extends Controller
     public function boxHistory($boxId)
     {
         $user = Auth::user();
-        if (!$user || !in_array($user->role, ['warehouse_operator', 'ppc', 'admin_warehouse', 'supervisi', 'admin'], true)) {
+        if (! $user || ! in_array($user->role, ['warehouse_operator', 'ppc', 'admin_warehouse', 'supervisi', 'admin'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -1036,7 +1050,7 @@ class StockViewController extends Controller
     public function deleteBox(Request $request, $boxId)
     {
         $user = Auth::user();
-        if (!$this->canDeleteStock($user)) {
+        if (! $this->canDeleteStock($user)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -1044,8 +1058,8 @@ class StockViewController extends Controller
 
         try {
             $box = Box::whereKey($boxId)->lockForUpdate()->firstOrFail();
-            if ($this->isBoxLockedByActivePicking((int) $box->id)) {
-                throw new \RuntimeException('Box sedang digunakan dalam sesi picking dan tidak dapat dihapus.');
+            if ($blockReason = $this->getBoxMutationBlockReason($box)) {
+                throw new \RuntimeException($blockReason);
             }
 
             $pallets = $box->pallets()->lockForUpdate()->get();
@@ -1088,7 +1102,7 @@ class StockViewController extends Controller
 
             foreach ($affectedPalletIds as $palletId) {
                 $pallet = Pallet::whereKey($palletId)->lockForUpdate()->first();
-                if (!$pallet) {
+                if (! $pallet) {
                     continue;
                 }
 
@@ -1097,7 +1111,9 @@ class StockViewController extends Controller
                     ->where('pallet_boxes.pallet_id', $palletId)
                     ->whereNull('boxes.deleted_at')
                     ->where('boxes.is_withdrawn', false)
-                    ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+                    ->where(function ($q) {
+                        $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                    })
                     ->lockForUpdate()
                     ->count();
 
@@ -1135,6 +1151,7 @@ class StockViewController extends Controller
                         ],
                         sprintf('Pallet %s terhapus otomatis karena box terakhir dihapus', $palletNumber)
                     );
+
                     continue;
                 }
 
@@ -1159,9 +1176,10 @@ class StockViewController extends Controller
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menghapus box: ' . $e->getMessage(),
+                'message' => 'Gagal menghapus box: '.$e->getMessage(),
             ], $e instanceof \RuntimeException ? 422 : 500);
         }
 
@@ -1174,22 +1192,22 @@ class StockViewController extends Controller
     public function deletePallet(Request $request, $palletId)
     {
         $user = Auth::user();
-        if (!$this->canDeleteStock($user)) {
+        if (! $this->canDeleteStock($user)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         DB::beginTransaction();
 
         try {
-            $pallet = Pallet::with(['stockLocation', 'boxes', 'items'])->whereKey($palletId)->lockForUpdate()->firstOrFail();
-            $attachedBoxes = $pallet->boxes;
+            $pallet = Pallet::with(['stockLocation', 'items'])->whereKey($palletId)->lockForUpdate()->firstOrFail();
+            $attachedBoxes = $pallet->boxes()->lockForUpdate()->get();
 
-            $lockedBox = $attachedBoxes->first(
-                fn ($box) => $this->isBoxLockedByActivePicking((int) $box->id)
+            $protectedBox = $attachedBoxes->first(
+                fn ($box) => $this->getBoxMutationBlockReason($box) !== null
             );
-            if ($lockedBox) {
+            if ($protectedBox) {
                 throw new \RuntimeException(
-                    "Box {$lockedBox->box_number} sedang digunakan dalam sesi picking. Pallet tidak dapat dihapus."
+                    "Box {$protectedBox->box_number} masih di-assign atau digunakan dalam sesi picking. Pallet tidak dapat dihapus."
                 );
             }
 
@@ -1210,7 +1228,7 @@ class StockViewController extends Controller
 
             foreach ($attachedBoxes as $box) {
                 $box = Box::whereKey($box->id)->lockForUpdate()->first();
-                if (!$box) {
+                if (! $box) {
                     continue;
                 }
 
@@ -1263,9 +1281,10 @@ class StockViewController extends Controller
             DB::commit();
         } catch (\Throwable $e) {
             DB::rollBack();
+
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menghapus pallet: ' . $e->getMessage(),
+                'message' => 'Gagal menghapus pallet: '.$e->getMessage(),
             ], $e instanceof \RuntimeException ? 422 : 500);
         }
 
@@ -1286,7 +1305,7 @@ class StockViewController extends Controller
 
         return Excel::download(
             new StockViewByPartExport($this->buildPartGroups($stocks), $sortMode),
-            'stock_by_part_' . now()->format('Ymd_His') . '.xlsx'
+            'stock_by_part_'.now()->format('Ymd_His').'.xlsx'
         );
     }
 
@@ -1301,7 +1320,7 @@ class StockViewController extends Controller
 
         return Excel::download(
             new StockViewByBoxIdExport($stocks, $sortMode),
-            'stock_by_box_id_' . now()->format('Ymd_His') . '.xlsx'
+            'stock_by_box_id_'.now()->format('Ymd_His').'.xlsx'
         );
     }
 
@@ -1313,7 +1332,7 @@ class StockViewController extends Controller
         $search = $request->query('search');
         $stocks = $this->buildStockItems($search);
         $sortMode = $this->normalizeSortMode('pallet', $request->query('sort'));
-        
+
         $mergedPalletIds = AuditLog::where('model', 'Pallet')
             ->where('type', 'pallet_merged')
             ->whereIn('model_id', $stocks->pluck('pallet_id')->unique()->values())
@@ -1323,7 +1342,7 @@ class StockViewController extends Controller
 
         return Excel::download(
             new StockViewByPalletExport($this->buildPalletGroups($stocks, $mergedPalletIds), $sortMode),
-            'stock_by_pallet_' . now()->format('Ymd_His') . '.xlsx'
+            'stock_by_pallet_'.now()->format('Ymd_His').'.xlsx'
         );
     }
 }

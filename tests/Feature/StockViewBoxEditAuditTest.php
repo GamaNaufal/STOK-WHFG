@@ -440,7 +440,7 @@ class StockViewBoxEditAuditTest extends TestCase
         $reportResponse->assertOk();
         $reportResponse->assertViewHas('stockInputs', function ($stockInputs) use ($stockInput, $box) {
             $record = $stockInputs->getCollection()->firstWhere('id', $stockInput->id);
-            if (!$record) {
+            if (! $record) {
                 return false;
             }
 
@@ -451,5 +451,72 @@ class StockViewBoxEditAuditTest extends TestCase
                 && ($deletedBox['status'] ?? null) === 'deleted_not_shipped'
                 && str_contains((string) ($deletedBox['label'] ?? ''), 'DELETED - BUKAN TERKIRIM');
         });
+    }
+
+    public function test_assigned_box_cannot_be_edited_deleted_or_deleted_with_its_pallet(): void
+    {
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $this->seedMasterParts(['P-ASSIGNED-GUARD']);
+
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Assigned Stock Guard',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-ASSIGNED-GUARD',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $pallet = Pallet::create(['pallet_number' => 'PLT-ASSIGNED-GUARD']);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'ASSIGNED-GUARD',
+            'stored_at' => now(),
+        ]);
+        $box = Box::create([
+            'box_number' => '91001001',
+            'part_number' => 'P-ASSIGNED-GUARD',
+            'pcs_quantity' => 100,
+            'qty_box' => 100,
+            'qr_code' => '91001001|P-ASSIGNED-GUARD|100',
+            'user_id' => $adminWarehouse->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        $this->actingAs($adminWarehouse)
+            ->postJson(route('stock-view.box-update', $box->id), [
+                'part_number' => 'P-ASSIGNED-GUARD',
+                'pcs_quantity' => 100,
+                'stored_at' => now()->subDay()->format('Y-m-d H:i:s'),
+                'reason' => 'Percobaan edit box assigned',
+            ])
+            ->assertStatus(422)
+            ->assertJson(['success' => false]);
+
+        $this->actingAs($adminWarehouse)
+            ->deleteJson(route('stock-view.box-delete', $box->id))
+            ->assertStatus(422)
+            ->assertJson(['success' => false]);
+
+        $this->actingAs($adminWarehouse)
+            ->deleteJson(route('stock-view.pallet-delete', $pallet->id))
+            ->assertStatus(422)
+            ->assertJson(['success' => false]);
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'deleted_at' => null,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $this->assertDatabaseHas('pallets', [
+            'id' => $pallet->id,
+            'deleted_at' => null,
+        ]);
     }
 }

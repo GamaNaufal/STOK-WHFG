@@ -203,7 +203,7 @@ Aturan penting:
 - Nomor part wajib terdaftar di master part.
 - PCS tidak boleh melebihi kapasitas standar box.
 - Palet existing yang sudah memiliki lokasi tidak boleh dipindahkan dari flow stock input.
-- Palet baru wajib memiliki lokasi.
+- Palet baru wajib memilih lokasi yang terdaftar pada Master Location; kode lokasi bebas dari request tidak diterima.
 - Request `pallet_id` harus sama dengan palet aktif dalam session.
 
 File utama:
@@ -250,7 +250,16 @@ Jenis request:
 - `supplement`: menyediakan box untuk delivery tanpa menambah quantity order.
 - `additional`: menyediakan box dan menambah quantity order.
 
-Selama request `additional` masih pending, proses fulfillment delivery terkait diblokir.
+Aturan khusus `supplement`:
+
+- nomor part wajib sudah ada pada item delivery;
+- delivery masih memiliki kebutuhan yang belum terpenuhi;
+- PCS supplement tidak boleh melebihi kebutuhan yang belum ter-cover oleh box assigned aktif;
+- kapasitas tersebut diperiksa ulang dengan row lock saat approval.
+
+Request box not full tidak dapat dibuat atau disetujui ketika delivery memiliki sesi picking `pending/scanning/blocked/approved`.
+
+Selama request box not full jenis apa pun masih `pending`, schedule, picking, split, dan fulfillment delivery terkait diblokir.
 
 File utama:
 
@@ -282,9 +291,9 @@ Admin Warehouse/Admin dapat mengubah:
 - tanggal penyimpanan box;
 - alasan koreksi wajib.
 
-Koreksi box juga memperbarui QR, header transaksi stock input yang terhubung, dan tanggal umur box. Box yang sedang dipakai sesi picking aktif tidak dapat diedit atau dihapus.
+Koreksi box juga memperbarui QR, header transaksi stock input yang terhubung, dan tanggal umur box. Box yang sudah assigned ke delivery atau sedang dipakai sesi picking aktif tidak dapat diedit atau dihapus.
 
-Supervisi/Admin Warehouse/Admin dapat menghapus box atau palet dari stok aktif. Penghapusan box dan palet menggunakan soft delete agar histori transaksi tetap tersedia. Jika box terakhir dihapus, palet dan occupancy lokasinya ikut dibersihkan.
+Supervisi/Admin Warehouse/Admin dapat menghapus box atau palet dari stok aktif selama tidak memuat box assigned atau pick-locked. Penghapusan box dan palet menggunakan soft delete agar histori transaksi tetap tersedia. Jika box terakhir dihapus, palet dan occupancy lokasinya ikut dibersihkan.
 
 File utama:
 
@@ -330,7 +339,7 @@ Ketersediaan mempertimbangkan:
 - FIFO berdasarkan umur box;
 - kapasitas box dan kebutuhan box not full;
 - delivery dengan tanggal lebih awal;
-- request additional not-full yang masih pending.
+- request box not-full jenis apa pun yang masih pending.
 
 ### 9. Assignment box ke delivery
 
@@ -486,12 +495,13 @@ Alur:
 - hanya palet dengan box aktif yang dapat dipilih;
 - sistem membuat nomor palet baru;
 - seluruh box aktif dipindahkan ke palet baru;
+- merge ditolak jika terdapat box yang sudah assigned ke delivery atau dikunci sesi picking aktif;
 - ringkasan `pallet_items` digabung;
 - referensi transaksi stock input diarahkan ke palet baru;
-- relasi dan lokasi palet sumber dibersihkan;
+- relasi box aktif yang dipindahkan dan lokasi palet sumber dibersihkan; relasi box inactive dipertahankan untuk histori;
 - lokasi lama dibuat available;
 - palet sumber dihapus;
-- palet baru ditempatkan pada lokasi tujuan;
+- palet baru ditempatkan pada lokasi tujuan yang wajib berasal dari Master Location;
 - perpindahan box dan merge dicatat di audit log.
 
 Ringkasan pallet hasil merge dibangun ulang dari box aktif unik yang benar-benar dipindahkan, bukan menjumlahkan `pallet_items` sumber yang mungkin sudah basi.
@@ -515,7 +525,7 @@ Box `expired` atau `handled` tidak termasuk stok aktif dan tidak boleh dipakai u
 
 Saat status berubah menjadi `expired` atau `handled`, sistem langsung menghitung ulang `pallet_items`, menghapus stock location pallet yang sudah kosong, dan mengosongkan master location terkait.
 
-Supervisi/Admin dapat menandai box berstatus `warning` maupun `expired` sebagai `handled`. Sistem menyimpan histori penanganannya.
+Supervisi/Admin dapat menandai box berstatus `warning` maupun `expired` sebagai `handled`. Endpoint memverifikasi ulang umur minimal sembilan bulan. Box yang masih assigned ke delivery atau dikunci sesi picking aktif tidak dapat ditandai `handled`. Sistem menyimpan histori penanganannya.
 
 Setiap hari pukul 07.00 sistem:
 
@@ -604,6 +614,9 @@ Status yang digunakan:
 - Canonical pallet box shared adalah relasi lokasi valid paling baru.
 - Box dalam sesi picking aktif tidak boleh dialokasikan ke order lain.
 - Box dalam sesi picking aktif tidak boleh diedit atau dihapus.
+- Box assigned ke delivery tidak boleh diedit, dihapus, ditangani sebagai expired, atau dipindahkan melalui merge pallet.
+- Semua lokasi baru dari Stock Input dan Merge Pallet wajib berasal dari Master Location.
+- Semua request box not full pending memblokir fulfillment; supplement hanya boleh menutup kebutuhan order yang benar-benar masih tersisa.
 - Completion delivery wajib exact dan membatalkan transaksi jika snapshot box, status, quantity, assignment, atau lokasi telah berubah.
 - Lokasi hanya boleh ditempati satu palet aktif.
 - Database menjamin satu `stock_locations` per pallet dan satu relasi `master_location_id` aktif melalui unique constraint.
@@ -623,14 +636,14 @@ Status yang digunakan:
 - Status delivery `partial` tetap dipakai khusus untuk parent order yang memiliki child hasil split.
 - Semua box not full wajib melalui request dan approval Supervisi; Stock Input dan Delivery Assignment tidak boleh membuat box not full secara langsung.
 - PCS direct input wajib sama dengan fixed qty Master Part.
-- Box berstatus `warning` (9 sampai kurang dari 12 bulan) boleh langsung ditandai `handled`.
+- Box berstatus `warning` (9 sampai kurang dari 12 bulan) boleh ditandai `handled` selama tidak assigned atau pick-locked.
 
 ## Status Schema dan Validasi Terakhir
 
 - Seluruh migration sampai `2026_06_19_000004_harden_location_and_pick_serialization` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.
-- Full regression suite terakhir: 128 test, 633 assertion, seluruhnya lulus.
+- Full regression suite terakhir: 139 test, 671 assertion, seluruhnya lulus.
 
 ## Catatan yang Belum Diputuskan
 

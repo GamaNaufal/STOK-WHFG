@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Box;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
+use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
 use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
@@ -32,6 +34,12 @@ class StockInputAndNotFullWorkflowTest extends TestCase
             'customer_name' => 'Cust NF LOC',
             'delivery_date' => now()->addDays(2)->toDateString(),
             'status' => 'approved',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-NF-LOC',
+            'quantity' => 75,
+            'fulfilled_quantity' => 0,
         ]);
 
         MasterLocation::create([
@@ -105,6 +113,12 @@ class StockInputAndNotFullWorkflowTest extends TestCase
             'delivery_date' => now()->addDays(2)->toDateString(),
             'status' => 'approved',
         ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-NF-REJ',
+            'quantity' => 80,
+            'fulfilled_quantity' => 0,
+        ]);
 
         $targetPallet = Pallet::create(['pallet_number' => 'PLT-REJ-01']);
         \App\Models\StockLocation::create([
@@ -158,6 +172,12 @@ class StockInputAndNotFullWorkflowTest extends TestCase
             'delivery_date' => now()->addDays(2)->toDateString(),
             'status' => 'approved',
         ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-NF-GUARD',
+            'quantity' => 80,
+            'fulfilled_quantity' => 0,
+        ]);
 
         $targetPallet = Pallet::create(['pallet_number' => 'PLT-GUARD-01']);
         \App\Models\StockLocation::create([
@@ -194,6 +214,154 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         $this->assertDatabaseHas('not_full_box_requests', [
             'id' => $requestId,
             'status' => 'approved',
+        ]);
+    }
+
+    public function test_supplement_request_rejects_part_not_present_in_delivery_order(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        PartSetting::create([
+            'part_number' => 'P-NF-NOT-ORDERED',
+            'qty_box' => 100,
+        ]);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Missing Part',
+            'delivery_date' => now()->addDays(2)->toDateString(),
+            'status' => 'approved',
+        ]);
+        $location = MasterLocation::create([
+            'code' => 'NF-MISSING-PART',
+            'is_occupied' => false,
+        ]);
+
+        $response = $this->actingAs($operator)->post(route('box-not-full.store'), [
+            'box_number' => '91000006',
+            'part_number' => 'P-NF-NOT-ORDERED',
+            'pcs_quantity' => 50,
+            'delivery_order_id' => $order->id,
+            'reason' => 'Part tidak ada di order',
+            'request_type' => 'supplement',
+            'target_type' => 'location',
+            'target_location_id' => $location->id,
+        ]);
+
+        $response->assertRedirect()->assertSessionHas('error');
+        $this->assertDatabaseMissing('not_full_box_requests', [
+            'box_number' => '91000006',
+        ]);
+    }
+
+    public function test_supplement_request_rejects_quantity_above_uncovered_order_need(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        PartSetting::create([
+            'part_number' => 'P-NF-CAPACITY',
+            'qty_box' => 100,
+        ]);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Supplement Capacity',
+            'delivery_date' => now()->addDays(2)->toDateString(),
+            'status' => 'approved',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-NF-CAPACITY',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+        Box::create([
+            'box_number' => '91000007',
+            'part_number' => 'P-NF-CAPACITY',
+            'pcs_quantity' => 70,
+            'qty_box' => 100,
+            'qr_code' => '91000007|P-NF-CAPACITY|70',
+            'user_id' => $operator->id,
+            'is_not_full' => true,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $location = MasterLocation::create([
+            'code' => 'NF-CAPACITY',
+            'is_occupied' => false,
+        ]);
+
+        $response = $this->actingAs($operator)->post(route('box-not-full.store'), [
+            'box_number' => '91000008',
+            'part_number' => 'P-NF-CAPACITY',
+            'pcs_quantity' => 40,
+            'delivery_order_id' => $order->id,
+            'reason' => 'Melebihi sisa kebutuhan',
+            'request_type' => 'supplement',
+            'target_type' => 'location',
+            'target_location_id' => $location->id,
+        ]);
+
+        $response->assertRedirect()->assertSessionHas('error');
+        $this->assertDatabaseMissing('not_full_box_requests', [
+            'box_number' => '91000008',
+        ]);
+    }
+
+    public function test_not_full_approval_is_rejected_after_delivery_enters_active_picking(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        PartSetting::create([
+            'part_number' => 'P-NF-ACTIVE-PICK',
+            'qty_box' => 100,
+        ]);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Cust Active Pick Guard',
+            'delivery_date' => now()->addDays(2)->toDateString(),
+            'status' => 'processing',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-NF-ACTIVE-PICK',
+            'quantity' => 80,
+            'fulfilled_quantity' => 0,
+        ]);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-NF-ACTIVE-PICK']);
+        \App\Models\StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'NF-ACTIVE-PICK',
+            'stored_at' => now(),
+        ]);
+        $notFullRequest = NotFullBoxRequest::create([
+            'box_number' => '91000009',
+            'part_number' => 'P-NF-ACTIVE-PICK',
+            'pcs_quantity' => 80,
+            'fixed_qty' => 100,
+            'reason' => 'Request dibuat sebelum picking',
+            'request_type' => 'supplement',
+            'delivery_order_id' => $order->id,
+            'requested_by' => $operator->id,
+            'target_pallet_id' => $pallet->id,
+            'status' => 'pending',
+        ]);
+        DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'scanning',
+            'started_at' => now(),
+        ]);
+
+        $response = $this->actingAs($supervisi)
+            ->post(route('box-not-full.approve', $notFullRequest->id));
+
+        $response->assertRedirect()->assertSessionHas('error');
+        $this->assertDatabaseHas('not_full_box_requests', [
+            'id' => $notFullRequest->id,
+            'status' => 'pending',
+            'box_id' => null,
+        ]);
+        $this->assertDatabaseMissing('boxes', [
+            'box_number' => '91000009',
         ]);
     }
 

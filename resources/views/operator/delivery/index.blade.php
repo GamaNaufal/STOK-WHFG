@@ -550,7 +550,7 @@
                                         <i class="bi bi-check-circle"></i> Selesai
                                     </span>
                                 @elseif(!empty($order->has_pending_additional_approval))
-                                    <button class="btn-insufficient" disabled title="{{ $order->readiness_reason ?? 'Pending approval not full tambahan' }}">
+                                    <button class="btn-insufficient" disabled title="{{ $order->readiness_reason ?? 'Pending approval box not full' }}">
                                         <i class="bi bi-hourglass-split"></i> Pending Approval
                                     </button>
                                 @elseif(!empty($order->has_active_pick_session) && !empty($order->active_pick_owned_by_current_user) && !empty($order->active_pick_resume_url))

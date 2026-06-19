@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Box;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
+use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
 use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
@@ -15,17 +16,93 @@ use App\Models\StockLocation;
 use App\Services\AuditService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class NotFullBoxRequestController extends Controller
 {
+    private const ACTIVE_PICK_STATUSES = ['pending', 'scanning', 'blocked', 'approved'];
+
     private function isDuplicateKeyException(QueryException $e): bool
     {
         $sqlState = (string) ($e->getCode() ?? '');
         $driverCode = (int) ($e->errorInfo[1] ?? 0);
 
         return $sqlState === '23000' || $driverCode === 1062;
+    }
+
+    private function hasActivePickSession(int $deliveryOrderId, bool $lockRows = false): bool
+    {
+        $query = DeliveryPickSession::query()
+            ->where('delivery_order_id', $deliveryOrderId)
+            ->whereIn('status', self::ACTIVE_PICK_STATUSES);
+
+        if ($lockRows) {
+            $query->lockForUpdate();
+        }
+
+        return $query->exists();
+    }
+
+    private function getSupplementCapacity(
+        int $deliveryOrderId,
+        string $partNumber,
+        bool $lockRows = false
+    ): array {
+        $itemQuery = DeliveryOrderItem::query()
+            ->where('delivery_order_id', $deliveryOrderId)
+            ->where('part_number', $partNumber);
+
+        if ($lockRows) {
+            $itemQuery->lockForUpdate();
+        }
+
+        $orderItem = $itemQuery->first();
+        if (! $orderItem) {
+            throw new \RuntimeException('Tipe pelengkap hanya dapat digunakan untuk part yang sudah ada dalam delivery order.');
+        }
+
+        $remainingQty = max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity);
+
+        $assignedQuery = Box::query()
+            ->active()
+            ->where('assigned_delivery_order_id', $deliveryOrderId)
+            ->where('part_number', $partNumber);
+
+        if ($lockRows) {
+            $assignedQuery->lockForUpdate();
+        }
+
+        $assignedQty = (int) $assignedQuery->get(['id', 'pcs_quantity'])->sum('pcs_quantity');
+
+        return [
+            'remaining_qty' => $remainingQty,
+            'assigned_qty' => $assignedQty,
+            'available_qty' => max(0, $remainingQty - $assignedQty),
+        ];
+    }
+
+    private function assertSupplementFitsOrder(
+        int $deliveryOrderId,
+        string $partNumber,
+        int $pcsQuantity,
+        bool $lockRows = false
+    ): void {
+        $capacity = $this->getSupplementCapacity(
+            $deliveryOrderId,
+            $partNumber,
+            $lockRows
+        );
+
+        if ($capacity['remaining_qty'] <= 0) {
+            throw new \RuntimeException('Part delivery sudah terpenuhi dan tidak dapat menerima box pelengkap.');
+        }
+
+        if ($pcsQuantity > $capacity['available_qty']) {
+            throw new \RuntimeException(
+                "PCS box pelengkap melebihi kebutuhan delivery yang belum ter-cover ({$capacity['available_qty']} PCS)."
+            );
+        }
     }
 
     public function create()
@@ -96,7 +173,7 @@ class NotFullBoxRequestController extends Controller
 
         $partNumber = (string) $request->part_number;
         $partSetting = $this->findExactPartSetting($partNumber);
-        if (!$partSetting) {
+        if (! $partSetting) {
             return redirect()->back()->with('error', 'No Part tidak ditemukan.')->withInput();
         }
 
@@ -107,8 +184,26 @@ class NotFullBoxRequestController extends Controller
 
         $deliveryOrder = DeliveryOrder::whereIn('status', ['approved', 'processing', 'partial'])
             ->find($request->delivery_order_id);
-        if (!$deliveryOrder) {
+        if (! $deliveryOrder) {
             return redirect()->back()->with('error', 'Delivery yang dipilih tidak valid.')->withInput();
+        }
+
+        if ($this->hasActivePickSession((int) $deliveryOrder->id)) {
+            return redirect()->back()
+                ->with('error', 'Delivery sedang memiliki sesi picking aktif. Selesaikan atau batalkan sesi sebelum membuat request box not full.')
+                ->withInput();
+        }
+
+        if ($request->request_type === 'supplement') {
+            try {
+                $this->assertSupplementFitsOrder(
+                    (int) $deliveryOrder->id,
+                    $partNumber,
+                    (int) $request->pcs_quantity
+                );
+            } catch (\RuntimeException $e) {
+                return redirect()->back()->with('error', $e->getMessage())->withInput();
+            }
         }
 
         if ($request->target_type === 'pallet' && empty($request->target_pallet_id)) {
@@ -118,7 +213,7 @@ class NotFullBoxRequestController extends Controller
         if ($request->target_type === 'pallet') {
             $targetPallet = Pallet::with('stockLocation')->find($request->target_pallet_id);
             $targetLocationCode = $targetPallet?->stockLocation?->warehouse_location;
-            if (!$targetPallet || !$targetLocationCode || $targetLocationCode === 'Unknown') {
+            if (! $targetPallet || ! $targetLocationCode || $targetLocationCode === 'Unknown') {
                 return redirect()->back()->with('error', 'Pallet tujuan belum memiliki lokasi tersimpan yang valid.')->withInput();
             }
         }
@@ -171,6 +266,14 @@ class NotFullBoxRequestController extends Controller
     {
         try {
             DB::transaction(function () use ($id) {
+                $requestSnapshot = NotFullBoxRequest::whereKey($id)->firstOrFail();
+                $deliveryOrder = DeliveryOrder::whereKey($requestSnapshot->delivery_order_id)
+                    ->lockForUpdate()
+                    ->first();
+                if (! $deliveryOrder || ! in_array((string) $deliveryOrder->status, ['approved', 'processing', 'partial'], true)) {
+                    throw new \RuntimeException('Delivery tujuan sudah tidak dapat menerima box not full.');
+                }
+
                 $request = NotFullBoxRequest::with(['deliveryOrder', 'targetLocation', 'targetPallet'])
                     ->whereKey($id)
                     ->lockForUpdate()
@@ -180,18 +283,21 @@ class NotFullBoxRequestController extends Controller
                     throw new \RuntimeException('Status permintaan sudah diproses.');
                 }
 
-                $deliveryOrder = DeliveryOrder::whereKey($request->delivery_order_id)
-                    ->lockForUpdate()
-                    ->first();
-                if (!$deliveryOrder || !in_array((string) $deliveryOrder->status, ['approved', 'processing', 'partial'], true)) {
-                    throw new \RuntimeException('Delivery tujuan sudah tidak dapat menerima box not full.');
+                if ((int) $request->delivery_order_id !== (int) $deliveryOrder->id) {
+                    throw new \RuntimeException('Delivery tujuan request sudah berubah. Muat ulang data approval.');
+                }
+
+                if ($this->hasActivePickSession((int) $deliveryOrder->id, true)) {
+                    throw new \RuntimeException(
+                        'Delivery sedang memiliki sesi picking aktif. Selesaikan atau batalkan sesi sebelum approval box not full.'
+                    );
                 }
 
                 $partSetting = PartSetting::where('part_number', $request->part_number)
                     ->lockForUpdate()
                     ->first();
                 $currentFixedQty = (int) ($partSetting?->qty_box ?? 0);
-                if (!$partSetting || (int) $request->pcs_quantity >= $currentFixedQty) {
+                if (! $partSetting || (int) $request->pcs_quantity >= $currentFixedQty) {
                     throw new \RuntimeException('PCS request tidak lagi lebih kecil dari fixed qty Master Part saat ini.');
                 }
 
@@ -199,12 +305,21 @@ class NotFullBoxRequestController extends Controller
                     $request->fixed_qty = $currentFixedQty;
                 }
 
+                if ($request->request_type === 'supplement') {
+                    $this->assertSupplementFitsOrder(
+                        (int) $request->delivery_order_id,
+                        (string) $request->part_number,
+                        (int) $request->pcs_quantity,
+                        true
+                    );
+                }
+
                 $pallet = $request->targetPallet;
                 $locationCode = null;
 
-                if (!$pallet) {
+                if (! $pallet) {
                     $location = $request->targetLocation;
-                    if (!$location) {
+                    if (! $location) {
                         throw new \RuntimeException('Lokasi tidak tersedia.');
                     }
 
@@ -236,7 +351,7 @@ class NotFullBoxRequestController extends Controller
                 } else {
                     $pallet = Pallet::whereKey($pallet->id)->lockForUpdate()->firstOrFail();
                     $locationCode = $pallet->stockLocation?->warehouse_location;
-                    if (!$locationCode || $locationCode === 'Unknown') {
+                    if (! $locationCode || $locationCode === 'Unknown') {
                         throw new \RuntimeException('Pallet tujuan belum memiliki lokasi tersimpan yang valid.');
                     }
                 }
@@ -249,7 +364,7 @@ class NotFullBoxRequestController extends Controller
                     'box_number' => $request->box_number,
                     'part_number' => $request->part_number,
                     'pcs_quantity' => $request->pcs_quantity,
-                    'qr_code' => $request->box_number . '|' . $request->part_number . '|' . $request->pcs_quantity,
+                    'qr_code' => $request->box_number.'|'.$request->part_number.'|'.$request->pcs_quantity,
                     'user_id' => $request->requested_by,
                     'qty_box' => $request->fixed_qty,
                     'is_not_full' => true,
@@ -316,7 +431,7 @@ class NotFullBoxRequestController extends Controller
 
             return redirect()->back()->with('success', 'Permintaan berhasil di-approve.');
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', 'Gagal approve: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'Gagal approve: '.$e->getMessage());
         }
     }
 
@@ -352,12 +467,13 @@ class NotFullBoxRequestController extends Controller
                 ->pluck('pallet_number')
                 ->map(function ($palletNumber) {
                     preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+
                     return isset($matches[1]) ? (int) $matches[1] : 0;
                 })
                 ->max() ?? 0;
 
             $nextNumber = $maxNumber + 1;
-            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $palletNumber = 'PLT-'.str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
             try {
                 return Pallet::create([

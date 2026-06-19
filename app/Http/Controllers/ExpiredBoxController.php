@@ -35,7 +35,12 @@ class ExpiredBoxController extends Controller
 
     public function handle(Request $request, int $boxId, ExpiredBoxService $service): RedirectResponse
     {
-        $service->handleBox($boxId, $request->user()->id);
+        try {
+            $service->handleBox($boxId, $request->user()->id);
+        } catch (\RuntimeException $e) {
+            return redirect()->route('expired-box.index')
+                ->with('error', $e->getMessage());
+        }
 
         return redirect()->route('expired-box.index')
             ->with('success', 'Box berhasil ditandai sebagai handled.');

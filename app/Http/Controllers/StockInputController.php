@@ -3,15 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Models\Box;
+use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Models\PalletItem;
-use App\Models\PartSetting;
-use App\Models\MasterLocation;
-use App\Models\StockLocation;
 use App\Models\StockInput;
+use App\Models\StockLocation;
 use App\Services\AuditService;
-use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -42,12 +41,13 @@ class StockInputController extends Controller
                 ->pluck('pallet_number')
                 ->map(function ($palletNumber) {
                     preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+
                     return isset($matches[1]) ? (int) $matches[1] : 0;
                 })
                 ->max() ?? 0;
 
             $nextNumber = $maxNumber + 1;
-            $palletNumber = 'PLT-' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+            $palletNumber = 'PLT-'.str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
             try {
                 $pallet = Pallet::create([
@@ -87,7 +87,7 @@ class StockInputController extends Controller
             ->whereHas('stockLocation')
             ->whereHas('activeBoxes')
             ->when($query !== '', function ($q) use ($query) {
-                $q->where('pallet_number', 'like', '%' . $query . '%');
+                $q->where('pallet_number', 'like', '%'.$query.'%');
             })
             ->orderByDesc('id')
             ->limit(10)
@@ -120,14 +120,14 @@ class StockInputController extends Controller
 
         $pallet = Pallet::with('stockLocation')->findOrFail($validated['pallet_id']);
 
-        if (!$pallet->stockLocation) {
+        if (! $pallet->stockLocation) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pallet ini belum punya lokasi tersimpan dan tidak bisa dipilih sebagai pallet existing.',
             ], 422);
         }
 
-        if (!$pallet->activeBoxes()->exists()) {
+        if (! $pallet->activeBoxes()->exists()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Pallet ini sudah kosong dan tidak bisa dipilih sebagai pallet existing.',
@@ -156,7 +156,7 @@ class StockInputController extends Controller
             $currentPallet = Pallet::with(['stockLocation'])->find($currentPalletId);
 
             if ($currentPallet) {
-                if ($currentPalletSource === 'new' && $currentPallet->boxes()->count() === 0 && !$currentPallet->stockLocation) {
+                if ($currentPalletSource === 'new' && $currentPallet->boxes()->count() === 0 && ! $currentPallet->stockLocation) {
                     $currentPallet->delete();
                 }
             }
@@ -195,7 +195,7 @@ class StockInputController extends Controller
         if (session()->has('pending_box')) {
             return response()->json([
                 'success' => false,
-                'message' => 'Selesaikan scan No Part untuk box sebelumnya terlebih dahulu.'
+                'message' => 'Selesaikan scan No Part untuk box sebelumnya terlebih dahulu.',
             ], 400);
         }
 
@@ -205,7 +205,7 @@ class StockInputController extends Controller
             if ($existingBox->trashed()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'ID Box ini sudah pernah digunakan dan telah diarsipkan. Gunakan ID Box baru.'
+                    'message' => 'ID Box ini sudah pernah digunakan dan telah diarsipkan. Gunakan ID Box baru.',
                 ], 400);
             }
 
@@ -215,7 +215,7 @@ class StockInputController extends Controller
             ) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Box ini sudah tidak aktif dan tidak dapat dimasukkan ulang.'
+                    'message' => 'Box ini sudah tidak aktif dan tidak dapat dimasukkan ulang.',
                 ], 400);
             }
 
@@ -226,7 +226,7 @@ class StockInputController extends Controller
             if ($existingPallet) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Box ini sudah tersimpan di palet ' . $existingPallet->pallet_number
+                    'message' => 'Box ini sudah tersimpan di palet '.$existingPallet->pallet_number,
                 ], 400);
             }
         }
@@ -239,7 +239,7 @@ class StockInputController extends Controller
         if ($boxAlreadyScanned) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box ' . $barcode . ' sudah di-scan dalam palet ini'
+                'message' => 'Box '.$barcode.' sudah di-scan dalam palet ini',
             ], 400);
         }
 
@@ -255,7 +255,7 @@ class StockInputController extends Controller
             'has_stock_location' => (bool) $pallet->stockLocation()->exists(),
             'warehouse_location' => $pallet->stockLocation?->warehouse_location,
             'box_number' => $barcode,
-            'message' => 'Scan No Part untuk konfirmasi.'
+            'message' => 'Scan No Part untuk konfirmasi.',
         ]);
     }
 
@@ -268,20 +268,20 @@ class StockInputController extends Controller
         ]);
 
         $pendingBox = session('pending_box');
-        if (!$pendingBox) {
+        if (! $pendingBox) {
             return response()->json([
                 'success' => false,
-                'message' => 'Scan box terlebih dahulu.'
+                'message' => 'Scan box terlebih dahulu.',
             ], 400);
         }
 
         $partNumber = $validated['part_number'];
 
         $partSetting = $this->findExactPartSetting($partNumber);
-        if (!$partSetting) {
+        if (! $partSetting) {
             return response()->json([
                 'success' => false,
-                'message' => 'No Part belum terdaftar di Master Part.'
+                'message' => 'No Part belum terdaftar di Master Part.',
             ], 400);
         }
 
@@ -291,7 +291,7 @@ class StockInputController extends Controller
         if ($pcsQuantity > $fixedQty) {
             return response()->json([
                 'success' => false,
-                'message' => 'Qty box tidak boleh melebihi fixed qty.'
+                'message' => 'Qty box tidak boleh melebihi fixed qty.',
             ], 422);
         }
 
@@ -306,10 +306,10 @@ class StockInputController extends Controller
 
         $pallet_id = session('current_pallet_id');
         $pallet = $pallet_id ? Pallet::find($pallet_id) : null;
-        if (!$pallet) {
+        if (! $pallet) {
             return response()->json([
                 'success' => false,
-                'message' => 'Palet tidak ditemukan. Ulangi scan box.'
+                'message' => 'Palet tidak ditemukan. Ulangi scan box.',
             ], 400);
         }
 
@@ -319,7 +319,7 @@ class StockInputController extends Controller
         if ($boxAlreadyScanned) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box ' . $pendingBox['box_number'] . ' sudah di-scan dalam palet ini'
+                'message' => 'Box '.$pendingBox['box_number'].' sudah di-scan dalam palet ini',
             ], 400);
         }
 
@@ -366,7 +366,7 @@ class StockInputController extends Controller
         if (count($parts) !== 3) {
             return response()->json([
                 'success' => false,
-                'message' => 'Format QR code tidak valid'
+                'message' => 'Format QR code tidak valid',
             ], 400);
         }
 
@@ -374,27 +374,27 @@ class StockInputController extends Controller
         $part_number = $parts[1];
         $pcs_quantity = (int) $parts[2];
 
-        if (!preg_match('/^\d{8}$/', $box_number)) {
+        if (! preg_match('/^\d{8}$/', $box_number)) {
             return response()->json([
                 'success' => false,
-                'message' => 'ID Box harus 8 angka.'
+                'message' => 'ID Box harus 8 angka.',
             ], 422);
         }
 
         // Verify box exists in database
         $box = Box::withTrashed()->where('box_number', $box_number)->first();
 
-        if (!$box || $box->trashed()) {
+        if (! $box || $box->trashed()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box tidak ditemukan di sistem'
+                'message' => 'Box tidak ditemukan di sistem',
             ], 404);
         }
 
         if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box sudah tidak aktif dan tidak dapat dimasukkan ulang.'
+                'message' => 'Box sudah tidak aktif dan tidak dapat dimasukkan ulang.',
             ], 422);
         }
 
@@ -404,7 +404,7 @@ class StockInputController extends Controller
         ) {
             return response()->json([
                 'success' => false,
-                'message' => 'Data QR tidak sesuai dengan data box terbaru. Cetak ulang QR box.'
+                'message' => 'Data QR tidak sesuai dengan data box terbaru. Cetak ulang QR box.',
             ], 422);
         }
 
@@ -416,7 +416,7 @@ class StockInputController extends Controller
         if ($existingPallet) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box ini sudah tersimpan di palet ' . $existingPallet->pallet_number
+                'message' => 'Box ini sudah tersimpan di palet '.$existingPallet->pallet_number,
             ], 400);
         }
 
@@ -427,18 +427,18 @@ class StockInputController extends Controller
         if ($existingBox) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box ini sudah di-scan dalam palet ini'
+                'message' => 'Box ini sudah di-scan dalam palet ini',
             ], 400);
         }
 
         // Check if box already scanned dalam session ini (untuk prevent duplikat dalam satu pallet)
         $scannedBoxes = session('scanned_boxes', []);
         $boxAlreadyScanned = collect($scannedBoxes)->contains('box_id', $box->id);
-        
+
         if ($boxAlreadyScanned) {
             return response()->json([
                 'success' => false,
-                'message' => 'Box ' . $box_number . ' sudah di-scan. Setiap box hanya bisa di-scan sekali karena kode QR-nya unik!'
+                'message' => 'Box '.$box_number.' sudah di-scan. Setiap box hanya bisa di-scan sekali karena kode QR-nya unik!',
             ], 400);
         }
 
@@ -469,20 +469,21 @@ class StockInputController extends Controller
     {
         $pallet_id = session('current_pallet_id');
 
-        if (!$pallet_id) {
+        if (! $pallet_id) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tidak ada palet yang sedang aktif'
+                'message' => 'Tidak ada palet yang sedang aktif',
             ]);
         }
 
         $pallet = Pallet::with(['stockLocation'])->find($pallet_id);
 
-        if (!$pallet) {
+        if (! $pallet) {
             session()->forget('current_pallet_id');
+
             return response()->json([
                 'success' => false,
-                'message' => 'Palet tidak ditemukan'
+                'message' => 'Palet tidak ditemukan',
             ]);
         }
 
@@ -528,7 +529,7 @@ class StockInputController extends Controller
             ->all();
 
         $itemsSummary = collect($boxesForPrint)
-            ->filter(fn ($box) => !empty($box['part_number']))
+            ->filter(fn ($box) => ! empty($box['part_number']))
             ->groupBy('part_number')
             ->map(function ($boxes, $partNumber) {
                 return [
@@ -563,7 +564,7 @@ class StockInputController extends Controller
                 'total_boxes_pending' => $pendingBoxes->count(),
                 'total_boxes_combined' => count($boxesForPrint),
                 'total_pcs' => $totalPcs,
-            ]
+            ],
         ]);
     }
 
@@ -586,7 +587,7 @@ class StockInputController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Session palet berhasil dihapus'
+            'message' => 'Session palet berhasil dihapus',
         ]);
     }
 
@@ -595,13 +596,14 @@ class StockInputController extends Controller
         return $request->validate([
             'pallet_id' => 'required|exists:pallets,id',
             'input_date' => 'nullable|date|date_format:Y-m-d',
-            // 'warehouse_location' => 'required|string', // Validasi manual di bawah karena bisa 'location_id' atau text
+            'location_id' => 'nullable|integer|exists:master_locations,id',
+            'warehouse_location' => 'nullable|string',
         ]);
     }
 
     private function hasLocationInput(Request $request): bool
     {
-        return (bool) ($request->input('location_id') || $request->input('warehouse_location'));
+        return (bool) $request->input('location_id');
     }
 
     private function getScannedBoxes(): array
@@ -634,10 +636,10 @@ class StockInputController extends Controller
                 throw new \RuntimeException("Box {$boxNumber} sudah tidak aktif dan tidak dapat dimasukkan ulang.");
             }
 
-            if (!$box) {
+            if (! $box) {
                 $fixedQty = (int) ($scannedBox['qty_box'] ?? 0);
                 $pcsQuantity = (int) ($scannedBox['pcs_quantity'] ?? $fixedQty);
-                if (!empty($scannedBox['is_not_full']) || $fixedQty <= 0 || $pcsQuantity !== $fixedQty) {
+                if (! empty($scannedBox['is_not_full']) || $fixedQty <= 0 || $pcsQuantity !== $fixedQty) {
                     throw new \RuntimeException(
                         "Box {$boxNumber} bukan full box. Ajukan melalui menu Request Box Not Full dan tunggu approval Supervisi."
                     );
@@ -647,7 +649,7 @@ class StockInputController extends Controller
                     'box_number' => $scannedBox['box_number'],
                     'part_number' => $scannedBox['part_number'],
                     'pcs_quantity' => $scannedBox['pcs_quantity'] ?? $scannedBox['qty_box'],
-                    'qr_code' => $scannedBox['box_number'] . '|' . $scannedBox['part_number'] . '|' . ($scannedBox['pcs_quantity'] ?? $scannedBox['qty_box']),
+                    'qr_code' => $scannedBox['box_number'].'|'.$scannedBox['part_number'].'|'.($scannedBox['pcs_quantity'] ?? $scannedBox['qty_box']),
                     'user_id' => Auth::id(),
                     'qty_box' => $scannedBox['qty_box'] ?? null,
                     'is_not_full' => false,
@@ -700,54 +702,28 @@ class StockInputController extends Controller
     private function resolveLocationCode(Request $request, Pallet $pallet): ?string
     {
         $locationId = $request->input('location_id');
-        $locationCode = null;
-
-        if ($locationId) {
-            $masterLocation = MasterLocation::find($locationId);
-            if (!$masterLocation) {
-                throw new \Exception('Lokasi yang dipilih tidak ditemukan!');
-            }
-
-            $claimed = MasterLocation::where('id', $masterLocation->id)
-                ->where('is_occupied', false)
-                ->update([
-                    'is_occupied' => true,
-                    'current_pallet_id' => $pallet->id,
-                    'updated_at' => now(),
-                ]);
-
-            if ($claimed === 0) {
-                throw new \Exception('Lokasi yang dipilih sudah terisi!');
-            }
-
-            $locationCode = $masterLocation->code;
-
-            return $locationCode;
+        if (! $locationId) {
+            throw new \RuntimeException('Lokasi wajib dipilih dari Master Location.');
         }
 
-        $locationCode = $request->input('warehouse_location');
-        if ($locationCode) {
-            $locationCode = strtoupper($locationCode);
+        $masterLocation = MasterLocation::find($locationId);
+        if (! $masterLocation) {
+            throw new \RuntimeException('Lokasi yang dipilih tidak ditemukan!');
         }
 
-        if ($locationCode) {
-            $masterLocation = MasterLocation::where('code', $locationCode)->first();
-            if ($masterLocation) {
-                $claimed = MasterLocation::where('id', $masterLocation->id)
-                    ->where('is_occupied', false)
-                    ->update([
-                        'is_occupied' => true,
-                        'current_pallet_id' => $pallet->id,
-                        'updated_at' => now(),
-                    ]);
+        $claimed = MasterLocation::where('id', $masterLocation->id)
+            ->where('is_occupied', false)
+            ->update([
+                'is_occupied' => true,
+                'current_pallet_id' => $pallet->id,
+                'updated_at' => now(),
+            ]);
 
-                if ($claimed === 0) {
-                    throw new \Exception("Lokasi {$locationCode} sudah terisi!");
-                }
-            }
+        if ($claimed === 0) {
+            throw new \RuntimeException('Lokasi yang dipilih sudah terisi!');
         }
 
-        return $locationCode;
+        return $masterLocation->code;
     }
 
     private function createStockLocationRecord(Pallet $pallet, ?string $locationCode): void
@@ -788,7 +764,7 @@ class StockInputController extends Controller
             ->values()
             ->toArray();
 
-        $palletItem = !empty($partNumbers)
+        $palletItem = ! empty($partNumbers)
             ? $pallet->items()->whereIn('part_number', $partNumbers)->orderBy('id')->first()
             : null;
 
@@ -820,7 +796,7 @@ class StockInputController extends Controller
         if ($activePalletId <= 0 || $activePalletId !== (int) $validated['pallet_id']) {
             return response()->json([
                 'success' => false,
-                'message' => 'Pallet aktif tidak sesuai dengan request. Muat ulang halaman lalu coba lagi.'
+                'message' => 'Pallet aktif tidak sesuai dengan request. Muat ulang halaman lalu coba lagi.',
             ], 422);
         }
 
@@ -833,27 +809,29 @@ class StockInputController extends Controller
             // Verify pallet has items (scanned QR) (INI KHUSUS UNTUK FLOW SCAN QR BARU - JIKA KITA PAKAI LOGIC DI BAWAH, LOGIC INI MUNGKIN PERLU DISESUAIKAN)
             // KARENA SAAT INI ITEM BELUM DI ATTACH KE PALLET (MASIH DI SESSION)
             // TAPI DI KODE SEBELUMNYA `items` RELASI KE `PalletItems` SUDAH DIBUAT SAAT SCAN? TIDAK, SAAT SCAN HANYA SESSION.
-            
+
             // LOGIC KOREKSI: Relasi items (PalletItems) baru dibuat di bawah, jadi pengecekan valid disini harusnya check Session.
-            
+
             // Get scanned boxes dari session
             $scannedBoxes = $this->getScannedBoxes();
-            
+
             if (empty($scannedBoxes)) {
                 DB::rollBack();
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Tidak ada box yang ter-scan'
+                    'message' => 'Tidak ada box yang ter-scan',
                 ], 400);
             }
 
             foreach ($scannedBoxes as $scannedBox) {
                 $boxNumber = (string) ($scannedBox['box_number'] ?? '');
-                if (!preg_match('/^\d{8}$/', $boxNumber)) {
+                if (! preg_match('/^\d{8}$/', $boxNumber)) {
                     DB::rollBack();
+
                     return response()->json([
                         'success' => false,
-                        'message' => 'ID Box harus 8 angka.'
+                        'message' => 'ID Box harus 8 angka.',
                     ], 422);
                 }
             }
@@ -864,17 +842,19 @@ class StockInputController extends Controller
 
             if ($currentPalletSource === 'existing' && $hasExistingLocation && $hasLocationInput) {
                 DB::rollBack();
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Pallet existing tidak boleh mengganti lokasi dari proses input ini.'
+                    'message' => 'Pallet existing tidak boleh mengganti lokasi dari proses input ini.',
                 ], 422);
             }
 
-            if (!$hasLocationInput && !$hasExistingLocation) {
+            if (! $hasLocationInput && ! $hasExistingLocation) {
                 DB::rollBack();
+
                 return response()->json([
                     'success' => false,
-                    'message' => 'Lokasi penyimpanan harus diisi untuk pallet baru.'
+                    'message' => 'Lokasi penyimpanan harus diisi untuk pallet baru.',
                 ], 422);
             }
 
@@ -882,17 +862,17 @@ class StockInputController extends Controller
             $attachedBoxIds = $this->attachScannedBoxes($pallet, $scannedBoxes);
 
             // Update created_at untuk box dan pallet jika user input tanggal
-            if (!empty($validated['input_date'])) {
+            if (! empty($validated['input_date'])) {
                 $inputDate = \Carbon\Carbon::createFromFormat('Y-m-d', $validated['input_date'])->startOfDay();
-                
+
                 // Update created_at untuk semua boxes yang baru di-attach
-                if (!empty($attachedBoxIds)) {
+                if (! empty($attachedBoxIds)) {
                     Box::whereIn('id', $attachedBoxIds)->update([
                         'created_at' => $inputDate,
                         'updated_at' => now(),
                     ]);
                 }
-                
+
                 // Update created_at untuk pallet
                 $pallet->update([
                     'created_at' => $inputDate,
@@ -907,7 +887,7 @@ class StockInputController extends Controller
             $locationCode = $pallet->stockLocation?->warehouse_location;
             if ($hasLocationInput) {
                 $locationCode = $this->resolveLocationCode($request, $pallet);
-                if (!$hasExistingLocation) {
+                if (! $hasExistingLocation) {
                     $this->createStockLocationRecord($pallet, $locationCode);
                 }
             }
@@ -935,8 +915,9 @@ class StockInputController extends Controller
         } catch (\Exception $e) {
             DB::rollBack(); // Rollback transaction on error
             // Log the error for debugging
-             \Illuminate\Support\Facades\Log::error('Stock Input Error: ' . $e->getMessage());
-            return response()->json(['message' => 'Terjadi kesalahan saat menyimpan data: ' . $e->getMessage()], 500);
+            \Illuminate\Support\Facades\Log::error('Stock Input Error: '.$e->getMessage());
+
+            return response()->json(['message' => 'Terjadi kesalahan saat menyimpan data: '.$e->getMessage()], 500);
         }
     }
 }

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Box;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
-use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
@@ -17,7 +16,6 @@ use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
 use App\Services\AuditService;
 use Barryvdh\DomPDF\Facade\Pdf;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -25,8 +23,10 @@ use Illuminate\Support\Str;
 
 class DeliveryPickController extends Controller
 {
-    private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
+    private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.';
+
     private const SESSION_RECALC_MESSAGE = 'Sesi picking ini perlu dihitung ulang karena ada order dengan prioritas tanggal lebih awal.';
+
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
 
     private function authorizePickSessionView(DeliveryPickSession $session): void
@@ -103,7 +103,7 @@ class DeliveryPickController extends Controller
                 $masterLocation->autoVacateIfEmpty();
             }
 
-            if (!$linkedPallet->activeBoxes()->exists() && $linkedPallet->stockLocation) {
+            if (! $linkedPallet->activeBoxes()->exists() && $linkedPallet->stockLocation) {
                 $linkedPallet->stockLocation->delete();
             }
         }
@@ -152,7 +152,6 @@ class DeliveryPickController extends Controller
     private function hasPendingAdditionalNotFullRequestForOrder(int $orderId, bool $lockRows = false): bool
     {
         $query = NotFullBoxRequest::where('delivery_order_id', $orderId)
-            ->where('request_type', 'additional')
             ->where('status', 'pending');
 
         if ($lockRows) {
@@ -176,9 +175,11 @@ class DeliveryPickController extends Controller
         $rowsQuery = DB::table('boxes')
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->whereNull('boxes.assigned_delivery_order_id')
-            ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
+            ->when(! empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
             })
             ->orderBy('boxes.created_at', 'asc')
@@ -202,7 +203,9 @@ class DeliveryPickController extends Controller
         $rowsQuery = DB::table('boxes')
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->orderBy('boxes.created_at', 'asc')
             ->select('boxes.assigned_delivery_order_id', 'boxes.part_number', 'boxes.pcs_quantity', 'boxes.is_not_full');
@@ -225,12 +228,12 @@ class DeliveryPickController extends Controller
     public function verificationIndex()
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
         $orders = DeliveryOrder::with('items')
-              ->whereIn('status', ['approved', 'processing', 'partial'])
+            ->whereIn('status', ['approved', 'processing', 'partial'])
             ->orderBy('delivery_date', 'asc')
             ->limit(100)
             ->get();
@@ -290,31 +293,34 @@ class DeliveryPickController extends Controller
 
                     $fullMissing = max(0, $fullBoxNeeded - $fullAvailable);
                     $poolIndex = 0;
-                    while (($fullMissing > 0 || ($needsNotFull && !$hasNotFull)) && isset($pool[$poolIndex])) {
+                    while (($fullMissing > 0 || ($needsNotFull && ! $hasNotFull)) && isset($pool[$poolIndex])) {
                         $entry = $pool[$poolIndex];
                         $entryQty = (int) ($entry['qty'] ?? 0);
                         $entryIsNotFull = (bool) ($entry['is_not_full'] ?? false) || $entryQty < $qtyPerBox;
 
-                        if ($fullMissing > 0 && !$entryIsNotFull && $entryQty === $qtyPerBox) {
+                        if ($fullMissing > 0 && ! $entryIsNotFull && $entryQty === $qtyPerBox) {
                             $fullMissing--;
                             array_splice($pool, $poolIndex, 1);
+
                             continue;
                         }
 
-                        if ($needsNotFull && !$hasNotFull && $entryIsNotFull) {
+                        if ($needsNotFull && ! $hasNotFull && $entryIsNotFull) {
                             $hasNotFull = true;
                             array_splice($pool, $poolIndex, 1);
+
                             continue;
                         }
 
                         $poolIndex++;
                     }
 
-                    if ($fullMissing > 0 || ($needsNotFull && !$hasNotFull)) {
+                    if ($fullMissing > 0 || ($needsNotFull && ! $hasNotFull)) {
                         $isReadyToPick = false;
                     }
 
                     $fifoPools[$partNumber] = $pool;
+
                     continue;
                 }
 
@@ -358,8 +364,8 @@ class DeliveryPickController extends Controller
 
             if ($hasPendingAdditionalApproval) {
                 $order->is_ready_to_pick = false;
-                $order->readiness_reason = 'Pending approval not full tambahan';
-            } elseif ($hasGlobalLock && !$isOwner) {
+                $order->readiness_reason = 'Pending approval box not full';
+            } elseif ($hasGlobalLock && ! $isOwner) {
                 $order->is_ready_to_pick = false;
                 $order->readiness_reason = null;
             } else {
@@ -413,11 +419,11 @@ class DeliveryPickController extends Controller
             $totalPcs = (int) $selectedReservedBoxes->sum('pcs_quantity') + (int) $boxes->sum('pcs_quantity');
 
             if ($totalPcs <= 0) {
-                throw new \RuntimeException('Stok box tidak cukup untuk part ' . $item->part_number);
+                throw new \RuntimeException('Stok box tidak cukup untuk part '.$item->part_number);
             }
 
             if ($totalPcs !== $remainingQty) {
-                throw new \RuntimeException('Stok box tidak cukup untuk part ' . $item->part_number);
+                throw new \RuntimeException('Stok box tidak cukup untuk part '.$item->part_number);
             }
 
             foreach ($boxes as $box) {
@@ -449,7 +455,7 @@ class DeliveryPickController extends Controller
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            if (!in_array((string) $lockedOrder->status, ['approved', 'processing', 'partial'], true)) {
+            if (! in_array((string) $lockedOrder->status, ['approved', 'processing', 'partial'], true)) {
                 throw new \RuntimeException('Delivery ini tidak dapat memulai picking pada status saat ini.');
             }
 
@@ -467,20 +473,20 @@ class DeliveryPickController extends Controller
                 $isOwner = (int) $activeSession->created_by === $userId;
 
                 if ($activeOrderId === (int) $lockedOrder->id) {
-                    if (!$isOwner) {
+                    if (! $isOwner) {
                         $ownerName = trim((string) optional($activeSession->creator)->name);
-                        throw new \RuntimeException('Order ini sedang diproses oleh ' . ($ownerName !== '' ? $ownerName : 'operator lain') . '.');
+                        throw new \RuntimeException('Order ini sedang diproses oleh '.($ownerName !== '' ? $ownerName : 'operator lain').'.');
                     }
 
                     return $activeSession;
                 }
 
                 if ($isOwner) {
-                    throw new \RuntimeException('Anda masih memiliki proses delivery aktif di order #' . $activeOrderId . '. Lanjutkan atau batalkan dulu.');
+                    throw new \RuntimeException('Anda masih memiliki proses delivery aktif di order #'.$activeOrderId.'. Lanjutkan atau batalkan dulu.');
                 }
 
                 $ownerName = trim((string) optional($activeSession->creator)->name);
-                throw new \RuntimeException('Delivery sedang diproses oleh ' . ($ownerName !== '' ? $ownerName : 'operator lain') . '.');
+                throw new \RuntimeException('Delivery sedang diproses oleh '.($ownerName !== '' ? $ownerName : 'operator lain').'.');
             }
 
             $pendingSessions = DeliveryPickSession::where('delivery_order_id', (int) $lockedOrder->id)
@@ -526,7 +532,7 @@ class DeliveryPickController extends Controller
 
             $this->createSessionItems($lockedOrder, $session);
 
-            if (!$session->items()->exists()) {
+            if (! $session->items()->exists()) {
                 throw new \RuntimeException('Stok tidak cukup atau tidak ada rekomendasi FIFO yang tersedia.');
             }
 
@@ -537,7 +543,7 @@ class DeliveryPickController extends Controller
     public function startPick($orderId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -553,6 +559,7 @@ class DeliveryPickController extends Controller
             $statusCode = $message === self::DELIVERY_APPROVAL_PENDING_MESSAGE || str_contains($message, 'diproses') || str_contains($message, 'aktif')
                 ? 423
                 : 422;
+
             return response()->json(['message' => $e->getMessage()], $statusCode);
         }
 
@@ -567,7 +574,7 @@ class DeliveryPickController extends Controller
     public function startVerification($orderId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -583,6 +590,7 @@ class DeliveryPickController extends Controller
             $statusCode = $message === self::DELIVERY_APPROVAL_PENDING_MESSAGE || str_contains($message, 'diproses') || str_contains($message, 'aktif')
                 ? 423
                 : 422;
+
             return response()->json(['message' => $e->getMessage()], $statusCode);
         }
 
@@ -597,7 +605,7 @@ class DeliveryPickController extends Controller
     public function showScan($orderId, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
@@ -620,7 +628,7 @@ class DeliveryPickController extends Controller
     public function showVerificationScan($orderId, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
@@ -650,7 +658,7 @@ class DeliveryPickController extends Controller
     public function cancel($sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -661,7 +669,7 @@ class DeliveryPickController extends Controller
                 return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
             }
 
-            if (!in_array((string) $session->status, self::ACTIVE_LOCK_STATUSES, true)) {
+            if (! in_array((string) $session->status, self::ACTIVE_LOCK_STATUSES, true)) {
                 return ['success' => false, 'message' => 'Sesi tidak dapat dibatalkan.', 'status' => 409];
             }
 
@@ -677,11 +685,11 @@ class DeliveryPickController extends Controller
             DeliveryIssue::where('pick_session_id', (int) $session->id)->where('status', 'pending')->delete();
 
             $notes = trim((string) $session->approval_notes);
-            $cancelNote = 'Sesi dibatalkan oleh ' . ($user->name ?? ('user #' . $user->id)) . '.';
+            $cancelNote = 'Sesi dibatalkan oleh '.($user->name ?? ('user #'.$user->id)).'.';
 
             $session->status = 'cancelled';
             $session->verification_box_ids = null;
-            $session->approval_notes = $notes !== '' ? ($notes . ' | ' . $cancelNote) : $cancelNote;
+            $session->approval_notes = $notes !== '' ? ($notes.' | '.$cancelNote) : $cancelNote;
             $session->save();
 
             return ['success' => true, 'message' => 'Proses scan dibatalkan dan lock box telah dilepas.', 'status' => 200];
@@ -696,7 +704,7 @@ class DeliveryPickController extends Controller
     public function scanBox(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -704,7 +712,7 @@ class DeliveryPickController extends Controller
         if ($session && $this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id)) {
             return response()->json([
                 'success' => false,
-                'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE
+                'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE,
             ], 423);
         }
 
@@ -765,7 +773,7 @@ class DeliveryPickController extends Controller
                     ->first()
                 : null;
 
-            if (!$pickItem) {
+            if (! $pickItem) {
                 DeliveryIssue::create([
                     'pick_session_id' => $session->id,
                     'box_id' => $box?->id,
@@ -816,7 +824,7 @@ class DeliveryPickController extends Controller
     public function verifyScanBox(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -824,7 +832,7 @@ class DeliveryPickController extends Controller
         if ($session && $this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id)) {
             return response()->json([
                 'success' => false,
-                'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE
+                'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE,
             ], 423);
         }
 
@@ -858,7 +866,7 @@ class DeliveryPickController extends Controller
             }
 
             $box = Box::where('box_number', $request->box_number)->lockForUpdate()->first();
-            if (!$box) {
+            if (! $box) {
                 return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
             }
 
@@ -870,7 +878,7 @@ class DeliveryPickController extends Controller
                 ->where('box_id', $box->id)
                 ->exists();
 
-            if (!$pickItemExists) {
+            if (! $pickItemExists) {
                 return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
             }
 
@@ -881,7 +889,7 @@ class DeliveryPickController extends Controller
                 ->values();
 
             $already = $verifiedBoxIds->contains((int) $box->id);
-            if (!$already) {
+            if (! $already) {
                 $verifiedBoxIds->push((int) $box->id);
                 $session->verification_box_ids = $verifiedBoxIds->unique()->values()->all();
                 $session->save();
@@ -910,7 +918,7 @@ class DeliveryPickController extends Controller
     public function approveIssue(Request $request, $issueId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
@@ -938,7 +946,7 @@ class DeliveryPickController extends Controller
     public function complete(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -1000,7 +1008,7 @@ class DeliveryPickController extends Controller
                     ->map(fn ($items) => (int) $items->sum('pcs_quantity'));
 
                 foreach ($pickedByPart as $partNumber => $pickedQty) {
-                    if (!$requiredByPart->has((string) $partNumber) || (int) $requiredByPart->get((string) $partNumber) === 0) {
+                    if (! $requiredByPart->has((string) $partNumber) || (int) $requiredByPart->get((string) $partNumber) === 0) {
                         return [
                             'success' => false,
                             'message' => 'Picklist mengandung part yang sudah tidak dibutuhkan. Hitung ulang sesi picking.',
@@ -1021,8 +1029,8 @@ class DeliveryPickController extends Controller
                         return [
                             'success' => false,
                             'message' => $pickedQty < $requiredQty
-                                ? 'Qty part ' . $orderItem->part_number . ' belum cukup untuk complete.'
-                                : 'Qty part ' . $orderItem->part_number . ' melebihi kebutuhan delivery. Hitung ulang sesi picking.',
+                                ? 'Qty part '.$orderItem->part_number.' belum cukup untuk complete.'
+                                : 'Qty part '.$orderItem->part_number.' melebihi kebutuhan delivery. Hitung ulang sesi picking.',
                             'status' => 422,
                         ];
                     }
@@ -1032,7 +1040,7 @@ class DeliveryPickController extends Controller
                 foreach ($sessionItems as $pickItem) {
                     $box = Box::whereKey($pickItem->box_id)->lockForUpdate()->first();
                     if (
-                        !$box
+                        ! $box
                         || $box->is_withdrawn
                         || in_array($box->expired_status, ['handled', 'expired'], true)
                         || (string) $box->part_number !== (string) $pickItem->part_number
@@ -1057,7 +1065,7 @@ class DeliveryPickController extends Controller
                     }
 
                     $pallet = $this->resolveStoredPalletForBox((int) $box->id, true);
-                    if (!$pallet) {
+                    if (! $pallet) {
                         return [
                             'success' => false,
                             'message' => 'Lokasi box pada sesi picking sudah tidak valid. Hitung ulang sesi picking.',
@@ -1099,7 +1107,7 @@ class DeliveryPickController extends Controller
                         ->where('box_id', $box->id)
                         ->first();
 
-                    if (!$existingWithdrawal) {
+                    if (! $existingWithdrawal) {
                         StockWithdrawal::create([
                             'withdrawal_batch_id' => $batchId,
                             'pick_session_id' => $session->id,
@@ -1148,6 +1156,7 @@ class DeliveryPickController extends Controller
             });
 
             $statusCode = (int) ($result['status'] ?? 200);
+
             return response()->json([
                 'success' => (bool) ($result['success'] ?? false),
                 'message' => $result['message'] ?? null,
@@ -1160,7 +1169,7 @@ class DeliveryPickController extends Controller
     public function redo(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
@@ -1173,6 +1182,7 @@ class DeliveryPickController extends Controller
         $requestedRelocations = collect((array) $request->input('relocation_locations', []))
             ->mapWithKeys(function ($locationCode, $palletId) {
                 $code = strtoupper(trim((string) $locationCode));
+
                 return [(int) $palletId => $code];
             })
             ->filter(fn ($code) => $code !== '')
@@ -1195,8 +1205,8 @@ class DeliveryPickController extends Controller
             $boxIds = $session->items()->pluck('box_id')->toArray();
             $notFullBoxCount = 0;
             $notFullRequestsCount = 0;
-            
-            if (!empty($boxIds)) {
+
+            if (! empty($boxIds)) {
                 $redoContext = $this->buildRedoContext($session, $boxIds);
                 $withdrawals = $redoContext['withdrawals'];
 
@@ -1210,6 +1220,7 @@ class DeliveryPickController extends Controller
                 if ($singleRelocationCode !== '' && empty($requestedRelocations)) {
                     if (count($targetPalletIds) !== 1) {
                         DB::rollBack();
+
                         return redirect()->back()->with('error', 'Redo melibatkan lebih dari satu pallet. Gunakan relokasi per pallet.');
                     }
 
@@ -1217,8 +1228,9 @@ class DeliveryPickController extends Controller
                 }
 
                 $locationCheck = $this->resolveRedoLocationAssignments($targetPalletIds, $requestedRelocations, $redoContext);
-                if (!($locationCheck['success'] ?? false)) {
+                if (! ($locationCheck['success'] ?? false)) {
                     DB::rollBack();
+
                     return redirect()->back()->with('error', (string) ($locationCheck['message'] ?? 'Redo gagal karena konflik lokasi.'));
                 }
 
@@ -1245,7 +1257,7 @@ class DeliveryPickController extends Controller
                         [],
                         [
                             'restored_not_full_boxes' => $notFullBoxCount,
-                            'cancelled_requests' => $notFullRequestsCount
+                            'cancelled_requests' => $notFullRequestsCount,
                         ],
                         "Redo delivery: {$notFullBoxCount} box not_full dikembalikan ke stok, {$notFullRequestsCount} request dibatalkan"
                     );
@@ -1263,28 +1275,29 @@ class DeliveryPickController extends Controller
             $session->save();
 
             // Log delivery redo
-            AuditService::logDeliveryRedo($session->id, "Pengambilan delivery di-redo oleh " . (Auth::user()?->name ?? 'system'));
+            AuditService::logDeliveryRedo($session->id, 'Pengambilan delivery di-redo oleh '.(Auth::user()?->name ?? 'system'));
 
             $order = $session->order;
             $order->status = 'processing';
             $order->save();
 
             DB::commit();
-            
+
             // Build detailed success message
             $successMessage = $this->buildRedoSuccessMessage($notFullBoxCount, $notFullRequestsCount);
-            
+
             return redirect()->back()->with('success', $successMessage);
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Redo gagal: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Redo gagal: '.$e->getMessage());
         }
     }
 
     public function redoOptions(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 
@@ -1322,7 +1335,7 @@ class DeliveryPickController extends Controller
         $targets = [];
         foreach ($targetPalletIds as $palletId) {
             $pallet = $pallets->get((int) $palletId);
-            if (!$pallet) {
+            if (! $pallet) {
                 continue;
             }
 
@@ -1334,6 +1347,7 @@ class DeliveryPickController extends Controller
                     'default_location' => null,
                     'conflict' => null,
                 ];
+
                 continue;
             }
 
@@ -1362,7 +1376,7 @@ class DeliveryPickController extends Controller
         $availableLocations = MasterLocation::query()
             ->where('is_occupied', false)
             ->when($locationSearch !== '', function ($q) use ($locationSearch) {
-                $q->where('code', 'like', '%' . strtoupper($locationSearch) . '%');
+                $q->where('code', 'like', '%'.strtoupper($locationSearch).'%');
             })
             ->orderBy('code')
             ->limit(20)
@@ -1382,7 +1396,7 @@ class DeliveryPickController extends Controller
         $palletIds = [];
 
         foreach ($allSessionBoxes as $box) {
-            if (!$box instanceof Box) {
+            if (! $box instanceof Box) {
                 continue;
             }
 
@@ -1422,7 +1436,7 @@ class DeliveryPickController extends Controller
             ->keys()
             ->all();
 
-        if (!empty($duplicateRequestedCodes)) {
+        if (! empty($duplicateRequestedCodes)) {
             return [
                 'success' => false,
                 'message' => 'Satu lokasi relokasi tidak boleh dipakai untuk lebih dari satu pallet pada redo yang sama.',
@@ -1433,13 +1447,13 @@ class DeliveryPickController extends Controller
 
         foreach ($targetPalletIds as $palletId) {
             $pallet = $pallets->get((int) $palletId);
-            if (!$pallet) {
+            if (! $pallet) {
                 continue;
             }
 
             $requestedCode = $requestedRelocations[(int) $palletId] ?? null;
             $targetCode = $requestedCode ?: ($pallet->stockLocation?->warehouse_location ?: $this->getHistoricalLocationForPallet((int) $palletId, $redoContext));
-            if (!$targetCode || strtoupper($targetCode) === 'UNKNOWN') {
+            if (! $targetCode || strtoupper($targetCode) === 'UNKNOWN') {
                 continue;
             }
 
@@ -1449,7 +1463,7 @@ class DeliveryPickController extends Controller
                 ->lockForUpdate()
                 ->first();
 
-            if (!$masterLocation) {
+            if (! $masterLocation) {
                 if ($requestedCode) {
                     return [
                         'success' => false,
@@ -1465,9 +1479,9 @@ class DeliveryPickController extends Controller
 
             if ($conflictState['conflict']) {
                 $occupyingLabel = $conflictState['occupying_pallet_number']
-                    ?? ('ID ' . (int) ($conflictState['occupying_pallet_id'] ?? 0));
+                    ?? ('ID '.(int) ($conflictState['occupying_pallet_id'] ?? 0));
 
-                if (!$requestedCode) {
+                if (! $requestedCode) {
                     return [
                         'success' => false,
                         'message' => "Redo diblokir: lokasi {$targetCode} sedang dipakai pallet {$occupyingLabel}. Pindahkan pallet aktif atau kirim relokasi lokasi baru.",
@@ -1507,6 +1521,7 @@ class DeliveryPickController extends Controller
                 return $w->warehouse_location;
             }
         }
+
         return null;
     }
 
@@ -1514,7 +1529,7 @@ class DeliveryPickController extends Controller
     {
         $occupyingPalletId = (int) ($masterLocation->current_pallet_id ?? 0);
 
-        if (!$masterLocation->is_occupied || $occupyingPalletId <= 0 || $occupyingPalletId === $targetPalletId) {
+        if (! $masterLocation->is_occupied || $occupyingPalletId <= 0 || $occupyingPalletId === $targetPalletId) {
             return [
                 'conflict' => false,
                 'occupying_pallet_id' => null,
@@ -1523,7 +1538,7 @@ class DeliveryPickController extends Controller
         }
 
         $occupyingPallet = Pallet::with('stockLocation')->find($occupyingPalletId);
-        if (!$occupyingPallet) {
+        if (! $occupyingPallet) {
             if ($cleanupStale) {
                 $masterLocation->update([
                     'is_occupied' => false,
@@ -1545,7 +1560,7 @@ class DeliveryPickController extends Controller
         $hasInventory = $this->palletHasActiveInventory($occupyingPallet);
         $occupyingInAnotherLocation = $occupyingLocationCode !== '' && $occupyingLocationCode !== $locationCode;
 
-        if (!$hasInventory || $occupyingInAnotherLocation) {
+        if (! $hasInventory || $occupyingInAnotherLocation) {
             if ($cleanupStale) {
                 $masterLocation->update([
                     'is_occupied' => false,
@@ -1564,7 +1579,7 @@ class DeliveryPickController extends Controller
         return [
             'conflict' => true,
             'occupying_pallet_id' => (int) $occupyingPallet->id,
-            'occupying_pallet_number' => (string) ($occupyingPallet->pallet_number ?? ('ID ' . $occupyingPallet->id)),
+            'occupying_pallet_number' => (string) ($occupyingPallet->pallet_number ?? ('ID '.$occupyingPallet->id)),
         ];
     }
 
@@ -1573,7 +1588,9 @@ class DeliveryPickController extends Controller
         $hasActiveBoxes = $pallet->boxes()
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->exists();
 
         if ($hasActiveBoxes) {
@@ -1689,7 +1706,7 @@ class DeliveryPickController extends Controller
         $affectedPalletIds = [];
 
         foreach ($allSessionBoxes as $box) {
-            if (!$box instanceof Box) {
+            if (! $box instanceof Box) {
                 continue;
             }
 
@@ -1731,7 +1748,7 @@ class DeliveryPickController extends Controller
     private function reverseWithdrawalsAndRestorePalletItems($withdrawals, $palletItemsById): void
     {
         foreach ($withdrawals as $withdrawal) {
-            if (!$withdrawal instanceof StockWithdrawal) {
+            if (! $withdrawal instanceof StockWithdrawal) {
                 continue;
             }
 
@@ -1764,7 +1781,7 @@ class DeliveryPickController extends Controller
     {
         foreach (array_values(array_unique(array_filter($palletIds))) as $palletId) {
             $pallet = Pallet::withTrashed()->whereKey((int) $palletId)->lockForUpdate()->first();
-            if (!$pallet || $pallet->trashed()) {
+            if (! $pallet || $pallet->trashed()) {
                 continue;
             }
 
@@ -1823,7 +1840,7 @@ class DeliveryPickController extends Controller
             return 'Redo hanya dapat dilakukan satu kali pada sesi delivery yang sudah completed.';
         }
 
-        if (!$session->redo_until || now()->greaterThan($session->redo_until)) {
+        if (! $session->redo_until || now()->greaterThan($session->redo_until)) {
             return 'Redo sudah kadaluarsa.';
         }
 
@@ -1835,7 +1852,7 @@ class DeliveryPickController extends Controller
         $notFullBoxCount = 0;
 
         foreach ($allSessionBoxes as $box) {
-            if (!$box instanceof Box) {
+            if (! $box instanceof Box) {
                 continue;
             }
 
@@ -1899,52 +1916,53 @@ class DeliveryPickController extends Controller
     {
         // Eager load with proper joins to get location
         $session = DeliveryPickSession::with([
-            'items' => function($q) {
+            'items' => function ($q) {
                 $q->with([
-                    'box' => function($q) {
+                    'box' => function ($q) {
                         $q->with([
-                            'pallets' => function($q) {
+                            'pallets' => function ($q) {
                                 $q->with([
-                                    'stockLocation' => function($q) {
+                                    'stockLocation' => function ($q) {
                                         $q->with('masterLocation');
                                     },
-                                    'currentLocation'
+                                    'currentLocation',
                                 ]);
-                            }
+                            },
                         ]);
-                    }
+                    },
                 ]);
-            }
+            },
         ])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
 
         $this->authorizePickSessionView($session);
-        
+
         $order = DeliveryOrder::with('items')->findOrFail($orderId);
 
         $pdf = Pdf::loadView('operator.delivery.picklist_pdf', compact('order', 'session'));
-        return $pdf->stream('picklist-order-' . $order->id . '.pdf');
+
+        return $pdf->stream('picklist-order-'.$order->id.'.pdf');
     }
 
     public function printPreview($orderId, $sessionId)
     {
         $session = DeliveryPickSession::with([
             'creator',
-            'items' => function($q) {
+            'items' => function ($q) {
                 $q->with([
-                    'box' => function($q) {
+                    'box' => function ($q) {
                         $q->with([
-                            'pallets' => function($q) {
+                            'pallets' => function ($q) {
                                 $q->with([
-                                    'stockLocation' => function($q) {
+                                    'stockLocation' => function ($q) {
                                         $q->with('masterLocation');
                                     },
-                                    'currentLocation'
+                                    'currentLocation',
                                 ]);
-                            }
+                            },
                         ]);
-                    }
+                    },
                 ]);
-            }
+            },
         ])->where('delivery_order_id', $orderId)->findOrFail($sessionId);
 
         $this->authorizePickSessionView($session);
@@ -1957,7 +1975,7 @@ class DeliveryPickController extends Controller
     public function issues()
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
@@ -2013,7 +2031,7 @@ class DeliveryPickController extends Controller
             $result = DB::transaction(function () use ($sessionId, $user, $validated) {
                 $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
 
-                if (!in_array((string) $session->status, self::ACTIVE_LOCK_STATUSES, true)) {
+                if (! in_array((string) $session->status, self::ACTIVE_LOCK_STATUSES, true)) {
                     return ['success' => false, 'message' => 'Sesi tidak aktif atau sudah tidak terkunci.'];
                 }
 
@@ -2022,23 +2040,23 @@ class DeliveryPickController extends Controller
 
                 $notes = trim((string) $session->approval_notes);
                 $reason = trim((string) ($validated['reason'] ?? ''));
-                $terminateNote = 'Force terminate oleh ' . ($user->name ?? ('user #' . $user->id)) . ': ' . $reason;
+                $terminateNote = 'Force terminate oleh '.($user->name ?? ('user #'.$user->id)).': '.$reason;
 
                 $session->status = 'cancelled';
                 $session->verification_box_ids = null;
-                $session->approval_notes = $notes !== '' ? ($notes . ' | ' . $terminateNote) : $terminateNote;
+                $session->approval_notes = $notes !== '' ? ($notes.' | '.$terminateNote) : $terminateNote;
                 $session->save();
 
                 return [
                     'success' => true,
-                    'message' => 'Lock berhasil dilepas untuk order #' . (int) $session->delivery_order_id . '.',
+                    'message' => 'Lock berhasil dilepas untuk order #'.(int) $session->delivery_order_id.'.',
                 ];
             });
         } catch (\Throwable $e) {
-            return redirect()->route('delivery.pick.locks')->with('error', 'Gagal terminate lock: ' . $e->getMessage());
+            return redirect()->route('delivery.pick.locks')->with('error', 'Gagal terminate lock: '.$e->getMessage());
         }
 
-        if (!($result['success'] ?? false)) {
+        if (! ($result['success'] ?? false)) {
             return redirect()->route('delivery.pick.locks')->with('error', (string) ($result['message'] ?? 'Terminate lock gagal.'));
         }
 
@@ -2051,7 +2069,9 @@ class DeliveryPickController extends Controller
             ->with(['pallets.stockLocation'])
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->where('boxes.assigned_delivery_order_id', $orderId)
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
@@ -2076,7 +2096,9 @@ class DeliveryPickController extends Controller
         $query = Box::query()
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']);
+            })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')

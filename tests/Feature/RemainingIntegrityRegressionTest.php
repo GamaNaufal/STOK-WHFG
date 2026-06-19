@@ -114,6 +114,68 @@ class RemainingIntegrityRegressionTest extends TestCase
         $this->assertDatabaseMissing('stock_locations', ['pallet_id' => $pallet->id]);
     }
 
+    public function test_active_box_cannot_be_handled_through_expired_flow(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+        [, $box] = $this->createStoredBox(
+            $operator,
+            '94000007',
+            'P-ACTIVE-HANDLE-GUARD',
+            20,
+            'ACTIVE-HANDLE'
+        );
+
+        try {
+            app(ExpiredBoxService::class)->handleBox($box->id, $supervisi->id);
+            $this->fail('Box aktif seharusnya tidak dapat ditandai handled.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('warning atau expired', $e->getMessage());
+        }
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'expired_status' => 'active',
+            'handled_at' => null,
+        ]);
+    }
+
+    public function test_warning_box_assigned_to_delivery_cannot_be_handled(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $order = $this->createOrder($sales, 'P-WARNING-ASSIGNED', 20);
+        [, $box] = $this->createStoredBox(
+            $operator,
+            '94000008',
+            'P-WARNING-ASSIGNED',
+            20,
+            'WARNING-ASSIGNED'
+        );
+        $box->forceFill([
+            'created_at' => now()->subMonths(10),
+            'updated_at' => now()->subMonths(10),
+            'assigned_delivery_order_id' => $order->id,
+        ])->save();
+
+        $service = app(ExpiredBoxService::class);
+        $service->syncStatuses();
+
+        try {
+            $service->handleBox($box->id, $supervisi->id);
+            $this->fail('Box assigned seharusnya tidak dapat ditandai handled.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('di-assign ke delivery', $e->getMessage());
+        }
+
+        $this->assertDatabaseHas('boxes', [
+            'id' => $box->id,
+            'expired_status' => 'warning',
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+    }
+
     public function test_start_pick_reuses_pending_assignment_session_without_orphan_lock(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
@@ -434,7 +496,7 @@ class RemainingIntegrityRegressionTest extends TestCase
         int $pcs,
         string $location
     ): array {
-        $pallet = Pallet::create(['pallet_number' => 'PLT-' . $boxNumber]);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-'.$boxNumber]);
         StockLocation::create([
             'pallet_id' => $pallet->id,
             'warehouse_location' => $location,

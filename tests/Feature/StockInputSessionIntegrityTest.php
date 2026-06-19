@@ -293,4 +293,38 @@ class StockInputSessionIntegrityTest extends TestCase
             'current_pallet_id' => null,
         ]);
     }
+
+    public function test_new_pallet_store_rejects_free_text_location_without_master_location_id(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-SI-FREE-TEXT']);
+
+        $response = $this->actingAs($operator)
+            ->withSession([
+                'current_pallet_id' => $pallet->id,
+                'current_pallet_source' => 'new',
+                'scanned_boxes' => [
+                    [
+                        'box_number' => '97060100',
+                        'part_number' => 'P-SI-FREE-TEXT',
+                        'pcs_quantity' => 50,
+                        'qty_box' => 50,
+                        'is_not_full' => false,
+                        'delivery_order_id' => null,
+                    ],
+                ],
+            ])
+            ->postJson(route('stock-input.store'), [
+                'pallet_id' => $pallet->id,
+                'warehouse_location' => 'LOKASI-FIKTIF',
+            ]);
+
+        $response->assertStatus(422)->assertJson(['success' => false]);
+        $this->assertDatabaseMissing('stock_locations', [
+            'pallet_id' => $pallet->id,
+        ]);
+        $this->assertDatabaseMissing('boxes', [
+            'box_number' => '97060100',
+        ]);
+    }
 }

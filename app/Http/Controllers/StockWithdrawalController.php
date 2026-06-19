@@ -16,12 +16,12 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class StockWithdrawalController extends Controller
 {
-    private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.';
+    private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.';
+
     private const WAREHOUSE_ROLES = ['warehouse_operator', 'admin_warehouse', 'admin'];
 
     private function ensureWarehouseRole(): void
@@ -101,7 +101,7 @@ class StockWithdrawalController extends Controller
                 $masterLocation->autoVacateIfEmpty();
             }
 
-            if (!$linkedPallet->activeBoxes()->exists()) {
+            if (! $linkedPallet->activeBoxes()->exists()) {
                 if ($linkedPallet->stockLocation) {
                     $linkedPallet->stockLocation->delete();
                 }
@@ -141,7 +141,9 @@ class StockWithdrawalController extends Controller
         $fifoQuery = Box::query()
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
                     ->from('delivery_pick_items')
@@ -177,7 +179,6 @@ class StockWithdrawalController extends Controller
     private function hasPendingAdditionalNotFullRequestForOrder(int $orderId, bool $lockRows = false): bool
     {
         $query = NotFullBoxRequest::where('delivery_order_id', $orderId)
-            ->where('request_type', 'additional')
             ->where('status', 'pending');
 
         if ($lockRows) {
@@ -206,7 +207,7 @@ class StockWithdrawalController extends Controller
 
         foreach ($partNumbers as $partNumber) {
             $partSetting = $partSettings->get($partNumber);
-            if (!$partSetting || (string) $partSetting->part_number !== $partNumber) {
+            if (! $partSetting || (string) $partSetting->part_number !== $partNumber) {
                 return $partNumber;
             }
         }
@@ -242,8 +243,10 @@ class StockWithdrawalController extends Controller
         $boxPartsQuery = DB::table('boxes')
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
-            ->where('boxes.part_number', 'like', '%' . $query . '%')
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
+            ->where('boxes.part_number', 'like', '%'.$query.'%')
             ->select('boxes.part_number')
             ->distinct()
             ->limit(20);
@@ -253,10 +256,10 @@ class StockWithdrawalController extends Controller
 
         $legacyParts = PalletItem::select('part_number')
             ->distinct()
-            ->where('part_number', 'like', '%' . $query . '%')
+            ->where('part_number', 'like', '%'.$query.'%')
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation')
-                  ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
+                    ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
             })
             ->limit(20)
             ->pluck('part_number');
@@ -300,7 +303,7 @@ class StockWithdrawalController extends Controller
         $requestedQty = (int) $request->input('pcs_quantity');
         $orderId = $request->input('delivery_order_id');
 
-        if (!$this->findExactPartSetting($partNumber)) {
+        if (! $this->findExactPartSetting($partNumber)) {
             return response()->json([
                 'success' => false,
                 'message' => 'No Part tidak ditemukan di Master Part.',
@@ -337,7 +340,7 @@ class StockWithdrawalController extends Controller
         $remainingQty = max(0, $requestedQty - $reservedTotal);
         $plannedQty = $reservedTotal;
 
-        if (!$orderId) {
+        if (! $orderId) {
             // Get total available stock (exclude reserved boxes)
             $totalStock = $this->getTotalStockForPart($partNumber, true);
 
@@ -422,7 +425,7 @@ class StockWithdrawalController extends Controller
         $requestedQty = (int) $request->input('pcs_quantity');
         $notes = $request->input('notes');
 
-        if (!$this->findExactPartSetting($partNumber)) {
+        if (! $this->findExactPartSetting($partNumber)) {
             return response()->json([
                 'success' => false,
                 'message' => 'No Part tidak ditemukan di Master Part.',
@@ -470,7 +473,7 @@ class StockWithdrawalController extends Controller
                     throw new \RuntimeException(self::DELIVERY_APPROVAL_PENDING_MESSAGE);
                 }
 
-                if ($deliveryOrderId > 0 && !$deliveryItem) {
+                if ($deliveryOrderId > 0 && ! $deliveryItem) {
                     throw new \RuntimeException('Item delivery wajib dipilih untuk withdrawal delivery.');
                 }
 
@@ -487,7 +490,7 @@ class StockWithdrawalController extends Controller
                 foreach ($selectedBoxes as $selectedBox) {
                     $box = Box::whereKey($selectedBox->id)->lockForUpdate()->first();
                     if (
-                        !$box
+                        ! $box
                         || $box->is_withdrawn
                         || in_array($box->expired_status, ['handled', 'expired'], true)
                     ) {
@@ -495,7 +498,7 @@ class StockWithdrawalController extends Controller
                     }
 
                     $pallet = $this->resolveStoredPalletForBox((int) $box->id, true);
-                    if (!$pallet) {
+                    if (! $pallet) {
                         throw new \RuntimeException('Lokasi box tidak lagi tersedia. Silakan hitung ulang FIFO.');
                     }
 
@@ -582,9 +585,10 @@ class StockWithdrawalController extends Controller
             $statusCode = str_contains($message, self::DELIVERY_APPROVAL_PENDING_MESSAGE)
                 ? 423
                 : ($e instanceof \RuntimeException ? 422 : 500);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $message,
+                'message' => 'Terjadi kesalahan: '.$message,
             ], $statusCode);
         }
     }
@@ -627,7 +631,7 @@ class StockWithdrawalController extends Controller
                     foreach ($selectedBoxes as $selectedBox) {
                         $box = Box::whereKey($selectedBox->id)->lockForUpdate()->first();
                         if (
-                            !$box
+                            ! $box
                             || $box->is_withdrawn
                             || in_array($box->expired_status, ['handled', 'expired'], true)
                         ) {
@@ -635,7 +639,7 @@ class StockWithdrawalController extends Controller
                         }
 
                         $pallet = $this->resolveStoredPalletForBox((int) $box->id, true);
-                        if (!$pallet) {
+                        if (! $pallet) {
                             throw new \RuntimeException('Lokasi box tidak lagi tersedia. Silakan hitung ulang FIFO.');
                         }
 
@@ -669,7 +673,7 @@ class StockWithdrawalController extends Controller
 
             return response()->json([
                 'success' => true,
-                'message' => 'Pengambilan stok dari ' . count($items) . ' part berhasil diproses',
+                'message' => 'Pengambilan stok dari '.count($items).' part berhasil diproses',
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -801,7 +805,7 @@ class StockWithdrawalController extends Controller
                         ->keyBy('id');
 
                 foreach ($batchWithdrawals as $batchWithdrawal) {
-                    if (!$batchWithdrawal instanceof StockWithdrawal) {
+                    if (! $batchWithdrawal instanceof StockWithdrawal) {
                         continue;
                     }
 
@@ -818,11 +822,11 @@ class StockWithdrawalController extends Controller
                     $box = null;
                     if ($batchWithdrawal->box_id) {
                         $box = $boxesById->get((int) $batchWithdrawal->box_id);
-                        if (!$box) {
+                        if (! $box) {
                             throw new \RuntimeException('Box withdrawal tidak ditemukan dan tidak dapat dipulihkan.');
                         }
 
-                        if (!$restoredPalletId) {
+                        if (! $restoredPalletId) {
                             $restoredPalletId = (int) DB::table('pallet_boxes')
                                 ->where('box_id', $box->id)
                                 ->orderByDesc('id')
@@ -830,7 +834,7 @@ class StockWithdrawalController extends Controller
                         }
                     }
 
-                    if (!$restoredPalletId) {
+                    if (! $restoredPalletId) {
                         throw new \RuntimeException('Pallet asal withdrawal tidak ditemukan.');
                     }
 
@@ -838,7 +842,7 @@ class StockWithdrawalController extends Controller
                         ->whereKey($restoredPalletId)
                         ->lockForUpdate()
                         ->first();
-                    if (!$pallet) {
+                    if (! $pallet) {
                         throw new \RuntimeException('Pallet asal withdrawal sudah tidak tersedia.');
                     }
 
@@ -852,7 +856,7 @@ class StockWithdrawalController extends Controller
                         $box->save();
                     }
 
-                    if (!$palletItem) {
+                    if (! $palletItem) {
                         $palletItem = PalletItem::firstOrCreate(
                             [
                                 'pallet_id' => $restoredPalletId,
@@ -870,12 +874,12 @@ class StockWithdrawalController extends Controller
                     $palletItem->box_quantity = (int) $palletItem->box_quantity + (int) $batchWithdrawal->box_quantity;
                     $palletItem->save();
 
-                    if (!empty($batchWithdrawal->warehouse_location) && $batchWithdrawal->warehouse_location !== 'Unknown') {
+                    if (! empty($batchWithdrawal->warehouse_location) && $batchWithdrawal->warehouse_location !== 'Unknown') {
                         $masterLocation = MasterLocation::where('code', $batchWithdrawal->warehouse_location)
                             ->lockForUpdate()
                             ->first();
 
-                        if (!$masterLocation) {
+                        if (! $masterLocation) {
                             throw new \RuntimeException('Master lokasi asal withdrawal tidak ditemukan.');
                         }
 
@@ -929,7 +933,7 @@ class StockWithdrawalController extends Controller
         } catch (\Throwable $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Terjadi kesalahan: ' . $e->getMessage(),
+                'message' => 'Terjadi kesalahan: '.$e->getMessage(),
             ], 500);
         }
     }
@@ -943,7 +947,9 @@ class StockWithdrawalController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
             });
@@ -955,7 +961,7 @@ class StockWithdrawalController extends Controller
             ->where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation')
-                  ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
+                    ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
             })
             ->sum('pcs_quantity');
 
@@ -975,7 +981,9 @@ class StockWithdrawalController extends Controller
         $boxTotalsQuery = DB::table('boxes')
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->whereIn('boxes.part_number', $partNumbers)
             ->groupBy('boxes.part_number')
             ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'));
@@ -988,7 +996,7 @@ class StockWithdrawalController extends Controller
             ->where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation')
-                  ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
+                    ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
             })
             ->groupBy('part_number')
             ->pluck('total', 'part_number');
@@ -1022,7 +1030,9 @@ class StockWithdrawalController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
                     ->from('delivery_pick_items')
@@ -1083,7 +1093,7 @@ class StockWithdrawalController extends Controller
                 ->where('pcs_quantity', '>', 0)
                 ->whereHas('pallet', function ($q) {
                     $q->whereHas('stockLocation')
-                      ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
+                        ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
                 })
                 ->with(['pallet' => function ($q) {
                     $q->with('stockLocation');
@@ -1132,7 +1142,9 @@ class StockWithdrawalController extends Controller
             ->with(['pallets.stockLocation'])
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->where('boxes.assigned_delivery_order_id', $orderId)
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')

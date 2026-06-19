@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
 use App\Models\Box;
+use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
-use App\Models\DeliveryIssue;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
 use App\Models\NotFullBoxRequest;
@@ -14,6 +13,7 @@ use App\Models\PalletItem;
 use App\Models\PartSetting;
 use App\Models\StockWithdrawal;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
@@ -70,9 +70,11 @@ class DeliveryOrderController extends Controller
         $boxRowsQuery = DB::table('boxes')
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->whereNull('boxes.assigned_delivery_order_id')
-            ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
+            ->when(! empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
             })
             ->orderBy('boxes.created_at', 'asc')
@@ -84,7 +86,7 @@ class DeliveryOrderController extends Controller
         $legacyRows = PalletItem::where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation')
-                  ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
+                    ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
             })
             ->select('part_number', 'pcs_quantity', 'created_at')
             ->get();
@@ -122,6 +124,7 @@ class DeliveryOrderController extends Controller
 
         return $pools;
     }
+
     private function getAvailableStockByPart(): array
     {
         $lockedBoxIds = $this->getActivePickLockedBoxIds();
@@ -129,9 +132,11 @@ class DeliveryOrderController extends Controller
         $boxTotals = $this->applyStoredLocationExistsFilter(DB::table('boxes')
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->whereNull('boxes.assigned_delivery_order_id')
-            ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
+            ->when(! empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
             })
             ->select('boxes.part_number', DB::raw('SUM(boxes.pcs_quantity) as total'))
@@ -142,7 +147,7 @@ class DeliveryOrderController extends Controller
             ->where('pcs_quantity', '>', 0)
             ->whereHas('pallet', function ($q) {
                 $q->whereHas('stockLocation')
-                  ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
+                    ->whereDoesntHave('boxes', fn ($boxQuery) => $boxQuery->withTrashed());
             })
             ->groupBy('part_number')
             ->pluck('total', 'part_number');
@@ -165,7 +170,9 @@ class DeliveryOrderController extends Controller
             )
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) {
+                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+            })
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number');
 
@@ -201,7 +208,7 @@ class DeliveryOrderController extends Controller
 
         foreach ($partNumbers as $partNumber) {
             $partSetting = $partSettings->get($partNumber);
-            if (!$partSetting || (string) $partSetting->part_number !== $partNumber) {
+            if (! $partSetting || (string) $partSetting->part_number !== $partNumber) {
                 return $partNumber;
             }
         }
@@ -213,11 +220,14 @@ class DeliveryOrderController extends Controller
     public function index()
     {
         $user = Auth::user();
-        
-           // Strict Role Check: Admin & Warehouse Operator only
-                 if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse', 'ppc'], true)) {
-             if ($user->role === 'sales') return redirect()->route('delivery.create');
-             return redirect('/')->with('error', 'Unauthorized access to Schedule.');
+
+        // Strict Role Check: Admin & Warehouse Operator only
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse', 'ppc'], true)) {
+            if ($user->role === 'sales') {
+                return redirect()->route('delivery.create');
+            }
+
+            return redirect('/')->with('error', 'Unauthorized access to Schedule.');
         }
 
         $approvedOrders = DeliveryOrder::with(['items', 'salesUser'])
@@ -237,7 +247,6 @@ class DeliveryOrderController extends Controller
             ->first();
 
         $pendingAdditionalApprovalOrderIds = NotFullBoxRequest::query()
-            ->where('request_type', 'additional')
             ->where('status', 'pending')
             ->whereIn('delivery_order_id', $approvedOrders->pluck('id')->all())
             ->pluck('delivery_order_id')
@@ -274,7 +283,7 @@ class DeliveryOrderController extends Controller
         $approvedOrders->each(function ($order) use ($availableByPart, $reservedByOrder, $activeLockedByOrderPart, $partSettings, &$fifoPools, $pendingAdditionalApprovalByOrderId, $splitLockedByOrderId, $globalActiveSession, $currentUserId) {
             $allAvailable = true;
             $hasAnyFulfillable = false;
-            $hasPendingAdditionalApproval = !empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
+            $hasPendingAdditionalApproval = ! empty($pendingAdditionalApprovalByOrderId[(int) $order->id]);
 
             $today = now()->startOfDay();
             $deliveryDate = Carbon::parse($order->delivery_date)->startOfDay();
@@ -302,11 +311,11 @@ class DeliveryOrderController extends Controller
                         $remainder = $remainingNeeded % $fixedQty;
                         $availableFullBoxes = 0;
                         $hasNotFullBoxForRemainder = false;
-                        
+
                         foreach ($pool as $box) {
                             $qty = is_array($box) ? (int) $box['qty'] : (int) $box;
                             $isNotFull = is_array($box) ? (bool) $box['is_not_full'] : false;
-                            
+
                             if ($qty === $fixedQty) {
                                 $availableFullBoxes++;
                             } elseif ($remainder > 0 && ($isNotFull || $qty < $fixedQty)) {
@@ -314,9 +323,9 @@ class DeliveryOrderController extends Controller
                                 $hasNotFullBoxForRemainder = true;
                             }
                         }
-                        
+
                         // Only need not-full if there's remainder AND we have full boxes but NO not-full box
-                        $needsNotFull = $remainder > 0 && $availableFullBoxes >= $fullBoxesRequired && !$hasNotFullBoxForRemainder;
+                        $needsNotFull = $remainder > 0 && $availableFullBoxes >= $fullBoxesRequired && ! $hasNotFullBoxForRemainder;
                     }
                 }
 
@@ -325,7 +334,7 @@ class DeliveryOrderController extends Controller
                     $box = $pool[$poolIndex];
                     $nextBoxQty = is_array($box) ? (int) $box['qty'] : (int) $box;
                     $isNotFull = is_array($box) ? (bool) $box['is_not_full'] : false;
-                    
+
                     // Allow taking box if:
                     // 1. Box qty <= remaining (normal case)
                     // 2. Box is not_full (can be taken even if larger, to fulfill remainder)
@@ -360,17 +369,17 @@ class DeliveryOrderController extends Controller
                     $hasAnyFulfillable = true;
                 }
 
-                if (!$item->is_fulfillable) {
+                if (! $item->is_fulfillable) {
                     $allAvailable = false;
                 }
             });
 
             $order->has_pending_additional_approval = $hasPendingAdditionalApproval;
             $order->readiness_reason = $hasPendingAdditionalApproval
-                ? 'Pending approval not full tambahan'
+                ? 'Pending approval box not full'
                 : null;
-            $order->has_sufficient_stock = $allAvailable && !$hasPendingAdditionalApproval;
-            $order->has_partial_stock = $hasAnyFulfillable && !$allAvailable && !$hasPendingAdditionalApproval;
+            $order->has_sufficient_stock = $allAvailable && ! $hasPendingAdditionalApproval;
+            $order->has_partial_stock = $hasAnyFulfillable && ! $allAvailable && ! $hasPendingAdditionalApproval;
 
             $hasGlobalLock = $globalActiveSession !== null;
             $isActiveOrder = $hasGlobalLock && (int) $globalActiveSession->delivery_order_id === (int) $order->id;
@@ -382,26 +391,26 @@ class DeliveryOrderController extends Controller
             $order->active_pick_owner_name = $ownerName !== '' ? $ownerName : '-';
             $order->global_pick_lock_active = $hasGlobalLock;
             $order->global_pick_lock_order_id = $hasGlobalLock ? (int) $globalActiveSession->delivery_order_id : null;
-            $order->is_split_child = !empty($order->parent_delivery_order_id);
+            $order->is_split_child = ! empty($order->parent_delivery_order_id);
             $order->has_split_children = ((int) ($order->split_children_count ?? 0)) > 0;
-            $order->has_split_operation_lock = !empty($splitLockedByOrderId[(int) $order->id]);
-            $order->can_split_delivery = !$order->is_split_child
+            $order->has_split_operation_lock = ! empty($splitLockedByOrderId[(int) $order->id]);
+            $order->can_split_delivery = ! $order->is_split_child
                 && in_array($order->status, ['approved', 'partial'], true)
                 && empty($order->has_split_operation_lock)
                 && empty($order->has_pending_additional_approval)
                 && $order->items->contains(fn ($item) => (int) $item->quantity > 1);
             $order->split_disabled_reason = null;
 
-            if (!$order->can_split_delivery) {
+            if (! $order->can_split_delivery) {
                 if ($order->is_split_child) {
                     $order->split_disabled_reason = 'Order ini adalah hasil split dan tidak bisa di-split lagi.';
-                } elseif (!in_array($order->status, ['approved', 'partial'], true)) {
+                } elseif (! in_array($order->status, ['approved', 'partial'], true)) {
                     $order->split_disabled_reason = 'Split hanya tersedia untuk order berstatus approved atau partial.';
-                } elseif (!empty($order->has_split_operation_lock)) {
+                } elseif (! empty($order->has_split_operation_lock)) {
                     $order->split_disabled_reason = 'Order sudah memiliki assignment atau sesi picking dan tidak bisa di-split.';
-                } elseif (!empty($order->has_pending_additional_approval)) {
-                    $order->split_disabled_reason = 'Masih ada pending approval not full tambahan.';
-                } elseif (!$order->items->contains(fn ($item) => (int) $item->quantity > 1)) {
+                } elseif (! empty($order->has_pending_additional_approval)) {
+                    $order->split_disabled_reason = 'Masih ada pending approval box not full.';
+                } elseif (! $order->items->contains(fn ($item) => (int) $item->quantity > 1)) {
                     $order->split_disabled_reason = 'Tidak ada part dengan qty lebih dari 1 untuk di-split.';
                 } else {
                     $order->split_disabled_reason = 'Order ini belum memenuhi syarat split.';
@@ -426,10 +435,10 @@ class DeliveryOrderController extends Controller
         $historyOrders = DeliveryPickSession::with('order.items')
             ->where(function ($q) {
                 $q->where('completion_status', 'redone')
-                  ->orWhere(function ($q2) {
-                      $q2->where('completion_status', 'completed')
-                         ->where('redo_until', '<', now());
-                  });
+                    ->orWhere(function ($q2) {
+                        $q2->where('completion_status', 'completed')
+                            ->where('redo_until', '<', now());
+                    });
             })
             ->orderBy('completed_at', 'desc')
             ->limit(50)
@@ -468,7 +477,7 @@ class DeliveryOrderController extends Controller
     public function split(Request $request, $id)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['admin', 'admin_warehouse'], true)) {
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
 
@@ -482,11 +491,11 @@ class DeliveryOrderController extends Controller
             DB::transaction(function () use ($id, $validated) {
                 $order = DeliveryOrder::lockForUpdate()->findOrFail($id);
 
-                if (!empty($order->parent_delivery_order_id)) {
+                if (! empty($order->parent_delivery_order_id)) {
                     throw new \RuntimeException('Delivery hasil split tidak dapat di-split lagi.');
                 }
 
-                if (!in_array($order->status, ['approved', 'partial'], true)) {
+                if (! in_array($order->status, ['approved', 'partial'], true)) {
                     throw new \RuntimeException('Delivery hanya bisa di-split dari status approved atau partial.');
                 }
 
@@ -523,13 +532,13 @@ class DeliveryOrderController extends Controller
                     $splitQuantity = (int) ($entry['quantity'] ?? 0);
 
                     $sourceItem = $sourceItems->get($partNumber);
-                    if (!$sourceItem) {
+                    if (! $sourceItem) {
                         throw new \RuntimeException("Part {$partNumber} tidak ditemukan pada delivery ini.");
                     }
 
                     $currentQuantity = (int) $sourceItem->quantity;
                     if ($splitQuantity <= 0 || $splitQuantity >= $currentQuantity) {
-                        throw new \RuntimeException("Qty split untuk part {$partNumber} harus antara 1 dan " . ($currentQuantity - 1) . ".");
+                        throw new \RuntimeException("Qty split untuk part {$partNumber} harus antara 1 dan ".($currentQuantity - 1).'.');
                     }
 
                     $childItems[] = ['part_number' => $partNumber, 'quantity' => $splitQuantity, 'source_item' => $sourceItem];
@@ -578,7 +587,7 @@ class DeliveryOrderController extends Controller
     public function restoreSplit($id)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['admin', 'admin_warehouse'], true)) {
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
 
@@ -624,6 +633,7 @@ class DeliveryOrderController extends Controller
                     if ($parentItem) {
                         $parentItem->quantity = (int) $parentItem->quantity + (int) $childItem->quantity;
                         $parentItem->save();
+
                         continue;
                     }
 
@@ -659,7 +669,7 @@ class DeliveryOrderController extends Controller
     public function createOrder()
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['sales', 'admin', 'ppc'])) {
+        if (! in_array($user->role, ['sales', 'admin', 'ppc'])) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
         }
 
@@ -755,22 +765,22 @@ class DeliveryOrderController extends Controller
     public function fulfillData($id)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
         $order = DeliveryOrder::with('items')->findOrFail($id);
         $hasPendingAdditionalApproval = NotFullBoxRequest::query()
             ->where('delivery_order_id', (int) $order->id)
-            ->where('request_type', 'additional')
             ->where('status', 'pending')
             ->exists();
         $blockedReason = $hasPendingAdditionalApproval
-            ? 'Delivery diblokir: masih ada request box not full tambahan yang menunggu approval supervisi.'
+            ? 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.'
             : null;
 
         $items = $order->items->map(function ($item) {
             $remaining = max(0, $item->quantity - $item->fulfilled_quantity);
+
             return [
                 'id' => $item->id,
                 'part_number' => $item->part_number,
@@ -833,7 +843,7 @@ class DeliveryOrderController extends Controller
             'delivery_date' => 'required|date',
             'items' => 'required|array|min:1',
             'items.*.part_number' => 'required|string|distinct',
-            'items.*.quantity' => 'required|integer|min:1'
+            'items.*.quantity' => 'required|integer|min:1',
         ]);
 
         $invalidPart = $this->findInvalidMasterPartNumber($request->input('items', []));
@@ -877,7 +887,8 @@ class DeliveryOrderController extends Controller
             return redirect()->route('delivery.create')->with('success', 'Perbaikan berhasil dikirim ulang ke PPC.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Error update order: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Error update order: '.$e->getMessage());
         }
     }
 
@@ -909,13 +920,13 @@ class DeliveryOrderController extends Controller
             // Check if updating existing (resubmit correction) or new
             // Implementation note: User didn't ask for edit/resubmit UI yet, just status flow.
             // For now, assume this creates NEW. Editing requires ID.
-            
+
             $order = DeliveryOrder::create([
                 'sales_user_id' => Auth::id(),
                 'customer_name' => $request->customer_name,
                 'delivery_date' => $request->delivery_date,
                 'status' => 'pending',
-                'notes' => null
+                'notes' => null,
             ]);
 
             foreach ($request->items as $item) {
@@ -927,10 +938,12 @@ class DeliveryOrderController extends Controller
             }
 
             DB::commit();
+
             return redirect()->back()->with('success', 'Delivery Order submitted to PPC.');
         } catch (\Exception $e) {
             DB::rollBack();
-            return redirect()->back()->with('error', 'Error creating order: ' . $e->getMessage());
+
+            return redirect()->back()->with('error', 'Error creating order: '.$e->getMessage());
         }
     }
 
@@ -944,7 +957,7 @@ class DeliveryOrderController extends Controller
 
         $request->validate([
             'status' => 'required|in:approved,rejected,correction',
-            'notes' => 'nullable|string'
+            'notes' => 'nullable|string',
         ]);
 
         if ($request->status === 'approved' && trim((string) $request->notes) === '') {
@@ -973,8 +986,10 @@ class DeliveryOrderController extends Controller
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        $msg = 'Order status updated to ' . ucfirst($request->status);
-        if($request->status == 'correction') $msg .= '. Sent back to Sales.';
+        $msg = 'Order status updated to '.ucfirst($request->status);
+        if ($request->status == 'correction') {
+            $msg .= '. Sent back to Sales.';
+        }
 
         return redirect()->back()->with('success', $msg);
     }
@@ -1001,7 +1016,7 @@ class DeliveryOrderController extends Controller
                         return (string) $session->status === 'completed'
                             || in_array((string) $session->completion_status, ['completed', 'redone'], true);
                     })
-                    || (!empty($sessionIds) && StockWithdrawal::whereIn('pick_session_id', $sessionIds)->exists());
+                    || (! empty($sessionIds) && StockWithdrawal::whereIn('pick_session_id', $sessionIds)->exists());
 
                 if ($hasCompletedHistory) {
                     throw new \RuntimeException('Delivery yang sudah memiliki histori completion/withdrawal tidak dapat dihapus.');
@@ -1016,27 +1031,27 @@ class DeliveryOrderController extends Controller
 
                 if ($sessions->isNotEmpty()) {
 
-                DeliveryPickItem::whereIn('pick_session_id', $sessionIds)
-                    ->lockForUpdate()
-                    ->delete();
+                    DeliveryPickItem::whereIn('pick_session_id', $sessionIds)
+                        ->lockForUpdate()
+                        ->delete();
 
-                DeliveryIssue::whereIn('pick_session_id', $sessionIds)
-                    ->where('status', 'pending')
-                    ->delete();
+                    DeliveryIssue::whereIn('pick_session_id', $sessionIds)
+                        ->where('status', 'pending')
+                        ->delete();
 
-                foreach ($sessions as $session) {
-                    /** @var DeliveryPickSession $session */
-                    if (!in_array((string) $session->status, ['completed', 'cancelled'], true)) {
-                        $notes = trim((string) $session->approval_notes);
-                        $cancelNote = 'Sesi dibatalkan otomatis karena schedule dihapus oleh ' . ($user->name ?? ('user #' . $user->id)) . '.';
+                    foreach ($sessions as $session) {
+                        /** @var DeliveryPickSession $session */
+                        if (! in_array((string) $session->status, ['completed', 'cancelled'], true)) {
+                            $notes = trim((string) $session->approval_notes);
+                            $cancelNote = 'Sesi dibatalkan otomatis karena schedule dihapus oleh '.($user->name ?? ('user #'.$user->id)).'.';
 
-                        $session->status = 'cancelled';
-                        $session->verification_box_ids = null;
-                        $session->approval_notes = $notes !== '' ? ($notes . ' | ' . $cancelNote) : $cancelNote;
-                        $session->save();
+                            $session->status = 'cancelled';
+                            $session->verification_box_ids = null;
+                            $session->approval_notes = $notes !== '' ? ($notes.' | '.$cancelNote) : $cancelNote;
+                            $session->save();
+                        }
                     }
                 }
-            }
 
                 $order->status = 'deleted';
                 $order->save();
@@ -1052,7 +1067,7 @@ class DeliveryOrderController extends Controller
     public function approvalImpact($id)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['ppc', 'admin'], true)) {
+        if (! in_array($user->role, ['ppc', 'admin'], true)) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -1123,7 +1138,7 @@ class DeliveryOrderController extends Controller
             $before = $baseline[$approvedOrder->id] ?? ['fully' => false, 'short_parts' => []];
             $afterState = $after[$approvedOrder->id] ?? ['fully' => false, 'short_parts' => []];
 
-            if ($before['fully'] && !$afterState['fully']) {
+            if ($before['fully'] && ! $afterState['fully']) {
                 $impacted[] = [
                     'id' => $approvedOrder->id,
                     'delivery_date' => $approvedOrder->delivery_date?->format('d M Y') ?? null,
