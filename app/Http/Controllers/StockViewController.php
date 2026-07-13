@@ -665,6 +665,9 @@ class StockViewController extends Controller
             ->orderBy('part_number')
             ->pluck('part_number')
             ->values();
+        $masterPartCapacities = PartSetting::query()
+            ->pluck('qty_box', 'part_number')
+            ->all();
 
         return view('shared.stock-view.index', compact(
             'groupedByPart',
@@ -683,7 +686,9 @@ class StockViewController extends Controller
             'allLocations',
             'allSearchTerms',
             'directBoxTarget',
-            'masterPartNumbers', 'sortMode',
+            'masterPartNumbers',
+            'masterPartCapacities',
+            'sortMode',
             'sortOptions'
         ));
     }
@@ -889,21 +894,7 @@ class StockViewController extends Controller
                 throw new \RuntimeException('Qty PCS tidak boleh melebihi fixed qty Master Part.');
             }
 
-            $isApprovedNotFull = false;
-            if ($newPcsQuantity < $fixedQty) {
-                $isApprovedNotFull = NotFullBoxRequest::where('box_id', (int) $box->id)
-                    ->where('status', 'approved')
-                    ->where('part_number', $newPartNumber)
-                    ->where('pcs_quantity', $newPcsQuantity)
-                    ->lockForUpdate()
-                    ->exists();
-
-                if (! $isApprovedNotFull) {
-                    throw new \RuntimeException(
-                        'Perubahan ini akan membuat atau mengubah box not full. Ajukan Request Box Not Full dan tunggu approval Supervisi.'
-                    );
-                }
-            }
+            $isNotFull = $newPcsQuantity < $fixedQty;
 
             if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
                 throw new \RuntimeException('Box tidak bisa diedit karena statusnya tidak aktif.');
@@ -961,9 +952,11 @@ class StockViewController extends Controller
             $box->part_number = $newPartNumber;
             $box->pcs_quantity = $newPcsQuantity;
             $box->qty_box = $fixedQty;
-            $box->is_not_full = $isApprovedNotFull;
-            if (! $isApprovedNotFull) {
+            $box->is_not_full = $isNotFull;
+            if (! $isNotFull) {
                 $box->not_full_reason = null;
+            } else {
+                $box->not_full_reason = $box->not_full_reason ?? 'Diperbarui via Edit Box';
             }
             $box->qr_code = $box->box_number.'|'.$newPartNumber.'|'.$newPcsQuantity;
             $box->created_at = $newStoredAt;
@@ -1022,9 +1015,7 @@ class StockViewController extends Controller
 
         $logs = AuditLog::query()
             ->with('user')
-            ->where('type', 'other')
             ->where('model', 'Box')
-            ->where('action', 'box_updated_by_admin_warehouse')
             ->where('model_id', $box->id)
             ->orderBy('created_at', 'desc')
             ->limit(20)
@@ -1033,8 +1024,8 @@ class StockViewController extends Controller
                 'id' => $log->id,
                 'action' => $log->action,
                 'description' => $log->description,
-                'old_values' => $log->old_values ?? [],
-                'new_values' => $log->new_values ?? [],
+                'old_values' => $log->getOldValuesArray(),
+                'new_values' => $log->getNewValuesArray(),
                 'user_name' => $log->user?->name ?? 'System',
                 'created_at' => optional($log->created_at)->format('d M Y H:i:s'),
             ])

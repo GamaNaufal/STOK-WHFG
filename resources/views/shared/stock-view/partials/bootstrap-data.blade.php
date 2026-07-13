@@ -3,6 +3,7 @@
     'currentUserRole' => Auth::user()->role ?? null,
     'allParts' => $allParts,
     'masterParts' => $masterPartNumbers,
+    'masterPartCapacities' => $masterPartCapacities ?? [],
     'allPallets' => $allPallets,
     'allBoxNumbers' => $allBoxNumbers,
     'allLocations' => $allLocations,

@@ -236,7 +236,7 @@ class StockViewBoxEditAuditTest extends TestCase
         ]);
     }
 
-    public function test_box_edit_cannot_bypass_not_full_approval(): void
+    public function test_box_edit_can_bypass_not_full_approval(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
         $this->seedMasterParts(['P-NF-OLD', 'P-NF-NEW']);
@@ -274,30 +274,31 @@ class StockViewBoxEditAuditTest extends TestCase
             'reason' => 'Koreksi untuk rekomendasi',
         ]);
 
-        $response->assertStatus(422)->assertJson(['success' => false]);
-        $this->assertStringContainsString('approval Supervisi', (string) $response->json('message'));
+        $response->assertOk()->assertJson(['success' => true]);
 
         $this->assertDatabaseHas('boxes', [
             'id' => $box->id,
-            'part_number' => 'P-NF-OLD',
-            'pcs_quantity' => 100,
-            'is_not_full' => 0,
+            'part_number' => 'P-NF-NEW',
+            'pcs_quantity' => 80,
+            'is_not_full' => true,
         ]);
 
         $this->assertDatabaseHas('pallet_items', [
             'pallet_id' => $pallet->id,
             'part_number' => 'P-NF-OLD',
-            'box_quantity' => 1,
-            'pcs_quantity' => 100,
+            'box_quantity' => 0,
+            'pcs_quantity' => 0,
         ]);
 
-        $this->assertDatabaseMissing('pallet_items', [
+        $this->assertDatabaseHas('pallet_items', [
             'pallet_id' => $pallet->id,
             'part_number' => 'P-NF-NEW',
+            'box_quantity' => 1,
+            'pcs_quantity' => 80,
         ]);
     }
 
-    public function test_box_edit_cannot_reduce_stock_by_creating_unapproved_not_full_box(): void
+    public function test_box_edit_can_reduce_stock_without_unapproved_not_full_box_check(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
         $ppc = User::factory()->create(['role' => 'ppc']);
@@ -348,12 +349,11 @@ class StockViewBoxEditAuditTest extends TestCase
             'stored_at' => now()->subHours(4)->format('Y-m-d H:i:s'),
             'reason' => 'Penyesuaian sebelum pemenuhan',
         ]);
-        $update->assertStatus(422);
-        $this->assertStringContainsString('approval Supervisi', (string) $update->json('message'));
+        $update->assertOk();
 
         $after = $this->actingAs($ppc)->get(route('delivery.index'));
         $after->assertOk();
-        $after->assertSee('100 / 100', false);
+        $after->assertSee('60 / 100', false);
     }
 
     public function test_delete_box_soft_deletes_box_and_report_marks_deleted_not_shipped(): void

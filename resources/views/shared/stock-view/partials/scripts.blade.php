@@ -820,17 +820,23 @@
                 tableBody.innerHTML = historyRows.map((row) => {
                     const oldVal = row.old_values || {};
                     const newVal = row.new_values || {};
-                    const diff = [
-                        `Part: ${oldVal.part_number ?? '-'} → ${newVal.part_number ?? '-'}`,
-                        `PCS: ${oldVal.pcs_quantity ?? '-'} → ${newVal.pcs_quantity ?? '-'}`,
-                        `Tanggal: ${oldVal.stored_at ?? '-'} → ${newVal.stored_at ?? '-'}`,
-                    ].join('<br>');
+                    let diff = '';
+                    let reason = newVal.reason || '-';
+                    if (row.action === 'box_updated_by_admin_warehouse') {
+                        diff = [
+                            `Part: ${oldVal.part_number ?? '-'} → ${newVal.part_number ?? '-'}`,
+                            `PCS: ${oldVal.pcs_quantity ?? '-'} → ${newVal.pcs_quantity ?? '-'}`,
+                            `Tanggal: ${oldVal.stored_at ?? '-'} → ${newVal.stored_at ?? '-'}`,
+                        ].join('<br>');
+                    } else {
+                        diff = `<strong>${escapeHtml(row.action || '')}</strong>: ${escapeHtml(row.description || '')}`;
+                    }
                     return `
                         <tr>
                             <td>${row.created_at || '-'}</td>
                             <td>${row.user_name || '-'}</td>
                             <td>${diff}</td>
-                            <td>${newVal.reason || '-'}</td>
+                            <td>${reason}</td>
                         </tr>
                     `;
                 }).join('');
@@ -844,7 +850,7 @@
 
     const editBoxForm = document.getElementById('editBoxForm');
     if (editBoxForm) {
-        editBoxForm.addEventListener('submit', async function (event) {
+        editBoxForm.addEventListener('submit', function (event) {
             event.preventDefault();
 
             const boxId = document.getElementById('editBoxId').value;
@@ -864,44 +870,73 @@
 
             hideEditBoxInlineAlert();
 
-            const payload = {
-                part_number: currentPartNumber,
-                pcs_quantity: currentPcsQuantity,
-                stored_at: currentStoredAt,
-                reason: document.getElementById('editReason').value,
-            };
+            const warningItems = [
+                'Perubahan detail box akan langsung memperbarui data stok aktif.',
+                'Perubahan ini akan otomatis tercatat ke Audit Trail.'
+            ];
 
-            try {
-                const response = await fetch(`/stock-view/boxes/${boxId}/update`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                        'Accept': 'application/json',
-                    },
-                    body: JSON.stringify(payload),
-                });
-
-                const data = await response.json();
-                if (!response.ok) {
-                    const firstError = data?.errors ? Object.values(data.errors)[0][0] : (data.message || 'Gagal update box');
-                    throw new Error(firstError);
-                }
-
-                if (editBoxModal) {
-                    editBoxModal.hide();
-                }
-
-                showToast(data.message || 'Detail box berhasil diperbarui.', 'success');
-                if (currentPalletId) {
-                    window.viewPalletDetail(currentPalletId);
-                }
-                if (currentPartNumber && detailModalEl?.classList.contains('show')) {
-                    window.viewDetail(currentPartNumber);
-                }
-            } catch (error) {
-                showEditBoxInlineAlert(error.message || 'Gagal update box', 'danger');
+            const fixedQty = (bootstrapData.masterPartCapacities ?? {})[currentPartNumber] ?? 0;
+            if (fixedQty > 0 && currentPcsQuantity < fixedQty) {
+                warningItems.push(`<strong class="text-danger">PERINGATAN: Kuantitas PCS (${currentPcsQuantity}) di bawah kapasitas standar (${fixedQty}). Box ini akan berubah status menjadi NOT FULL!</strong>`);
             }
+
+            const infoHtml = `
+                <div class="small">
+                    <strong>Part Number:</strong> ${initialEditBoxState ? initialEditBoxState.partNumber : '-'} &rarr; ${currentPartNumber}<br>
+                    <strong>PCS Quantity:</strong> ${initialEditBoxState ? initialEditBoxState.pcsQuantity : '-'} &rarr; ${currentPcsQuantity}<br>
+                    <strong>Tanggal Masuk:</strong> ${initialEditBoxState ? initialEditBoxState.storedAt.replace('T', ' ') : '-'} &rarr; ${currentStoredAt.replace('T', ' ')}<br>
+                    <strong>Alasan Perubahan:</strong> ${escapeHtml(document.getElementById('editReason').value)}
+                </div>
+            `;
+
+            WarehouseAlert.confirm({
+                title: 'Konfirmasi Perubahan Detail Box',
+                message: 'Apakah Anda yakin ingin menyimpan perubahan data box berikut?',
+                warningItems: warningItems,
+                infoText: infoHtml,
+                confirmText: 'Ya, Simpan',
+                confirmColor: '#0C7779',
+                onConfirm: async () => {
+                    const payload = {
+                        part_number: currentPartNumber,
+                        pcs_quantity: currentPcsQuantity,
+                        stored_at: currentStoredAt,
+                        reason: document.getElementById('editReason').value,
+                    };
+
+                    try {
+                        const response = await fetch(`/stock-view/boxes/${boxId}/update`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                                'Accept': 'application/json',
+                            },
+                            body: JSON.stringify(payload),
+                        });
+
+                        const data = await response.json();
+                        if (!response.ok) {
+                            const firstError = data?.errors ? Object.values(data.errors)[0][0] : (data.message || 'Gagal update box');
+                            throw new Error(firstError);
+                        }
+
+                        if (editBoxModal) {
+                            editBoxModal.hide();
+                        }
+
+                        showToast(data.message || 'Detail box berhasil diperbarui.', 'success');
+                        if (currentPalletId) {
+                            window.viewPalletDetail(currentPalletId);
+                        }
+                        if (currentPartNumber && detailModalEl?.classList.contains('show')) {
+                            window.viewDetail(currentPartNumber);
+                        }
+                    } catch (error) {
+                        showEditBoxInlineAlert(error.message || 'Gagal update box', 'danger');
+                    }
+                }
+            });
         });
     }
 
