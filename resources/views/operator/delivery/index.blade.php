@@ -8,9 +8,16 @@
         }
 
         .page-header {
-            margin-bottom: 3rem;
-            padding-top: 1.5rem;
+            margin-bottom: 2rem;
+            padding-top: 1rem;
             padding-bottom: 0.5rem;
+        }
+
+        @media (min-width: 992px) {
+            .page-header {
+                margin-bottom: 3rem;
+                padding-top: 1.5rem;
+            }
         }
 
         .page-header h1 {
@@ -102,6 +109,8 @@
                 padding: 0.35rem 0.5rem;
                 border: none;
                 white-space: normal;
+                width: 100% !important;
+                text-align: left !important;
             }
 
             .part-item {

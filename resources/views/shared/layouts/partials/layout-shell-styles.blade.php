@@ -5,11 +5,11 @@
     body {
         background-color: #f5f7fa;
         max-width: 100%;
-        overflow-x: clip;
+        overflow-x: hidden;
     }
     html {
         max-width: 100%;
-        overflow-x: clip;
+        overflow-x: hidden;
     }
     :root {
         --top-navbar-height: 64px;
@@ -562,9 +562,9 @@
             padding: 1rem !important;
         }
 
-        .btn,
-        .btn-sm,
-        .btn-lg {
+        .main-content > .btn,
+        .main-content > form > .btn,
+        .btn-block-mobile {
             width: 100%;
             margin-bottom: 0.5rem;
         }
@@ -578,13 +578,13 @@
             margin-bottom: 1rem;
         }
 
-        .input-group {
+        .input-group-stacked {
             flex-wrap: wrap;
         }
 
-        .input-group > .form-control,
-        .input-group > .form-select,
-        .input-group > .btn {
+        .input-group-stacked > .form-control,
+        .input-group-stacked > .form-select,
+        .input-group-stacked > .btn {
             width: 100%;
             border-radius: 0.5rem !important;
         }
@@ -595,9 +595,9 @@
     }
 
     @media (max-width: 576px) {
-        .btn,
-        .btn-sm,
-        .btn-lg {
+        .main-content > .btn,
+        .main-content > form > .btn,
+        .btn-block-mobile {
             width: 100%;
         }
 
@@ -701,6 +701,44 @@
             max-width: 1680px;
             margin-left: auto;
             margin-right: auto;
+        }
+    }
+
+    /* Responsive Utilities */
+    .hero-responsive {
+        background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
+        color: white;
+        padding: 40px 30px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    @media (max-width: 768px) {
+        .hero-responsive {
+            padding: 24px 20px;
+        }
+    }
+
+    .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+    }
+
+    @media (max-width: 992px) {
+        .summary-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (max-width: 576px) {
+        .summary-grid {
+            grid-template-columns: repeat(2, 1fr);
         }
     }
 </style>

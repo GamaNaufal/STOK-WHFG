@@ -118,3 +118,9 @@
         top: 0 !important;
     }
 }
+
+@media (max-width: 576px) {
+    .card-body {
+        padding: 15px !important;
+    }
+}

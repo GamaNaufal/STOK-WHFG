@@ -2,7 +2,7 @@
 
 @if ($paginator->hasPages())
     <div class="p-4" style="background-color: #f8f9fa; border-top: 1px solid #e5e7eb;">
-        <nav aria-label="Pagination Navigation" class="d-flex justify-content-between align-items-center">
+        <nav aria-label="Pagination Navigation" class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <!-- Previous Button -->
             <div>
                 @if ($paginator->onFirstPage())
@@ -42,7 +42,7 @@
 
         <!-- Page Number Links -->
         @if($paginator->lastPage() > 1)
-        <div class="mt-3 d-flex justify-content-center gap-2">
+        <div class="mt-3 d-flex justify-content-center flex-wrap gap-2">
             @foreach ($paginator->getUrlRange(1, $paginator->lastPage()) as $page => $url)
                 @if ($page == $paginator->currentPage())
                     <span class="btn btn-sm" style="background-color: #0C7779; color: white; border: none; min-width: 40px; padding: 6px 10px; border-radius: 6px;">

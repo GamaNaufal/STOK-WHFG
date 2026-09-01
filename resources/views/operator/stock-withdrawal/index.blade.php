@@ -3,18 +3,16 @@
 @section('title', 'Pengambilan Stok - Warehouse FG Yamato')
 
 @section('content')
-<div class="mb-5 pb-3" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); border-radius: 12px; padding: 40px 30px; box-shadow: 0 4px 20px rgba(12, 119, 121, 0.15);">
-    <div class="d-flex justify-content-between align-items-start">
-        <div>
-            <h1 class="h2 fw-bold text-white mb-2">
-                <i class="bi bi-bag-check"></i> Pengambilan Stok
-            </h1>
-            <p class="text-white-50 mb-0">Kelola dan proses pengambilan stok barang dengan mudah</p>
-        </div>
-        <a href="{{ route('stock-withdrawal.history') }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px;">
-            <i class="bi bi-clock-history"></i> <span class="ms-2">Riwayat</span>
-        </a>
+<div class="mb-5 hero-responsive">
+    <div>
+        <h1 class="h2 fw-bold text-white mb-2">
+            <i class="bi bi-bag-check"></i> Pengambilan Stok
+        </h1>
+        <p class="text-white-50 mb-0">Kelola dan proses pengambilan stok barang dengan mudah</p>
     </div>
+    <a href="{{ route('stock-withdrawal.history') }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px;">
+        <i class="bi bi-clock-history"></i> <span class="ms-2">Riwayat</span>
+    </a>
 </div>
 
 <div class="row g-4 mt-4">

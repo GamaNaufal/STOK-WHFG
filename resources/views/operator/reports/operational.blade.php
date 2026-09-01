@@ -10,12 +10,19 @@
     .popover.popover-wide .popover-body {
         max-width: 520px;
     }
+    
+    @media (max-width: 576px) {
+        .popover.popover-wide,
+        .popover.popover-wide .popover-body {
+            max-width: 320px;
+        }
+    }
 </style>
 @endsection
 
 @section('content')
 <div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
         <div>
             <h1 class="h4 mb-1">Operational Warehouse Reports</h1>
             <div class="text-muted small">Periode: {{ $rangeLabel }} @if($start && $end) ({{ $start->format('d M Y') }} - {{ $end->format('d M Y') }}) @endif</div>

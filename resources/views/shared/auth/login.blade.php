@@ -18,20 +18,29 @@
             box-sizing: border-box;
         }
 
+        html,
         body {
+            margin: 0;
+            width: 100%;
+            min-height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
             background: linear-gradient(135deg, #005461 0%, #0C7779 50%, #249E94 100%);
             background-attachment: fixed;
+        }
+
+        .login-page {
+            width: 100%;
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            padding: 20px;
             position: relative;
-            overflow-y: auto;
+            overflow: hidden; /* Hides the decorative circles without breaking page layout */
         }
 
         /* Background decoration */
-        body::before {
+        .login-page::before {
             content: '';
             position: absolute;
             top: -50%;
@@ -40,9 +49,11 @@
             height: 600px;
             background: rgba(255, 255, 255, 0.05);
             border-radius: 50%;
+            z-index: 0;
+            pointer-events: none;
         }
 
-        body::after {
+        .login-page::after {
             content: '';
             position: absolute;
             bottom: -30%;
@@ -51,6 +62,8 @@
             height: 500px;
             background: rgba(255, 255, 255, 0.03);
             border-radius: 50%;
+            z-index: 0;
+            pointer-events: none;
         }
 
         .login-wrapper {
@@ -62,7 +75,6 @@
             align-items: center;
             position: relative;
             z-index: 1;
-            padding: 2rem;
         }
 
         .login-info {
@@ -257,18 +269,14 @@
         }
 
         @media (max-width: 991.98px) {
-            body {
-                padding: 0.75rem;
+            .login-page {
+                padding: 16px;
             }
 
             .login-wrapper {
                 grid-template-columns: 1fr;
                 gap: 0;
-                max-width: 520px;
-                width: 100%;
-                min-height: calc(100svh - 1.5rem);
-                padding: 0;
-                place-items: center;
+                max-width: 420px;
             }
 
             .login-info {
@@ -291,12 +299,8 @@
         }
 
         @media (max-width: 480px) {
-            body {
-                padding: 0.5rem;
-            }
-
-            .login-wrapper {
-                min-height: calc(100svh - 1rem);
+            .login-page {
+                padding: 12px;
             }
 
             .login-container {
@@ -325,7 +329,8 @@
     </style>
 </head>
 <body>
-    <div class="login-wrapper">
+    <div class="login-page">
+        <div class="login-wrapper">
         <!-- Left Side - Info -->
         <div class="login-info d-none d-lg-block">
             <h2>Warehouse FG</h2>
@@ -390,6 +395,7 @@
             </div>
         </div>
     </div>
+</div>
 
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

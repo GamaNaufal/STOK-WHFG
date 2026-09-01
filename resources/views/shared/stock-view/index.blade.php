@@ -10,14 +10,7 @@
 @section('content')
 <div class="row mb-4">
     <div class="col-12">
-        <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
-                    color: white; 
-                    padding: 40px 30px; 
-                    border-radius: 12px; 
-                    box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;">
+        <div class="hero-responsive">
             <div>
                 <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
                     <i class="bi bi-eye"></i> Lihat Stok Tersedia
@@ -78,54 +71,54 @@
 </div>
 
 <div class="row mb-4 g-3">
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="background: #f9fafb; border-radius: 12px;">
             <div class="card-body" style="padding: 24px;">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Part Numbers</p>
                         <h2 class="fw-bold" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $summaryTotalParts }}</h2>
                     </div>
-                    <i class="bi bi-tag" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
+                    <i class="bi bi-tag d-none d-sm-block" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="background: #f9fafb; border-radius: 12px;">
             <div class="card-body" style="padding: 24px;">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Pallet</p>
                         <h2 class="fw-bold" style="color: #005461; margin: 0; font-size: 2.5rem;">{{ $totalPallets }}</h2>
                     </div>
-                    <i class="bi bi-layers" style="font-size: 2.5rem; color: #005461; opacity: 0.2;"></i>
+                    <i class="bi bi-layers d-none d-sm-block" style="font-size: 2.5rem; color: #005461; opacity: 0.2;"></i>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="background: #f9fafb; border-radius: 12px;">
             <div class="card-body" style="padding: 24px;">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Box</p>
                         <h2 class="fw-bold" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ (int) $summaryTotalBox }}</h2>
                     </div>
-                    <i class="bi bi-box2" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
+                    <i class="bi bi-box2 d-none d-sm-block" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-3">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
+    <div class="col-6 col-md-3">
+        <div class="card border-0 shadow-sm h-100" style="background: #f9fafb; border-radius: 12px;">
             <div class="card-body" style="padding: 24px;">
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total PCS</p>
                         <h2 class="fw-bold" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $summaryTotalPcs }}</h2>
                     </div>
-                    <i class="bi bi-stack" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
+                    <i class="bi bi-stack d-none d-sm-block" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
                 </div>
             </div>
         </div>

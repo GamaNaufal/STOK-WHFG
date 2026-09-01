@@ -1,4 +1,4 @@
-﻿@extends('shared.layouts.app')
+@extends('shared.layouts.app')
 
 @section('title', 'Assign Delivery - Warehouse FG Yamato')
 
@@ -6,9 +6,8 @@
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-12">
-            <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
+            <div class="p-3 p-md-4" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                         color: white;
-                        padding: 28px 24px;
                         border-radius: 12px;
                         box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);">
                 <h1 class="h3" style="margin: 0 0 6px 0; font-weight: 700;">
@@ -22,7 +21,7 @@
     </div>
 
     <div class="card shadow" style="border: none; border-radius: 12px; overflow: hidden;">
-        <div class="card-body" style="padding: 24px;">
+        <div class="card-body p-3 p-md-4">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-6">
                     <label class="form-label fw-semibold">Delivery Order</label>
@@ -44,7 +43,7 @@
     </div>
 
     <div class="card shadow mt-4" style="border: none; border-radius: 12px; overflow: hidden;">
-        <div class="card-body" style="padding: 24px;">
+        <div class="card-body p-3 p-md-4">
             <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
                 <div>
                     <div class="fw-semibold">Input Box Baru</div>
@@ -128,7 +127,7 @@
     </div>
 
     <div class="card shadow mt-4" style="border: none; border-radius: 12px;">
-        <div class="card-body" style="padding: 24px;">
+        <div class="card-body p-3 p-md-4">
             <div class="row g-3 align-items-end">
                 <div class="col-lg-8">
                     <label class="form-label fw-semibold">Cari Box atau Pallet</label>
@@ -163,7 +162,7 @@
     </div>
 
     <div class="card shadow mt-4" style="border: none; border-radius: 12px;">
-        <div class="card-body" style="padding: 24px;">
+        <div class="card-body p-3 p-md-4">
             <div class="d-flex flex-wrap gap-3 align-items-center justify-content-between">
                 <div>
                     <div class="fw-semibold">Ringkasan Assign</div>
