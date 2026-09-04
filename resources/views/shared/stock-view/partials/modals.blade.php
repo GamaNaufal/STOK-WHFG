@@ -152,6 +152,31 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="row g-3 mt-2">
+                        <div class="col-12">
+                            <h6 class="fw-bold text-dark mb-3" style="color: #0C7779; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px;">
+                                <i class="bi bi-clock-history"></i> Riwayat Pallet
+                            </h6>
+                            <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
+                                <table class="table table-sm table-hover" style="margin: 0;">
+                                    <thead style="background: #f9fafb; border-top: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 1;">
+                                        <tr>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 10px 8px;">Waktu</th>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 10px 8px;">Aktivitas</th>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 10px 8px;">Detail</th>
+                                            <th style="color: #0C7779; font-weight: 600; font-size: 12px; padding: 10px 8px;">User</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="palletHistoryTable">
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted py-3">Belum ada riwayat tercatat</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -209,7 +234,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
             <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 18px 20px;">
-                <h5 class="modal-title fw-bold" style="margin:0; font-size:16px;">Riwayat Perubahan Box</h5>
+                <h5 class="modal-title fw-bold" style="margin:0; font-size:16px;">Riwayat Aktivitas Box</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" style="padding: 20px;">
@@ -219,9 +244,9 @@
                         <thead style="background:#f9fafb;">
                             <tr>
                                 <th>Waktu</th>
+                                <th>Aktivitas</th>
+                                <th>Detail / Keterangan</th>
                                 <th>User</th>
-                                <th>Perubahan</th>
-                                <th>Alasan</th>
                             </tr>
                         </thead>
                         <tbody id="boxHistoryTableBody">

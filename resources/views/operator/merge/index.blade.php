@@ -74,6 +74,7 @@
                                     'id' => $p->id,
                                     'pallet_number' => $p->pallet_number,
                                     'location' => $loc,
+                                    'location_id' => $p->stockLocation?->master_location_id,
                                     'total_box' => $activeBoxCount,
                                     'total_pcs' => $totalPcs
                                 ];
@@ -268,28 +269,28 @@
                 searchResults.innerHTML = '';
 
                 // Collect locations from selected pallets
-                const selectedLocations = new Set();
+                const selectedLocations = new Map();
                 selectedPallets.forEach(p => {
-                    if(p.location && p.location !== '-' && p.location !== 'Not Stored') {
-                        selectedLocations.add(p.location);
+                    if(p.location && p.location !== '-' && p.location !== 'Not Stored' && p.location !== 'No Loc') {
+                        selectedLocations.set(p.location, p.location_id || null);
                     }
                 });
 
                 // Add selected pallets locations first
-                selectedLocations.forEach(loc => {
+                selectedLocations.forEach((locId, locCode) => {
                     const item = document.createElement('a');
                     item.href = '#';
                     item.className = 'list-group-item list-group-item-action';
                     item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
-                                        <strong>${loc}</strong>
+                                        <strong>${locCode}</strong>
                                         <span class="badge bg-info rounded-pill" style="font-size: 0.7em;">From Selected</span>
                                       </div>`;
                     item.style.cursor = 'pointer';
                     item.onclick = (e) => {
                         e.preventDefault();
-                        searchInput.value = loc;
-                        selectedLocationId.value = '';
-                        selectedLocationCode.value = loc;
+                        searchInput.value = locCode;
+                        selectedLocationId.value = locId ? String(locId) : '';
+                        selectedLocationCode.value = locCode;
                         searchResults.style.display = 'none';
                     };
                     searchResults.appendChild(item);
@@ -539,7 +540,7 @@
                 },
                 body: JSON.stringify({
                     pallet_ids: ids,
-                    location_id: locId,
+                    location_id: locId ? parseInt(locId, 10) : null,
                     warehouse_location: locCode
                 })
             })

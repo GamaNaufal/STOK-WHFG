@@ -220,7 +220,11 @@ class StockInputController extends Controller
             }
 
             $existingPallet = $existingBox->pallets()
-                ->whereHas('stockLocation')
+                ->whereNull('pallets.deleted_at')
+                ->whereHas('stockLocation', function ($q) {
+                    $q->whereNotNull('warehouse_location')
+                        ->where('warehouse_location', '!=', 'Unknown');
+                })
                 ->first();
 
             if ($existingPallet) {
@@ -410,7 +414,11 @@ class StockInputController extends Controller
 
         // Check if box already attached to a pallet with stock location (SUDAH TERSIMPAN)
         $existingPallet = $box->pallets()
-            ->whereHas('stockLocation')
+            ->whereNull('pallets.deleted_at')
+            ->whereHas('stockLocation', function ($q) {
+                $q->whereNotNull('warehouse_location')
+                    ->where('warehouse_location', '!=', 'Unknown');
+            })
             ->first();
 
         if ($existingPallet) {

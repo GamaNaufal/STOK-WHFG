@@ -1,6 +1,6 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 19 Juni 2026.
+Terakhir diverifikasi dari source code: 5 September 2026.
 
 ## Tujuan Memo
 
@@ -627,6 +627,10 @@ Status yang digunakan:
 - Sales hanya boleh mengubah order berstatus `correction`; PPC hanya boleh memutuskan order berstatus `pending`.
 - Delivery yang sudah memiliki completion atau withdrawal tidak boleh dihapus.
 - Picklist PDF/print hanya dapat diakses role warehouse; Warehouse Operator hanya dapat mengakses session miliknya.
+- Riwayat Pallet mengagregasi audit log Pallet, transaksi input stok (`stock_inputs`), dan mutasi perpindahan box (`box_pallet_moved`).
+- Riwayat Box mengagregasi audit log Box, transaksi input stok (`stock_inputs` via `stock_input_boxes`), dan catatan withdrawal (`stock_withdrawals`).
+- Pencarian Stock View mencakup box orphan aktif dan box non-aktif (withdrawn/expired/archived), serta otomatis beralih ke mode box_id saat user mencari box tanpa kecocokan nomor part.
+- Merge Pallet mendukung pemilihan lokasi tujuan dari salah satu pallet sumber yang digabung; pembersihan pallet sumber melepas okupansi master location secara tuntas dan backend mendukung fallback pencarian master location via kode string `warehouse_location`.
 
 ## Keputusan Bisnis
 
@@ -643,7 +647,7 @@ Status yang digunakan:
 - Seluruh migration sampai `2026_06_19_000005_make_audit_log_type_extensible` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.
-- Full regression suite terakhir: 139 test, 672 assertion, seluruhnya lulus.
+- Full regression suite terakhir: 143 test, 704 assertion, seluruhnya lulus (diverifikasi 5 September 2026).
 - Kolom `audit_logs.type` menggunakan string terindeks, bukan enum tertutup, sehingga audit fitur baru seperti `delivery_assignment` dapat disimpan tanpa melanggar constraint.
 
 ## Catatan yang Belum Diputuskan

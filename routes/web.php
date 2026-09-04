@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
@@ -129,6 +129,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/stock-view/export-box-id', [StockViewController::class, 'exportByBoxId'])->name('stock-view.export-box-id');
         Route::get('/stock-view/export-pallet', [StockViewController::class, 'exportByPallet'])->name('stock-view.export-pallet');
         Route::get('/stock-view/boxes/{boxId}/history', [StockViewController::class, 'boxHistory'])->name('stock-view.box-history');
+        Route::get('/stock-view/pallets/{palletId}/history', [StockViewController::class, 'palletHistory'])->name('stock-view.pallet-history');
     });
 
     // Delivery Assignment Routes (Warehouse Operator, Admin Warehouse, Admin)

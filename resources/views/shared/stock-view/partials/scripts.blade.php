@@ -714,6 +714,41 @@
                     `).join('');
                 }
 
+                const historyTableBody = document.getElementById('palletHistoryTable');
+                if (historyTableBody) {
+                    const historyList = Array.isArray(data.history) ? data.history : [];
+                    if (historyList.length === 0) {
+                        historyTableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Belum ada riwayat tercatat</td></tr>';
+                    } else {
+                        historyTableBody.innerHTML = historyList.map(h => {
+                            let badgeClass = 'bg-secondary';
+                            let actionLabel = h.action || h.type || 'Aktivitas';
+                            if (h.action === 'stock_input' || h.type === 'stock_input') {
+                                badgeClass = 'bg-success';
+                                actionLabel = 'Input Stok';
+                            } else if (h.action === 'box_pallet_moved' || h.type === 'box_pallet_moved') {
+                                badgeClass = 'bg-info text-dark';
+                                actionLabel = 'Pindah Box';
+                            } else if (h.action === 'merged' || h.type === 'pallet_merged') {
+                                badgeClass = 'bg-primary';
+                                actionLabel = 'Merge Pallet';
+                            } else if (h.action === 'deleted') {
+                                badgeClass = 'bg-danger';
+                                actionLabel = 'Hapus';
+                            }
+
+                            return `
+                                <tr>
+                                    <td style="font-size: 11px; color: #6b7280; padding: 8px; white-space: nowrap;">${escapeHtml(h.created_at || '-')}</td>
+                                    <td style="padding: 8px;"><span class="badge ${badgeClass}">${escapeHtml(actionLabel)}</span></td>
+                                    <td style="font-size: 12px; color: #374151; padding: 8px;">${escapeHtml(h.description || '-')}</td>
+                                    <td style="font-size: 11px; color: #6b7280; padding: 8px;">${escapeHtml(h.user_name || 'System')}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+
                 if (pendingHighlightBoxId) {
                     const selector = `tr[data-box-id="${pendingHighlightBoxId}"]`;
                     const targetRow = tableBody.querySelector(selector);
@@ -820,23 +855,44 @@
                 tableBody.innerHTML = historyRows.map((row) => {
                     const oldVal = row.old_values || {};
                     const newVal = row.new_values || {};
-                    let diff = '';
-                    let reason = newVal.reason || '-';
+                    let badgeClass = 'bg-secondary';
+                    let actionLabel = row.action || row.type || 'Aktivitas';
+                    let detailHtml = '';
+
                     if (row.action === 'box_updated_by_admin_warehouse') {
-                        diff = [
-                            `Part: ${oldVal.part_number ?? '-'} → ${newVal.part_number ?? '-'}`,
-                            `PCS: ${oldVal.pcs_quantity ?? '-'} → ${newVal.pcs_quantity ?? '-'}`,
-                            `Tanggal: ${oldVal.stored_at ?? '-'} → ${newVal.stored_at ?? '-'}`,
-                        ].join('<br>');
+                        badgeClass = 'bg-warning text-dark';
+                        actionLabel = 'Edit Box';
+                        const diffLines = [
+                            `Part: ${escapeHtml(oldVal.part_number ?? '-')} → ${escapeHtml(newVal.part_number ?? '-')}`,
+                            `PCS: ${escapeHtml(String(oldVal.pcs_quantity ?? '-'))} → ${escapeHtml(String(newVal.pcs_quantity ?? '-'))}`,
+                            `Tanggal: ${escapeHtml(oldVal.stored_at ?? '-')} → ${escapeHtml(newVal.stored_at ?? '-')}`,
+                        ];
+                        if (newVal.reason) {
+                            diffLines.push(`Alasan: ${escapeHtml(newVal.reason)}`);
+                        }
+                        detailHtml = diffLines.join('<br>');
+                    } else if (row.action === 'stock_input' || row.type === 'stock_input') {
+                        badgeClass = 'bg-success';
+                        actionLabel = 'Input Stok';
+                        detailHtml = escapeHtml(row.description || 'Input stok ke pallet');
+                    } else if (row.action === 'box_pallet_moved' || row.type === 'box_pallet_moved') {
+                        badgeClass = 'bg-info text-dark';
+                        actionLabel = 'Pindah Pallet';
+                        detailHtml = escapeHtml(row.description || 'Box dipindahkan');
+                    } else if (row.action === 'stock_withdrawn' || row.type === 'stock_withdrawn') {
+                        badgeClass = 'bg-danger';
+                        actionLabel = 'Withdrawal';
+                        detailHtml = escapeHtml(row.description || 'Pengambilan stok');
                     } else {
-                        diff = `<strong>${escapeHtml(row.action || '')}</strong>: ${escapeHtml(row.description || '')}`;
+                        detailHtml = escapeHtml(row.description || '-');
                     }
+
                     return `
                         <tr>
-                            <td>${row.created_at || '-'}</td>
-                            <td>${row.user_name || '-'}</td>
-                            <td>${diff}</td>
-                            <td>${reason}</td>
+                            <td style="white-space: nowrap; font-size: 11px;">${escapeHtml(row.created_at || '-')}</td>
+                            <td><span class="badge ${badgeClass}">${escapeHtml(actionLabel)}</span></td>
+                            <td style="font-size: 12px;">${detailHtml}</td>
+                            <td style="font-size: 11px;">${escapeHtml(row.user_name || 'System')}</td>
                         </tr>
                     `;
                 }).join('');
@@ -1015,15 +1071,19 @@
             && !hasAutoOpenedDirectBox
             && !!currentSearch
             && directBoxTarget
-            && Number.isFinite(Number(directBoxTarget.pallet_id))
             && Number.isFinite(Number(directBoxTarget.box_id))
         );
 
         if (shouldAutoOpenDirectBox) {
             hasAutoOpenedDirectBox = true;
-            pendingHighlightBoxId = String(directBoxTarget.box_id);
-            window.viewPalletDetail(String(directBoxTarget.pallet_id));
-            showAutoPopup(`Membuka detail pallet untuk ID Box ${directBoxTarget.box_number || directBoxTarget.box_id}`, 'success', 2200);
+            if (directBoxTarget.pallet_id && Number.isFinite(Number(directBoxTarget.pallet_id))) {
+                pendingHighlightBoxId = String(directBoxTarget.box_id);
+                window.viewPalletDetail(String(directBoxTarget.pallet_id));
+                showAutoPopup(`Membuka detail pallet untuk ID Box ${directBoxTarget.box_number || directBoxTarget.box_id}`, 'success', 2200);
+            } else {
+                openBoxHistoryModal(directBoxTarget.box_id);
+                showAutoPopup(`Box ${directBoxTarget.box_number || directBoxTarget.box_id}: ${directBoxTarget.status_label || 'Tanpa Pallet Aktif'}`, 'info', 3000);
+            }
         }
     });
 </script>

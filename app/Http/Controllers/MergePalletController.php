@@ -260,6 +260,14 @@ class MergePalletController extends Controller
             $sourcePallet->items()->delete();
 
             if ($sourcePallet->stockLocation) {
+                if ($sourcePallet->stockLocation->master_location_id) {
+                    MasterLocation::where('id', $sourcePallet->stockLocation->master_location_id)
+                        ->update([
+                            'is_occupied' => false,
+                            'current_pallet_id' => null,
+                        ]);
+                }
+
                 $oldLocation = $oldLocationsByCode->get($sourcePallet->stockLocation->warehouse_location);
                 if ($oldLocation) {
                     $oldLocation->update([
@@ -270,6 +278,12 @@ class MergePalletController extends Controller
                 $sourcePallet->stockLocation->delete();
             }
 
+            MasterLocation::where('current_pallet_id', $sourcePallet->id)
+                ->update([
+                    'is_occupied' => false,
+                    'current_pallet_id' => null,
+                ]);
+
             $sourcePallet->delete();
         }
     }
@@ -277,7 +291,15 @@ class MergePalletController extends Controller
     private function assignNewLocation(Request $request, Pallet $newPallet): ?string
     {
         $locationId = $request->input('location_id');
-        $masterLocation = MasterLocation::find($locationId);
+        $masterLocation = ! empty($locationId) ? MasterLocation::find($locationId) : null;
+
+        if (! $masterLocation && $request->filled('warehouse_location')) {
+            $locationCode = trim((string) $request->input('warehouse_location'));
+            $masterLocation = MasterLocation::where('code', $locationCode)
+                ->orWhereRaw('LOWER(code) = ?', [strtolower($locationCode)])
+                ->first();
+        }
+
         if (! $masterLocation) {
             throw new \RuntimeException('Lokasi tujuan tidak ditemukan');
         }
@@ -430,6 +452,7 @@ class MergePalletController extends Controller
                 'total_box' => $totalBox,
                 'total_pcs' => $totalPcs,
                 'location' => $location,
+                'location_id' => $pallet->stockLocation?->master_location_id,
                 'items' => $pallet->boxes->map(function ($box) {
                     return [
                         'box_number' => $box->box_number,

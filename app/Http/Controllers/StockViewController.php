@@ -12,6 +12,8 @@ use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
+use App\Models\StockInput;
+use App\Models\StockWithdrawal;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -28,7 +30,8 @@ class StockViewController extends Controller
             return null;
         }
 
-        $matches = $items
+        // 1. Exact match on box_number or box_id
+        $exactMatches = $items
             ->filter(function ($item) use ($needle) {
                 $boxId = isset($item['box_id']) ? (string) $item['box_id'] : '';
                 $boxNumber = isset($item['box_number']) ? (string) $item['box_number'] : '';
@@ -41,21 +44,49 @@ class StockViewController extends Controller
             })
             ->values();
 
-        if ($matches->count() !== 1) {
-            return null;
+        if ($exactMatches->count() === 1) {
+            $target = $exactMatches->first();
+            if (! empty($target['box_id'])) {
+                return [
+                    'box_id' => (int) $target['box_id'],
+                    'box_number' => (string) ($target['box_number'] ?? ''),
+                    'pallet_id' => ! empty($target['pallet_id']) ? (int) $target['pallet_id'] : null,
+                    'pallet_number' => (string) ($target['pallet_number'] ?? ''),
+                    'status_label' => $target['status_label'] ?? null,
+                ];
+            }
         }
 
-        $target = $matches->first();
-        if (empty($target['box_id']) || empty($target['pallet_id'])) {
-            return null;
+        // 2. Partial match if exactly 1 box matches
+        if ($exactMatches->isEmpty()) {
+            $partialMatches = $items
+                ->filter(function ($item) use ($needle) {
+                    $boxId = isset($item['box_id']) ? (string) $item['box_id'] : '';
+                    $boxNumber = isset($item['box_number']) ? (string) $item['box_number'] : '';
+                    if ($boxId === '' && $boxNumber === '') {
+                        return false;
+                    }
+
+                    return ($boxId !== '' && mb_strpos(mb_strtolower($boxId), $needle) !== false)
+                        || ($boxNumber !== '' && mb_strpos(mb_strtolower($boxNumber), $needle) !== false);
+                })
+                ->values();
+
+            if ($partialMatches->count() === 1) {
+                $target = $partialMatches->first();
+                if (! empty($target['box_id'])) {
+                    return [
+                        'box_id' => (int) $target['box_id'],
+                        'box_number' => (string) ($target['box_number'] ?? ''),
+                        'pallet_id' => ! empty($target['pallet_id']) ? (int) $target['pallet_id'] : null,
+                        'pallet_number' => (string) ($target['pallet_number'] ?? ''),
+                        'status_label' => $target['status_label'] ?? null,
+                    ];
+                }
+            }
         }
 
-        return [
-            'box_id' => (int) $target['box_id'],
-            'box_number' => (string) ($target['box_number'] ?? ''),
-            'pallet_id' => (int) $target['pallet_id'],
-            'pallet_number' => (string) ($target['pallet_number'] ?? ''),
-        ];
+        return null;
     }
 
     private function matchesGlobalSearch(?string $search, ?string $location, ?string $partNumber, ?string $palletNumber, ?string $boxNumber = null, $boxId = null): bool
@@ -470,6 +501,7 @@ class StockViewController extends Controller
             ->join('pallets as p', 'p.id', '=', 'pb.pallet_id')
             ->leftJoin('stock_locations as sl', 'sl.pallet_id', '=', 'p.id')
             ->join('boxes as b', 'b.id', '=', 'pb.box_id')
+            ->whereNull('p.deleted_at')
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
             ->where(function ($q) {
@@ -595,6 +627,94 @@ class StockViewController extends Controller
             }
         });
 
+        $indexedBoxIds = collect($items)->pluck('box_id')->filter()->unique()->all();
+
+        // Include Active Orphan Boxes (boxes not attached to any active pallet)
+        $orphanBoxQuery = Box::query()
+            ->whereNull('deleted_at')
+            ->where('is_withdrawn', false)
+            ->where(function ($q) {
+                $q->whereNull('expired_status')
+                    ->orWhereNotIn('expired_status', ['handled', 'expired']);
+            })
+            ->whereNotIn('id', $indexedBoxIds);
+
+        if ($search) {
+            $orphanBoxQuery->where(function ($q) use ($search) {
+                $q->where('box_number', 'like', "%{$search}%")
+                    ->orWhere('part_number', 'like', "%{$search}%")
+                    ->orWhere('id', $search);
+            });
+        }
+
+        $orphanBoxes = $orphanBoxQuery->get();
+        foreach ($orphanBoxes as $box) {
+            $items[] = [
+                'box_id' => $box->id,
+                'pallet_id' => null,
+                'pallet_number' => 'Tanpa Pallet',
+                'location' => 'Belum Dialokasikan',
+                'part_number' => $box->part_number,
+                'box_number' => $box->box_number,
+                'box_quantity' => 1,
+                'pcs_quantity' => (int) $box->pcs_quantity,
+                'created_at' => $box->created_at,
+                'updated_at' => $box->updated_at,
+                'is_not_full' => (bool) $box->is_not_full,
+                'not_full_reason' => $box->not_full_reason ?? 'Orphan Box',
+                'status_label' => 'Orphan (Tanpa Pallet)',
+            ];
+            $indexedBoxIds[] = $box->id;
+        }
+
+        // When a search query is provided, also find inactive/withdrawn/expired/archived boxes
+        // so the user can trace why an existing box was rejected during input
+        if (filled($search)) {
+            $inactiveBoxes = Box::withTrashed()
+                ->where(function ($q) use ($search) {
+                    $q->where('box_number', 'like', "%{$search}%")
+                        ->orWhere('id', $search);
+                })
+                ->whereNotIn('id', $indexedBoxIds)
+                ->with(['pallets' => function ($q) {
+                    $q->withTrashed()->with('stockLocation');
+                }])
+                ->limit(20)
+                ->get();
+
+            foreach ($inactiveBoxes as $box) {
+                $statusLabel = 'Non-Aktif';
+                if ($box->trashed()) {
+                    $statusLabel = 'Diarsipkan (Dihapus)';
+                } elseif ($box->is_withdrawn) {
+                    $statusLabel = 'Withdrawn';
+                } elseif (in_array($box->expired_status, ['expired', 'handled'], true)) {
+                    $statusLabel = ucfirst($box->expired_status);
+                }
+
+                $pallet = $box->pallets->first();
+                $palletNum = $pallet?->pallet_number ?? 'Tanpa Pallet';
+                $loc = $pallet?->stockLocation?->warehouse_location ?? '-';
+
+                $items[] = [
+                    'box_id' => $box->id,
+                    'pallet_id' => $pallet?->id,
+                    'pallet_number' => $palletNum,
+                    'location' => $loc,
+                    'part_number' => $box->part_number,
+                    'box_number' => $box->box_number,
+                    'box_quantity' => 1,
+                    'pcs_quantity' => (int) $box->pcs_quantity,
+                    'created_at' => $box->created_at,
+                    'updated_at' => $box->updated_at,
+                    'is_not_full' => (bool) $box->is_not_full,
+                    'not_full_reason' => $box->not_full_reason,
+                    'status_label' => $statusLabel,
+                    'is_inactive' => true,
+                ];
+            }
+        }
+
         return collect($items)->sortBy('created_at');
     }
 
@@ -602,11 +722,23 @@ class StockViewController extends Controller
     {
         $search = $request->input('search');
         $viewMode = $request->input('view_mode', 'part'); // Default view by part
-        $sortMode = $this->normalizeSortMode($viewMode, $request->input('sort'));
-        $sortOptions = $this->getSortOptionsByViewMode($viewMode);
 
         $items = $this->buildStockItems($search);
         $directBoxTarget = filled($search) ? $this->resolveDirectBoxTarget((string) $search, $items) : null;
+
+        // Auto-switch to box_id view mode if user searched a box without specifying view_mode and there are no part matches
+        if (! $request->filled('view_mode') && filled($search) && $items->isNotEmpty()) {
+            $hasPartMatches = $items->contains(function ($item) use ($search) {
+                return mb_stripos((string) ($item['part_number'] ?? ''), trim((string) $search)) !== false;
+            });
+            if (! $hasPartMatches) {
+                $viewMode = 'box_id';
+            }
+        }
+
+        $sortMode = $this->normalizeSortMode($viewMode, $request->input('sort'));
+        $sortOptions = $this->getSortOptionsByViewMode($viewMode);
+
         if ($viewMode === 'not_full') {
             $items = $items->filter(fn ($item) => ! empty($item['is_not_full']))->values();
         }
@@ -822,10 +954,113 @@ class StockViewController extends Controller
         }
 
         return response()->json([
+            'pallet_id' => $pallet->id,
             'pallet_number' => $pallet->pallet_number,
             'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
             'items' => $items->values(),
+            'history' => $this->buildPalletHistory($pallet),
         ]);
+    }
+
+    public function palletHistory($palletId)
+    {
+        $user = Auth::user();
+        if (! $user || ! in_array($user->role, ['warehouse_operator', 'ppc', 'admin_warehouse', 'supervisi', 'admin'], true)) {
+            return response()->json(['message' => 'Unauthorized'], 403);
+        }
+
+        $pallet = Pallet::with('stockLocation')->findOrFail($palletId);
+
+        return response()->json([
+            'pallet_id' => $pallet->id,
+            'pallet_number' => $pallet->pallet_number,
+            'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
+            'history' => $this->buildPalletHistory($pallet),
+        ]);
+    }
+
+    private function buildPalletHistory(Pallet $pallet): array
+    {
+        // 1. Pallet audit logs
+        $palletLogs = AuditLog::query()
+            ->with('user')
+            ->where(function ($q) use ($pallet) {
+                $q->where(function ($q2) use ($pallet) {
+                    $q2->where('model', 'Pallet')
+                        ->where('model_id', $pallet->id);
+                })->orWhere(function ($q2) use ($pallet) {
+                    $q2->where('type', 'pallet_merged')
+                        ->where('description', 'like', "%{$pallet->pallet_number}%");
+                });
+            })
+            ->get()
+            ->map(function ($log) {
+                return [
+                    'id' => 'audit_'.$log->id,
+                    'action' => $log->action,
+                    'type' => $log->type,
+                    'description' => $log->description,
+                    'user_name' => $log->user?->name ?? 'System',
+                    'created_at_raw' => $log->created_at,
+                    'created_at' => optional($log->created_at)->format('d M Y H:i:s'),
+                ];
+            });
+
+        // 2. Stock inputs associated with this pallet
+        $stockInputs = StockInput::where('pallet_id', $pallet->id)
+            ->with('user')
+            ->get()
+            ->map(function ($si) {
+                $time = $si->stored_at ?? $si->created_at;
+                $carbonTime = $time ? \Carbon\Carbon::parse($time) : null;
+                $locText = $si->warehouse_location ? " di lokasi {$si->warehouse_location}" : '';
+
+                return [
+                    'id' => 'si_'.$si->id,
+                    'action' => 'stock_input',
+                    'type' => 'stock_input',
+                    'description' => "Input stok {$si->pcs_quantity} PCS ({$si->box_quantity} box){$locText}",
+                    'user_name' => $si->user?->name ?? 'System',
+                    'created_at_raw' => $carbonTime,
+                    'created_at' => $carbonTime ? $carbonTime->format('d M Y H:i:s') : '-',
+                ];
+            });
+
+        // 3. Box movements in/out of this pallet
+        $boxMoves = AuditLog::query()
+            ->where('type', 'box_pallet_moved')
+            ->where(function ($q) use ($pallet) {
+                $q->where('old_values', 'like', '%"from_pallet":"'.$pallet->pallet_number.'"%')
+                    ->orWhere('new_values', 'like', '%"to_pallet":"'.$pallet->pallet_number.'"%');
+            })
+            ->with('user')
+            ->get()
+            ->map(function ($log) {
+                return [
+                    'id' => 'move_'.$log->id,
+                    'action' => 'box_pallet_moved',
+                    'type' => $log->type,
+                    'description' => $log->description,
+                    'user_name' => $log->user?->name ?? 'System',
+                    'created_at_raw' => $log->created_at,
+                    'created_at' => optional($log->created_at)->format('d M Y H:i:s'),
+                ];
+            });
+
+        return $palletLogs
+            ->concat($stockInputs)
+            ->concat($boxMoves)
+            ->sortByDesc(function ($item) {
+                return $item['created_at_raw'] ? \Carbon\Carbon::parse($item['created_at_raw'])->timestamp : 0;
+            })
+            ->take(50)
+            ->map(function ($item) {
+                unset($item['created_at_raw']);
+
+                return $item;
+            })
+            ->values()
+            ->all();
     }
 
     public function updateBox(Request $request, $boxId)
@@ -1011,30 +1246,101 @@ class StockViewController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
-        $box = Box::findOrFail($boxId);
+        $box = Box::withTrashed()->findOrFail($boxId);
 
-        $logs = AuditLog::query()
+        // 1. Audit logs for Box
+        $boxLogs = AuditLog::query()
             ->with('user')
             ->where('model', 'Box')
             ->where('model_id', $box->id)
-            ->orderBy('created_at', 'desc')
-            ->limit(20)
             ->get()
             ->map(fn ($log) => [
-                'id' => $log->id,
+                'id' => 'audit_'.$log->id,
                 'action' => $log->action,
+                'type' => $log->type,
                 'description' => $log->description,
                 'old_values' => $log->getOldValuesArray(),
                 'new_values' => $log->getNewValuesArray(),
                 'user_name' => $log->user?->name ?? 'System',
+                'created_at_raw' => $log->created_at,
                 'created_at' => optional($log->created_at)->format('d M Y H:i:s'),
-            ])
+            ]);
+
+        // 2. Stock Input events via stock_input_boxes
+        $boxStockInputs = DB::table('stock_input_boxes as sib')
+            ->join('stock_inputs as si', 'si.id', '=', 'sib.stock_input_id')
+            ->leftJoin('pallets as p', 'p.id', '=', 'si.pallet_id')
+            ->leftJoin('users as u', 'u.id', '=', 'si.user_id')
+            ->where('sib.box_id', $box->id)
+            ->select('si.*', 'p.pallet_number', 'u.name as user_name')
+            ->get()
+            ->map(function ($si) {
+                $time = $si->stored_at ?? $si->created_at;
+                $carbonTime = $time ? \Carbon\Carbon::parse($time) : null;
+                $palletText = $si->pallet_number ? "Pallet {$si->pallet_number}" : 'Pallet';
+                $locationText = $si->warehouse_location ? " di lokasi {$si->warehouse_location}" : '';
+
+                return [
+                    'id' => 'si_'.$si->id,
+                    'action' => 'stock_input',
+                    'type' => 'stock_input',
+                    'description' => "Input stok box ke {$palletText}{$locationText}",
+                    'old_values' => [],
+                    'new_values' => [
+                        'pallet_number' => $si->pallet_number,
+                        'warehouse_location' => $si->warehouse_location,
+                        'pcs_quantity' => $si->pcs_quantity,
+                    ],
+                    'user_name' => $si->user_name ?? 'System',
+                    'created_at_raw' => $carbonTime,
+                    'created_at' => $carbonTime ? $carbonTime->format('d M Y H:i:s') : '-',
+                ];
+            });
+
+        // 3. Stock Withdrawals
+        $boxWithdrawals = StockWithdrawal::query()
+            ->with('user')
+            ->where('box_id', $box->id)
+            ->get()
+            ->map(function ($sw) {
+                $carbonTime = $sw->withdrawn_at ?? $sw->created_at;
+                $notes = $sw->notes ? " (Catatan: {$sw->notes})" : '';
+
+                return [
+                    'id' => 'sw_'.$sw->id,
+                    'action' => 'stock_withdrawn',
+                    'type' => 'stock_withdrawn',
+                    'description' => "Pengambilan/Withdrawal stok {$sw->pcs_quantity} PCS dari lokasi {$sw->warehouse_location}{$notes}",
+                    'old_values' => [],
+                    'new_values' => [
+                        'status' => $sw->status,
+                        'warehouse_location' => $sw->warehouse_location,
+                        'pcs_quantity' => $sw->pcs_quantity,
+                    ],
+                    'user_name' => $sw->user?->name ?? 'System',
+                    'created_at_raw' => $carbonTime,
+                    'created_at' => $carbonTime ? $carbonTime->format('d M Y H:i:s') : '-',
+                ];
+            });
+
+        $allHistory = $boxLogs
+            ->concat($boxStockInputs)
+            ->concat($boxWithdrawals)
+            ->sortByDesc(function ($item) {
+                return $item['created_at_raw'] ? \Carbon\Carbon::parse($item['created_at_raw'])->timestamp : 0;
+            })
+            ->take(50)
+            ->map(function ($item) {
+                unset($item['created_at_raw']);
+
+                return $item;
+            })
             ->values();
 
         return response()->json([
             'box_id' => $box->id,
             'box_number' => $box->box_number,
-            'history' => $logs,
+            'history' => $allHistory,
         ]);
     }
 
