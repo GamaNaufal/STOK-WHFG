@@ -231,6 +231,24 @@ class MergePalletController extends Controller
         }
     }
 
+    /**
+     * Collect master_location_ids owned by source pallets so we can
+     * distinguish "target = source location" from "target = third-party".
+     *
+     * @return array<int> master_location_id values owned by source pallets
+     */
+    private function collectSourceLocationIds(array $sourcePallets): array
+    {
+        $ids = [];
+        foreach ($sourcePallets as $sourcePallet) {
+            if ($sourcePallet->stockLocation && $sourcePallet->stockLocation->master_location_id) {
+                $ids[] = (int) $sourcePallet->stockLocation->master_location_id;
+            }
+        }
+
+        return array_values(array_unique($ids));
+    }
+
     private function cleanupSourcePallets(array $sourcePallets, Pallet $newPallet, array $movedBoxes): void
     {
         $movedBoxIds = collect($movedBoxes)
@@ -288,7 +306,16 @@ class MergePalletController extends Controller
         }
     }
 
-    private function assignNewLocation(Request $request, Pallet $newPallet): ?string
+    /**
+     * Resolve and lock the target master location.
+     *
+     * Validates that the location exists in master_locations and that it is
+     * either free, or belongs to one of the source pallets being merged.
+     * Locations held by unrelated pallets are rejected.
+     *
+     * @param  array<int>  $sourceLocationIds  master_location_ids owned by source pallets
+     */
+    private function resolveTargetLocation(Request $request, array $sourceLocationIds): MasterLocation
     {
         $locationId = $request->input('location_id');
         $masterLocation = ! empty($locationId) ? MasterLocation::find($locationId) : null;
@@ -301,29 +328,64 @@ class MergePalletController extends Controller
         }
 
         if (! $masterLocation) {
-            throw new \RuntimeException('Lokasi tujuan tidak ditemukan');
+            throw new \RuntimeException('Lokasi tujuan tidak ditemukan di Master Location.');
         }
 
-        $claimed = MasterLocation::whereKey($masterLocation->id)
-            ->where('is_occupied', false)
+        // Lock the row for the duration of the transaction
+        $masterLocation = MasterLocation::whereKey($masterLocation->id)
+            ->lockForUpdate()
+            ->first();
+
+        // Allow if: unoccupied, OR occupied by one of the source pallets
+        $isSourceLocation = in_array((int) $masterLocation->id, $sourceLocationIds, true);
+
+        if ($masterLocation->is_occupied && ! $isSourceLocation) {
+            throw new \RuntimeException(
+                "Lokasi {$masterLocation->code} sudah digunakan oleh pallet lain. Pilih lokasi yang kosong atau lokasi salah satu pallet sumber."
+            );
+        }
+
+        return $masterLocation;
+    }
+
+    /**
+     * Assign the new pallet to the target location.
+     *
+     * Uses updateOrCreate for the stock_location row to safely handle the case
+     * where the target location was previously owned by a source pallet (whose
+     * stock_location row was already deleted in cleanupSourcePallets).
+     *
+     * Also cleans up any stale stock_location rows that may reference the same
+     * master_location_id from previous failed attempts.
+     */
+    private function assignNewLocation(MasterLocation $masterLocation, Pallet $newPallet): string
+    {
+        $locationCode = $masterLocation->code;
+
+        // Claim the master location for the new pallet
+        MasterLocation::whereKey($masterLocation->id)
             ->update([
                 'is_occupied' => true,
                 'current_pallet_id' => $newPallet->id,
                 'updated_at' => now(),
             ]);
 
-        if ($claimed === 0) {
-            throw new \Exception('Lokasi tujuan sudah terisi');
-        }
+        // Clean up any stale stock_location rows for this master_location_id
+        // that may remain from previous failed merge attempts (data "kotor").
+        // The unique constraint on master_location_id means only one row can exist.
+        StockLocation::where('master_location_id', $masterLocation->id)
+            ->where('pallet_id', '!=', $newPallet->id)
+            ->delete();
 
-        $locationCode = $masterLocation->code;
-
-        StockLocation::create([
-            'pallet_id' => $newPallet->id,
-            'master_location_id' => $masterLocation->id,
-            'warehouse_location' => $locationCode,
-            'stored_at' => now(),
-        ]);
+        // Use updateOrCreate to safely handle both fresh insert and re-use scenarios
+        StockLocation::updateOrCreate(
+            ['pallet_id' => $newPallet->id],
+            [
+                'master_location_id' => $masterLocation->id,
+                'warehouse_location' => $locationCode,
+                'stored_at' => now(),
+            ]
+        );
 
         return $locationCode;
     }
@@ -471,11 +533,9 @@ class MergePalletController extends Controller
         DB::beginTransaction();
 
         try {
-            // 1. Generate New Pallet (Auto-generated Number) - Format: PLT-001, PLT-002, etc.
-            // Extract the last number (after last hyphen) and sort numerically - only new format
-            $newPallet = $this->generateNewPallet();
-
             $palletIds = $request->pallet_ids;
+
+            // 1. Lock and collect source pallets, boxes, and validate eligibility
             [$sourcePallets, $palletNumbers, $allBoxes, $boxOrigins] = $this->collectSourcePallets($palletIds);
 
             if (count($sourcePallets) < 2) {
@@ -496,16 +556,23 @@ class MergePalletController extends Controller
                 ], 422);
             }
 
-            // 3. Attach all boxes to new pallet and group items by part_number
+            // 2. Resolve and validate target location BEFORE any mutations
+            $sourceLocationIds = $this->collectSourceLocationIds($sourcePallets);
+            $targetMasterLocation = $this->resolveTargetLocation($request, $sourceLocationIds);
+
+            // 3. Generate new pallet
+            $newPallet = $this->generateNewPallet();
+
+            // 4. Attach all boxes to new pallet and build pallet_items
             $this->attachBoxesAndCreateItems($newPallet, $allBoxes, $boxOrigins, $request, $sourcePallets);
 
-            // 4. Clean up source pallets
+            // 5. Clean up source pallets FIRST (deletes their stock_locations → frees master_location_id)
             $this->cleanupSourcePallets($sourcePallets, $newPallet, $allBoxes);
 
-            // 3. Handle New Location Assignment
-            $this->assignNewLocation($request, $newPallet);
+            // 6. NOW assign the new pallet to the target location (safe: source rows already gone)
+            $this->assignNewLocation($targetMasterLocation, $newPallet);
 
-            // Mark new pallet as merged by adding a special note (store merge info in first stock input)
+            // 7. Create audit log
             $this->createMergeAudit($newPallet, $palletNumbers, $request);
 
             DB::commit();
@@ -516,13 +583,20 @@ class MergePalletController extends Controller
                 'new_pallet_number' => $newPallet->pallet_number,
             ]);
 
+        } catch (\RuntimeException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         } catch (\Exception $e) {
             DB::rollBack();
 
             return response()->json([
                 'success' => false,
-                'message' => 'Gagal menggabungkan: '.$e->getMessage(),
-            ], $e instanceof \RuntimeException ? 422 : 500);
+                'message' => 'Gagal menggabungkan pallet. Silakan coba lagi atau hubungi admin.',
+            ], 500);
         }
     }
 }

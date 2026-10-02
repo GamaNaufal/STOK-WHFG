@@ -502,7 +502,11 @@
         });
     }
 
+    let isProcessing = false;
+
     function processMerge() {
+        if (isProcessing) return;
+
         if(selectedPallets.length < 2) {
             showToast('Pilih minimal 2 pallet untuk digabungkan!', 'warning');
             return;
@@ -527,6 +531,12 @@
             confirmText: 'Ya, Gabungkan!',
             confirmColor: '#10B981',
             onConfirm: () => {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            const btn = document.getElementById('btnProcess');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Memproses...';
 
             const ids = selectedPallets.map(p => p.id);
             const locId = selectedLocationId.value;
@@ -551,9 +561,17 @@
                     window.location.reload();
                 } else {
                     showToast(data.message, 'danger');
+                    isProcessing = false;
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-intersect"></i> Gabungkan & Generate Baru';
                 }
             })
-            .catch(err => showToast('Error: ' + err, 'danger'));
+            .catch(err => {
+                showToast('Error: ' + err, 'danger');
+                isProcessing = false;
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-intersect"></i> Gabungkan & Generate Baru';
+            });
             }
         });
     }

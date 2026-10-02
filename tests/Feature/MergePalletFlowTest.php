@@ -156,7 +156,7 @@ class MergePalletFlowTest extends TestCase
             'location_id' => $occupiedTarget->id,
         ]);
 
-        $response->assertStatus(500)->assertJson([
+        $response->assertStatus(422)->assertJson([
             'success' => false,
         ]);
 

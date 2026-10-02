@@ -719,8 +719,44 @@ class StockInputController extends Controller
             throw new \RuntimeException('Lokasi yang dipilih tidak ditemukan!');
         }
 
+        // Lock the master location row to prevent concurrent assignment
+        $masterLocation = MasterLocation::whereKey($masterLocation->id)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $masterLocation) {
+            throw new \RuntimeException('Lokasi yang dipilih tidak ditemukan!');
+        }
+
+        // Check if there is already a stock_location row for this master_location_id
+        $existingStockLocation = StockLocation::where('master_location_id', $masterLocation->id)
+            ->where('pallet_id', '!=', $pallet->id)
+            ->first();
+
+        if ($existingStockLocation) {
+            $existingPallet = Pallet::withTrashed()->withCount('activeBoxes')->find($existingStockLocation->pallet_id);
+            if ($existingPallet && ! $existingPallet->trashed() && $existingPallet->active_boxes_count > 0) {
+                // Location is truly occupied by an active pallet with physical boxes. NEVER delete it!
+                if (! $masterLocation->is_occupied || (int) $masterLocation->current_pallet_id !== (int) $existingPallet->id) {
+                    $masterLocation->update([
+                        'is_occupied' => true,
+                        'current_pallet_id' => $existingPallet->id,
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                throw new \RuntimeException("Lokasi {$masterLocation->code} sudah terisi oleh palet aktif {$existingPallet->pallet_number}!");
+            }
+
+            // Only clean up if the pallet is deleted or completely empty (0 active boxes)
+            $existingStockLocation->delete();
+        }
+
         $claimed = MasterLocation::where('id', $masterLocation->id)
-            ->where('is_occupied', false)
+            ->where(function ($q) use ($pallet) {
+                $q->where('is_occupied', false)
+                    ->orWhere('current_pallet_id', $pallet->id);
+            })
             ->update([
                 'is_occupied' => true,
                 'current_pallet_id' => $pallet->id,
@@ -740,12 +776,14 @@ class StockInputController extends Controller
             ? MasterLocation::where('code', $locationCode)->value('id')
             : null;
 
-        StockLocation::create([
-            'pallet_id' => $pallet->id,
-            'master_location_id' => $masterLocationId,
-            'warehouse_location' => $locationCode ?? 'Unknown',
-            'stored_at' => now(),
-        ]);
+        StockLocation::updateOrCreate(
+            ['pallet_id' => $pallet->id],
+            [
+                'master_location_id' => $masterLocationId,
+                'warehouse_location' => $locationCode ?? 'Unknown',
+                'stored_at' => now(),
+            ]
+        );
     }
 
     private function syncPalletItemsWithActiveBoxes(Pallet $pallet): void
@@ -920,6 +958,25 @@ class StockInputController extends Controller
                 'box_ids' => $attachedBoxIds,
             ], 200);
 
+        } catch (\RuntimeException $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (QueryException $e) {
+            DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Stock Input DB Error: '.$e->getMessage());
+
+            $message = $this->isDuplicateKeyException($e)
+                ? 'Terjadi bentrok data lokasi atau palet. Lokasi mungkin sudah ditempati atau sedang digunakan. Silakan muat ulang halaman.'
+                : 'Terjadi kesalahan pada database saat menyimpan stok.';
+
+            return response()->json([
+                'success' => false,
+                'message' => $message,
+            ], 422);
         } catch (\Exception $e) {
             DB::rollBack(); // Rollback transaction on error
             // Log the error for debugging
