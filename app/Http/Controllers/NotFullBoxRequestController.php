@@ -462,7 +462,7 @@ class NotFullBoxRequestController extends Controller
         $maxAttempts = 5;
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            $maxNumber = Pallet::query()
+            $maxNumber = Pallet::withTrashed()
                 ->where('pallet_number', 'like', 'PLT-%')
                 ->pluck('pallet_number')
                 ->map(function ($palletNumber) {
@@ -475,6 +475,10 @@ class NotFullBoxRequestController extends Controller
             $nextNumber = $maxNumber + 1;
             $palletNumber = 'PLT-'.str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
+            if (Pallet::withTrashed()->where('pallet_number', $palletNumber)->exists()) {
+                continue;
+            }
+
             try {
                 return Pallet::create([
                     'pallet_number' => $palletNumber,
@@ -482,6 +486,14 @@ class NotFullBoxRequestController extends Controller
             } catch (QueryException $e) {
                 if ($this->isDuplicateKeyException($e) && $attempt < $maxAttempts) {
                     continue;
+                }
+
+                if ($this->isDuplicateKeyException($e)) {
+                    throw new \RuntimeException(
+                        "Nomor pallet {$palletNumber} sudah terdaftar. Silakan coba lagi.",
+                        0,
+                        $e
+                    );
                 }
 
                 throw $e;

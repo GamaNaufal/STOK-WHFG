@@ -34,9 +34,10 @@ class StockInputController extends Controller
         }
 
         $maxAttempts = 5;
+        $palletNumber = 'PLT-000';
 
         for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            $maxNumber = Pallet::query()
+            $maxNumber = Pallet::withTrashed()
                 ->where('pallet_number', 'like', 'PLT-%')
                 ->pluck('pallet_number')
                 ->map(function ($palletNumber) {
@@ -48,6 +49,10 @@ class StockInputController extends Controller
 
             $nextNumber = $maxNumber + 1;
             $palletNumber = 'PLT-'.str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
+
+            if (Pallet::withTrashed()->where('pallet_number', $palletNumber)->exists()) {
+                continue;
+            }
 
             try {
                 $pallet = Pallet::create([
@@ -65,11 +70,19 @@ class StockInputController extends Controller
                     continue;
                 }
 
+                if ($this->isDuplicateKeyException($e)) {
+                    throw new \RuntimeException(
+                        "Nomor pallet {$palletNumber} sudah terdaftar. Silakan gunakan nomor pallet lain.",
+                        0,
+                        $e
+                    );
+                }
+
                 throw $e;
             }
         }
 
-        throw new \RuntimeException('Gagal membuat nomor palet unik. Silakan coba lagi.');
+        throw new \RuntimeException("Nomor pallet {$palletNumber} sudah terdaftar. Silakan gunakan nomor pallet lain.");
     }
 
     public function index()
@@ -235,7 +248,14 @@ class StockInputController extends Controller
             }
         }
 
-        $pallet = $this->resolveActivePallet();
+        try {
+            $pallet = $this->resolveActivePallet();
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
 
         // Check if box already scanned dalam session ini
         $scannedBoxes = session('scanned_boxes', []);
@@ -428,7 +448,14 @@ class StockInputController extends Controller
             ], 400);
         }
 
-        $pallet = $this->resolveActivePallet();
+        try {
+            $pallet = $this->resolveActivePallet();
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
 
         // Check if box already in this pallet
         $existingBox = $pallet->boxes()->where('box_id', $box->id)->first();

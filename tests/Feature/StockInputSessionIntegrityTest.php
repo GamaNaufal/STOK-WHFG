@@ -153,6 +153,26 @@ class StockInputSessionIntegrityTest extends TestCase
         ]);
     }
 
+    public function test_scan_barcode_skips_pallet_number_used_by_soft_deleted_pallet(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $deletedPallet = Pallet::create(['pallet_number' => 'PLT-559']);
+        $deletedPallet->delete();
+
+        $response = $this->actingAs($operator)->postJson(route('stock-input.scan-barcode'), [
+            'barcode' => '97020101',
+        ]);
+
+        $response->assertOk()->assertJson([
+            'success' => true,
+            'pallet_number' => 'PLT-560',
+        ]);
+        $this->assertDatabaseHas('pallets', [
+            'pallet_number' => 'PLT-560',
+            'deleted_at' => null,
+        ]);
+    }
+
     public function test_scan_qr_preview_does_not_persist_pallet_item_or_attachment_before_store(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);

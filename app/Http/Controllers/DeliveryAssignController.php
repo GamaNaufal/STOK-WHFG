@@ -14,6 +14,7 @@ use App\Models\PartSetting;
 use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Services\AuditService;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -1087,7 +1088,7 @@ class DeliveryAssignController extends Controller
                     ], 422);
                 }
 
-                $alreadyExists = Pallet::query()->where('pallet_number', $newBoxesPalletNumber)->exists();
+                $alreadyExists = Pallet::withTrashed()->where('pallet_number', $newBoxesPalletNumber)->exists();
                 if ($alreadyExists) {
                     return response()->json([
                         'message' => 'Nomor pallet sudah ada. Pilih mode pallet existing.',
@@ -1434,6 +1435,12 @@ class DeliveryAssignController extends Controller
             });
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 409);
+        } catch (QueryException $e) {
+            $message = ((string) $e->getCode() === '23000' || (int) ($e->errorInfo[1] ?? 0) === 1062)
+                ? 'Nomor pallet sudah digunakan. Pilih nomor pallet lain atau gunakan pallet existing.'
+                : 'Terjadi kesalahan database saat melakukan assignment.';
+
+            return response()->json(['message' => $message], 422);
         }
 
         if (!empty($assignedExistingBoxIds) || !empty($createdNewBoxIds)) {
