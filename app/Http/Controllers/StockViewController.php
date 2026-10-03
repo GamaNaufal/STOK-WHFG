@@ -1090,7 +1090,14 @@ class StockViewController extends Controller
         $newPcsQuantity = (int) $validated['pcs_quantity'];
         $newStoredAt = Carbon::parse($validated['stored_at']);
 
-        $box = Box::with('pallets')->findOrFail($boxId);
+        $box = Box::withTrashed()->with('pallets')->whereKey($boxId)->first();
+
+        if (! $box || $box->trashed()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Box tidak ditemukan atau sudah dihapus.',
+            ], 404);
+        }
 
         if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
             return response()->json([
@@ -1115,7 +1122,12 @@ class StockViewController extends Controller
         DB::beginTransaction();
 
         try {
-            $box = Box::whereKey($boxId)->lockForUpdate()->firstOrFail();
+            $box = Box::withTrashed()->whereKey($boxId)->lockForUpdate()->first();
+
+            if (! $box || $box->trashed()) {
+                throw new \RuntimeException('Box tidak ditemukan atau sudah dihapus.');
+            }
+
             $partSetting = PartSetting::where('part_number', $newPartNumber)
                 ->lockForUpdate()
                 ->first();
@@ -1351,10 +1363,23 @@ class StockViewController extends Controller
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
+        $existingBox = Box::withTrashed()->whereKey($boxId)->first();
+        if (! $existingBox || $existingBox->trashed()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Box tidak ditemukan atau sudah dihapus.',
+            ], 404);
+        }
+
         DB::beginTransaction();
 
         try {
-            $box = Box::whereKey($boxId)->lockForUpdate()->firstOrFail();
+            $box = Box::withTrashed()->whereKey($boxId)->lockForUpdate()->first();
+
+            if (! $box || $box->trashed()) {
+                throw new \RuntimeException('Box tidak ditemukan atau sudah dihapus.');
+            }
+
             if ($blockReason = $this->getBoxMutationBlockReason($box)) {
                 throw new \RuntimeException($blockReason);
             }

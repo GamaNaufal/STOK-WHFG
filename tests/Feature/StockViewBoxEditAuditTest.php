@@ -453,6 +453,19 @@ class StockViewBoxEditAuditTest extends TestCase
         });
     }
 
+    public function test_delete_box_for_missing_or_soft_deleted_box_returns_friendly_error(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->deleteJson(route('stock-view.box-delete', 999999))
+            ->assertStatus(404)
+            ->assertJson([
+                'success' => false,
+                'message' => 'Box tidak ditemukan atau sudah dihapus.',
+            ]);
+    }
+
     public function test_assigned_box_cannot_be_edited_deleted_or_deleted_with_its_pallet(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
