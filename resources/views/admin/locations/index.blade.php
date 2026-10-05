@@ -149,6 +149,17 @@
 
 @endsection
 
+@push('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const codeInput = document.getElementById('code');
+        if (codeInput) {
+            codeInput.focus();
+        }
+    });
+</script>
+@endpush
+
 @section('scripts')
 <script>
     (function () {

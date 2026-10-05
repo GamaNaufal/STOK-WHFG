@@ -12,6 +12,7 @@ use App\Models\PalletItem;
 use App\Models\PartSetting;
 use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
+use App\Services\LocationAssignmentService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +24,11 @@ class StockWithdrawalController extends Controller
     private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.';
 
     private const WAREHOUSE_ROLES = ['warehouse_operator', 'admin_warehouse', 'admin'];
+
+    public function __construct(
+        private readonly LocationAssignmentService $locationAssignmentService
+    ) {
+    }
 
     private function ensureWarehouseRole(): void
     {
@@ -883,47 +889,11 @@ class StockWithdrawalController extends Controller
                             throw new \RuntimeException('Master lokasi asal withdrawal tidak ditemukan.');
                         }
 
-                        if (
-                            $masterLocation->is_occupied
-                            && $masterLocation->current_pallet_id
-                            && (int) $masterLocation->current_pallet_id !== $restoredPalletId
-                        ) {
-                            throw new \RuntimeException(
-                                "Lokasi {$batchWithdrawal->warehouse_location} sudah ditempati pallet lain."
-                            );
-                        }
-
-                        $conflictingStockLocation = StockLocation::where('master_location_id', $masterLocation->id)
-                            ->where('pallet_id', '!=', $restoredPalletId)
-                            ->lockForUpdate()
-                            ->exists();
-
-                        if ($conflictingStockLocation) {
-                            throw new \RuntimeException(
-                                "Lokasi {$batchWithdrawal->warehouse_location} sudah memiliki pallet lain."
-                            );
-                        }
-
-                        $stockLocation = StockLocation::where('pallet_id', $restoredPalletId)
-                            ->lockForUpdate()
-                            ->first();
-
-                        if ($stockLocation) {
-                            $stockLocation->warehouse_location = $batchWithdrawal->warehouse_location;
-                            $stockLocation->master_location_id = $masterLocation->id;
-                            $stockLocation->save();
-                        } else {
-                            StockLocation::create([
-                                'pallet_id' => $restoredPalletId,
-                                'master_location_id' => $masterLocation->id,
-                                'warehouse_location' => $batchWithdrawal->warehouse_location,
-                                'stored_at' => $box?->created_at ?? now(),
-                            ]);
-                        }
-
-                        $masterLocation->is_occupied = true;
-                        $masterLocation->current_pallet_id = $restoredPalletId;
-                        $masterLocation->save();
+                        $this->locationAssignmentService->assign(
+                            (int) $masterLocation->id,
+                            Pallet::findOrFail($restoredPalletId),
+                            $box?->created_at ?? now()
+                        );
                     }
 
                     $batchWithdrawal->status = 'reversed';

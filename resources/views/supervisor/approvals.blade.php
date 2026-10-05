@@ -249,7 +249,7 @@
                         button.disabled = true;
                         button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Memproses...';
                     }
-                    form.submit();
+                    window.setTimeout(() => form.submit(), 150);
                 }
             });
         });
@@ -269,7 +269,7 @@
                         button.disabled = true;
                         button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Memproses...';
                     }
-                    form.submit();
+                    window.setTimeout(() => form.submit(), 150);
                 }
             });
         });

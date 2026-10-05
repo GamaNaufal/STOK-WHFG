@@ -1027,11 +1027,12 @@
                 const isLocationConflict =
                     /lokasi|location|duplicate|23000|1062/i.test(message);
 
-                showError(
+                showToast(
                     isLocationConflict
                         ? "Lokasi baru saja digunakan oleh proses lain. Pilih lokasi lain lalu coba lagi."
                         : message ||
                               "Terjadi kesalahan saat menyimpan data. Silakan coba lagi.",
+                    "danger",
                 );
 
                 if (isLocationConflict) {

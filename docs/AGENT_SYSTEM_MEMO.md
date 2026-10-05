@@ -1,6 +1,6 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 5 September 2026.
+Terakhir diverifikasi dari source code: 6 Oktober 2026.
 
 ## Tujuan Memo
 
@@ -473,18 +473,21 @@ Admin Warehouse/Admin dapat melakukan redo selama belum melewati `redo_until`, y
 
 Redo:
 
-- memulihkan box ke palet;
+- membuat satu palet baru otomatis untuk seluruh box dari delivery yang di-redo;
+- memindahkan seluruh box hasil restore ke palet konsolidasi tersebut;
+- meminta satu lokasi kosong untuk palet konsolidasi;
+- mengosongkan lokasi dan ringkasan palet asal hanya jika tidak ada box aktif yang tersisa;
 - mengubah withdrawal menjadi `reversed`;
 - mengembalikan nilai `pallet_items`;
 - mengembalikan `fulfilled_quantity`;
 - menghapus assignment delivery dari box;
 - membatalkan request not-full terkait;
-- memulihkan atau merelokasi lokasi palet;
+- mengunci dan mengisi lokasi tujuan palet konsolidasi secara atomik;
 - menandai completion sebagai `redone`;
 - mengubah order menjadi `processing`;
 - membuat audit redo.
 
-Redo hanya berlaku satu kali untuk session `completed` dengan `completion_status=completed` dan `redo_until` yang belum lewat. Untuk shared box, pallet dari withdrawal menjadi sumber kanonik; pivot box dinormalkan ke pallet tersebut dan ringkasan pallet terdampak dihitung ulang. Session assignment pending yang tersisa dibatalkan saat redo.
+Redo hanya berlaku satu kali untuk session `completed` dengan `completion_status=completed` dan `redo_until` yang belum lewat. Untuk shared box, seluruh box yang direstore dipindahkan ke pallet konsolidasi baru; pallet asal yang masih memiliki box aktif tetap mempertahankan lokasi dan ringkasannya, sedangkan pallet asal yang kosong dilepas dari lokasi dan stock location-nya. Session assignment pending yang tersisa dibatalkan saat redo.
 
 ### 15. Merge palet
 
@@ -632,6 +635,8 @@ Status yang digunakan:
 - Pencarian Stock View mencakup box orphan aktif dan box non-aktif (withdrawn/expired/archived), serta otomatis beralih ke mode box_id saat user mencari box tanpa kecocokan nomor part.
 - Merge Pallet mendukung pemilihan lokasi tujuan dari salah satu pallet sumber yang digabung; pembersihan pallet sumber melepas okupansi master location secara tuntas dan backend mendukung fallback pencarian master location via kode string `warehouse_location`.
 - Stock Input memvalidasi ketersediaan lokasi secara defensif terhadap `master_locations` dan `stock_locations`; baris `stock_locations` yatim (orphan) yang tertinggal dari palet non-aktif/terhapus dibersihkan secara aman (self-healing) untuk mencegah bentrok unique constraint `master_location_id`.
+- Assignment lokasi pada Stock Input, Delivery Assign, approval Box Not Full, Restore Withdrawal, Redo/relokasi, dan Merge Pallet menggunakan `App\Services\LocationAssignmentService` untuk locking `master_locations`, validasi konflik `stock_locations`, dan assignment atomik di dalam transaksi flow masing-masing (diverifikasi 6 Oktober 2026).
+- Redo Withdrawal selalu memakai satu lokasi tujuan untuk satu pallet konsolidasi baru; UI tidak lagi meminta relokasi per pallet asal.
 
 ## Keputusan Bisnis
 

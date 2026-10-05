@@ -1307,9 +1307,61 @@
 
         const targets = Array.isArray(optionsPayload.targets) ? optionsPayload.targets : [];
         if (targets.length > 1) {
+            const sourcePallets = targets.map((target) => target.pallet_number).filter(Boolean).join(', ');
+            const availableCodes = (optionsPayload.available_locations || [])
+                .map((location) => String(location.code || '').trim().toUpperCase())
+                .filter(Boolean);
+            const options = availableCodes.map((code) => `<option value="${code}">${code}</option>`).join('');
+            const result = await Swal.fire({
+                title: 'Redo Withdrawal: Konsolidasi Pallet',
+                html: `
+                    <div class="text-start small text-muted mb-3">
+                        Box dari pallet ${sourcePallets || 'asal'} akan dikembalikan menjadi <strong>satu pallet baru</strong>.
+                        Pilih satu lokasi kosong untuk pallet hasil konsolidasi.
+                    </div>
+                    <select id="redo-consolidated-location" class="form-select">
+                        <option value="">Pilih lokasi kosong...</option>${options}
+                    </select>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Lanjutkan Redo',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#0C7779',
+                cancelButtonColor: '#6B7280',
+                reverseButtons: true,
+                width: '640px',
+                preConfirm: () => {
+                    const code = (document.getElementById('redo-consolidated-location')?.value || '').trim().toUpperCase();
+                    if (!code) {
+                        Swal.showValidationMessage('Pilih satu lokasi kosong untuk pallet hasil konsolidasi.');
+                        return false;
+                    }
+                    return code;
+                }
+            });
+
+            if (!result.isConfirmed) {
+                return;
+            }
+
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'relocation_location';
+            input.value = result.value;
+            form.appendChild(input);
+            form.submit();
+            return;
+        }
+
+        /*
+         * A single-source redo uses the same consolidated-pallet dialog below.
+         * The backend always creates a new pallet, even when only one source
+         * pallet is involved.
+         */
+        if (targets.length === 0) {
             WarehouseAlert.error({
                 title: 'Redo Gagal',
-                message: 'Redo ini melibatkan lebih dari satu pallet. Gunakan relokasi per pallet melalui proses admin lanjutan.'
+                message: 'Tidak ada box yang dapat dikembalikan dari delivery ini.'
             });
             return;
         }
@@ -1327,22 +1379,21 @@
             `
             : '<div class="small text-muted text-start mb-2">Tidak ada bentrok lokasi. Anda bisa lanjutkan redo tanpa isi relokasi.</div>';
 
-        const firstDefaultLocation = targets.length > 0 ? (targets[0].default_location || '') : '';
-        let selectedLocation = conflictRows.length === 0 ? firstDefaultLocation : '';
-        let locationOptions = mergeLocationOptions(firstDefaultLocation, optionsPayload.available_locations || []);
+        let selectedLocation = '';
+        let locationOptions = mergeLocationOptions('', optionsPayload.available_locations || []);
 
         await Swal.fire({
-            title: '<strong style="font-size: 1.4rem; color: #374151;">Konfirmasi Redo Delivery</strong>',
+            title: '<strong style="font-size: 1.4rem; color: #374151;">Redo Withdrawal: Konsolidasi Pallet</strong>',
             html: `
                 <div style="text-align: left; padding: 8px 6px;">
                     ${conflictHtml}
                     <div class="mb-2">
                         <label for="redo-location-search" class="form-label" style="font-weight: 600; color: #374151;">Pilih Lokasi Tujuan</label>
                         <input id="redo-location-search" class="form-control" type="text" placeholder="Cari kode lokasi..." value="${selectedLocation || ''}" autocomplete="off">
-                        <div class="form-text">Satu field ini dipakai untuk lokasi sebelumnya maupun relokasi.</div>
+                        <div class="form-text">Box akan dikembalikan ke satu pallet baru di lokasi kosong ini.</div>
                     </div>
                     <div id="redo-location-suggestions" style="max-height: 180px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #f9fafb;"></div>
-                    <div class="small text-muted mt-2">Default lokasi pallet: ${firstDefaultLocation || '-'}</div>
+                    <div class="small text-muted mt-2">Pallet asal: ${targets.map((target) => target.pallet_number).filter(Boolean).join(', ') || '-'}</div>
                 </div>
             `,
             showCancelButton: true,
@@ -1381,10 +1432,10 @@
                     searchTimeout = setTimeout(async () => {
                         try {
                             const payload = await fetchRedoOptions(optionsUrl, (searchInput.value || '').trim());
-                            locationOptions = mergeLocationOptions(firstDefaultLocation, payload.available_locations || []);
+                            locationOptions = mergeLocationOptions('', payload.available_locations || []);
                             renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput.value || '');
                         } catch (error) {
-                            renderLocationDropdown(suggestions, mergeLocationOptions(firstDefaultLocation, []), selectedLocation, searchInput.value || '');
+                            renderLocationDropdown(suggestions, mergeLocationOptions('', []), selectedLocation, searchInput.value || '');
                         }
                     }, 250);
                 });

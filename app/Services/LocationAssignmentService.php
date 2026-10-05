@@ -52,6 +52,14 @@ class LocationAssignmentService
             }
 
             $existingStockLocation->delete();
+
+            if ((int) $location->current_pallet_id === (int) $existingStockLocation->pallet_id) {
+                $location->update([
+                    'is_occupied' => false,
+                    'current_pallet_id' => null,
+                    'updated_at' => now(),
+                ]);
+            }
         }
 
         if (

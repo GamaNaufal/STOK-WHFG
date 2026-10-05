@@ -7,12 +7,18 @@ use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Models\StockInput;
 use App\Models\StockLocation;
+use App\Services\LocationAssignmentService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class MergePalletController extends Controller
 {
+    public function __construct(
+        private readonly LocationAssignmentService $locationAssignmentService
+    ) {
+    }
+
     private function isDuplicateKeyException(QueryException $e): bool
     {
         $sqlState = (string) ($e->getCode() ?? '');
@@ -372,34 +378,9 @@ class MergePalletController extends Controller
      */
     private function assignNewLocation(MasterLocation $masterLocation, Pallet $newPallet): string
     {
-        $locationCode = $masterLocation->code;
-
-        // Claim the master location for the new pallet
-        MasterLocation::whereKey($masterLocation->id)
-            ->update([
-                'is_occupied' => true,
-                'current_pallet_id' => $newPallet->id,
-                'updated_at' => now(),
-            ]);
-
-        // Clean up any stale stock_location rows for this master_location_id
-        // that may remain from previous failed merge attempts (data "kotor").
-        // The unique constraint on master_location_id means only one row can exist.
-        StockLocation::where('master_location_id', $masterLocation->id)
-            ->where('pallet_id', '!=', $newPallet->id)
-            ->delete();
-
-        // Use updateOrCreate to safely handle both fresh insert and re-use scenarios
-        StockLocation::updateOrCreate(
-            ['pallet_id' => $newPallet->id],
-            [
-                'master_location_id' => $masterLocation->id,
-                'warehouse_location' => $locationCode,
-                'stored_at' => now(),
-            ]
-        );
-
-        return $locationCode;
+        return $this->locationAssignmentService
+            ->assign((int) $masterLocation->id, $newPallet)
+            ->warehouse_location;
     }
 
     private function createMergeAudit(Pallet $newPallet, array $palletNumbers, Request $request): void

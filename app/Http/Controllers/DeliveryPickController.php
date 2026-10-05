@@ -15,6 +15,7 @@ use App\Models\PartSetting;
 use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
 use App\Services\AuditService;
+use App\Services\LocationAssignmentService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -28,6 +29,11 @@ class DeliveryPickController extends Controller
     private const SESSION_RECALC_MESSAGE = 'Sesi picking ini perlu dihitung ulang karena ada order dengan prioritas tanggal lebih awal.';
 
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
+
+    public function __construct(
+        private readonly LocationAssignmentService $locationAssignmentService
+    ) {
+    }
 
     private function authorizePickSessionView(DeliveryPickSession $session): void
     {
@@ -1179,16 +1185,11 @@ class DeliveryPickController extends Controller
             return redirect()->back()->with('error', $error);
         }
 
-        $requestedRelocations = collect((array) $request->input('relocation_locations', []))
-            ->mapWithKeys(function ($locationCode, $palletId) {
-                $code = strtoupper(trim((string) $locationCode));
-
-                return [(int) $palletId => $code];
-            })
-            ->filter(fn ($code) => $code !== '')
-            ->all();
-
+        $legacyRelocationCodes = (array) $request->input('relocation_locations', []);
         $singleRelocationCode = strtoupper(trim((string) $request->input('relocation_location', '')));
+        if ($singleRelocationCode === '') {
+            $singleRelocationCode = strtoupper(trim((string) (reset($legacyRelocationCodes) ?: '')));
+        }
 
         DB::beginTransaction();
         try {
@@ -1217,29 +1218,23 @@ class DeliveryPickController extends Controller
                     $redoContext['boxPalletIdsByBoxId']
                 );
 
-                if ($singleRelocationCode !== '' && empty($requestedRelocations)) {
-                    if (count($targetPalletIds) !== 1) {
-                        DB::rollBack();
+                if ($singleRelocationCode === '') {
+                    DB::rollBack();
 
-                        return redirect()->back()->with('error', 'Redo melibatkan lebih dari satu pallet. Gunakan relokasi per pallet.');
-                    }
-
-                    $requestedRelocations[(int) $targetPalletIds[0]] = $singleRelocationCode;
+                    return redirect()->back()->with('error', 'Pilih satu lokasi kosong untuk pallet hasil konsolidasi redo.');
                 }
 
-                $locationCheck = $this->resolveRedoLocationAssignments($targetPalletIds, $requestedRelocations, $redoContext);
+                $locationCheck = $this->resolveRedoConsolidationLocation($singleRelocationCode);
                 if (! ($locationCheck['success'] ?? false)) {
                     DB::rollBack();
 
                     return redirect()->back()->with('error', (string) ($locationCheck['message'] ?? 'Redo gagal karena konflik lokasi.'));
                 }
 
-                $affectedPalletIds = $this->restoreBoxesToPallets(
+                $consolidatedPallet = $this->restoreBoxesToConsolidatedPallet(
                     $redoContext['allSessionBoxes'],
-                    $withdrawals,
-                    $redoContext['palletItemsById'],
-                    $redoContext['boxPalletIdsByBoxId']
                 );
+                $affectedPalletIds = array_merge($targetPalletIds, [(int) $consolidatedPallet->id]);
 
                 $this->reverseWithdrawalsAndRestorePalletItems($withdrawals, $redoContext['palletItemsById']);
                 $this->syncPalletSummariesFromActiveBoxes($affectedPalletIds);
@@ -1268,7 +1263,10 @@ class DeliveryPickController extends Controller
 
                 $this->rollbackOrderFulfilledQuantities($session->order, $withdrawals);
 
-                $this->applyRedoLocationAssignments($locationCheck['assignments'] ?? []);
+                $this->releaseEmptyPalletLocations($targetPalletIds);
+                $this->applyRedoLocationAssignments([
+                    (int) $consolidatedPallet->id => $locationCheck['location_code'],
+                ]);
             }
 
             $session->completion_status = 'redone';
@@ -1413,6 +1411,94 @@ class DeliveryPickController extends Controller
         }
 
         return array_values(array_unique(array_filter($palletIds)));
+    }
+
+    private function resolveRedoConsolidationLocation(string $locationCode): array
+    {
+        $locationCode = strtoupper(trim($locationCode));
+        $masterLocation = MasterLocation::where('code', $locationCode)
+            ->lockForUpdate()
+            ->first();
+
+        if (! $masterLocation) {
+            return [
+                'success' => false,
+                'message' => "Redo diblokir: lokasi {$locationCode} tidak ditemukan.",
+            ];
+        }
+
+        $conflictState = $this->evaluateLocationConflictState($masterLocation, 0, true);
+        if ($conflictState['conflict']) {
+            return [
+                'success' => false,
+                'message' => "Redo diblokir: lokasi {$locationCode} sedang dipakai pallet {$conflictState['occupying_pallet_number']}.",
+            ];
+        }
+
+        return [
+            'success' => true,
+            'location_code' => $locationCode,
+        ];
+    }
+
+    private function restoreBoxesToConsolidatedPallet($allSessionBoxes): Pallet
+    {
+        $pallet = Pallet::create([
+            'pallet_number' => $this->generateRedoPalletNumber(),
+        ]);
+
+        foreach ($allSessionBoxes as $box) {
+            if (! $box instanceof Box) {
+                continue;
+            }
+
+            if ($box->is_withdrawn) {
+                $box->is_withdrawn = false;
+                $box->withdrawn_at = null;
+                $box->save();
+            }
+
+            $box->pallets()->sync([$pallet->id]);
+        }
+
+        return $pallet;
+    }
+
+    private function releaseEmptyPalletLocations(array $palletIds): void
+    {
+        foreach (array_values(array_unique(array_filter($palletIds))) as $palletId) {
+            $pallet = Pallet::find((int) $palletId);
+            if (! $pallet || $pallet->activeBoxes()->exists()) {
+                continue;
+            }
+
+            MasterLocation::where('current_pallet_id', (int) $palletId)
+                ->lockForUpdate()
+                ->update([
+                    'is_occupied' => false,
+                    'current_pallet_id' => null,
+                    'updated_at' => now(),
+                ]);
+
+            StockLocation::where('pallet_id', (int) $palletId)
+                ->lockForUpdate()
+                ->delete();
+        }
+    }
+
+    private function generateRedoPalletNumber(): string
+    {
+        $maxNumber = Pallet::withTrashed()
+            ->where('pallet_number', 'like', 'PLT-%')
+            ->pluck('pallet_number')
+            ->map(function ($palletNumber) {
+                preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+
+                return isset($matches[1]) ? (int) $matches[1] : 0;
+            })
+            ->max() ?? 0;
+
+        return 'PLT-'.str_pad($maxNumber + 1, 3, '0', STR_PAD_LEFT);
     }
 
     private function resolveRedoLocationAssignments(array $targetPalletIds, array $requestedRelocations, array $redoContext): array
@@ -1644,30 +1730,10 @@ class DeliveryPickController extends Controller
                 throw new \RuntimeException("Lokasi {$locationCode} sudah ditempati pallet lain.");
             }
 
-            $masterLocationId = (int) $masterLocation->id;
-
-            $masterLocation->update([
-                'is_occupied' => true,
-                'current_pallet_id' => $palletId,
-                'updated_at' => now(),
-            ]);
-
-            $conflictingStockLocation = StockLocation::where('master_location_id', $masterLocationId)
-                ->where('pallet_id', '!=', $palletId)
-                ->lockForUpdate()
-                ->first();
-
-            if ($conflictingStockLocation) {
-                throw new \RuntimeException("Lokasi {$locationCode} sudah memiliki pallet lain.");
-            }
-
-            StockLocation::updateOrCreate(
-                ['pallet_id' => $palletId],
-                [
-                    'master_location_id' => $masterLocationId,
-                    'warehouse_location' => $locationCode,
-                    'stored_at' => now(),
-                ]
+            $pallet = Pallet::findOrFail($palletId);
+            $this->locationAssignmentService->assign(
+                (int) $masterLocation->id,
+                $pallet
             );
         }
     }
