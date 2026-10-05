@@ -14,6 +14,7 @@ use App\Models\PartSetting;
 use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Services\AuditService;
+use App\Services\LocationAssignmentService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -23,40 +24,16 @@ class DeliveryAssignController extends Controller
 {
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
 
+    public function __construct(
+        private readonly LocationAssignmentService $locationAssignmentService
+    ) {
+    }
+
     private function resolveAndClaimMasterLocation(int $masterLocationId, Pallet $pallet): string
     {
-        $masterLocation = MasterLocation::query()
-            ->whereKey($masterLocationId)
-            ->lockForUpdate()
-            ->first();
-        if (!$masterLocation) {
-            throw new \RuntimeException('Lokasi yang dipilih tidak ditemukan.');
-        }
-
-        $existingStockLocation = StockLocation::query()
-            ->where('master_location_id', $masterLocation->id)
-            ->where('pallet_id', '!=', $pallet->id)
-            ->lockForUpdate()
-            ->first();
-
-        if ($existingStockLocation) {
-            throw new \RuntimeException('Lokasi yang dipilih sudah memiliki pallet. Pilih lokasi lain.');
-        }
-
-        if (
-            $masterLocation->is_occupied
-            && (int) $masterLocation->current_pallet_id !== (int) $pallet->id
-        ) {
-            throw new \RuntimeException('Lokasi yang dipilih sudah terisi.');
-        }
-
-        $masterLocation->update([
-            'is_occupied' => true,
-            'current_pallet_id' => $pallet->id,
-            'updated_at' => now(),
-        ]);
-
-        return (string) $masterLocation->code;
+        return (string) $this->locationAssignmentService
+            ->claim($masterLocationId, (int) $pallet->id)
+            ->code;
     }
 
     private function syncPalletItemsWithActiveBoxes(Pallet $pallet): void
@@ -1372,12 +1349,10 @@ class DeliveryAssignController extends Controller
 
                     $locationCodeForNewBoxes = $this->resolveAndClaimMasterLocation($newBoxesLocationId, $palletForNewBoxes);
 
-                    StockLocation::create([
-                        'pallet_id' => $palletForNewBoxes->id,
-                        'master_location_id' => $newBoxesLocationId,
-                        'warehouse_location' => $locationCodeForNewBoxes,
-                        'stored_at' => now(),
-                    ]);
+                    $this->locationAssignmentService->assign(
+                        $newBoxesLocationId,
+                        $palletForNewBoxes
+                    );
                 }
 
                 $now = now();

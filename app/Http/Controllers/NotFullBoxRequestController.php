@@ -14,6 +14,7 @@ use App\Models\PartSetting;
 use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\AuditService;
+use App\Services\LocationAssignmentService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,6 +23,11 @@ use Illuminate\Support\Facades\DB;
 class NotFullBoxRequestController extends Controller
 {
     private const ACTIVE_PICK_STATUSES = ['pending', 'scanning', 'blocked', 'approved'];
+
+    public function __construct(
+        private readonly LocationAssignmentService $locationAssignmentService
+    ) {
+    }
 
     private function isDuplicateKeyException(QueryException $e): bool
     {
@@ -323,37 +329,12 @@ class NotFullBoxRequestController extends Controller
                         throw new \RuntimeException('Lokasi tidak tersedia.');
                     }
 
-                    $location = MasterLocation::whereKey($location->id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if (! $location) {
-                        throw new \RuntimeException('Lokasi tidak tersedia.');
-                    }
-
-                    $existingStockLocation = StockLocation::where('master_location_id', $location->id)
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($existingStockLocation || $location->is_occupied) {
-                        throw new \RuntimeException('Lokasi tidak tersedia.');
-                    }
-
                     $pallet = $this->createNewPallet();
-                    $locationCode = $location->code;
-
-                    $location->update([
-                        'is_occupied' => true,
-                        'current_pallet_id' => $pallet->id,
-                        'updated_at' => now(),
-                    ]);
-
-                    StockLocation::create([
-                        'pallet_id' => $pallet->id,
-                        'master_location_id' => $location->id,
-                        'warehouse_location' => $locationCode,
-                        'stored_at' => now(),
-                    ]);
+                    $location = $this->locationAssignmentService->assign(
+                        (int) $location->id,
+                        $pallet
+                    );
+                    $locationCode = $location->warehouse_location;
                 } else {
                     $pallet = Pallet::whereKey($pallet->id)->lockForUpdate()->firstOrFail();
                     $locationCode = $pallet->stockLocation?->warehouse_location;

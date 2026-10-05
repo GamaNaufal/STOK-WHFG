@@ -9,6 +9,8 @@ use App\Models\PalletItem;
 use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\AuditService;
+use App\Services\LocationAssignmentService;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +18,10 @@ use Illuminate\Support\Facades\DB;
 
 class StockInputController extends Controller
 {
+    public function __construct(
+        private readonly LocationAssignmentService $locationAssignmentService
+    ) {
+    }
     private function isDuplicateKeyException(QueryException $e): bool
     {
         $sqlState = (string) ($e->getCode() ?? '');
@@ -741,60 +747,13 @@ class StockInputController extends Controller
             throw new \RuntimeException('Lokasi wajib dipilih dari Master Location.');
         }
 
-        $masterLocation = MasterLocation::find($locationId);
-        if (! $masterLocation) {
+        try {
+            return $this->locationAssignmentService
+                ->claim((int) $locationId, (int) $pallet->id)
+                ->code;
+        } catch (ModelNotFoundException) {
             throw new \RuntimeException('Lokasi yang dipilih tidak ditemukan!');
         }
-
-        // Lock the master location row to prevent concurrent assignment
-        $masterLocation = MasterLocation::whereKey($masterLocation->id)
-            ->lockForUpdate()
-            ->first();
-
-        if (! $masterLocation) {
-            throw new \RuntimeException('Lokasi yang dipilih tidak ditemukan!');
-        }
-
-        // Check if there is already a stock_location row for this master_location_id
-        $existingStockLocation = StockLocation::where('master_location_id', $masterLocation->id)
-            ->where('pallet_id', '!=', $pallet->id)
-            ->first();
-
-        if ($existingStockLocation) {
-            $existingPallet = Pallet::withTrashed()->withCount('activeBoxes')->find($existingStockLocation->pallet_id);
-            if ($existingPallet && ! $existingPallet->trashed() && $existingPallet->active_boxes_count > 0) {
-                // Location is truly occupied by an active pallet with physical boxes. NEVER delete it!
-                if (! $masterLocation->is_occupied || (int) $masterLocation->current_pallet_id !== (int) $existingPallet->id) {
-                    $masterLocation->update([
-                        'is_occupied' => true,
-                        'current_pallet_id' => $existingPallet->id,
-                        'updated_at' => now(),
-                    ]);
-                }
-
-                throw new \RuntimeException("Lokasi {$masterLocation->code} sudah terisi oleh palet aktif {$existingPallet->pallet_number}!");
-            }
-
-            // Only clean up if the pallet is deleted or completely empty (0 active boxes)
-            $existingStockLocation->delete();
-        }
-
-        $claimed = MasterLocation::where('id', $masterLocation->id)
-            ->where(function ($q) use ($pallet) {
-                $q->where('is_occupied', false)
-                    ->orWhere('current_pallet_id', $pallet->id);
-            })
-            ->update([
-                'is_occupied' => true,
-                'current_pallet_id' => $pallet->id,
-                'updated_at' => now(),
-            ]);
-
-        if ($claimed === 0) {
-            throw new \RuntimeException('Lokasi yang dipilih sudah terisi!');
-        }
-
-        return $masterLocation->code;
     }
 
     private function createStockLocationRecord(Pallet $pallet, ?string $locationCode): void
@@ -803,10 +762,15 @@ class StockInputController extends Controller
             ? MasterLocation::where('code', $locationCode)->value('id')
             : null;
 
+        if ($masterLocationId) {
+            $this->locationAssignmentService->assign($masterLocationId, $pallet);
+            return;
+        }
+
         StockLocation::updateOrCreate(
             ['pallet_id' => $pallet->id],
             [
-                'master_location_id' => $masterLocationId,
+                'master_location_id' => null,
                 'warehouse_location' => $locationCode ?? 'Unknown',
                 'stored_at' => now(),
             ]

@@ -1622,28 +1622,43 @@ class DeliveryPickController extends Controller
 
             MasterLocation::where('current_pallet_id', $palletId)
                 ->where('code', '!=', $locationCode)
+                ->lockForUpdate()
                 ->update([
                     'is_occupied' => false,
                     'current_pallet_id' => null,
                     'updated_at' => now(),
                 ]);
 
-            $masterLocationId = MasterLocation::where('code', $locationCode)->value('id');
+            $masterLocation = MasterLocation::where('code', $locationCode)
+                ->lockForUpdate()
+                ->first();
 
-            MasterLocation::where('code', $locationCode)
-                ->update([
-                    'is_occupied' => true,
-                    'current_pallet_id' => $palletId,
-                    'updated_at' => now(),
-                ]);
+            if (! $masterLocation) {
+                throw new \RuntimeException("Lokasi {$locationCode} tidak ditemukan.");
+            }
 
-            if ($masterLocationId) {
-                StockLocation::where('master_location_id', $masterLocationId)
-                    ->where('pallet_id', '!=', $palletId)
-                    ->update([
-                        'master_location_id' => null,
-                        'updated_at' => now(),
-                    ]);
+            if (
+                $masterLocation->is_occupied
+                && (int) $masterLocation->current_pallet_id !== $palletId
+            ) {
+                throw new \RuntimeException("Lokasi {$locationCode} sudah ditempati pallet lain.");
+            }
+
+            $masterLocationId = (int) $masterLocation->id;
+
+            $masterLocation->update([
+                'is_occupied' => true,
+                'current_pallet_id' => $palletId,
+                'updated_at' => now(),
+            ]);
+
+            $conflictingStockLocation = StockLocation::where('master_location_id', $masterLocationId)
+                ->where('pallet_id', '!=', $palletId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($conflictingStockLocation) {
+                throw new \RuntimeException("Lokasi {$locationCode} sudah memiliki pallet lain.");
             }
 
             StockLocation::updateOrCreate(

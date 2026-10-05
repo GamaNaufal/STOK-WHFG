@@ -6,6 +6,7 @@ use App\Models\Box;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
+use App\Models\MasterLocation;
 use App\Models\StockLocation;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,6 +15,79 @@ use Tests\TestCase;
 class StockInputSessionIntegrityTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_stock_input_location_conflict_rolls_back_new_box_and_keeps_session(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $location = MasterLocation::create([
+            'code' => 'CONFLICT-A1',
+            'is_occupied' => true,
+        ]);
+        $occupyingPallet = Pallet::create(['pallet_number' => 'PLT-CONFLICT-OWNER']);
+        $location->update([
+            'current_pallet_id' => $occupyingPallet->id,
+        ]);
+        StockLocation::create([
+            'pallet_id' => $occupyingPallet->id,
+            'master_location_id' => $location->id,
+            'warehouse_location' => $location->code,
+            'stored_at' => now(),
+        ]);
+
+        $occupyingBox = Box::create([
+            'box_number' => '97000101',
+            'part_number' => 'P-CONFLICT',
+            'pcs_quantity' => 12,
+            'qty_box' => 12,
+            'qr_code' => '97000101|P-CONFLICT|12',
+            'user_id' => $operator->id,
+            'is_withdrawn' => false,
+            'expired_status' => 'active',
+        ]);
+        $occupyingPallet->boxes()->attach($occupyingBox->id);
+
+        $newPallet = Pallet::create(['pallet_number' => 'PLT-CONFLICT-NEW']);
+        $response = $this->actingAs($operator)
+            ->withSession([
+                'current_pallet_id' => $newPallet->id,
+                'current_pallet_source' => 'new',
+                'scanned_boxes' => [[
+                    'box_number' => '97000102',
+                    'part_number' => 'P-CONFLICT',
+                    'pcs_quantity' => 12,
+                    'qty_box' => 12,
+                    'is_not_full' => false,
+                ]],
+            ])
+            ->postJson(route('stock-input.store'), [
+                'pallet_id' => $newPallet->id,
+                'location_id' => $location->id,
+                'warehouse_location' => $location->code,
+            ]);
+
+        $response
+            ->assertStatus(422)
+            ->assertJson([
+                'success' => false,
+                'message' => "Lokasi {$location->code} sudah terisi oleh palet aktif {$occupyingPallet->pallet_number}!",
+            ]);
+
+        $this->assertDatabaseMissing('boxes', ['box_number' => '97000102']);
+        $this->assertDatabaseMissing('pallet_boxes', ['pallet_id' => $newPallet->id]);
+        $this->assertDatabaseMissing('stock_locations', ['pallet_id' => $newPallet->id]);
+        $this->assertDatabaseHas('stock_locations', [
+            'pallet_id' => $occupyingPallet->id,
+            'master_location_id' => $location->id,
+        ]);
+        $this->assertDatabaseHas('master_locations', [
+            'id' => $location->id,
+            'current_pallet_id' => $occupyingPallet->id,
+            'is_occupied' => true,
+        ]);
+        $this->assertSame('new', session('current_pallet_source'));
+        $this->assertSame($newPallet->id, (int) session('current_pallet_id'));
+        $this->assertNotEmpty(session('scanned_boxes'));
+    }
 
     public function test_select_existing_pallet_does_not_move_items_between_existing_pallets(): void
     {

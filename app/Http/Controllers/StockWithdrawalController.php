@@ -893,6 +893,17 @@ class StockWithdrawalController extends Controller
                             );
                         }
 
+                        $conflictingStockLocation = StockLocation::where('master_location_id', $masterLocation->id)
+                            ->where('pallet_id', '!=', $restoredPalletId)
+                            ->lockForUpdate()
+                            ->exists();
+
+                        if ($conflictingStockLocation) {
+                            throw new \RuntimeException(
+                                "Lokasi {$batchWithdrawal->warehouse_location} sudah memiliki pallet lain."
+                            );
+                        }
+
                         $stockLocation = StockLocation::where('pallet_id', $restoredPalletId)
                             ->lockForUpdate()
                             ->first();
