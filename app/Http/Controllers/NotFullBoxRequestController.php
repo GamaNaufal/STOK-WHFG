@@ -15,6 +15,7 @@ use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletNumberService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,7 +26,8 @@ class NotFullBoxRequestController extends Controller
     private const ACTIVE_PICK_STATUSES = ['pending', 'scanning', 'blocked', 'approved'];
 
     public function __construct(
-        private readonly LocationAssignmentService $locationAssignmentService
+        private readonly LocationAssignmentService $locationAssignmentService,
+        private readonly PalletNumberService $palletNumberService
     ) {
     }
 
@@ -454,47 +456,6 @@ class NotFullBoxRequestController extends Controller
 
     private function createNewPallet(): Pallet
     {
-        $maxAttempts = 5;
-
-        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            $maxNumber = Pallet::withTrashed()
-                ->where('pallet_number', 'like', 'PLT-%')
-                ->pluck('pallet_number')
-                ->map(function ($palletNumber) {
-                    preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
-
-                    return isset($matches[1]) ? (int) $matches[1] : 0;
-                })
-                ->max() ?? 0;
-
-            $nextNumber = $maxNumber + 1;
-            $palletNumber = 'PLT-'.str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-
-            if (Pallet::withTrashed()->where('pallet_number', $palletNumber)->exists()) {
-                continue;
-            }
-
-            try {
-                return Pallet::create([
-                    'pallet_number' => $palletNumber,
-                ]);
-            } catch (QueryException $e) {
-                if ($this->isDuplicateKeyException($e) && $attempt < $maxAttempts) {
-                    continue;
-                }
-
-                if ($this->isDuplicateKeyException($e)) {
-                    throw new \RuntimeException(
-                        "Nomor pallet {$palletNumber} sudah terdaftar. Silakan coba lagi.",
-                        0,
-                        $e
-                    );
-                }
-
-                throw $e;
-            }
-        }
-
-        throw new \RuntimeException('Gagal membuat nomor palet unik. Silakan coba lagi.');
+        return $this->palletNumberService->create();
     }
 }

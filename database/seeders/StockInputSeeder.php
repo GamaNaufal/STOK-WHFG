@@ -10,6 +10,7 @@ use App\Models\StockInput;
 use App\Models\User;
 use App\Models\MasterLocation;
 use App\Models\StockLocation;
+use App\Services\PalletNumberService;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 use Carbon\Carbon;
@@ -43,7 +44,7 @@ class StockInputSeeder extends Seeder
         
         $now = Carbon::now();
         $boxNumberCounter = mt_rand(10000000, 99000000);
-        $startIdx = Pallet::max('id') ?? 0;
+        $palletNumberService = app(PalletNumberService::class);
 
         for ($i = 0; $i < $numberOfInputs; $i++) {
             $part = $parts->random();
@@ -53,9 +54,7 @@ class StockInputSeeder extends Seeder
             $numberOfBoxes = rand(1, 5);
 
             // 4. Create a pallet
-            $pallet = Pallet::create([
-                'pallet_number' => sprintf('PLT-%03d', $startIdx + $i + 1),
-            ]);
+            $pallet = $palletNumberService->create();
 
             // 5. Create pallet item
             $palletItem = PalletItem::create([

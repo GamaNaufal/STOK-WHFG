@@ -637,6 +637,7 @@ Status yang digunakan:
 - Stock Input memvalidasi ketersediaan lokasi secara defensif terhadap `master_locations` dan `stock_locations`; baris `stock_locations` yatim (orphan) yang tertinggal dari palet non-aktif/terhapus dibersihkan secara aman (self-healing) untuk mencegah bentrok unique constraint `master_location_id`.
 - Assignment lokasi pada Stock Input, Delivery Assign, approval Box Not Full, Restore Withdrawal, Redo/relokasi, dan Merge Pallet menggunakan `App\Services\LocationAssignmentService` untuk locking `master_locations`, validasi konflik `stock_locations`, dan assignment atomik di dalam transaksi flow masing-masing (diverifikasi 6 Oktober 2026).
 - Redo Withdrawal selalu memakai satu lokasi tujuan untuk satu pallet konsolidasi baru; UI tidak lagi meminta relokasi per pallet asal.
+- Nomor pallet otomatis dialokasikan melalui `App\Services\PalletNumberService` dan tabel `pallet_number_sequences` yang dikunci database; generator tidak lagi bergantung hanya pada pola `MAX + 1` di tiap controller (diverifikasi 6 Oktober 2026).
 
 ## Keputusan Bisnis
 

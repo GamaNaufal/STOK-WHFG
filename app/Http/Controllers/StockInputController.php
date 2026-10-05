@@ -10,6 +10,7 @@ use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletNumberService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -19,7 +20,8 @@ use Illuminate\Support\Facades\DB;
 class StockInputController extends Controller
 {
     public function __construct(
-        private readonly LocationAssignmentService $locationAssignmentService
+        private readonly LocationAssignmentService $locationAssignmentService,
+        private readonly PalletNumberService $palletNumberService
     ) {
     }
     private function isDuplicateKeyException(QueryException $e): bool
@@ -39,56 +41,14 @@ class StockInputController extends Controller
             return $pallet;
         }
 
-        $maxAttempts = 5;
-        $palletNumber = 'PLT-000';
+        $pallet = $this->palletNumberService->create();
 
-        for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-            $maxNumber = Pallet::withTrashed()
-                ->where('pallet_number', 'like', 'PLT-%')
-                ->pluck('pallet_number')
-                ->map(function ($palletNumber) {
-                    preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+        session([
+            'current_pallet_id' => $pallet->id,
+            'current_pallet_source' => 'new',
+        ]);
 
-                    return isset($matches[1]) ? (int) $matches[1] : 0;
-                })
-                ->max() ?? 0;
-
-            $nextNumber = $maxNumber + 1;
-            $palletNumber = 'PLT-'.str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
-
-            if (Pallet::withTrashed()->where('pallet_number', $palletNumber)->exists()) {
-                continue;
-            }
-
-            try {
-                $pallet = Pallet::create([
-                    'pallet_number' => $palletNumber,
-                ]);
-
-                session([
-                    'current_pallet_id' => $pallet->id,
-                    'current_pallet_source' => 'new',
-                ]);
-
-                return $pallet;
-            } catch (QueryException $e) {
-                if ($this->isDuplicateKeyException($e) && $attempt < $maxAttempts) {
-                    continue;
-                }
-
-                if ($this->isDuplicateKeyException($e)) {
-                    throw new \RuntimeException(
-                        "Nomor pallet {$palletNumber} sudah terdaftar. Silakan gunakan nomor pallet lain.",
-                        0,
-                        $e
-                    );
-                }
-
-                throw $e;
-            }
-        }
-
-        throw new \RuntimeException("Nomor pallet {$palletNumber} sudah terdaftar. Silakan gunakan nomor pallet lain.");
+        return $pallet;
     }
 
     public function index()

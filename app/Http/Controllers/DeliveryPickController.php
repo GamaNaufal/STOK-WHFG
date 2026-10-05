@@ -16,6 +16,7 @@ use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletNumberService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,7 +32,8 @@ class DeliveryPickController extends Controller
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
 
     public function __construct(
-        private readonly LocationAssignmentService $locationAssignmentService
+        private readonly LocationAssignmentService $locationAssignmentService,
+        private readonly PalletNumberService $palletNumberService
     ) {
     }
 
@@ -1443,9 +1445,7 @@ class DeliveryPickController extends Controller
 
     private function restoreBoxesToConsolidatedPallet($allSessionBoxes): Pallet
     {
-        $pallet = Pallet::create([
-            'pallet_number' => $this->generateRedoPalletNumber(),
-        ]);
+        $pallet = $this->palletNumberService->create();
 
         foreach ($allSessionBoxes as $box) {
             if (! $box instanceof Box) {
@@ -1484,21 +1484,6 @@ class DeliveryPickController extends Controller
                 ->lockForUpdate()
                 ->delete();
         }
-    }
-
-    private function generateRedoPalletNumber(): string
-    {
-        $maxNumber = Pallet::withTrashed()
-            ->where('pallet_number', 'like', 'PLT-%')
-            ->pluck('pallet_number')
-            ->map(function ($palletNumber) {
-                preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
-
-                return isset($matches[1]) ? (int) $matches[1] : 0;
-            })
-            ->max() ?? 0;
-
-        return 'PLT-'.str_pad($maxNumber + 1, 3, '0', STR_PAD_LEFT);
     }
 
     private function resolveRedoLocationAssignments(array $targetPalletIds, array $requestedRelocations, array $redoContext): array
