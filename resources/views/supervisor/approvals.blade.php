@@ -243,7 +243,14 @@
                 message: 'Apakah Anda yakin ingin menyetujui permintaan ini?',
                 confirmText: 'Ya, Setujui',
                 confirmColor: '#10B981',
-                onConfirm: () => form.submit()
+                onConfirm: () => {
+                    const button = form.querySelector('button[type="submit"]');
+                    if (button) {
+                        button.disabled = true;
+                        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Memproses...';
+                    }
+                    form.submit();
+                }
             });
         });
     });
@@ -256,7 +263,14 @@
                 message: 'Apakah Anda yakin ingin menolak permintaan ini?',
                 confirmText: 'Ya, Tolak',
                 confirmColor: '#DC2626',
-                onConfirm: () => form.submit()
+                onConfirm: () => {
+                    const button = form.querySelector('button[type="submit"]');
+                    if (button) {
+                        button.disabled = true;
+                        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Memproses...';
+                    }
+                    form.submit();
+                }
             });
         });
     });

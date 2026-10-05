@@ -323,21 +323,27 @@ class NotFullBoxRequestController extends Controller
                         throw new \RuntimeException('Lokasi tidak tersedia.');
                     }
 
-                    $claimed = MasterLocation::whereKey($location->id)
-                        ->where('is_occupied', false)
-                        ->update([
-                            'is_occupied' => true,
-                            'updated_at' => now(),
-                        ]);
+                    $location = MasterLocation::whereKey($location->id)
+                        ->lockForUpdate()
+                        ->first();
 
-                    if ($claimed === 0) {
+                    if (! $location) {
+                        throw new \RuntimeException('Lokasi tidak tersedia.');
+                    }
+
+                    $existingStockLocation = StockLocation::where('master_location_id', $location->id)
+                        ->lockForUpdate()
+                        ->first();
+
+                    if ($existingStockLocation || $location->is_occupied) {
                         throw new \RuntimeException('Lokasi tidak tersedia.');
                     }
 
                     $pallet = $this->createNewPallet();
                     $locationCode = $location->code;
 
-                    MasterLocation::whereKey($location->id)->update([
+                    $location->update([
+                        'is_occupied' => true,
                         'current_pallet_id' => $pallet->id,
                         'updated_at' => now(),
                     ]);
@@ -431,7 +437,15 @@ class NotFullBoxRequestController extends Controller
 
             return redirect()->back()->with('success', 'Permintaan berhasil di-approve.');
         } catch (\Throwable $e) {
-            return redirect()->back()->with('error', 'Gagal approve: '.$e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Not Full approval error: '.$e->getMessage());
+
+            $message = $e instanceof QueryException && $this->isDuplicateKeyException($e)
+                ? 'Lokasi baru saja digunakan oleh proses lain. Silakan pilih lokasi lain atau pallet existing.'
+                : ($e instanceof \RuntimeException
+                    ? $e->getMessage()
+                    : 'Gagal approve. Data belum disimpan. Silakan coba lagi.');
+
+            return redirect()->back()->with('error', $message);
         }
     }
 

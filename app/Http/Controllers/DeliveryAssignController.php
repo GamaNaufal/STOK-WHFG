@@ -25,23 +25,36 @@ class DeliveryAssignController extends Controller
 
     private function resolveAndClaimMasterLocation(int $masterLocationId, Pallet $pallet): string
     {
-        $masterLocation = MasterLocation::query()->find($masterLocationId);
+        $masterLocation = MasterLocation::query()
+            ->whereKey($masterLocationId)
+            ->lockForUpdate()
+            ->first();
         if (!$masterLocation) {
             throw new \RuntimeException('Lokasi yang dipilih tidak ditemukan.');
         }
 
-        $claimed = MasterLocation::query()
-            ->whereKey($masterLocation->id)
-            ->where('is_occupied', false)
-            ->update([
-                'is_occupied' => true,
-                'current_pallet_id' => $pallet->id,
-                'updated_at' => now(),
-            ]);
+        $existingStockLocation = StockLocation::query()
+            ->where('master_location_id', $masterLocation->id)
+            ->where('pallet_id', '!=', $pallet->id)
+            ->lockForUpdate()
+            ->first();
 
-        if ($claimed === 0) {
+        if ($existingStockLocation) {
+            throw new \RuntimeException('Lokasi yang dipilih sudah memiliki pallet. Pilih lokasi lain.');
+        }
+
+        if (
+            $masterLocation->is_occupied
+            && (int) $masterLocation->current_pallet_id !== (int) $pallet->id
+        ) {
             throw new \RuntimeException('Lokasi yang dipilih sudah terisi.');
         }
+
+        $masterLocation->update([
+            'is_occupied' => true,
+            'current_pallet_id' => $pallet->id,
+            'updated_at' => now(),
+        ]);
 
         return (string) $masterLocation->code;
     }
@@ -1437,7 +1450,7 @@ class DeliveryAssignController extends Controller
             return response()->json(['message' => $e->getMessage()], 409);
         } catch (QueryException $e) {
             $message = ((string) $e->getCode() === '23000' || (int) ($e->errorInfo[1] ?? 0) === 1062)
-                ? 'Nomor pallet sudah digunakan. Pilih nomor pallet lain atau gunakan pallet existing.'
+                ? 'Lokasi atau nomor pallet baru saja digunakan oleh proses lain. Pilih lokasi/pallet lain lalu coba lagi.'
                 : 'Terjadi kesalahan database saat melakukan assignment.';
 
             return response()->json(['message' => $message], 422);

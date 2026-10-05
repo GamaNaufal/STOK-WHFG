@@ -43,6 +43,7 @@
     let lastScanTime = 0;
     let existingPalletSearchTimeout;
     let isSelectingExistingPallet = false;
+    let isSaving = false;
 
     /**
      * Fungsi untuk memutar suara error/alert 3x beep
@@ -862,6 +863,10 @@
     }
 
     document.getElementById("save-btn").addEventListener("click", function () {
+        if (isSaving) {
+            return;
+        }
+
         const deliveryOrderSelect = document.getElementById(
             config.deliveryOrderSelectId || "deliveryOrderSelect",
         );
@@ -915,6 +920,13 @@
             form.append("input_date", inputDate);
         }
         form.append("_token", config.csrfToken);
+
+        isSaving = true;
+        const saveButton = document.getElementById("save-btn");
+        const originalSaveButtonHtml = saveButton.innerHTML;
+        saveButton.disabled = true;
+        saveButton.innerHTML =
+            '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Menyimpan...';
 
         fetch(config.storeUrl, {
             method: "POST",
@@ -1007,7 +1019,24 @@
                 window.location.href = config.indexUrl;
             })
             .catch((error) => {
-                showError("Terjadi kesalahan saat menyimpan: " + error.message);
+                isSaving = false;
+                saveButton.disabled = false;
+                saveButton.innerHTML = originalSaveButtonHtml;
+
+                const message = String(error?.message || "");
+                const isLocationConflict =
+                    /lokasi|location|duplicate|23000|1062/i.test(message);
+
+                showError(
+                    isLocationConflict
+                        ? "Lokasi baru saja digunakan oleh proses lain. Pilih lokasi lain lalu coba lagi."
+                        : message ||
+                              "Terjadi kesalahan saat menyimpan data. Silakan coba lagi.",
+                );
+
+                if (isLocationConflict) {
+                    performSearch("");
+                }
             });
     });
 
@@ -1059,7 +1088,7 @@
                             '<div class="list-group-item text-muted">Tidak ada lokasi tersedia.</div>';
                     } else {
                         searchResults.innerHTML =
-                            '<div class="list-group-item text-muted">Lokasi tidak ditemukan di Master. Gunakan sebagai lokasi baru?</div>';
+                            '<div class="list-group-item text-muted">Lokasi tidak tersedia atau baru saja digunakan. Muat ulang daftar lalu pilih lokasi lain.</div>';
                     }
                     searchResults.style.display = "block";
                 }

@@ -1009,7 +1009,10 @@ class StockInputController extends Controller
             // Log the error for debugging
             \Illuminate\Support\Facades\Log::error('Stock Input Error: '.$e->getMessage());
 
-            return response()->json(['message' => 'Terjadi kesalahan saat menyimpan data: '.$e->getMessage()], 500);
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan saat menyimpan data. Data belum disimpan. Silakan coba lagi.',
+            ], 500);
         }
     }
 }
