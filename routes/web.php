@@ -120,6 +120,9 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/merge-pallet', [\App\Http\Controllers\MergePalletController::class, 'index'])->name('merge-pallet.index');
         Route::get('/merge-pallet/search', [\App\Http\Controllers\MergePalletController::class, 'searchPallet'])->name('merge-pallet.search');
         Route::post('/merge-pallet/store', [\App\Http\Controllers\MergePalletController::class, 'store'])->name('merge-pallet.store');
+        Route::get('/move-pallet', [\App\Http\Controllers\MovePalletController::class, 'index'])->name('move-pallet.index');
+        Route::get('/move-pallet/search', [\App\Http\Controllers\MovePalletController::class, 'searchPallet'])->name('move-pallet.search');
+        Route::post('/move-pallet/store', [\App\Http\Controllers\MovePalletController::class, 'store'])->name('move-pallet.store');
     });
 
     // Stock View Routes (Warehouse Operator, PPC, Admin Warehouse, Supervisi, Admin)

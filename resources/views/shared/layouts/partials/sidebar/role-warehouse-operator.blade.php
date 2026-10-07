@@ -33,10 +33,17 @@
         <i class="bi bi-upc-scan"></i> Picking Verification
     </a>
 </li>
+<div class="mt-3 mb-2 text-muted px-2" style="font-size: 0.75rem; font-weight: 600;">MANAJEMEN PALLET</div>
 <li class="nav-item">
     <a class="nav-link {{ request()->routeIs('merge-pallet*') ? 'active' : '' }}"
        href="{{ route('merge-pallet.index') }}">
         <i class="bi bi-box-seam"></i> Merge Palet
+    </a>
+</li>
+<li class="nav-item">
+    <a class="nav-link {{ request()->routeIs('move-pallet*') ? 'active' : '' }}"
+       href="{{ route('move-pallet.index') }}">
+        <i class="bi bi-arrow-left-right"></i> Pemindahan Pallet
     </a>
 </li>
 <li class="nav-item">

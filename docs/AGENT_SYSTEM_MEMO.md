@@ -66,6 +66,7 @@ Entry point penting:
 - Melakukan assignment box ke delivery.
 - Menjalankan picking, verification scan, dan scan pengiriman.
 - Melakukan merge palet.
+- Melakukan pemindahan pallet.
 - Melihat stok.
 
 ### Admin Warehouse
@@ -516,7 +517,27 @@ File utama:
 
 - `app/Http/Controllers/MergePalletController.php`
 
-### 16. Expired box
+### 16. Pemindahan pallet
+
+Warehouse Operator, Admin Warehouse, dan Admin dapat memindahkan pallet aktif tanpa
+mengubah nomor pallet, box, atau ringkasan pallet.
+
+Alur:
+
+- operator memilih pallet melalui scan atau pencarian nomor pallet;
+- pallet wajib memiliki box aktif, lokasi master yang valid, dan tidak sedang digunakan delivery/picking;
+- lokasi tujuan wajib berasal dari Master Location dan tersedia;
+- backend mengunci pallet serta lokasi sumber/tujuan dalam transaksi;
+- occupancy lokasi sumber dilepas, lokasi tujuan diklaim atomik, dan `stock_locations` diperbarui;
+- kegagalan validasi atau konflik lokasi membatalkan seluruh transaksi;
+- pemindahan dicatat sebagai audit type `pallet_location_moved`.
+
+File utama:
+
+- `app/Http/Controllers/MovePalletController.php`
+- `resources/views/operator/move-pallet/index.blade.php`
+
+### 17. Expired box
 
 Umur box menggunakan `boxes.created_at` sebagai tanggal penyimpanan per box. Mapping `stock_input_boxes -> stock_inputs.stored_at` tetap menjadi fallback untuk data legacy yang tidak memiliki tanggal box.
 
@@ -544,7 +565,7 @@ File utama:
 - `app/Http/Controllers/ExpiredBoxController.php`
 - `routes/console.php`
 
-### 17. Laporan dan audit
+### 18. Laporan dan audit
 
 Laporan yang tersedia:
 
