@@ -21,7 +21,16 @@ class PalletNumberService
                     throw new \RuntimeException('Allocator nomor pallet belum tersedia. Jalankan migration terbaru.');
                 }
 
-                $number = (int) $sequence->next_number;
+                $highestExistingNumber = Pallet::withTrashed()
+                    ->pluck('pallet_number')
+                    ->map(function ($palletNumber) {
+                        preg_match('/-?(\d+)$/', (string) $palletNumber, $matches);
+
+                        return isset($matches[1]) ? (int) $matches[1] : 0;
+                    })
+                    ->max() ?? 0;
+
+                $number = max((int) $sequence->next_number, $highestExistingNumber + 1);
                 $palletNumber = 'PLT-'.str_pad((string) $number, 3, '0', STR_PAD_LEFT);
 
                 DB::table('pallet_number_sequences')
@@ -47,8 +56,10 @@ class PalletNumberService
     private function isDuplicatePalletNumber(QueryException $e): bool
     {
         $driverCode = (int) ($e->errorInfo[1] ?? 0);
+        $sqlState = (string) ($e->getCode() ?? '');
+        $message = strtolower((string) ($e->errorInfo[2] ?? $e->getMessage()));
 
-        return $driverCode === 1062
-            && str_contains(strtolower((string) ($e->errorInfo[2] ?? $e->getMessage())), 'pallet');
+        return ($sqlState === '23000' || $driverCode === 1062)
+            && (str_contains($message, 'pallet') || str_contains($message, 'pallet_number'));
     }
 }

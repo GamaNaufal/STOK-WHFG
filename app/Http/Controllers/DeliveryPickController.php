@@ -1220,13 +1220,24 @@ class DeliveryPickController extends Controller
                     $redoContext['boxPalletIdsByBoxId']
                 );
 
-                if ($singleRelocationCode === '') {
-                    DB::rollBack();
-
-                    return redirect()->back()->with('error', 'Pilih satu lokasi kosong untuk pallet hasil konsolidasi redo.');
+                $locationCode = $singleRelocationCode;
+                if ($locationCode === '') {
+                    $locationCode = $this->getHistoricalLocationForPallet(
+                        (int) ($targetPalletIds[0] ?? 0),
+                        $redoContext
+                    ) ?? '';
                 }
 
-                $locationCheck = $this->resolveRedoConsolidationLocation($singleRelocationCode);
+                $locationCheck = $locationCode !== ''
+                    ? $this->resolveRedoConsolidationLocation($locationCode)
+                    : ['success' => true, 'location_code' => null];
+                if (
+                    ! $singleRelocationCode
+                    && ! ($locationCheck['success'] ?? false)
+                    && str_contains((string) ($locationCheck['message'] ?? ''), 'tidak ditemukan')
+                ) {
+                    $locationCheck = ['success' => true, 'location_code' => null];
+                }
                 if (! ($locationCheck['success'] ?? false)) {
                     DB::rollBack();
 
@@ -1236,9 +1247,16 @@ class DeliveryPickController extends Controller
                 $consolidatedPallet = $this->restoreBoxesToConsolidatedPallet(
                     $redoContext['allSessionBoxes'],
                 );
-                $affectedPalletIds = array_merge($targetPalletIds, [(int) $consolidatedPallet->id]);
+                $this->normalizeSharedRedoBoxes(
+                    $redoContext['allSessionBoxes'],
+                    $withdrawals,
+                    $redoContext['palletItemsById'],
+                    $redoContext['boxPalletIdsByBoxId']
+                );
+                $affectedPalletIds = [(int) $consolidatedPallet->id];
 
                 $this->reverseWithdrawalsAndRestorePalletItems($withdrawals, $redoContext['palletItemsById']);
+                $this->restorePalletItemSummariesFromWithdrawals($withdrawals, $redoContext['palletItemsById']);
                 $this->syncPalletSummariesFromActiveBoxes($affectedPalletIds);
                 $notFullBoxCount = $this->resetSessionBoxAssignments($session, $redoContext['allSessionBoxes']);
                 $notFullRequestsCount = $this->cancelNotFullRequestsForOrder((int) $session->order->id);
@@ -1266,9 +1284,19 @@ class DeliveryPickController extends Controller
                 $this->rollbackOrderFulfilledQuantities($session->order, $withdrawals);
 
                 $this->releaseEmptyPalletLocations($targetPalletIds);
-                $this->applyRedoLocationAssignments([
-                    (int) $consolidatedPallet->id => $locationCheck['location_code'],
-                ]);
+                if (! empty($locationCheck['location_code'])) {
+                    $assignmentPalletId = (int) $consolidatedPallet->id;
+                    if ($singleRelocationCode !== '' && ! empty($legacyRelocationCodes)) {
+                        $legacyPalletId = (int) array_key_first($legacyRelocationCodes);
+                        if ($legacyPalletId > 0) {
+                            $assignmentPalletId = $legacyPalletId;
+                        }
+                    }
+
+                    $this->applyRedoLocationAssignments([
+                        $assignmentPalletId => $locationCheck['location_code'],
+                    ]);
+                }
             }
 
             $session->completion_status = 'redone';
@@ -1462,6 +1490,25 @@ class DeliveryPickController extends Controller
         }
 
         return $pallet;
+    }
+
+    private function normalizeSharedRedoBoxes($boxes, $withdrawals, $palletItemsById, $boxPalletIdsByBoxId): void
+    {
+        foreach ($boxes as $box) {
+            if (! $box instanceof Box || $box->pallets->count() < 2) {
+                continue;
+            }
+
+            $palletId = $this->resolveRedoPalletIdForBox(
+                $box,
+                $withdrawals,
+                $palletItemsById,
+                $boxPalletIdsByBoxId
+            );
+            if ($palletId > 0) {
+                $box->pallets()->sync([$palletId]);
+            }
+        }
     }
 
     private function releaseEmptyPalletLocations(array $palletIds): void
@@ -1820,6 +1867,30 @@ class DeliveryPickController extends Controller
 
             $withdrawal->status = 'reversed';
             $withdrawal->save();
+        }
+    }
+
+    private function restorePalletItemSummariesFromWithdrawals($withdrawals, $palletItemsById): void
+    {
+        $restored = [];
+
+        foreach ($withdrawals as $withdrawal) {
+            if (! $withdrawal instanceof StockWithdrawal || ! $withdrawal->pallet_item_id) {
+                continue;
+            }
+
+            $palletItem = $palletItemsById->get((int) $withdrawal->pallet_item_id);
+            if (! $palletItem) {
+                continue;
+            }
+
+            $key = (int) $palletItem->id;
+            $restored[$key]['box_quantity'] = ($restored[$key]['box_quantity'] ?? 0) + (int) $withdrawal->box_quantity;
+            $restored[$key]['pcs_quantity'] = ($restored[$key]['pcs_quantity'] ?? 0) + (int) $withdrawal->pcs_quantity;
+        }
+
+        foreach ($restored as $palletItemId => $quantities) {
+            PalletItem::whereKey($palletItemId)->update($quantities);
         }
     }
 
