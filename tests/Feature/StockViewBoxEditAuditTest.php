@@ -466,6 +466,37 @@ class StockViewBoxEditAuditTest extends TestCase
             ]);
     }
 
+    public function test_soft_deleted_box_is_excluded_from_stock_view(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-STOCK-VIEW-ACTIVE']);
+        StockLocation::create([
+            'pallet_id' => $pallet->id,
+            'warehouse_location' => 'A-STOCK-VIEW',
+            'stored_at' => now(),
+        ]);
+
+        $deletedBox = Box::create([
+            'box_number' => 'BOX-STOCK-VIEW-DELETED',
+            'part_number' => 'P-STOCK-VIEW',
+            'pcs_quantity' => 100,
+            'qty_box' => 100,
+            'qr_code' => 'BOX-STOCK-VIEW-DELETED|P-STOCK-VIEW|100',
+            'user_id' => $admin->id,
+            'is_withdrawn' => false,
+        ]);
+        $pallet->boxes()->attach($deletedBox->id);
+        $deletedBox->delete();
+
+        $response = $this->actingAs($admin)->get(route('stock-view.index', [
+            'view_mode' => 'box_id',
+            'search' => 'BOX-STOCK-VIEW-DELETED',
+        ]));
+
+        $response->assertOk();
+        $response->assertViewHas('groupedByBoxId', fn ($items) => $items->isEmpty());
+    }
+
     public function test_assigned_box_cannot_be_edited_deleted_or_deleted_with_its_pallet(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);

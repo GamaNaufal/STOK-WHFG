@@ -1,6 +1,6 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 6 Oktober 2026.
+Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
 ## Tujuan Memo
 
@@ -71,6 +71,7 @@ Entry point penting:
 ### Admin Warehouse
 
 - Mengelola master lokasi dan master nomor part.
+- Melakukan merge palet.
 - Mengajukan box not full.
 - Melakukan assignment delivery, termasuk direct input box baru dengan PCS sesuai fixed qty Master Part.
 - Mengoreksi detail box aktif.
@@ -136,6 +137,8 @@ Box dapat terhubung ke lebih dari satu palet pada data tertentu. Perhitungan sto
 Canonical pallet untuk box shared ditentukan dari relasi `pallet_boxes` paling baru yang masih memiliki lokasi valid. Saat box dinonaktifkan karena withdrawal, ringkasan seluruh palet yang masih terhubung disinkronkan ulang dari box aktif agar tidak meninggalkan phantom stock.
 
 Query stok mentah wajib mengabaikan `boxes.deleted_at`. Fallback `pallet_items` hanya boleh digunakan untuk pallet yang benar-benar tidak pernah memiliki histori box, termasuk histori box soft-deleted.
+
+Halaman `Lihat Stok` hanya menampilkan box aktif. Box soft-deleted, withdrawn, atau expired/handled tidak boleh ditambahkan sebagai hasil pencarian stok; histori box nonaktif hanya ditampilkan melalui history/audit.
 
 ## Proses Bisnis
 
@@ -491,7 +494,7 @@ Redo hanya berlaku satu kali untuk session `completed` dengan `completion_status
 
 ### 15. Merge palet
 
-Warehouse Operator/Admin dapat menggabungkan minimal dua palet.
+Warehouse Operator, Admin Warehouse, dan Admin dapat menggabungkan minimal dua palet.
 
 Alur:
 

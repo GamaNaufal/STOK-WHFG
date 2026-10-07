@@ -23,6 +23,7 @@ class AuthorizationAndReportExportSanityTest extends TestCase
     {
         $sales = User::factory()->create(['role' => 'sales']);
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
         $supervisi = User::factory()->create(['role' => 'supervisi']);
 
         $this->actingAs($sales)->get(route('stock-input.index'))->assertForbidden();
@@ -30,6 +31,7 @@ class AuthorizationAndReportExportSanityTest extends TestCase
 
         $this->actingAs($sales)->get(route('merge-pallet.index'))->assertForbidden();
         $this->actingAs($operator)->get(route('merge-pallet.index'))->assertOk();
+        $this->actingAs($adminWarehouse)->get(route('merge-pallet.index'))->assertOk();
 
         $this->actingAs($operator)->get(route('box-not-full.approvals'))->assertForbidden();
         $this->actingAs($supervisi)->get(route('box-not-full.approvals'))->assertOk();

@@ -527,7 +527,22 @@ class StockViewController extends Controller
             ->with([
                 'stockLocation:id,pallet_id,warehouse_location',
                 'items:id,pallet_id,part_number,box_quantity,pcs_quantity,created_at,updated_at',
-                'boxes:id,box_number,part_number,pcs_quantity,is_not_full,not_full_reason,is_withdrawn,expired_status,created_at,updated_at',
+                'boxes' => function ($query) {
+                    $query->withTrashed()
+                        ->select([
+                            'boxes.id',
+                            'boxes.box_number',
+                            'boxes.part_number',
+                            'boxes.pcs_quantity',
+                            'boxes.is_not_full',
+                            'boxes.not_full_reason',
+                            'boxes.is_withdrawn',
+                            'boxes.expired_status',
+                            'boxes.created_at',
+                            'boxes.updated_at',
+                            'boxes.deleted_at',
+                        ]);
+                },
             ])
             ->where(function ($q) {
                 $q->whereHas('stockLocation', function ($q2) {
@@ -551,6 +566,7 @@ class StockViewController extends Controller
 
                 // Prefer active boxes as source of truth
                 $activeBoxes = $pallet->boxes
+                    ->whereNull('deleted_at')
                     ->where('is_withdrawn', false)
                     ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
                     ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
@@ -665,54 +681,6 @@ class StockViewController extends Controller
                 'status_label' => 'Orphan (Tanpa Pallet)',
             ];
             $indexedBoxIds[] = $box->id;
-        }
-
-        // When a search query is provided, also find inactive/withdrawn/expired/archived boxes
-        // so the user can trace why an existing box was rejected during input
-        if (filled($search)) {
-            $inactiveBoxes = Box::withTrashed()
-                ->where(function ($q) use ($search) {
-                    $q->where('box_number', 'like', "%{$search}%")
-                        ->orWhere('id', $search);
-                })
-                ->whereNotIn('id', $indexedBoxIds)
-                ->with(['pallets' => function ($q) {
-                    $q->withTrashed()->with('stockLocation');
-                }])
-                ->limit(20)
-                ->get();
-
-            foreach ($inactiveBoxes as $box) {
-                $statusLabel = 'Non-Aktif';
-                if ($box->trashed()) {
-                    $statusLabel = 'Diarsipkan (Dihapus)';
-                } elseif ($box->is_withdrawn) {
-                    $statusLabel = 'Withdrawn';
-                } elseif (in_array($box->expired_status, ['expired', 'handled'], true)) {
-                    $statusLabel = ucfirst($box->expired_status);
-                }
-
-                $pallet = $box->pallets->first();
-                $palletNum = $pallet?->pallet_number ?? 'Tanpa Pallet';
-                $loc = $pallet?->stockLocation?->warehouse_location ?? '-';
-
-                $items[] = [
-                    'box_id' => $box->id,
-                    'pallet_id' => $pallet?->id,
-                    'pallet_number' => $palletNum,
-                    'location' => $loc,
-                    'part_number' => $box->part_number,
-                    'box_number' => $box->box_number,
-                    'box_quantity' => 1,
-                    'pcs_quantity' => (int) $box->pcs_quantity,
-                    'created_at' => $box->created_at,
-                    'updated_at' => $box->updated_at,
-                    'is_not_full' => (bool) $box->is_not_full,
-                    'not_full_reason' => $box->not_full_reason,
-                    'status_label' => $statusLabel,
-                    'is_inactive' => true,
-                ];
-            }
         }
 
         return collect($items)->sortBy('created_at');
@@ -891,7 +859,11 @@ class StockViewController extends Controller
     // API: Get detailed information for a specific pallet
     public function apiGetPalletDetail($palletId)
     {
-        $pallet = Pallet::with(['items', 'boxes', 'stockLocation'])->find($palletId);
+        $pallet = Pallet::with([
+            'items',
+            'boxes' => fn ($query) => $query->withTrashed(),
+            'stockLocation',
+        ])->find($palletId);
 
         if (! $pallet) {
             return response()->json(['error' => 'Pallet not found'], 404);
@@ -914,6 +886,7 @@ class StockViewController extends Controller
                 });
 
             $items = $pallet->boxes
+                ->whereNull('deleted_at')
                 ->where('is_withdrawn', false)
                 ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
                 ->map(function ($box) use ($originLogs) {

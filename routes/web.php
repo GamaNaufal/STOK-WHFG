@@ -115,8 +115,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         
     });
 
-    // Merge Pallet Routes (Warehouse Operator + Admin)
-    Route::middleware('role:warehouse_operator,admin')->group(function () {
+    // Merge Pallet Routes (Warehouse Operator + Admin Warehouse + Admin)
+    Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
         Route::get('/merge-pallet', [\App\Http\Controllers\MergePalletController::class, 'index'])->name('merge-pallet.index');
         Route::get('/merge-pallet/search', [\App\Http\Controllers\MergePalletController::class, 'searchPallet'])->name('merge-pallet.search');
         Route::post('/merge-pallet/store', [\App\Http\Controllers\MergePalletController::class, 'store'])->name('merge-pallet.store');

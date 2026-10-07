@@ -28,6 +28,12 @@
     </a>
 </li>
 <li class="nav-item">
+    <a class="nav-link {{ request()->routeIs('merge-pallet*') ? 'active' : '' }}"
+       href="{{ route('merge-pallet.index') }}">
+        <i class="bi bi-box-seam"></i> Merge Palet
+    </a>
+</li>
+<li class="nav-item">
     <a class="nav-link {{ request()->routeIs('delivery.index') ? 'active' : '' }}"
        href="{{ route('delivery.index') }}">
         <i class="bi bi-truck"></i> Delivery
