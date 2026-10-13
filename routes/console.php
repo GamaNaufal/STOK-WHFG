@@ -13,6 +13,13 @@ Artisan::command('delivery:expire-verifications', function () {
 
 Schedule::command('delivery:expire-verifications')->everyMinute()->withoutOverlapping();
 
+Artisan::command('expired-box:sync-statuses', function () {
+    app(\App\Services\ExpiredBoxService::class)->syncStatuses();
+    $this->info('Box expiry statuses synchronized.');
+})->purpose('Synchronize box age and one-month reactivation deadlines');
+
+Schedule::command('expired-box:sync-statuses')->everyMinute()->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

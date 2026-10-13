@@ -148,7 +148,7 @@ class StockWithdrawalController extends Controller
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
@@ -250,7 +250,7 @@ class StockWithdrawalController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->where('boxes.part_number', 'like', '%'.$query.'%')
             ->select('boxes.part_number')
@@ -498,7 +498,7 @@ class StockWithdrawalController extends Controller
                     if (
                         ! $box
                         || $box->is_withdrawn
-                        || in_array($box->expired_status, ['handled', 'expired'], true)
+                        || $box->isExpiryUnavailable()
                     ) {
                         throw new \RuntimeException('Stok berubah saat withdrawal. Silakan hitung ulang FIFO.');
                     }
@@ -639,7 +639,7 @@ class StockWithdrawalController extends Controller
                         if (
                             ! $box
                             || $box->is_withdrawn
-                            || in_array($box->expired_status, ['handled', 'expired'], true)
+                            || $box->isExpiryUnavailable()
                         ) {
                             throw new \RuntimeException('Stok berubah saat withdrawal. Silakan hitung ulang FIFO.');
                         }
@@ -929,7 +929,7 @@ class StockWithdrawalController extends Controller
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->when($excludeAssigned, function ($q) {
                 $q->whereNull('boxes.assigned_delivery_order_id');
@@ -963,7 +963,7 @@ class StockWithdrawalController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->whereIn('boxes.part_number', $partNumbers)
             ->groupBy('boxes.part_number')
@@ -1012,7 +1012,7 @@ class StockWithdrawalController extends Controller
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->whereNotIn('boxes.id', function ($q) {
                 $q->select('box_id')
@@ -1124,7 +1124,7 @@ class StockWithdrawalController extends Controller
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->where('boxes.assigned_delivery_order_id', $orderId)
             ->whereNotIn('boxes.id', function ($q) {

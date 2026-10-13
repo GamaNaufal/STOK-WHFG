@@ -2,7 +2,7 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
-Verifikasi tambahan 13 Oktober 2026: audio scan serta pembatalan dan timeout Picking Verification.
+Verifikasi tambahan 13 Oktober 2026: audio scan, pembatalan dan timeout Picking Verification, serta aktivasi ulang box melalui Handle selama satu bulan.
 
 ## Tujuan Memo
 
@@ -131,6 +131,7 @@ Secara umum, box dianggap sebagai stok aktif apabila:
 - belum di-soft-delete;
 - `is_withdrawn = false`;
 - `expired_status` bukan `expired` atau `handled`;
+- masa aktivasi ulang `reactivated_until` belum habis (atau null untuk box yang belum pernah diaktifkan ulang);
 - terhubung ke palet yang memiliki lokasi penyimpanan valid dan bukan `Unknown`.
 
 Untuk data lama, beberapa tampilan dan ringkasan masih menggunakan `pallet_items` sebagai fallback hanya ketika palet benar-benar tidak memiliki riwayat box.
@@ -551,7 +552,7 @@ File utama:
 - `app/Http/Controllers/MovePalletController.php`
 - `resources/views/operator/move-pallet/index.blade.php`
 
-### 17. Expired box
+### 17. Expired box dan aktivasi ulang (13 Oktober 2026)
 
 Umur box menggunakan `boxes.created_at` sebagai tanggal penyimpanan per box. Mapping `stock_input_boxes -> stock_inputs.stored_at` tetap menjadi fallback untuk data legacy yang tidak memiliki tanggal box.
 
@@ -560,13 +561,21 @@ Status:
 - di bawah 9 bulan: `active`;
 - 9 sampai kurang dari 12 bulan: `warning`;
 - 12 bulan atau lebih: `expired`;
-- setelah ditangani: `handled`.
+- Handle pada warning/expired: `active` sampai `reactivated_until`, satu bulan kalender sejak Handle (`addMonthNoOverflow`, tanggal akhir menyesuaikan panjang bulan);
+- setelah masa aktivasi ulang habis: `expired`, wajib Handle lagi agar dapat masuk FIFO;
+- `handled` pada data box lama tetap nonaktif; migration tidak mengaktifkan data lama secara massal.
 
-Box `expired` atau `handled` tidak termasuk stok aktif dan tidak boleh dipakai untuk delivery.
+Box warning tetap boleh masuk FIFO tanpa Handle. Box expired/handled atau box dengan masa aktivasi ulang habis tidak termasuk stok aktif dan tidak boleh dipakai untuk delivery. Batas `reactivated_until` diperiksa langsung pada query stok/FIFO/assignment dan validasi scan/withdrawal/completion, sehingga box langsung ditolak meskipun scheduler belum memperbarui label status menjadi expired.
 
-Saat status berubah menjadi `expired` atau `handled`, sistem langsung menghitung ulang `pallet_items`, menghapus stock location pallet yang sudah kosong, dan mengosongkan master location terkait.
+Saat status berubah menjadi expired, sistem menghitung ulang `pallet_items`, menghapus stock location pallet yang sudah kosong, dan mengosongkan master location terkait. Snapshot lokasi disimpan sebelum pelepasan lokasi.
 
-Supervisi/Admin dapat menandai box berstatus `warning` maupun `expired` sebagai `handled`. Endpoint memverifikasi ulang umur minimal sembilan bulan. Box yang masih assigned ke delivery atau dikunci sesi picking aktif tidak dapat ditandai `handled`. Sistem menyimpan histori penanganannya.
+Supervisi/Admin dapat menekan Handle pada warning/expired untuk mengaktifkan box satu bulan. Box withdrawn, soft-deleted, assigned ke delivery, atau terkunci dalam sesi picking tidak dapat diaktifkan ulang. Request berulang saat masa aktif belum habis tidak memperpanjang deadline maupun menggandakan riwayat. Tanggal `boxes.created_at` tidak berubah, sehingga posisi FIFO tetap mengikuti penyimpanan asli.
+
+Handle mempertahankan pallet dan lokasi yang masih valid. Jika lokasi sudah dilepas, UI meminta lokasi kosong; backend juga mendukung lokasi historis bila request tidak menentukan lokasi. `LocationAssignmentService` mengunci dan memvalidasi lokasi, menolak lokasi yang sudah ditempati pallet lain, lalu memulihkan ringkasan box/PCS. Kegagalan assignment lokasi membatalkan aktivasi ulang secara atomik.
+
+Setiap aktivasi ulang disimpan sebagai baris baru `expired_box_reports` berstatus `handled`, termasuk petugas, waktu aktivasi, lokasi, dan `reactivated_until`. Riwayat sebelumnya tetap tersimpan. Halaman menampilkan kolom Aktif Sampai. Constraint unik `(box_id,status)` dihapus untuk mendukung riwayat berulang; index biasa dipertahankan. Jenis delivery issue `box_expired` kini didukung schema.
+
+Command `expired-box:sync-statuses` dijadwalkan setiap menit untuk mengubah status yang waktunya habis dan menyinkronkan stok/lokasi. Scheduler harus aktif di deployment. Migration `2026_10_13_000002_add_box_reactivation_period` menambahkan deadline pada box dan history, serta memperbarui constraint riwayat dan jenis issue.
 
 Setiap hari pukul 07.00 sistem:
 
@@ -695,7 +704,7 @@ Status yang digunakan:
 - Status delivery `partial` tetap dipakai khusus untuk parent order yang memiliki child hasil split.
 - Semua box not full wajib melalui request dan approval Supervisi; Stock Input dan Delivery Assignment tidak boleh membuat box not full secara langsung.
 - PCS direct input wajib sama dengan fixed qty Master Part.
-- Box berstatus `warning` (9 sampai kurang dari 12 bulan) boleh ditandai `handled` selama tidak assigned atau pick-locked.
+- Warning tetap dapat masuk FIFO. Handle pada warning/expired mengaktifkan box selama satu bulan kalender; saat masa aktif habis, box menjadi expired dan wajib Handle lagi. Aktivasi ulang tidak boleh dilakukan pada box assigned atau pick-locked.
 
 ## Status Schema dan Validasi Terakhir
 

@@ -505,8 +505,7 @@ class StockViewController extends Controller
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('b.expired_status')
-                    ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'b');
             })
             ->groupBy('pb.box_id')
             ->select(
@@ -538,6 +537,7 @@ class StockViewController extends Controller
                             'boxes.not_full_reason',
                             'boxes.is_withdrawn',
                             'boxes.expired_status',
+                            'boxes.reactivated_until',
                             'boxes.created_at',
                             'boxes.updated_at',
                             'boxes.deleted_at',
@@ -551,8 +551,7 @@ class StockViewController extends Controller
                     $q2->whereNull('boxes.deleted_at')
                         ->where('boxes.is_withdrawn', false)
                         ->where(function ($q3) {
-                            $q3->whereNull('boxes.expired_status')
-                                ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                            \App\Models\Box::applyUsableExpiryFilter($q3, 'boxes');
                         });
                 });
             });
@@ -568,7 +567,7 @@ class StockViewController extends Controller
                 $activeBoxes = $pallet->boxes
                     ->whereNull('deleted_at')
                     ->where('is_withdrawn', false)
-                    ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
+                    ->reject(fn ($box) => $box->isExpiryUnavailable())
                     ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
                         $boxId = (int) $box->id;
                         $canonicalPalletId = (int) ($canonicalPalletByBoxId[$boxId] ?? $pallet->id);
@@ -650,8 +649,7 @@ class StockViewController extends Controller
             ->whereNull('deleted_at')
             ->where('is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('expired_status')
-                    ->orWhereNotIn('expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, '');
             })
             ->whereNotIn('id', $indexedBoxIds);
 
@@ -873,7 +871,7 @@ class StockViewController extends Controller
         if ($pallet->boxes->count() > 0) {
             $boxIds = $pallet->boxes
                 ->where('is_withdrawn', false)
-                ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
+                ->reject(fn ($box) => $box->isExpiryUnavailable())
                 ->pluck('id');
             $originLogs = AuditLog::where('type', 'box_pallet_moved')
                 ->where('model', 'Box')
@@ -888,7 +886,7 @@ class StockViewController extends Controller
             $items = $pallet->boxes
                 ->whereNull('deleted_at')
                 ->where('is_withdrawn', false)
-                ->reject(fn ($box) => in_array($box->expired_status, ['handled', 'expired'], true))
+                ->reject(fn ($box) => $box->isExpiryUnavailable())
                 ->map(function ($box) use ($originLogs) {
                     $log = $originLogs->get($box->id);
                     $origin = $log?->getOldValuesArray()['from_pallet'] ?? null;
@@ -1072,7 +1070,7 @@ class StockViewController extends Controller
             ], 404);
         }
 
-        if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
+        if ($box->is_withdrawn || $box->isExpiryUnavailable()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Box tidak bisa diedit karena statusnya tidak aktif.',
@@ -1116,7 +1114,7 @@ class StockViewController extends Controller
 
             $isNotFull = $newPcsQuantity < $fixedQty;
 
-            if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
+            if ($box->is_withdrawn || $box->isExpiryUnavailable()) {
                 throw new \RuntimeException('Box tidak bisa diedit karena statusnya tidak aktif.');
             }
 
@@ -1407,7 +1405,7 @@ class StockViewController extends Controller
                     ->whereNull('boxes.deleted_at')
                     ->where('boxes.is_withdrawn', false)
                     ->where(function ($q) {
-                        $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                        \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
                     })
                     ->lockForUpdate()
                     ->count();

@@ -15,7 +15,7 @@
 </head>
 <body>
     <h2>Peringatan Box Mendekati Expired</h2>
-    <p>Berikut ringkasan box yang berumur 9+ bulan (warning) dan 12+ bulan (expired).</p>
+    <p>Berikut ringkasan box warning (umur 9–12 bulan) dan expired (umur 12+ bulan atau masa aktif hasil Handle sudah habis).</p>
 
     <div class="section-title">Warning (9-12 bulan)</div>
     @if($warningBoxes->isEmpty())
@@ -45,7 +45,7 @@
         </table>
     @endif
 
-    <div class="section-title">Expired (>=12 bulan)</div>
+    <div class="section-title">Expired / Masa Aktif Habis</div>
     @if($expiredBoxes->isEmpty())
         <p>Tidak ada data.</p>
     @else

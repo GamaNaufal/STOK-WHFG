@@ -139,8 +139,7 @@ class DeliveryAssignController extends Controller
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('b.expired_status')
-                    ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'b');
             })
             ->where('sl.warehouse_location', '!=', 'Unknown')
             ->groupBy('pb.box_id')
@@ -168,8 +167,7 @@ class DeliveryAssignController extends Controller
             ->whereNull('deleted_at')
             ->where('is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('expired_status')
-                    ->orWhereNotIn('expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, '');
             })
             ->select('part_number', DB::raw('SUM(pcs_quantity) as assigned_quantity'))
             ->groupBy('part_number')
@@ -325,7 +323,7 @@ class DeliveryAssignController extends Controller
             ->whereIn('pallet_boxes.pallet_id', $palletIds)
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']); })
+            ->where(function ($q) { \App\Models\Box::applyUsableExpiryFilter($q, 'boxes'); })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(!empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
                 $q->whereNotIn('boxes.id', $lockedBoxIds);
@@ -394,7 +392,7 @@ class DeliveryAssignController extends Controller
 
             if (
                 $box->is_withdrawn
-                || in_array((string) $box->expired_status, ['handled', 'expired'], true)
+                || $box->isExpiryUnavailable()
                 || $assignedOrderId !== null
                 || !empty($activeLockedLookup[$boxId])
                 || !$hasStoredLocation
@@ -601,7 +599,7 @@ class DeliveryAssignController extends Controller
                 continue;
             }
 
-            if ($box->expired_status && in_array($box->expired_status, ['handled', 'expired'], true)) {
+            if ($box->isExpiryUnavailable()) {
                 $skipped[] = $this->buildSkipEntry($box, 'Box expired atau sudah ditangani');
                 continue;
             }
@@ -830,8 +828,7 @@ class DeliveryAssignController extends Controller
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('b.expired_status')
-                    ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'b');
             })
             ->whereNull('b.assigned_delivery_order_id')
             ->whereIn('b.part_number', $availableParts)
@@ -872,8 +869,7 @@ class DeliveryAssignController extends Controller
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('b.expired_status')
-                    ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'b');
             })
             ->where('sl.warehouse_location', '!=', 'Unknown')
             ->whereNull('b.assigned_delivery_order_id')
@@ -959,8 +955,7 @@ class DeliveryAssignController extends Controller
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('b.expired_status')
-                    ->orWhereNotIn('b.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'b');
             })
             ->whereNull('b.assigned_delivery_order_id')
             ->whereIn('b.part_number', $availableParts)
@@ -1136,7 +1131,7 @@ class DeliveryAssignController extends Controller
                 continue;
             }
 
-            if ($box->expired_status && in_array($box->expired_status, ['handled', 'expired'], true)) {
+            if ($box->isExpiryUnavailable()) {
                 $skipped[] = $this->buildSkipEntry($box, 'Box expired atau sudah ditangani');
                 continue;
             }

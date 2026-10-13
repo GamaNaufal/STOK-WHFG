@@ -18,11 +18,13 @@ class ExpiredBoxReport extends Model
         'status',
         'handled_by',
         'handled_at',
+        'reactivated_until',
     ];
 
     protected $casts = [
         'stored_at' => 'datetime',
         'handled_at' => 'datetime',
+        'reactivated_until' => 'datetime',
     ];
 
     public function box()

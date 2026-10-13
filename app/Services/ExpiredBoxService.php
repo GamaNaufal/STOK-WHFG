@@ -24,126 +24,129 @@ class ExpiredBoxService
     {
         $this->getExpirableBoxesQuery()
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled']);
+                $q->whereNull('boxes.expired_status')->orWhere('boxes.expired_status', '!=', 'handled');
             })
-            ->orderBy('boxes.id')
-            ->chunkById(500, function ($rows): void {
-                foreach ($rows as $row) {
-                    if (! $row->stored_at) {
+            ->orderBy('boxes.id')->chunkById(500, function ($rows): void {
+                foreach ($rows as $candidate) {
+                    if (! $candidate->stored_at) {
+                        continue;
+                    }
+                    $candidateUntil = $candidate->reactivated_until ? Carbon::parse($candidate->reactivated_until) : null;
+                    $candidateAge = Carbon::parse($candidate->stored_at)->diffInMonths(now());
+                    if ($candidate->expired_status === $this->statusFor($candidateUntil, $candidateAge)) {
                         continue;
                     }
 
-                    $storedAt = Carbon::parse($row->stored_at);
-                    $ageMonths = $storedAt->diffInMonths(now());
+                    DB::transaction(function () use ($candidate): void {
+                        $box = Box::whereKey($candidate->id)->lockForUpdate()->first();
+                        if (! $box || $box->is_withdrawn || $box->expired_status === 'handled') {
+                            return;
+                        }
+                        $row = $this->getExpirableBoxesQuery()->where('boxes.id', $box->id)->first();
+                        if (! $row || ! $row->stored_at) {
+                            return;
+                        }
 
-                    $nextStatus = 'active';
-                    if ($ageMonths >= 12) {
-                        $nextStatus = 'expired';
-                    } elseif ($ageMonths >= 9) {
-                        $nextStatus = 'warning';
-                    }
-
-                    if ($row->expired_status !== $nextStatus) {
-                        DB::transaction(function () use ($row, $nextStatus): void {
-                            $box = Box::whereKey($row->id)->lockForUpdate()->first();
-                            if (! $box || $box->expired_status === 'handled') {
-                                return;
-                            }
-
-                            $wasInactive = in_array((string) $box->expired_status, ['expired', 'handled'], true);
+                        $ageMonths = Carbon::parse($row->stored_at)->diffInMonths(now());
+                        $nextStatus = $this->statusFor($box->reactivated_until, $ageMonths);
+                        // Capture the old storage location before inactive stock vacates it.
+                        if ($nextStatus === 'expired') {
+                            $this->ensureReportExists($row, (int) $ageMonths, $nextStatus);
+                        }
+                        if ($box->expired_status !== $nextStatus) {
                             $box->expired_status = $nextStatus;
                             $box->save();
-
-                            if ($nextStatus === 'expired' && ! $wasInactive) {
-                                $this->syncLinkedPalletsAfterBoxDeactivation($box);
-                            }
-                        });
-                    }
-
-                    if ($nextStatus === 'expired') {
-                        $this->ensureReportExists($row, $ageMonths, 'expired');
-                    }
+                        }
+                        if ($nextStatus === 'expired') {
+                            $this->syncLinkedPalletsAfterBoxDeactivation($box);
+                        }
+                    });
                 }
             }, 'boxes.id', 'id');
     }
 
-    public function handleBox(int $boxId, int $userId): void
+    private function statusFor(?Carbon $reactivatedUntil, float $ageMonths): string
+    {
+        if ($reactivatedUntil) {
+            return $reactivatedUntil->gt(now()) ? 'active' : 'expired';
+        }
+
+        return $ageMonths >= 12 ? 'expired' : ($ageMonths >= 9 ? 'warning' : 'active');
+    }
+
+    public function handleBox(int $boxId, int $userId, ?int $locationId = null): void
     {
         $this->syncStatuses();
-
-        DB::transaction(function () use ($boxId, $userId) {
+        DB::transaction(function () use ($boxId, $userId, $locationId) {
             $box = Box::whereKey($boxId)->lockForUpdate()->first();
-            if (! $box) {
-                throw new \RuntimeException('Box tidak ditemukan.');
+            if (! $box || $box->is_withdrawn) {
+                throw new \RuntimeException('Box tidak ditemukan atau sudah dikirim.');
             }
-
-            if ($box->expired_status === 'handled') {
+            // Idempotent repeated requests must not extend an already active period.
+            if ($box->reactivated_until && $box->reactivated_until->gt(now()) && $box->expired_status === 'active') {
                 return;
             }
-
             if (! in_array((string) $box->expired_status, ['warning', 'expired'], true)) {
-                throw new \RuntimeException('Hanya box berstatus warning atau expired yang dapat ditangani.');
+                throw new \RuntimeException('Hanya box berstatus warning atau expired yang dapat diaktifkan kembali.');
             }
-
             if ($box->assigned_delivery_order_id !== null) {
-                throw new \RuntimeException(
-                    'Box masih di-assign ke delivery. Lepaskan atau selesaikan proses delivery sebelum menangani box.'
-                );
+                throw new \RuntimeException('Box masih di-assign ke delivery. Lepaskan atau selesaikan proses delivery sebelum mengaktifkan box.');
             }
-
             $isPickLocked = DB::table('delivery_pick_items')
                 ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
                 ->where('delivery_pick_items.box_id', $box->id)
                 ->whereIn('delivery_pick_sessions.status', ['pending', 'scanning', 'blocked', 'approved'])
-                ->lockForUpdate()
-                ->exists();
-
+                ->lockForUpdate()->exists();
             if ($isPickLocked) {
-                throw new \RuntimeException(
-                    'Box sedang digunakan dalam sesi picking dan belum dapat ditangani.'
-                );
+                throw new \RuntimeException('Box sedang digunakan dalam sesi picking dan belum dapat diaktifkan kembali.');
             }
 
-            $row = $this->getExpirableBoxesQuery()
-                ->where('boxes.id', $boxId)
-                ->first();
-
+            $row = $this->getExpirableBoxesQuery()->where('boxes.id', $boxId)->first();
             if (! $row || ! $row->stored_at) {
                 throw new \RuntimeException('Riwayat penyimpanan box tidak valid.');
             }
-
-            $storedAt = $row?->stored_at ? Carbon::parse($row->stored_at) : null;
-            $ageMonths = $storedAt ? $storedAt->diffInMonths(now()) : 0;
-
-            if ($ageMonths < 9) {
+            $ageMonths = Carbon::parse($row->stored_at)->diffInMonths(now());
+            if ($ageMonths < 9 && ! $box->reactivated_until) {
                 throw new \RuntimeException('Box belum memasuki periode warning.');
             }
 
-            $box->expired_status = 'handled';
+            $pallet = \App\Models\Pallet::whereKey($row->pallet_id)->lockForUpdate()->firstOrFail();
+            $stockLocation = $pallet->stockLocation()->lockForUpdate()->first();
+            if ($stockLocation) {
+                $currentLocationId = $stockLocation->master_location_id
+                    ?: MasterLocation::where('code', $stockLocation->warehouse_location)->value('id');
+                if ($locationId && (int) $locationId !== (int) $currentLocationId) {
+                    throw new \RuntimeException('Pallet masih memiliki lokasi. Handle harus menggunakan lokasi pallet saat ini.');
+                }
+                $locationId = $currentLocationId;
+            } elseif (! $locationId && $this->canUseExpiredReports()) {
+                $previousCode = ExpiredBoxReport::where('box_id', $box->id)->where('pallet_id', $pallet->id)
+                    ->whereNotNull('warehouse_location')->latest('id')->value('warehouse_location');
+                $locationId = $previousCode ? MasterLocation::where('code', $previousCode)->value('id') : null;
+            }
+            if (! $locationId) {
+                throw new \RuntimeException('Pilih lokasi penyimpanan kosong untuk mengaktifkan box.');
+            }
+
+            // Claim before reactivation; a location conflict rolls back the entire renewal.
+            $storage = app(LocationAssignmentService::class)->assign((int) $locationId, $pallet, $stockLocation?->stored_at ?? Carbon::parse($row->stored_at));
+            $box->expired_status = 'active';
             $box->handled_at = now();
             $box->handled_by = $userId;
+            $box->reactivated_until = now()->addMonthNoOverflow();
             $box->save();
-
             $this->syncLinkedPalletsAfterBoxDeactivation($box);
 
-            if ($this->canUseExpiredReports() && $row) {
-                ExpiredBoxReport::updateOrCreate(
-                    [
-                        'box_id' => $row->id,
-                        'status' => 'handled',
-                    ],
-                    [
-                        'box_number' => $row->box_number,
-                        'part_number' => $row->part_number,
-                        'pallet_id' => $row->pallet_id,
-                        'pallet_number' => $row->pallet_number,
-                        'warehouse_location' => $row->warehouse_location,
-                        'stored_at' => $row->stored_at,
-                        'age_months' => $ageMonths,
-                        'handled_by' => $userId,
-                        'handled_at' => now(),
-                    ]
-                );
+            if ($this->canUseExpiredReports()) {
+                ExpiredBoxReport::create([
+                    'box_id' => $box->id, 'status' => 'handled',
+                    'box_number' => $box->box_number, 'part_number' => $box->part_number,
+                    'pallet_id' => $pallet->id, 'pallet_number' => $pallet->pallet_number,
+                    'warehouse_location' => $storage->warehouse_location,
+                    'stored_at' => $row->stored_at, 'age_months' => (int) $ageMonths,
+                    'handled_by' => $userId, 'handled_at' => $box->handled_at,
+                    'reactivated_until' => $box->reactivated_until,
+                ]);
             }
         });
     }
@@ -165,6 +168,9 @@ class ExpiredBoxService
                 ->lockForUpdate()
                 ->first();
 
+            if (! $item && $activeForPart->isNotEmpty()) {
+                $item = new PalletItem(['pallet_id' => $linkedPallet->id, 'part_number' => $box->part_number]);
+            }
             if ($item) {
                 $item->box_quantity = $activeForPart->count();
                 $item->pcs_quantity = (int) $activeForPart->sum('pcs_quantity');
@@ -245,6 +251,8 @@ class ExpiredBoxService
                 'boxes.box_number',
                 'boxes.part_number',
                 'boxes.expired_status',
+                'boxes.reactivated_until',
+                'stock_locations.master_location_id',
                 DB::raw('COALESCE(boxes.created_at, stock_in.stored_at) as stored_at'),
                 'pallets.id as pallet_id',
                 'pallets.pallet_number',
@@ -258,7 +266,7 @@ class ExpiredBoxService
             return;
         }
 
-        ExpiredBoxReport::updateOrCreate(
+        ExpiredBoxReport::firstOrCreate(
             [
                 'box_id' => $row->id,
                 'status' => $status,

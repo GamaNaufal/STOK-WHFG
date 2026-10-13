@@ -71,7 +71,7 @@ class DeliveryOrderController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(! empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
@@ -133,7 +133,7 @@ class DeliveryOrderController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(! empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
@@ -171,7 +171,7 @@ class DeliveryOrderController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->groupBy('boxes.assigned_delivery_order_id', 'boxes.part_number');

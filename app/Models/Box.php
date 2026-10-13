@@ -46,6 +46,7 @@ class Box extends Model
         'expired_status',
         'handled_at',
         'handled_by',
+        'reactivated_until',
         'created_at',
         'updated_at',
     ];
@@ -55,6 +56,7 @@ class Box extends Model
         'is_not_full' => 'boolean',
         'withdrawn_at' => 'datetime',
         'handled_at' => 'datetime',
+        'reactivated_until' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime',
@@ -106,10 +108,30 @@ class Box extends Model
     }
 
     // Scope helper
+    public static function applyUsableExpiryFilter($query, string $prefix = 'boxes'): void
+    {
+        $column = $prefix !== '' ? $prefix.'.' : '';
+        $query->where(function ($status) use ($column) {
+            $status->whereNull($column.'expired_status')
+                ->orWhereNotIn($column.'expired_status', ['handled', 'expired']);
+        })->where(function ($period) use ($column) {
+            $period->whereNull($column.'reactivated_until')
+                ->orWhere($column.'reactivated_until', '>', now());
+        });
+    }
+
+    public function isExpiryUnavailable(): bool
+    {
+        return in_array($this->expired_status, ['handled', 'expired'], true)
+            || ($this->reactivated_until && $this->reactivated_until->lte(now()));
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_withdrawn', false)
-            ->where(function ($q) { $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']); });
+            ->where(function ($q) {
+                \App\Models\Box::applyUsableExpiryFilter($q, '');
+            });
     }
 
     public function scopeWithdrawn($query)

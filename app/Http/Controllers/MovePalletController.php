@@ -22,8 +22,7 @@ class MovePalletController extends Controller
         return $pallet->boxes()
             ->where('boxes.is_withdrawn', false)
             ->where(function ($query) {
-                $query->whereNull('boxes.expired_status')
-                    ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($query, 'boxes');
             });
     }
 
@@ -75,8 +74,7 @@ class MovePalletController extends Controller
         $activeBoxFilter = function ($query) {
             $query->where('boxes.is_withdrawn', false)
                 ->where(function ($query) {
-                    $query->whereNull('boxes.expired_status')
-                        ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                    \App\Models\Box::applyUsableExpiryFilter($query, 'boxes');
                 });
         };
 

@@ -6,7 +6,7 @@
 <x-page-header 
     title="Expired Box Management"
     icon="clock-history"
-    subtitle="Box berumur 9-12 bulan (warning) dan 12+ bulan (expired)"
+    subtitle="Warning tetap dapat dikirim. Handle mengaktifkan box selama 1 bulan; setelah itu kembali expired."
 />
 
 
@@ -43,15 +43,23 @@
                                 <td><span class="badge bg-light text-dark border">{{ $box->warehouse_location ?? '-' }}</span></td>
                                 <td><span class="badge bg-warning text-dark">{{ $age }} bulan</span></td>
                                 <td class="text-end">
+                                    @if(!$box->warehouse_location || $box->warehouse_location === 'Unknown')
+                                        <select class="form-select form-select-sm mb-2 js-handle-location" data-box-id="{{ $box->id }}" aria-label="Lokasi penyimpanan box {{ $box->box_number }}">
+                                            <option value="">Pilih lokasi kosong untuk pallet</option>
+                                            @foreach($availableLocations as $location)
+                                                <option value="{{ $location->id }}">{{ $location->code }}</option>
+                                            @endforeach
+                                        </select>
+                                    @endif
                                     <x-button 
                                         type="button" 
                                         size="sm" 
-                                        variant="danger"
+                                        variant="success"
                                         class="js-handle-btn"
                                         data-box-id="{{ $box->id }}"
                                         data-box-number="{{ $box->box_number }}"
                                         data-age="{{ $age }}"
-                                        title="Tandai sudah ditangani">
+                                        title="Aktifkan selama 1 bulan">
                                         <i class="bi bi-check-circle"></i> Handle
                                     </x-button>
                                 </td>
@@ -73,7 +81,7 @@
     <div class="col-lg-6">
         <x-card>
             <x-slot name="header">
-                <i class="bi bi-exclamation-octagon text-danger"></i> Expired (>=12 Bulan)
+                <i class="bi bi-exclamation-octagon text-danger"></i> Expired / Masa Aktif Habis
             </x-slot>
             
             <div class="table-responsive">
@@ -101,15 +109,23 @@
                                 <td><span class="badge bg-light text-dark border">{{ $box->warehouse_location ?? '-' }}</span></td>
                                 <td><span class="badge bg-danger">{{ $age }} bulan</span></td>
                                 <td class="text-end">
+                                    @if(!$box->warehouse_location || $box->warehouse_location === 'Unknown')
+                                        <select class="form-select form-select-sm mb-2 js-handle-location" data-box-id="{{ $box->id }}" aria-label="Lokasi penyimpanan box {{ $box->box_number }}">
+                                            <option value="">Pilih lokasi kosong untuk pallet</option>
+                                            @foreach($availableLocations as $location)
+                                                <option value="{{ $location->id }}">{{ $location->code }}</option>
+                                            @endforeach
+                                        </select>
+                                    @endif
                                     <x-button 
                                         type="button" 
                                         size="sm" 
-                                        variant="danger"
+                                        variant="success"
                                         class="js-handle-btn"
                                         data-box-id="{{ $box->id }}"
                                         data-box-number="{{ $box->box_number }}"
                                         data-age="{{ $age }}"
-                                        title="Tandai sudah ditangani">
+                                        title="Aktifkan selama 1 bulan">
                                         <i class="bi bi-check-circle"></i> Handle
                                     </x-button>
                                 </td>
@@ -135,7 +151,7 @@
     <div class="col-12">
         <x-card>
             <x-slot name="header">
-                <i class="bi bi-clock-history"></i> History Handled
+                <i class="bi bi-clock-history"></i> Riwayat Handle / Aktivasi
             </x-slot>
             <div class="table-responsive">
                 <table class="table table-sm table-striped align-middle mb-0">
@@ -149,6 +165,7 @@
                             <th class="fw-semibold">Umur</th>
                             <th class="fw-semibold">Handled By</th>
                             <th class="fw-semibold">Handled At</th>
+                            <th class="fw-semibold">Aktif Sampai</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -162,10 +179,11 @@
                                 <td><span class="badge bg-info text-dark">{{ $row->age_months }} bulan</span></td>
                                 <td>{{ $row->handler?->name ?? '-' }}</td>
                                 <td><span class="badge bg-success">{{ optional($row->handled_at)->format('d M Y H:i') ?? '-' }}</span></td>
+                                <td>{{ $row->reactivated_until?->format('d M Y H:i') ?? 'Penanganan lama' }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="p-4">
+                                <td colspan="9" class="p-4">
                                     <x-empty-state 
                                         message="Belum ada history penanganan box expired" 
                                         icon="clock-history" />
@@ -196,16 +214,22 @@
                 const boxId = this.getAttribute('data-box-id');
                 const boxNumber = this.getAttribute('data-box-number');
                 const age = this.getAttribute('data-age');
+                const locationSelect = document.querySelector(`.js-handle-location[data-box-id="${boxId}"]`);
+                if (locationSelect && !locationSelect.value) {
+                    showToast('Pilih lokasi penyimpanan kosong untuk pallet terlebih dahulu.', 'warning');
+                    locationSelect.focus();
+                    return;
+                }
                 
                 WarehouseAlert.confirm({
-                    title: 'Konfirmasi Handle Expired Box',
-                    message: `Anda akan menandai box <strong style="color: #DC2626;">${boxNumber}</strong> (${age} bulan) sudah ditangani.`,
+                    title: 'Aktifkan Box Selama 1 Bulan?',
+                    message: `Anda akan menandai box <strong style="color: #DC2626;">${boxNumber}</strong> (${age} bulan) aktif kembali selama satu bulan kalender.`,
                     warningItems: [
-                        'Box akan <strong>dihapus dari stok</strong>',
-                        'Aksi ini <strong>tidak dapat dibatalkan</strong>',
-                        'Pastikan box sudah benar-benar ditangani'
+                        'Box dapat masuk FIFO selama masa aktif dan tetap mengikuti tanggal penyimpanan aslinya.',
+                        'Setelah satu bulan, box kembali expired dan diblokir dari FIFO sampai Handle berikutnya.',
+                        'Pastikan kondisi box layak digunakan dan lokasi penyimpanannya sesuai.'
                     ],
-                    confirmText: 'Ya, Handle!',
+                    confirmText: 'Ya, Aktifkan 1 Bulan',
                     confirmColor: '#DC2626',
                     onConfirm: () => {
                         // Submit form to handle the expired box
@@ -219,6 +243,13 @@
                         csrfToken.value = '{{ csrf_token() }}';
                         
                         form.appendChild(csrfToken);
+                        if (locationSelect) {
+                            const locationInput = document.createElement('input');
+                            locationInput.type = 'hidden';
+                            locationInput.name = 'location_id';
+                            locationInput.value = locationSelect.value;
+                            form.appendChild(locationInput);
+                        }
                         document.body.appendChild(form);
                         form.submit();
                     }
@@ -227,6 +258,4 @@
         });
     });
 </script>
-    </div>
-</div>
 @endsection

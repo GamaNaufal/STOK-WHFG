@@ -35,8 +35,7 @@ class DashboardController extends Controller
             ->where('boxes.is_withdrawn', false)
             ->whereNull('boxes.deleted_at')
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')
-                  ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             });
 
         $boxQuery = $this->applyStoredLocationExistsFilter($boxQuery);
@@ -81,8 +80,7 @@ class DashboardController extends Controller
                         ->where('boxes.is_withdrawn', false)
                         ->whereNull('boxes.deleted_at')
                         ->where(function ($q2) {
-                            $q2->whereNull('boxes.expired_status')
-                               ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                            \App\Models\Box::applyUsableExpiryFilter($q2, 'boxes');
                         });
                 })->orWhereExists(function ($sub) {
                     $sub->select(DB::raw(1))

@@ -185,7 +185,7 @@ class DeliveryPickController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->when(! empty($lockedBoxIds), function ($q) use ($lockedBoxIds) {
@@ -213,7 +213,7 @@ class DeliveryPickController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->whereNotNull('boxes.assigned_delivery_order_id')
             ->orderBy('boxes.created_at', 'asc')
@@ -838,7 +838,7 @@ class DeliveryPickController extends Controller
 
             $box = Box::where('box_number', $request->box_number)->lockForUpdate()->first();
 
-            if ($box && ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true))) {
+            if ($box && ($box->is_withdrawn || $box->isExpiryUnavailable())) {
                 DeliveryIssue::create([
                     'pick_session_id' => $session->id,
                     'box_id' => $box->id,
@@ -972,7 +972,7 @@ class DeliveryPickController extends Controller
                 return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
             }
 
-            if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
+            if ($box->is_withdrawn || $box->isExpiryUnavailable()) {
                 return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
             }
 
@@ -1155,7 +1155,7 @@ class DeliveryPickController extends Controller
                     if (
                         ! $box
                         || $box->is_withdrawn
-                        || in_array($box->expired_status, ['handled', 'expired'], true)
+                        || $box->isExpiryUnavailable()
                         || (string) $box->part_number !== (string) $pickItem->part_number
                         || (int) $box->pcs_quantity !== (int) $pickItem->pcs_quantity
                     ) {
@@ -1812,7 +1812,7 @@ class DeliveryPickController extends Controller
             ->whereNull('boxes.deleted_at')
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->exists();
 
@@ -2313,7 +2313,7 @@ class DeliveryPickController extends Controller
             ->where('boxes.part_number', $partNumber)
             ->where('boxes.is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('boxes.expired_status')->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
             })
             ->where('boxes.assigned_delivery_order_id', $orderId)
             ->whereNotIn('boxes.id', function ($q) {
@@ -2340,7 +2340,7 @@ class DeliveryPickController extends Controller
             ->where('part_number', $partNumber)
             ->where('is_withdrawn', false)
             ->where(function ($q) {
-                $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']);
+                \App\Models\Box::applyUsableExpiryFilter($q, '');
             })
             ->whereNull('boxes.assigned_delivery_order_id')
             ->whereNotIn('boxes.id', function ($q) {

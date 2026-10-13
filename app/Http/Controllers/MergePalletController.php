@@ -80,8 +80,7 @@ class MergePalletController extends Controller
                 ->whereNull('boxes.deleted_at')
                 ->where('boxes.is_withdrawn', false)
                 ->where(function ($query) {
-                    $query->whereNull('boxes.expired_status')
-                        ->orWhereNotIn('boxes.expired_status', ['handled', 'expired']);
+                    \App\Models\Box::applyUsableExpiryFilter($query, 'boxes');
                 })
                 ->lockForUpdate()
                 ->get();
@@ -363,19 +362,19 @@ class MergePalletController extends Controller
         $allPallets = Pallet::whereHas('boxes', function ($query) {
             $query->where('is_withdrawn', false)
                 ->where(function ($q) {
-                    $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']);
+                    \App\Models\Box::applyUsableExpiryFilter($q, '');
                 });
         })
             ->with(['stockLocation.masterLocation', 'boxes' => function ($query) {
                 $query->where('is_withdrawn', false)
                     ->where(function ($q) {
-                        $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']);
+                        \App\Models\Box::applyUsableExpiryFilter($q, '');
                     }); // Only load active boxes
             }])
             ->withCount(['boxes as active_boxes_count' => function ($query) {
                 $query->where('is_withdrawn', false)
                     ->where(function ($q) {
-                        $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']);
+                        \App\Models\Box::applyUsableExpiryFilter($q, '');
                     });
             }])
             ->orderBy('id', 'desc')
@@ -423,7 +422,7 @@ class MergePalletController extends Controller
             ->with(['boxes' => function ($query) {
                 $query->where('is_withdrawn', false)
                     ->where(function ($q) {
-                        $q->whereNull('expired_status')->orWhereNotIn('expired_status', ['handled', 'expired']);
+                        \App\Models\Box::applyUsableExpiryFilter($q, '');
                     }); // Only load active boxes
             }, 'stockLocation.masterLocation'])
             ->first();

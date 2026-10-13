@@ -190,7 +190,7 @@ class StockInputController extends Controller
 
             if (
                 $existingBox->is_withdrawn
-                || in_array($existingBox->expired_status, ['handled', 'expired'], true)
+                || $existingBox->isExpiryUnavailable()
             ) {
                 return response()->json([
                     'success' => false,
@@ -381,7 +381,7 @@ class StockInputController extends Controller
             ], 404);
         }
 
-        if ($box->is_withdrawn || in_array($box->expired_status, ['handled', 'expired'], true)) {
+        if ($box->is_withdrawn || $box->isExpiryUnavailable()) {
             return response()->json([
                 'success' => false,
                 'message' => 'Box sudah tidak aktif dan tidak dapat dimasukkan ulang.',
@@ -632,7 +632,7 @@ class StockInputController extends Controller
             if ($box && (
                 $box->trashed()
                 || $box->is_withdrawn
-                || in_array($box->expired_status, ['handled', 'expired'], true)
+                || $box->isExpiryUnavailable()
             )) {
                 throw new \RuntimeException("Box {$boxNumber} sudah tidak aktif dan tidak dapat dimasukkan ulang.");
             }

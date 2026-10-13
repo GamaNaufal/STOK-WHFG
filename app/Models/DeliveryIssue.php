@@ -45,6 +45,7 @@ class DeliveryIssue extends Model
     {
         return match ($this->issue_type) {
             'box_withdrawn' => 'Box sudah withdrawn',
+            'box_expired' => 'Box expired atau masa aktifnya sudah habis',
             'scan_mismatch' => 'Box tidak sesuai',
             'box_damaged' => 'Box rusak',
             'quantity_mismatch' => 'Quantity tidak sesuai',
