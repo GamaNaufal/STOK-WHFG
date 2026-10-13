@@ -6,6 +6,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Facades\Schema;
 
+Artisan::command('delivery:expire-verifications', function () {
+    $count = app(\App\Services\PickingVerificationActivityService::class)->expireDue();
+    $this->info("Expired verification sessions: {$count}");
+})->purpose('Cancel picking verification after 10 minutes without user activity');
+
+Schedule::command('delivery:expire-verifications')->everyMinute()->withoutOverlapping();
+
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');

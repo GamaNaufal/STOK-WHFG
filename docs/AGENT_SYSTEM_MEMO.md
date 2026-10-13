@@ -2,6 +2,8 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
+Verifikasi tambahan 13 Oktober 2026: audio scan serta pembatalan dan timeout Picking Verification.
+
 ## Tujuan Memo
 
 Dokumen ini adalah konteks awal utama bagi agent yang mengerjakan repository STOK WHFG.
@@ -419,6 +421,18 @@ Akibatnya:
 
 Admin memiliki lock management untuk menghentikan sesi aktif yang macet. Pembatalan menghapus pick item dan pending issue serta melepaskan lock.
 
+### Pembatalan dan batas tidak aktif Picking Verification (13 Oktober 2026)
+
+- Halaman Picking Verification memiliki tombol `Batalkan Verifikasi`, dengan gaya tombol, `WarehouseAlert.confirm`, dan endpoint pembatalan yang sama dengan Scan Final Delivery. Pemilik sesi atau Admin dapat membatalkan; sesi `blocked` hanya dapat dibatalkan Admin.
+- Timer khusus verifikasi menggunakan `delivery_pick_sessions.verification_last_activity_at`. Sesi `scanning` dibatalkan setelah 10 menit tanpa aktivitas pengguna di halaman verifikasi. Scan, keyboard, input, klik/sentuhan, pergerakan pointer, dan scroll mengirim pembaruan aktivitas yang dibatasi frekuensinya; polling status tidak memperpanjang waktu.
+- Waktu diverifikasi di server dengan row lock sebelum perpanjangan aktivitas, scan, dan perpindahan tahap. Sesi kedaluwarsa tidak dapat dihidupkan kembali oleh request terlambat. Scan ulang box yang sudah terverifikasi tetap dikirim ke server untuk memeriksa validitas sesi.
+- Timeout mengubah status menjadi `cancelled`, menghapus pick item dan progres verifikasi, serta mencatat alasan pada `approval_notes`. Stok fisik, withdrawal, dan assignment delivery yang sudah ada tidak diubah; lock picking dilepas.
+- Sesi `blocked` atau sesi dengan pending issue tidak dibatalkan otomatis. Setelah approval issue, waktu verifikasi yang masih aktif dimulai kembali. Saat membuka Scan Final Delivery, timer verifikasi dimatikan. Tab verifikasi lama tidak dapat mengaktifkan kembali timer melalui endpoint aktivitas.
+- Sesi lama sebelum migration belum memiliki timer sampai halaman verifikasi dibuka atau proses start-verification diakses kembali. Sesi yang telah memiliki item final `scanned` tidak diaktifkan timer verifikasinya saat membuka kembali halaman verifikasi.
+- Command `php artisan delivery:expire-verifications` dijadwalkan setiap menit; cleanup background dapat terlambat sampai sekitar satu menit setelah batas 10 menit. Halaman aktif juga mengecek batas waktu, dan membuka daftar/start verifikasi membersihkan sesi kedaluwarsa tanpa menunggu scheduler.
+- Development: migration `2026_10_13_000001_add_verification_activity_to_delivery_pick_sessions` diperlukan. Untuk cleanup ketika browser ditutup, jalankan Laravel scheduler (`php artisan schedule:work` di terminal development). Production perlu menjalankan migration dan memastikan scheduler Laravel berjalan setiap menit saat deployment; perubahan ini tidak otomatis diterapkan ke server.
+- File utama tambahan: `app/Services/PickingVerificationActivityService.php`, `public/js/pages/picking-verification-session.js`, `tests/Feature/PickingVerificationActivityTest.php`, dan `tests/Frontend/picking-verification-session.test.js`.
+
 ### 12. Penyelesaian delivery dan stock withdrawal
 
 Delivery hanya dapat diselesaikan apabila:
@@ -599,6 +613,16 @@ File utama:
 - `app/Http/Controllers/AuditController.php`
 - `app/Services/OperationalReportService.php`
 - `app/Services/AuditService.php`
+
+## Audio Scan (diverifikasi 13 Oktober 2026)
+
+- Stock Input, Picking Verification, dan Scan Final Delivery menggunakan pemutar bersama `public/js/scan-feedback.js`, dimuat melalui `resources/views/shared/partials/scan-feedback.blade.php`.
+- Audio berasal dari `public/audio/OK.mp3` untuk input/scan berhasil dan `public/audio/NG.mp3` untuk input/scan gagal. File disertakan dalam repository dan diakses melalui URL `asset()`, sehingga deployment tidak bergantung pada folder Downloads komputer development.
+- Stock Input memutar OK setelah server menerima ID box atau nomor part; seluruh pemanggilan suara error sebelumnya memakai NG. Pesan sedang memproses tidak memutar OK.
+- Picking Verification dan Scan Final Delivery memutar NG untuk validasi input gagal, penolakan server, dan kegagalan koneksi. Scan ulang box yang sudah diverifikasi tetap memakai OK sesuai perilaku sukses yang sudah ada.
+- Beep sintetis dan text-to-speech sebelumnya dihapus. Pemutar menyiapkan audio pada interaksi keyboard/pointer, menghentikan suara sebelumnya saat hasil baru datang, dan tidak menggagalkan proses scan jika audio tidak tersedia.
+- Audio OK dan NG memakai penguatan 2x (sekitar +6 dB sebelum kompresi) melalui GainNode bersama, lalu kompresor untuk menekan puncak suara dan mengurangi risiko clipping. Volume akhir tetap mengikuti perangkat pengguna.
+- Perubahan audio ini dibuat di project development; production memerlukan deployment file terkait.
 
 ## Status Delivery
 

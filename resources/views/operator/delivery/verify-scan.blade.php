@@ -46,6 +46,14 @@
                 <a href="{{ route('delivery.pick.scan', [$order->id, $session->id]) }}" id="btnToFinal" class="btn btn-success {{ $remaining > 0 ? 'disabled' : '' }}">
                     <i class="bi bi-arrow-right-circle"></i> Lanjut ke Scan Final Delivery
                 </a>
+                <button type="button" class="btn btn-outline-danger mt-2" id="btnCancelVerification"
+                    @disabled($session->status === 'blocked' && Auth::user()->role !== 'admin')
+                    @if($session->status === 'blocked' && Auth::user()->role !== 'admin') title="Menunggu approval admin. Operator tidak dapat membatalkan sesi blocked." @endif>
+                    <i class="bi bi-x-circle"></i> Batalkan Verifikasi
+                </button>
+                <p class="small text-muted mt-3 mb-0" id="verificationIdleStatus" role="status">
+                    Sesi otomatis dibatalkan setelah 10 menit tanpa aktivitas di halaman ini.
+                </p>
             </div>
         </div>
     </div>
@@ -92,6 +100,13 @@
 @endsection
 
 @section('scripts')
+@include('shared.partials.scan-feedback')
+<script src="{{ asset('js/pages/picking-verification-session.js') }}?v={{ filemtime(public_path('js/pages/picking-verification-session.js')) }}"
+    data-activity-url="{{ route('delivery.pick.verify.activity', $session->id) }}"
+    data-cancel-url="{{ route('delivery.pick.cancel', $session->id) }}"
+    data-return-url="{{ route('delivery.pick.verification') }}"
+    data-csrf="{{ csrf_token() }}"
+    data-expires-in="{{ $session->status === 'scanning' && $session->verification_last_activity_at ? max(0, (int) now()->diffInSeconds($session->verification_last_activity_at->copy()->addMinutes(10))) : '' }}"></script>
 <script>
     const scanInput = document.getElementById('scanInput');
     const btnScan = document.getElementById('btnScan');
@@ -102,206 +117,9 @@
     const btnToFinal = document.getElementById('btnToFinal');
 
     let requestQueue = Promise.resolve();
-    const requiredBoxNumberToId = new Map();
-    const localVerifiedBoxIds = new Set();
-    let selectedVoice = null;
-    let speechPrimed = false;
-    let speechPrimePromise = Promise.resolve();
-    let beepAudioContext = null;
-
-    function normalizeBoxNumber(value) {
-        return String(value || '').trim().toUpperCase();
-    }
-
-    function compactBoxNumber(value) {
-        return normalizeBoxNumber(value).replace(/[^A-Z0-9]/g, '');
-    }
-
-    document.querySelectorAll('#requiredBoxes tr[data-box-id]').forEach((row) => {
-        const boxId = Number(row.getAttribute('data-box-id'));
-        const boxNumber = row.querySelector('td:first-child')?.textContent || '';
-        const normalized = normalizeBoxNumber(boxNumber);
-        const compact = compactBoxNumber(boxNumber);
-
-        if (!Number.isNaN(boxId) && normalized) {
-            requiredBoxNumberToId.set(normalized, boxId);
-            if (compact) {
-                requiredBoxNumberToId.set(compact, boxId);
-            }
-        }
-
-        if (row.classList.contains('table-success')) {
-            localVerifiedBoxIds.add(boxId);
-        }
-    });
-
-    function selectSpeechVoice() {
-        if (!('speechSynthesis' in window)) {
-            return null;
-        }
-
-        const voices = window.speechSynthesis.getVoices();
-        if (!voices || voices.length === 0) {
-            return null;
-        }
-
-        const exactIndonesianLocal = voices.find((voice) => {
-            return String(voice.lang || '').toLowerCase() === 'id-id' && voice.localService;
-        });
-        if (exactIndonesianLocal) {
-            return exactIndonesianLocal;
-        }
-
-        const exactIndonesian = voices.find((voice) => String(voice.lang || '').toLowerCase() === 'id-id');
-        if (exactIndonesian) {
-            return exactIndonesian;
-        }
-
-        const anyIndonesianLocal = voices.find((voice) => {
-            return String(voice.lang || '').toLowerCase().startsWith('id') && voice.localService;
-        });
-        if (anyIndonesianLocal) {
-            return anyIndonesianLocal;
-        }
-
-        const anyIndonesian = voices.find((voice) => String(voice.lang || '').toLowerCase().startsWith('id'));
-        if (anyIndonesian) {
-            return anyIndonesian;
-        }
-
-        return voices[0] || null;
-    }
-
-    function primeSpeech() {
-        if (!('speechSynthesis' in window)) {
-            return;
-        }
-
-        window.speechSynthesis.getVoices();
-        selectedVoice = selectSpeechVoice();
-        if (speechPrimed) {
-            return;
-        }
-
-        speechPrimePromise = new Promise((resolve) => {
-            try {
-                const warmup = new SpeechSynthesisUtterance('.');
-                warmup.lang = 'id-ID';
-                warmup.rate = 1;
-                warmup.pitch = 1;
-                warmup.volume = 0;
-                if (selectedVoice) {
-                    warmup.voice = selectedVoice;
-                }
-
-                let finished = false;
-                const finish = () => {
-                    if (finished) {
-                        return;
-                    }
-                    finished = true;
-                    speechPrimed = true;
-                    resolve();
-                };
-
-                warmup.onend = finish;
-                warmup.onerror = finish;
-                window.speechSynthesis.cancel();
-                window.speechSynthesis.speak(warmup);
-                setTimeout(finish, 180);
-            } catch (error) {
-                resolve();
-            }
-        });
-    }
-
-    function ensureBeepAudioContext() {
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContextClass) {
-            return null;
-        }
-
-        if (!beepAudioContext) {
-            beepAudioContext = new AudioContextClass();
-        }
-
-        if (beepAudioContext.state === 'suspended') {
-            beepAudioContext.resume().catch(() => {});
-        }
-
-        return beepAudioContext;
-    }
-
-    function scheduleBeepPulse(audioContext, startAt, durationSeconds, frequency) {
-        const oscillator = audioContext.createOscillator();
-        oscillator.type = 'square';
-        oscillator.frequency.setValueAtTime(frequency, startAt);
-
-        const gainNode = audioContext.createGain();
-        gainNode.gain.setValueAtTime(0.0001, startAt);
-        gainNode.gain.exponentialRampToValueAtTime(2.2, startAt + 0.01);
-        gainNode.gain.exponentialRampToValueAtTime(0.0001, startAt + durationSeconds);
-
-        const compressor = audioContext.createDynamicsCompressor();
-        compressor.threshold.setValueAtTime(-16, startAt);
-        compressor.knee.setValueAtTime(8, startAt);
-        compressor.ratio.setValueAtTime(8, startAt);
-
-        oscillator.connect(gainNode);
-        gainNode.connect(compressor);
-        compressor.connect(audioContext.destination);
-
-        oscillator.start(startAt);
-        oscillator.stop(startAt + durationSeconds + 0.02);
-    }
-
-    function playSuccessBeep() {
-        try {
-            const audioContext = ensureBeepAudioContext();
-            if (!audioContext) {
-                return;
-            }
-
-            const initialStart = audioContext.currentTime + 0.01;
-            scheduleBeepPulse(audioContext, initialStart, 0.11, 1500);
-            scheduleBeepPulse(audioContext, initialStart + 0.14, 0.11, 1700);
-        } catch (error) {}
-    }
-
-    function speakSuccessNow() {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance('OK');
-        utterance.lang = 'en-US';
-        utterance.rate = 1.2;
-        utterance.pitch = 1;
-        utterance.volume = 100000000000;
-        if (selectedVoice) {
-            utterance.voice = selectedVoice;
-        }
-        window.speechSynthesis.speak(utterance);
-    }
-
-    function playSuccessSpeech() {
-        try {
-            playSuccessBeep();
-
-            if (!('speechSynthesis' in window)) {
-                return;
-            }
-
-            if (!speechPrimed) {
-                primeSpeech();
-                speechPrimePromise.finally(() => {
-                    speakSuccessNow();
-                });
-                return;
-            }
-
-            speakSuccessNow();
-        } catch (e) {}
-    }
 
     function showMessage(message, type = 'success') {
+        window.ScanFeedback?.[type === 'danger' ? 'error' : 'success']();
         const bg = type === 'success' ? '#ECFDF5' : '#FEF2F2';
         const border = type === 'success' ? '#10B981' : '#EF4444';
         const color = type === 'success' ? '#065F46' : '#991B1B';
@@ -311,7 +129,6 @@
 
     function markRowVerified(boxId) {
         const numericBoxId = Number(boxId);
-        localVerifiedBoxIds.add(numericBoxId);
 
         const row = document.querySelector(`tr[data-box-id="${numericBoxId}"]`);
         if (!row) return;
@@ -337,8 +154,7 @@
     }
 
     function submitScan() {
-        primeSpeech();
-
+        if (window.verificationSessionClosing) return;
         const boxNumber = scanInput.value.trim();
         if (!boxNumber) {
             showMessage('ID Box wajib diisi.', 'danger');
@@ -355,18 +171,6 @@
             return;
         }
 
-        const normalized = normalizeBoxNumber(boxNumber);
-        const compact = compactBoxNumber(boxNumber);
-        const preMatchedBoxId = requiredBoxNumberToId.get(normalized) ?? requiredBoxNumberToId.get(compact);
-
-        if (preMatchedBoxId && localVerifiedBoxIds.has(Number(preMatchedBoxId))) {
-            scanInput.value = '';
-            scanInput.focus();
-            playSuccessSpeech();
-            showMessage('Box ini sudah diverifikasi.', 'warning');
-            return;
-        }
-
         scanInput.value = '';
         scanInput.focus();
 
@@ -374,6 +178,7 @@
     }
 
     function processScanRequest(boxNumber) {
+        if (window.verificationSessionClosing) return Promise.resolve();
         return fetch("{{ route('delivery.pick.verify.scan', $session->id) }}", {
             method: 'POST',
             headers: {
@@ -384,9 +189,9 @@
         })
         .then(async (res) => {
             const data = await res.json();
+            if (window.verificationSessionClosing) return;
 
             if (data.success) {
-                playSuccessSpeech();
                 showMessage(data.message, 'success');
                 if (data.box_id) {
                     markRowVerified(data.box_id);
@@ -398,8 +203,12 @@
             showMessage(data.message || 'Scan verifikasi gagal.', 'danger');
 
             if (res.status === 409) {
+                window.verificationSessionClosing = true;
+                scanInput.disabled = true;
+                btnScan.disabled = true;
+                btnToFinal.classList.add('disabled');
                 setTimeout(() => {
-                    window.location.href = "{{ route('delivery.index') }}";
+                    window.location.href = "{{ route('delivery.pick.verification') }}";
                 }, 900);
             }
         })
@@ -416,14 +225,5 @@
     });
 
     btnScan.addEventListener('click', submitScan);
-
-    primeSpeech();
-    window.addEventListener('pointerdown', primeSpeech, { once: true });
-    window.addEventListener('keydown', primeSpeech, { once: true });
-    scanInput.addEventListener('focus', primeSpeech, { once: true });
-    scanInput.addEventListener('click', primeSpeech, { once: true });
-    window.speechSynthesis?.addEventListener?.('voiceschanged', () => {
-        selectedVoice = selectSpeechVoice();
-    });
 </script>
 @endsection

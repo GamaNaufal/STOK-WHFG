@@ -26,6 +26,7 @@ class DeliveryPickSession extends Model
         'redo_until',
         'completion_status',
         'verification_box_ids',
+        'verification_last_activity_at',
     ];
 
     protected $casts = [
@@ -36,6 +37,7 @@ class DeliveryPickSession extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'verification_box_ids' => 'array',
+        'verification_last_activity_at' => 'datetime',
     ];
 
     public function order()

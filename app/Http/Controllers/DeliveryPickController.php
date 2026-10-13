@@ -17,6 +17,7 @@ use App\Models\StockWithdrawal;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
 use App\Services\PalletNumberService;
+use App\Services\PickingVerificationActivityService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -33,9 +34,9 @@ class DeliveryPickController extends Controller
 
     public function __construct(
         private readonly LocationAssignmentService $locationAssignmentService,
-        private readonly PalletNumberService $palletNumberService
-    ) {
-    }
+        private readonly PalletNumberService $palletNumberService,
+        private readonly PickingVerificationActivityService $verificationActivityService
+    ) {}
 
     private function authorizePickSessionView(DeliveryPickSession $session): void
     {
@@ -235,6 +236,7 @@ class DeliveryPickController extends Controller
 
     public function verificationIndex()
     {
+        $this->verificationActivityService->expireDue();
         $user = Auth::user();
         if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
@@ -450,9 +452,11 @@ class DeliveryPickController extends Controller
         }
     }
 
-    private function startOrReusePickSession(DeliveryOrder $order, int $userId): DeliveryPickSession
+    private function startOrReusePickSession(DeliveryOrder $order, int $userId, bool $verification = false): DeliveryPickSession
     {
-        return DB::transaction(function () use ($order, $userId) {
+        $this->verificationActivityService->expireDue();
+
+        return DB::transaction(function () use ($order, $userId, $verification) {
             DB::table('operation_locks')
                 ->where('name', 'global_delivery_pick')
                 ->lockForUpdate()
@@ -484,6 +488,11 @@ class DeliveryPickController extends Controller
                     if (! $isOwner) {
                         $ownerName = trim((string) optional($activeSession->creator)->name);
                         throw new \RuntimeException('Order ini sedang diproses oleh '.($ownerName !== '' ? $ownerName : 'operator lain').'.');
+                    }
+
+                    if ($verification && ! $activeSession->verification_last_activity_at && ! $activeSession->items()->where('status', 'scanned')->exists()) {
+                        $activeSession->verification_last_activity_at = now();
+                        $activeSession->save();
                     }
 
                     return $activeSession;
@@ -538,6 +547,8 @@ class DeliveryPickController extends Controller
                 ]);
             }
 
+            $session->verification_last_activity_at = $verification ? now() : null;
+            $session->save();
             $this->createSessionItems($lockedOrder, $session);
 
             if (! $session->items()->exists()) {
@@ -591,7 +602,8 @@ class DeliveryPickController extends Controller
         try {
             $session = $this->startOrReusePickSession(
                 $order,
-                (int) $user->id
+                (int) $user->id,
+                true
             );
         } catch (\Throwable $e) {
             $message = (string) $e->getMessage();
@@ -625,6 +637,11 @@ class DeliveryPickController extends Controller
             return redirect()->route('delivery.index')->with('error', 'Sesi ini dimiliki operator lain.');
         }
 
+        $this->updateVerificationPhase($session, false);
+        if ($session->status === 'cancelled') {
+            return redirect()->route('delivery.pick.verification')->with('error', 'Sesi verifikasi sudah dibatalkan atau melewati batas 10 menit tanpa aktivitas. Silakan mulai kembali.');
+        }
+
         if (in_array((string) $session->status, ['stale', 'cancelled'], true)) {
             return redirect()->route('delivery.index')->with('error', self::SESSION_RECALC_MESSAGE);
         }
@@ -648,6 +665,11 @@ class DeliveryPickController extends Controller
             return redirect()->route('delivery.index')->with('error', 'Sesi ini dimiliki operator lain.');
         }
 
+        $this->updateVerificationPhase($session, true);
+        if ($session->status === 'cancelled') {
+            return redirect()->route('delivery.pick.verification')->with('error', 'Sesi verifikasi sudah dibatalkan atau melewati batas 10 menit tanpa aktivitas. Silakan mulai kembali.');
+        }
+
         if (in_array((string) $session->status, ['stale', 'cancelled'], true)) {
             return redirect()->route('delivery.index')->with('error', self::SESSION_RECALC_MESSAGE);
         }
@@ -661,6 +683,55 @@ class DeliveryPickController extends Controller
             ->all();
 
         return view('operator.delivery.verify-scan', compact('session', 'order', 'verifiedBoxIds'));
+    }
+
+    private function updateVerificationPhase(DeliveryPickSession $session, bool $verification): void
+    {
+        DB::transaction(function () use ($session, $verification) {
+            $locked = DeliveryPickSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            if (! $this->verificationActivityService->expireLocked($locked) && $locked->status === 'scanning') {
+                $locked->verification_last_activity_at = $verification && ! $locked->items()->where('status', 'scanned')->exists()
+                    ? now() : null;
+                $locked->save();
+            }
+        });
+        $session->refresh();
+    }
+
+    public function verificationActivity(Request $request, $sessionId)
+    {
+        $request->validate(['active' => ['required', 'boolean']]);
+        $user = Auth::user();
+
+        $result = DB::transaction(function () use ($request, $sessionId, $user) {
+            $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
+            if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
+                return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
+            }
+            if ($this->verificationActivityService->expireLocked($session)) {
+                return ['success' => false, 'message' => PickingVerificationActivityService::EXPIRED_MESSAGE, 'status' => 409];
+            }
+            if (! in_array($session->status, self::ACTIVE_LOCK_STATUSES, true)) {
+                return ['success' => false, 'message' => 'Sesi tidak aktif. Silakan mulai kembali.', 'status' => 409];
+            }
+
+            // Polling alone must never extend the deadline. An old verification tab
+            // must also not reactivate the timer after moving to final scanning.
+            if ($session->status === 'scanning' && $session->verification_last_activity_at && $request->boolean('active')) {
+                $session->verification_last_activity_at = now();
+                $session->save();
+            }
+
+            return [
+                'success' => true,
+                'expires_in' => $session->status === 'scanning' && $session->verification_last_activity_at
+                    ? max(0, (int) now()->diffInSeconds($session->verification_last_activity_at->copy()->addMinutes(PickingVerificationActivityService::TIMEOUT_MINUTES)))
+                    : null,
+                'status' => 200,
+            ];
+        });
+
+        return response()->json($result, $result['status']);
     }
 
     public function cancel($sessionId)
@@ -697,6 +768,7 @@ class DeliveryPickController extends Controller
 
             $session->status = 'cancelled';
             $session->verification_box_ids = null;
+            $session->verification_last_activity_at = null;
             $session->approval_notes = $notes !== '' ? ($notes.' | '.$cancelNote) : $cancelNote;
             $session->save();
 
@@ -735,6 +807,17 @@ class DeliveryPickController extends Controller
 
             if ((int) $session->created_by !== (int) $user->id && $user->role !== 'admin') {
                 return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
+            }
+
+            if ($this->verificationActivityService->expireLocked($session)) {
+                return ['success' => false, 'message' => PickingVerificationActivityService::EXPIRED_MESSAGE, 'status' => 409];
+            }
+            if (in_array($session->status, ['cancelled', 'pending'], true)) {
+                return ['success' => false, 'message' => 'Sesi tidak aktif. Silakan mulai kembali.', 'status' => 409];
+            }
+            if ($session->status === 'scanning' && $session->verification_last_activity_at) {
+                $session->verification_last_activity_at = null;
+                $session->save();
             }
 
             if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id, true)) {
@@ -857,6 +940,17 @@ class DeliveryPickController extends Controller
                 return ['success' => false, 'message' => 'Sesi ini dimiliki operator lain.', 'status' => 403];
             }
 
+            if ($this->verificationActivityService->expireLocked($session)) {
+                return ['success' => false, 'message' => PickingVerificationActivityService::EXPIRED_MESSAGE, 'status' => 409];
+            }
+            if (in_array($session->status, ['cancelled', 'pending'], true)) {
+                return ['success' => false, 'message' => 'Sesi tidak aktif. Silakan mulai kembali.', 'status' => 409];
+            }
+            if ($session->status === 'scanning' && $session->verification_last_activity_at) {
+                $session->verification_last_activity_at = now();
+                $session->save();
+            }
+
             if ($this->hasPendingAdditionalNotFullRequestForOrder((int) $session->delivery_order_id, true)) {
                 return ['success' => false, 'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE, 'status' => 423];
             }
@@ -944,6 +1038,9 @@ class DeliveryPickController extends Controller
         $session = $issue->session;
         $session->status = 'scanning';
         $session->approved_by = $user->id;
+        if ($session->verification_last_activity_at) {
+            $session->verification_last_activity_at = now();
+        }
         $session->approved_at = now();
         $session->approval_notes = $issue->notes;
         $session->save();
@@ -972,6 +1069,14 @@ class DeliveryPickController extends Controller
 
                 if ($session->status === 'completed') {
                     return ['success' => true, 'message' => 'Session sudah completed.'];
+                }
+
+                if (in_array($session->status, ['cancelled', 'pending'], true)) {
+                    return ['success' => false, 'message' => 'Sesi tidak aktif. Silakan mulai kembali.', 'status' => 409];
+                }
+
+                if ($this->verificationActivityService->expireLocked($session)) {
+                    return ['success' => false, 'message' => PickingVerificationActivityService::EXPIRED_MESSAGE, 'status' => 409];
                 }
 
                 if ($session->status === 'stale') {
@@ -2181,6 +2286,7 @@ class DeliveryPickController extends Controller
 
                 $session->status = 'cancelled';
                 $session->verification_box_ids = null;
+                $session->verification_last_activity_at = null;
                 $session->approval_notes = $notes !== '' ? ($notes.' | '.$terminateNote) : $terminateNote;
                 $session->save();
 

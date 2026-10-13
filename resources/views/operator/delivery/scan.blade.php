@@ -105,6 +105,7 @@
 @endsection
 
 @section('scripts')
+@include('shared.partials.scan-feedback')
 <script>
     const scanInput = document.getElementById('scanInput');
     const btnScan = document.getElementById('btnScan');
@@ -140,6 +141,7 @@
     }
 
     function showMessage(message, type = 'success') {
+        window.ScanFeedback?.[type === 'success' ? 'success' : 'error']();
         const bg = type === 'success' ? '#ECFDF5' : '#FEF2F2';
         const border = type === 'success' ? '#10B981' : '#EF4444';
         const color = type === 'success' ? '#065F46' : '#991B1B';

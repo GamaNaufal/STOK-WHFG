@@ -110,6 +110,7 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/delivery-stock/{order}/pick/{session}/scan', [DeliveryPickController::class, 'showScan'])->name('delivery.pick.scan');
         Route::post('/delivery-pick/{session}/cancel', [DeliveryPickController::class, 'cancel'])->name('delivery.pick.cancel');
         Route::post('/delivery-pick/{session}/verify-scan', [DeliveryPickController::class, 'verifyScanBox'])->name('delivery.pick.verify.scan');
+        Route::post('/delivery-pick/{session}/verification-activity', [DeliveryPickController::class, 'verificationActivity'])->name('delivery.pick.verify.activity');
         Route::post('/delivery-pick/{session}/scan', [DeliveryPickController::class, 'scanBox'])->name('delivery.pick.scan.submit');
         Route::post('/delivery-pick/{session}/complete', [DeliveryPickController::class, 'complete'])->name('delivery.pick.complete');
         

@@ -26,6 +26,7 @@
 @endsection
 
 @section('scripts')
+@include('shared.partials.scan-feedback')
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     window.stockInputConfig = {
@@ -41,5 +42,5 @@
         locationSearchUrl: '/api/locations/search'
     };
 </script>
-<script src="{{ asset('js/pages/operator-stock-input.js') }}"></script>
+<script src="{{ asset('js/pages/operator-stock-input.js') }}?v={{ filemtime(public_path('js/pages/operator-stock-input.js')) }}"></script>
 @endsection
