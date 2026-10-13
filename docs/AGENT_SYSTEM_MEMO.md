@@ -2,6 +2,8 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
+Verifikasi tambahan 14 Oktober 2026: Stock View menampilkan stok expired dengan label, dan Handle dibatasi untuk box expired.
+
 Verifikasi tambahan 13 Oktober 2026: audio scan, pembatalan dan timeout Picking Verification, serta aktivasi ulang box melalui Handle selama satu bulan.
 
 ## Tujuan Memo
@@ -142,7 +144,7 @@ Canonical pallet untuk box shared ditentukan dari relasi `pallet_boxes` paling b
 
 Query stok mentah wajib mengabaikan `boxes.deleted_at`. Fallback `pallet_items` hanya boleh digunakan untuk pallet yang benar-benar tidak pernah memiliki histori box, termasuk histori box soft-deleted.
 
-Halaman `Lihat Stok` hanya menampilkan box aktif. Box soft-deleted, withdrawn, atau expired/handled tidak boleh ditambahkan sebagai hasil pencarian stok; histori box nonaktif hanya ditampilkan melalui history/audit.
+Halaman `Lihat Stok` menampilkan stok fisik aktif dan expired, termasuk box tanpa lokasi aktif. Box expired diberi label merah dan tetap tidak eligible FIFO. Total halaman mencakup expired, dengan rincian jumlah box/PCS expired pada ringkasan, grup part/pallet, dan export. Detail part/pallet serta cetak ikut menampilkan status expired; tombol Edit tidak ditampilkan untuk expired. Box soft-deleted, withdrawn, dan status handled legacy tetap tidak ditampilkan. Endpoint `/api/stock/by-part` untuk ketersediaan pengambilan stok tetap mengecualikan expired. Batas reaktivasi yang sudah habis langsung ditandai expired meskipun scheduler belum menyinkronkan status.
 
 ## Proses Bisnis
 
@@ -569,7 +571,7 @@ Box warning tetap boleh masuk FIFO tanpa Handle. Box expired/handled atau box de
 
 Saat status berubah menjadi expired, sistem menghitung ulang `pallet_items`, menghapus stock location pallet yang sudah kosong, dan mengosongkan master location terkait. Snapshot lokasi disimpan sebelum pelepasan lokasi.
 
-Supervisi/Admin dapat menekan Handle pada warning/expired untuk mengaktifkan box satu bulan. Box withdrawn, soft-deleted, assigned ke delivery, atau terkunci dalam sesi picking tidak dapat diaktifkan ulang. Request berulang saat masa aktif belum habis tidak memperpanjang deadline maupun menggandakan riwayat. Tanggal `boxes.created_at` tidak berubah, sehingga posisi FIFO tetap mengikuti penyimpanan asli.
+Supervisi/Admin hanya dapat menekan Handle pada box expired untuk mengaktifkan box satu bulan. Warning tetap terlihat pada halaman Expired Box tanpa tombol Handle/lokasi; backend menolak request Handle untuk warning dan stok aktif yang belum expired. Box withdrawn, soft-deleted, assigned ke delivery, atau terkunci dalam sesi picking tidak dapat diaktifkan ulang. Request berulang saat masa aktif belum habis tidak memperpanjang deadline maupun menggandakan riwayat. Tanggal `boxes.created_at` tidak berubah, sehingga posisi FIFO tetap mengikuti penyimpanan asli.
 
 Handle mempertahankan pallet dan lokasi yang masih valid. Jika lokasi sudah dilepas, UI meminta lokasi kosong; backend juga mendukung lokasi historis bila request tidak menentukan lokasi. `LocationAssignmentService` mengunci dan memvalidasi lokasi, menolak lokasi yang sudah ditempati pallet lain, lalu memulihkan ringkasan box/PCS. Kegagalan assignment lokasi membatalkan aktivasi ulang secara atomik.
 
@@ -689,7 +691,7 @@ Status yang digunakan:
 - Picklist PDF/print hanya dapat diakses role warehouse; Warehouse Operator hanya dapat mengakses session miliknya.
 - Riwayat Pallet mengagregasi audit log Pallet, transaksi input stok (`stock_inputs`), dan mutasi perpindahan box (`box_pallet_moved`).
 - Riwayat Box mengagregasi audit log Box, transaksi input stok (`stock_inputs` via `stock_input_boxes`), dan catatan withdrawal (`stock_withdrawals`).
-- Pencarian Stock View mencakup box orphan aktif dan box non-aktif (withdrawn/expired/archived), serta otomatis beralih ke mode box_id saat user mencari box tanpa kecocokan nomor part.
+- Pencarian Stock View mencakup box aktif/expired, termasuk orphan, dan tetap mengecualikan withdrawn, soft-deleted, serta handled legacy. Pencarian otomatis beralih ke mode box_id saat user mencari box tanpa kecocokan nomor part.
 - Merge Pallet mendukung pemilihan lokasi tujuan dari salah satu pallet sumber yang digabung; pembersihan pallet sumber melepas okupansi master location secara tuntas dan backend mendukung fallback pencarian master location via kode string `warehouse_location`.
 - Stock Input memvalidasi ketersediaan lokasi secara defensif terhadap `master_locations` dan `stock_locations`; baris `stock_locations` yatim (orphan) yang tertinggal dari palet non-aktif/terhapus dibersihkan secara aman (self-healing) untuk mencegah bentrok unique constraint `master_location_id`.
 - Assignment lokasi pada Stock Input, Delivery Assign, approval Box Not Full, Restore Withdrawal, Redo/relokasi, dan Merge Pallet menggunakan `App\Services\LocationAssignmentService` untuk locking `master_locations`, validasi konflik `stock_locations`, dan assignment atomik di dalam transaksi flow masing-masing (diverifikasi 6 Oktober 2026).
@@ -704,7 +706,7 @@ Status yang digunakan:
 - Status delivery `partial` tetap dipakai khusus untuk parent order yang memiliki child hasil split.
 - Semua box not full wajib melalui request dan approval Supervisi; Stock Input dan Delivery Assignment tidak boleh membuat box not full secara langsung.
 - PCS direct input wajib sama dengan fixed qty Master Part.
-- Warning tetap dapat masuk FIFO. Handle pada warning/expired mengaktifkan box selama satu bulan kalender; saat masa aktif habis, box menjadi expired dan wajib Handle lagi. Aktivasi ulang tidak boleh dilakukan pada box assigned atau pick-locked.
+- Warning tetap dapat masuk FIFO dan tidak dapat di-Handle. Handle hanya pada expired, mengaktifkan box selama satu bulan kalender; saat masa aktif habis, box menjadi expired dan wajib Handle lagi. Aktivasi ulang tidak boleh dilakukan pada box assigned atau pick-locked.
 
 ## Status Schema dan Validasi Terakhir
 

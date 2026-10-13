@@ -50,6 +50,8 @@ class StockViewByPalletExport implements FromCollection, WithHeadings, WithStyle
                 'Lokasi' => $stock['location'] ?? '-',
                 'Total Box' => (int) ($stock['total_box'] ?? $stock['box_quantity'] ?? 0),
                 'Total PCS' => (int) ($stock['total_pcs'] ?? $stock['pcs_quantity'] ?? 0),
+                'Box Expired' => (int) ($stock['expired_box'] ?? 0),
+                'PCS Expired' => (int) ($stock['expired_pcs'] ?? 0),
             ]);
             $currentRow++;
             $this->groupEndRows[] = $currentRow - 1;
@@ -65,6 +67,8 @@ class StockViewByPalletExport implements FromCollection, WithHeadings, WithStyle
             'Lokasi',
             'Total Box',
             'Total PCS',
+            'Box Expired',
+            'PCS Expired',
         ];
     }
 
@@ -73,7 +77,7 @@ class StockViewByPalletExport implements FromCollection, WithHeadings, WithStyle
         $lastRow = $this->stocks->count() + 1;
 
         // Apply borders to all cells
-        $sheet->getStyle('A1:D' . $lastRow)->applyFromArray([
+        $sheet->getStyle('A1:F' . $lastRow)->applyFromArray([
             'border' => [
                 'allBorders' => [
                     'borderStyle' => Border::BORDER_THIN,
@@ -116,7 +120,7 @@ class StockViewByPalletExport implements FromCollection, WithHeadings, WithStyle
 
         // Apply thicker border di akhir setiap entry
         foreach ($this->groupEndRows as $row) {
-            $sheet->getStyle('A' . $row . ':D' . $row)->applyFromArray([
+            $sheet->getStyle('A' . $row . ':F' . $row)->applyFromArray([
                 'border' => [
                     'bottom' => [
                         'borderStyle' => Border::BORDER_MEDIUM,
@@ -127,6 +131,8 @@ class StockViewByPalletExport implements FromCollection, WithHeadings, WithStyle
         }
 
         // Freeze header row
+        $sheet->getColumnDimension('E')->setWidth(16);
+        $sheet->getColumnDimension('F')->setWidth(16);
         $sheet->freezePane('A2');
     }
 

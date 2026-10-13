@@ -8,12 +8,15 @@
 @endsection
 
 @section('content')
+<div class="alert alert-info" role="note">
+    Total stok mencakup stok expired. <strong>{{ $summaryExpiredBox }} box / {{ $summaryExpiredPcs }} PCS expired</strong> tidak dapat masuk FIFO sampai di-Handle.
+</div>
 <div class="row mb-4">
     <div class="col-12">
         <div class="hero-responsive">
             <div>
                 <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
-                    <i class="bi bi-eye"></i> Lihat Stok Tersedia
+                    <i class="bi bi-eye"></i> Lihat Stok Gudang
                 </h1>
                 <p style="margin: 0; opacity: 0.95; font-size: 15px;">
                     Pantau ketersediaan stok produk di gudang dengan detail lengkap
@@ -364,6 +367,7 @@
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
                                             <span style="background: linear-gradient(135deg, #f0f4f8 0%, #e0f2fe 100%); color: #0C7779; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; display: inline-block; box-shadow: 0 2px 4px rgba(12, 119, 121, 0.1);">
                                                 {{ $partData['part_number'] }}
+                                                @if(($partData['expired_box'] ?? 0) > 0)<span class="badge bg-danger ms-1">{{ $partData['expired_box'] }} box Expired / {{ $partData['expired_pcs'] }} PCS</span>@endif
                                             </span>
                                         </td>
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 700; text-align: center; font-size: 15px;">
@@ -403,6 +407,7 @@
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">
                                             <span style="background: linear-gradient(135deg, #f0f4f8 0%, #e0f2fe 100%); color: #0C7779; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; display: inline-block; box-shadow: 0 2px 4px rgba(12, 119, 121, 0.1);">
                                                 {{ $boxData['box_number'] ?? 'Legacy' }}
+                                                @if(!empty($boxData['is_expired']))<span class="badge bg-danger ms-1" title="Tidak dapat masuk FIFO sebelum Handle">Expired</span>@endif
                                             </span>
                                         </td>
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
@@ -428,7 +433,7 @@
                                                             style="font-size: 12px;">
                                                         <i class="bi bi-clock-history"></i> History
                                                     </button>
-                                                    @if($canEditBox)
+                                                    @if($canEditBox && empty($boxData['is_expired']))
                                                         <button type="button" class="btn btn-sm btn-outline-success js-edit-box"
                                                                 data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                                 data-box-number="{{ $boxData['box_number'] ?? '' }}"
@@ -466,6 +471,7 @@
                                             <div style="display: flex; align-items: center; gap: 8px;">
                                                 <span style="background: #fff8e1; color: #b45309; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
                                                     {{ $palletData['pallet_number'] }}
+                                                @if(($palletData['expired_box'] ?? 0) > 0)<span class="badge bg-danger ms-1">{{ $palletData['expired_box'] }} box Expired / {{ $palletData['expired_pcs'] }} PCS</span>@endif
                                                 </span>
                                                 @if($palletData['is_merged'])
                                                     <span style="background: #fce7f3; color: #be185d; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;" title="Pallet hasil merge">
@@ -506,6 +512,7 @@
                                         <td style="padding: 16px 20px; color: #9a3412; font-weight: 700;">
                                             <span style="background: #fff7ed; padding: 6px 12px; border-radius: 8px; display: inline-block;">
                                                 {{ $box['box_number'] }}
+                                                @if(!empty($box['is_expired']))<span class="badge bg-danger ms-1" title="Tidak dapat masuk FIFO sebelum Handle">Expired</span>@endif
                                             </span>
                                         </td>
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">

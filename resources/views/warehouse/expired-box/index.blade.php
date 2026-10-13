@@ -6,17 +6,14 @@
 <x-page-header 
     title="Expired Box Management"
     icon="clock-history"
-    subtitle="Warning tetap dapat dikirim. Handle mengaktifkan box selama 1 bulan; setelah itu kembali expired."
+    subtitle="Warning tetap dapat masuk FIFO dan tidak dapat di-Handle. Handle hanya untuk expired, berlaku selama 1 bulan."
 />
 
 
 
 <div class="row g-4 mb-4">
     <div class="col-lg-6">
-        <x-card>
-            <x-slot name="header">
-                <i class="bi bi-exclamation-triangle text-warning"></i> Warning (9-12 Bulan)
-            </x-slot>
+        <x-card title="Warning (9-12 Bulan)" icon="exclamation-triangle">
             
             <div class="table-responsive">
                 <table class="table table-sm table-striped align-middle mb-0">
@@ -33,36 +30,15 @@
                     <tbody>
                         @forelse($warningBoxes as $box)
                             @php
-                                $storedAt = $box->stored_at ? \Illuminate\Support\Carbon::parse($box->stored_at) : null;
-                                $age = $storedAt ? $storedAt->diffInMonths(now()) : 0;
+                                $age = \App\Support\BoxAgeFormatter::format($box->stored_at);
                             @endphp
                             <tr>
                                 <td class="fw-bold text-primary">{{ $box->box_number }}</td>
                                 <td>{{ $box->part_number }}</td>
                                 <td>{{ $box->pallet_number ?? '-' }}</td>
                                 <td><span class="badge bg-light text-dark border">{{ $box->warehouse_location ?? '-' }}</span></td>
-                                <td><span class="badge bg-warning text-dark">{{ $age }} bulan</span></td>
-                                <td class="text-end">
-                                    @if(!$box->warehouse_location || $box->warehouse_location === 'Unknown')
-                                        <select class="form-select form-select-sm mb-2 js-handle-location" data-box-id="{{ $box->id }}" aria-label="Lokasi penyimpanan box {{ $box->box_number }}">
-                                            <option value="">Pilih lokasi kosong untuk pallet</option>
-                                            @foreach($availableLocations as $location)
-                                                <option value="{{ $location->id }}">{{ $location->code }}</option>
-                                            @endforeach
-                                        </select>
-                                    @endif
-                                    <x-button 
-                                        type="button" 
-                                        size="sm" 
-                                        variant="success"
-                                        class="js-handle-btn"
-                                        data-box-id="{{ $box->id }}"
-                                        data-box-number="{{ $box->box_number }}"
-                                        data-age="{{ $age }}"
-                                        title="Aktifkan selama 1 bulan">
-                                        <i class="bi bi-check-circle"></i> Handle
-                                    </x-button>
-                                </td>
+                                <td><span class="badge bg-warning text-dark">{{ $age }}</span></td>
+                                <td><span class="badge bg-warning text-dark">Warning</span><small class="d-block text-muted mt-1">Belum expired; tidak perlu Handle. Tetap dapat masuk FIFO.</small></td>
                             </tr>
                         @empty
                             <tr>
@@ -79,10 +55,7 @@
         </x-card>
     </div>
     <div class="col-lg-6">
-        <x-card>
-            <x-slot name="header">
-                <i class="bi bi-exclamation-octagon text-danger"></i> Expired / Masa Aktif Habis
-            </x-slot>
+        <x-card title="Expired / Masa Aktif Habis" icon="exclamation-octagon">
             
             <div class="table-responsive">
                 <table class="table table-sm table-striped align-middle mb-0">
@@ -99,15 +72,14 @@
                     <tbody>
                         @forelse($expiredBoxes as $box)
                             @php
-                                $storedAt = $box->stored_at ? \Illuminate\Support\Carbon::parse($box->stored_at) : null;
-                                $age = $storedAt ? $storedAt->diffInMonths(now()) : 0;
+                                $age = \App\Support\BoxAgeFormatter::format($box->stored_at);
                             @endphp
                             <tr>
                                 <td class="fw-bold text-primary">{{ $box->box_number }}</td>
                                 <td>{{ $box->part_number }}</td>
                                 <td>{{ $box->pallet_number ?? '-' }}</td>
                                 <td><span class="badge bg-light text-dark border">{{ $box->warehouse_location ?? '-' }}</span></td>
-                                <td><span class="badge bg-danger">{{ $age }} bulan</span></td>
+                                <td><span class="badge bg-danger">{{ $age }}</span></td>
                                 <td class="text-end">
                                     @if(!$box->warehouse_location || $box->warehouse_location === 'Unknown')
                                         <select class="form-select form-select-sm mb-2 js-handle-location" data-box-id="{{ $box->id }}" aria-label="Lokasi penyimpanan box {{ $box->box_number }}">
@@ -176,7 +148,7 @@
                                 <td>{{ $row->pallet_number ?? '-' }}</td>
                                 <td><span class="badge bg-light text-dark border">{{ $row->warehouse_location ?? '-' }}</span></td>
                                 <td><span class="badge bg-secondary">{{ optional($row->stored_at)->format('d M Y') ?? '-' }}</span></td>
-                                <td><span class="badge bg-info text-dark">{{ $row->age_months }} bulan</span></td>
+                                <td><span class="badge bg-info text-dark">{{ \App\Support\BoxAgeFormatter::format($row->stored_at, $row->handled_at ?? $row->created_at) }}</span></td>
                                 <td>{{ $row->handler?->name ?? '-' }}</td>
                                 <td><span class="badge bg-success">{{ optional($row->handled_at)->format('d M Y H:i') ?? '-' }}</span></td>
                                 <td>{{ $row->reactivated_until?->format('d M Y H:i') ?? 'Penanganan lama' }}</td>
@@ -223,7 +195,7 @@
                 
                 WarehouseAlert.confirm({
                     title: 'Aktifkan Box Selama 1 Bulan?',
-                    message: `Anda akan menandai box <strong style="color: #DC2626;">${boxNumber}</strong> (${age} bulan) aktif kembali selama satu bulan kalender.`,
+                    message: `Anda akan menandai box <strong style="color: #DC2626;">${boxNumber}</strong> (${age}) aktif kembali selama satu bulan kalender.`,
                     warningItems: [
                         'Box dapat masuk FIFO selama masa aktif dan tetap mengikuti tanggal penyimpanan aslinya.',
                         'Setelah satu bulan, box kembali expired dan diblokir dari FIFO sampai Handle berikutnya.',

@@ -66,7 +66,7 @@ class RemainingIntegrityRegressionTest extends TestCase
         ]);
     }
 
-    public function test_warning_box_can_be_reactivated_for_one_month(): void
+    public function test_warning_box_cannot_be_reactivated_before_expiry(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $supervisi = User::factory()->create(['role' => 'supervisi']);
@@ -98,12 +98,9 @@ class RemainingIntegrityRegressionTest extends TestCase
         $service->syncStatuses();
         $this->assertDatabaseHas('boxes', ['id' => $box->id, 'expired_status' => 'warning']);
 
-        $service->handleBox($box->id, $supervisi->id);
-
+        $this->actingAs($supervisi)->post(route('expired-box.handle', $box->id))->assertSessionHas('error');
         $this->assertDatabaseHas('boxes', [
-            'id' => $box->id,
-            'expired_status' => 'active',
-            'handled_by' => $supervisi->id,
+            'id' => $box->id, 'expired_status' => 'warning', 'handled_by' => null,
         ]);
         $this->assertDatabaseHas('pallet_items', [
             'pallet_id' => $pallet->id,
@@ -112,7 +109,7 @@ class RemainingIntegrityRegressionTest extends TestCase
             'pcs_quantity' => 20,
         ]);
         $this->assertDatabaseHas('stock_locations', ['pallet_id' => $pallet->id]);
-        $this->assertSame(now()->addMonthNoOverflow()->toDateTimeString(), $box->fresh()->reactivated_until->toDateTimeString());
+        $this->assertNull($box->fresh()->reactivated_until);
     }
 
     public function test_active_box_cannot_be_handled_through_expired_flow(): void
@@ -131,7 +128,7 @@ class RemainingIntegrityRegressionTest extends TestCase
             app(ExpiredBoxService::class)->handleBox($box->id, $supervisi->id);
             $this->fail('Box aktif seharusnya tidak dapat ditandai handled.');
         } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('warning atau expired', $e->getMessage());
+            $this->assertStringContainsString('Hanya box expired', $e->getMessage());
         }
 
         $this->assertDatabaseHas('boxes', [
@@ -167,7 +164,7 @@ class RemainingIntegrityRegressionTest extends TestCase
             $service->handleBox($box->id, $supervisi->id);
             $this->fail('Box assigned seharusnya tidak dapat ditandai handled.');
         } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('di-assign ke delivery', $e->getMessage());
+            $this->assertStringContainsString('Hanya box expired', $e->getMessage());
         }
 
         $this->assertDatabaseHas('boxes', [

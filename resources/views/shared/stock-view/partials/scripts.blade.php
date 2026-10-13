@@ -129,7 +129,7 @@
                     <td>${escapeHtml(item.part_number || '-')}</td>
                     <td>${escapeHtml(item.box_quantity ?? '-')}</td>
                     <td>${escapeHtml(item.pcs_quantity ?? '-')}</td>
-                    <td>${item.is_not_full ? 'Not Full' : 'OK'}</td>
+                    <td>${item.is_expired ? 'Expired - tidak dapat masuk FIFO' : (item.is_not_full ? 'Not Full' : 'OK')}</td>
                     <td>${escapeHtml(item.origin_pallet || '-')}</td>
                     <td>${escapeHtml(item.created_at || '-')}</td>
                 </tr>
@@ -356,7 +356,7 @@
                     id: item.box_number || item.box_id || '-',
                     part_number: item.part_number || '-',
                     pcs_quantity: item.pcs_quantity || 0,
-                    note: item.is_not_full ? 'Not Full' : 'OK',
+                    note: item.is_expired ? 'Expired - tidak dapat masuk FIFO' : (item.is_not_full ? 'Not Full' : 'OK'),
                 })),
                 action: {
                     type: 'pallet',
@@ -573,6 +573,7 @@
                             pallet_id: pallet.pallet_id ?? null,
                             pallet_number: pallet.pallet_number || '-',
                             total_box: 0,
+                            expired_box: 0,
                             total_pcs: 0,
                             location: pallet.location || '-',
                             latest_created_at: pallet.created_at || '-',
@@ -580,6 +581,7 @@
                         };
                     }
 
+                    if (pallet.is_expired) acc[key].expired_box += Number(pallet.box_quantity || 0);
                     acc[key].total_box += Number(pallet.box_quantity || 0);
                     acc[key].total_pcs += Number(pallet.pcs_quantity || 0);
 
@@ -603,6 +605,7 @@
                         <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.2s ease;">
                             <td style="padding: 12px 8px; color: #0C7779; font-weight: 600; font-size: 13px;">
                                 <i class="bi bi-box2"></i> ${pallet.pallet_number}
+                                ${pallet.expired_box ? `<span class="badge bg-danger">${pallet.expired_box} box Expired</span>` : ''}
                             </td>
                             <td style="padding: 12px 8px; color: #1f2937; font-size: 13px;">
                                 <span class="badge bg-primary" style="font-size: 11px;">${pallet.total_box} BOX</span>
@@ -684,13 +687,13 @@
                             <td style="color: #6b7280; padding: 12px 8px;">${item.box_quantity}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.pcs_quantity}</td>
                             <td style="padding: 12px 8px;">
-                                ${item.is_not_full ? '<span class="badge bg-warning text-dark">Not Full</span>' : '<span class="badge bg-success">OK</span>'}
+                                ${item.is_expired ? '<span class="badge bg-danger">Expired</span> ' : ''}${item.is_not_full ? '<span class="badge bg-warning text-dark">Not Full</span>' : (item.is_expired ? '' : '<span class="badge bg-success">OK</span>')}
                             </td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.origin_pallet || '-'}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.created_at}</td>
                             <td style="padding: 12px 8px; white-space: nowrap;">
                                 ${item.box_id ? `
-                                    ${canEditBox ? `<button type="button" class="btn btn-sm btn-outline-primary js-edit-box" 
+                                    ${canEditBox && !item.is_expired ? `<button type="button" class="btn btn-sm btn-outline-primary js-edit-box"
                                         data-box-id="${item.box_id}" 
                                         data-box-number="${item.box_number || ''}" 
                                         data-part-number="${item.part_number || ''}" 

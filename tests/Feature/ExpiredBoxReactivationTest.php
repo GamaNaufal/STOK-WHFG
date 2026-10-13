@@ -60,6 +60,79 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->assertDatabaseHas('delivery_pick_items', ['box_id' => $box->id]);
     }
 
+    public function test_warning_is_visible_but_handle_is_rejected_without_changing_inventory(): void
+    {
+        [, $supervisor, $box, $pallet, $location] = $this->inventory(10);
+        $this->actingAs($supervisor)->get(route('expired-box.index'))->assertOk()
+            ->assertViewHas('warningBoxes', fn ($boxes) => $boxes->contains('id', $box->id))
+            ->assertSee('Belum expired; tidak perlu Handle.')
+            ->assertDontSee('class="js-handle-btn"', false);
+        $this->post(route('expired-box.handle', $box->id), ['location_id' => $location->id])
+            ->assertSessionHas('error');
+        $this->assertSame('warning', $box->fresh()->expired_status);
+        $this->assertNull($box->fresh()->reactivated_until);
+        $this->assertNull($box->fresh()->handled_at);
+        $this->assertDatabaseMissing('expired_box_reports', ['box_id' => $box->id, 'status' => 'handled']);
+        $this->assertDatabaseHas('stock_locations', ['pallet_id' => $pallet->id, 'master_location_id' => $location->id]);
+        $this->assertTrue(Box::active()->whereKey($box->id)->exists());
+    }
+
+    public function test_expired_stock_remains_visible_in_all_stock_views_and_details_after_location_is_released(): void
+    {
+        [$operator, , $box, $pallet, , $order] = $this->inventory();
+        $box->update(['is_not_full' => true]);
+        app(ExpiredBoxService::class)->syncStatuses();
+        $this->assertDatabaseMissing('stock_locations', ['pallet_id' => $pallet->id]);
+        foreach (['part', 'box_id', 'pallet', 'not_full'] as $mode) {
+            $this->actingAs($operator)->get(route('stock-view.index', ['view_mode' => $mode]))
+                ->assertOk()->assertSee('Expired')->assertViewHas('summaryTotalBox', 1)
+                ->assertViewHas('summaryExpiredBox', 1)->assertViewHas('summaryExpiredPcs', 20);
+        }
+        $this->get(route('stock-view.index', ['search' => $box->box_number]))->assertOk()
+            ->assertViewHas('viewMode', 'box_id')
+            ->assertViewHas('groupedByBoxId', fn ($rows) => $rows->first()['is_expired'] === true);
+        $this->getJson('/api/stock/part-detail/P-RENEW')->assertOk()->assertJsonPath('pallets.0.is_expired', true);
+        $this->getJson('/api/stock/pallet-detail/'.$pallet->id)->assertOk()->assertJsonPath('items.0.status_label', 'Expired');
+        $this->getJson('/api/stock/by-part')->assertOk()->assertExactJson([]);
+        $this->postJson(route('delivery.pick.start', $order->id))->assertStatus(422);
+    }
+
+    public function test_stock_view_deduplicates_expired_boxes_and_labels_elapsed_renewals_before_sync(): void
+    {
+        [$operator, , $box] = $this->inventory(10);
+        $box->update(['reactivated_until' => now(), 'expired_status' => 'active']);
+        $otherPallet = Pallet::create(['pallet_number' => 'SHARED-EXPIRED']);
+        $otherPallet->boxes()->attach($box->id);
+        $this->actingAs($operator)->get(route('stock-view.index', ['view_mode' => 'box_id']))
+            ->assertOk()->assertViewHas('summaryTotalBox', 1)->assertViewHas('summaryExpiredBox', 1);
+        $box->update(['is_withdrawn' => true]);
+        $this->get(route('stock-view.index'))->assertViewHas('summaryTotalBox', 0);
+        $box->update(['is_withdrawn' => false]);
+        $box->delete();
+        $this->get(route('stock-view.index'))->assertViewHas('summaryTotalBox', 0);
+    }
+
+    public function test_expired_orphan_and_export_breakdowns_remain_visible(): void
+    {
+        [$operator, , $box, $pallet] = $this->inventory();
+        app(ExpiredBoxService::class)->syncStatuses();
+        $this->actingAs($operator);
+        $parts = $this->get(route('stock-view.index'))->viewData('groupedByPart');
+        $partRows = (new \App\Exports\StockViewByPartExport($parts))->collection();
+        $this->assertSame(1, $partRows->first()['Box Expired']);
+        $this->assertSame(20, $partRows->first()['PCS Expired']);
+        $pallets = $this->get(route('stock-view.index', ['view_mode' => 'pallet']))->viewData('groupedByPallet');
+        $palletRows = (new \App\Exports\StockViewByPalletExport($pallets))->collection();
+        $this->assertSame(1, $palletRows->first()['Box Expired']);
+        $pallet->boxes()->detach($box->id);
+        $response = $this->get(route('stock-view.index', ['view_mode' => 'box_id', 'search' => $box->box_number]));
+        $response->assertOk()->assertViewHas('summaryExpiredBox', 1);
+        $boxes = $response->viewData('groupedByBoxId');
+        $this->assertNull($boxes->first()['pallet_id']);
+        $boxRows = (new \App\Exports\StockViewByBoxIdExport($boxes))->collection();
+        $this->assertSame('Expired', $boxRows->first()['Status']);
+    }
+
     public function test_handle_restores_stock_and_fifo_for_one_calendar_month_without_resetting_age(): void
     {
         [$operator, $supervisor, $box, $pallet, $location, $order] = $this->inventory();

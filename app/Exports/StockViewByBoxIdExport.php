@@ -57,6 +57,7 @@ class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
                 'PCS' => (int) ($stock['pcs_quantity'] ?? 0),
                 'Lokasi' => $stock['location'] ?? '-',
                 'Tanggal' => $this->formatDate($stock['created_at'] ?? null),
+                'Status' => $stock['status_label'] ?? 'Aktif',
             ]);
             $currentRow++;
             $this->groupEndRows[] = $currentRow - 1;
@@ -75,6 +76,7 @@ class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
             'PCS',
             'Lokasi',
             'Tanggal',
+            'Status',
         ];
     }
 
@@ -82,7 +84,7 @@ class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
     {
         $lastRow = $this->stocks->count() + 1;
 
-        $sheet->getStyle('A1:G' . $lastRow)->applyFromArray([
+        $sheet->getStyle('A1:H' . $lastRow)->applyFromArray([
             'border' => [
                 'allBorders' => [
                     'borderStyle' => Border::BORDER_THIN,
@@ -124,7 +126,7 @@ class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
         $sheet->getColumnDimension('G')->setWidth(18);
 
         foreach ($this->groupEndRows as $row) {
-            $sheet->getStyle('A' . $row . ':G' . $row)->applyFromArray([
+            $sheet->getStyle('A' . $row . ':H' . $row)->applyFromArray([
                 'border' => [
                     'bottom' => [
                         'borderStyle' => Border::BORDER_MEDIUM,
@@ -134,6 +136,7 @@ class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
             ]);
         }
 
+        $sheet->getColumnDimension('H')->setWidth(16);
         $sheet->freezePane('A2');
     }
 

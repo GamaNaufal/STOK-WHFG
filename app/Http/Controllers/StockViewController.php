@@ -365,6 +365,8 @@ class StockViewController extends Controller
                     'part_number' => $itemGroup->first()['part_number'],
                     'total_box' => (int) $totalBox,
                     'total_pcs' => $totalPcs,
+                    'expired_box' => (int) $itemGroup->where('is_expired', true)->sum('box_quantity'),
+                    'expired_pcs' => (int) $itemGroup->where('is_expired', true)->sum('pcs_quantity'),
                     'items' => $itemGroup->sortBy('created_at'),
                     'sort_created_at' => $sortedByCreated->first()['created_at'] ?? null,
                     'sort_updated_at' => $sortedByUpdated->first()['updated_at'] ?? ($sortedByUpdated->first()['created_at'] ?? null),
@@ -390,6 +392,8 @@ class StockViewController extends Controller
                     'location' => $firstItem['location'] ?? 'Unknown',
                     'total_box' => (int) $totalBox,
                     'total_pcs' => $totalPcs,
+                    'expired_box' => (int) $itemGroup->where('is_expired', true)->sum('box_quantity'),
+                    'expired_pcs' => (int) $itemGroup->where('is_expired', true)->sum('pcs_quantity'),
                     'items' => $itemGroup,
                     'is_merged' => $isMerged,
                     'sort_created_at' => $sortedByCreated->first()['created_at'] ?? null,
@@ -413,6 +417,7 @@ class StockViewController extends Controller
                     'created_at' => $item['created_at'],
                     'updated_at' => $item['updated_at'] ?? $item['created_at'],
                     'reason' => $item['not_full_reason'] ?? null,
+                    'is_expired' => (bool) ($item['is_expired'] ?? false),
                 ];
             })->values();
     }
@@ -495,7 +500,7 @@ class StockViewController extends Controller
         return $sortedRows;
     }
 
-    private function getCanonicalPalletByActiveBoxId(): array
+    private function getCanonicalPalletByVisibleBoxId(): array
     {
         return DB::table('pallet_boxes as pb')
             ->join('pallets as p', 'p.id', '=', 'pb.pallet_id')
@@ -505,7 +510,7 @@ class StockViewController extends Controller
             ->whereNull('b.deleted_at')
             ->where('b.is_withdrawn', false)
             ->where(function ($q) {
-                \App\Models\Box::applyUsableExpiryFilter($q, 'b');
+                $q->whereNull('b.expired_status')->orWhere('b.expired_status', '!=', 'handled');
             })
             ->groupBy('pb.box_id')
             ->select(
@@ -519,7 +524,7 @@ class StockViewController extends Controller
 
     private function buildStockItems(?string $search = null)
     {
-        $canonicalPalletByBoxId = $this->getCanonicalPalletByActiveBoxId();
+        $canonicalPalletByBoxId = $this->getCanonicalPalletByVisibleBoxId();
 
         $palletQuery = Pallet::query()
             ->select(['id', 'pallet_number'])
@@ -551,7 +556,7 @@ class StockViewController extends Controller
                     $q2->whereNull('boxes.deleted_at')
                         ->where('boxes.is_withdrawn', false)
                         ->where(function ($q3) {
-                            \App\Models\Box::applyUsableExpiryFilter($q3, 'boxes');
+                            $q3->whereNull('boxes.expired_status')->orWhere('boxes.expired_status', '!=', 'handled');
                         });
                 });
             });
@@ -563,11 +568,11 @@ class StockViewController extends Controller
                 $location = $pallet->stockLocation->warehouse_location ?? 'Unknown';
                 $hasAnyBoxHistory = $pallet->boxes->isNotEmpty();
 
-                // Prefer active boxes as source of truth
-                $activeBoxes = $pallet->boxes
+                // Physical stock includes expired boxes for visibility, but never withdrawn/deleted boxes.
+                $visibleBoxes = $pallet->boxes
                     ->whereNull('deleted_at')
                     ->where('is_withdrawn', false)
-                    ->reject(fn ($box) => $box->isExpiryUnavailable())
+                    ->reject(fn ($box) => $box->expired_status === 'handled')
                     ->filter(function ($box) use ($canonicalPalletByBoxId, $pallet) {
                         $boxId = (int) $box->id;
                         $canonicalPalletId = (int) ($canonicalPalletByBoxId[$boxId] ?? $pallet->id);
@@ -575,9 +580,9 @@ class StockViewController extends Controller
                         return $canonicalPalletId === (int) $pallet->id;
                     });
 
-                if ($activeBoxes->isNotEmpty()) {
+                if ($visibleBoxes->isNotEmpty()) {
                     if ($search) {
-                        $activeBoxes = $activeBoxes->filter(function ($box) use ($search, $pallet, $location) {
+                        $visibleBoxes = $visibleBoxes->filter(function ($box) use ($search, $pallet, $location) {
                             return $this->matchesGlobalSearch(
                                 $search,
                                 $location,
@@ -589,7 +594,7 @@ class StockViewController extends Controller
                         });
                     }
 
-                    foreach ($activeBoxes as $box) {
+                    foreach ($visibleBoxes as $box) {
                         $items[] = [
                             'box_id' => $box->id,
                             'pallet_id' => $pallet->id,
@@ -601,6 +606,8 @@ class StockViewController extends Controller
                             'pcs_quantity' => (int) $box->pcs_quantity,
                             'created_at' => $box->created_at,
                             'updated_at' => $box->updated_at,
+                            'is_expired' => $box->isExpiryUnavailable(),
+                            'status_label' => $box->isExpiryUnavailable() ? 'Expired' : ($box->expired_status === 'warning' ? 'Warning' : 'Aktif'),
                             'is_not_full' => (bool) $box->is_not_full,
                             'not_full_reason' => $box->not_full_reason,
                         ];
@@ -644,12 +651,12 @@ class StockViewController extends Controller
 
         $indexedBoxIds = collect($items)->pluck('box_id')->filter()->unique()->all();
 
-        // Include Active Orphan Boxes (boxes not attached to any active pallet)
+        // Include visible orphan boxes, including expired stock without a current pallet.
         $orphanBoxQuery = Box::query()
             ->whereNull('deleted_at')
             ->where('is_withdrawn', false)
             ->where(function ($q) {
-                \App\Models\Box::applyUsableExpiryFilter($q, '');
+                $q->whereNull('expired_status')->orWhere('expired_status', '!=', 'handled');
             })
             ->whereNotIn('id', $indexedBoxIds);
 
@@ -674,9 +681,10 @@ class StockViewController extends Controller
                 'pcs_quantity' => (int) $box->pcs_quantity,
                 'created_at' => $box->created_at,
                 'updated_at' => $box->updated_at,
+                'is_expired' => $box->isExpiryUnavailable(),
+                'status_label' => $box->isExpiryUnavailable() ? 'Expired' : ($box->expired_status === 'warning' ? 'Warning' : 'Aktif'),
                 'is_not_full' => (bool) $box->is_not_full,
                 'not_full_reason' => $box->not_full_reason ?? 'Orphan Box',
-                'status_label' => 'Orphan (Tanpa Pallet)',
             ];
             $indexedBoxIds[] = $box->id;
         }
@@ -743,6 +751,8 @@ class StockViewController extends Controller
 
         // Calculate totals for summary cards regardless of view mode
         // We use the raw items collection to calculate these compatible with both views
+        $summaryExpiredBox = $items->where('is_expired', true)->sum('box_quantity');
+        $summaryExpiredPcs = $items->where('is_expired', true)->sum('pcs_quantity');
         $summaryTotalBox = $items->sum('box_quantity');
         $summaryTotalPcs = $items->sum('pcs_quantity');
         $summaryTotalParts = $items->pluck('part_number')->unique()->count();
@@ -776,6 +786,8 @@ class StockViewController extends Controller
             'viewMode',
             'totalPallets',
             'summaryTotalBox',
+            'summaryExpiredBox',
+            'summaryExpiredPcs',
             'summaryTotalPcs',
             'summaryTotalParts',
             'allParts',
@@ -794,7 +806,8 @@ class StockViewController extends Controller
     // API: Get stock grouped by part number
     public function apiGetStockByPart()
     {
-        $items = $this->buildStockItems();
+        // This endpoint supplies available stock to withdrawal forms; keep expired stock excluded.
+        $items = $this->buildStockItems()->reject(fn ($item) => !empty($item['is_expired']));
 
         $groupedByPart = $items->groupBy('part_number')->map(function ($itemGroup) {
             $totalPcs = $itemGroup->sum('pcs_quantity');
@@ -840,6 +853,8 @@ class StockViewController extends Controller
                 'location' => $item['location'] ?? 'Unknown',
                 'created_at' => $item['created_at']->format('d M Y H:i'),
                 'stored_at_raw' => optional($item['created_at'])->format('Y-m-d H:i:s'),
+                'is_expired' => (bool) ($item['is_expired'] ?? false),
+                'status_label' => $item['status_label'] ?? 'Aktif',
                 'is_not_full' => (bool) ($item['is_not_full'] ?? false),
                 'not_full_reason' => $item['not_full_reason'] ?? null,
             ];
@@ -871,7 +886,7 @@ class StockViewController extends Controller
         if ($pallet->boxes->count() > 0) {
             $boxIds = $pallet->boxes
                 ->where('is_withdrawn', false)
-                ->reject(fn ($box) => $box->isExpiryUnavailable())
+                ->reject(fn ($box) => $box->expired_status === 'handled')
                 ->pluck('id');
             $originLogs = AuditLog::where('type', 'box_pallet_moved')
                 ->where('model', 'Box')
@@ -886,7 +901,7 @@ class StockViewController extends Controller
             $items = $pallet->boxes
                 ->whereNull('deleted_at')
                 ->where('is_withdrawn', false)
-                ->reject(fn ($box) => $box->isExpiryUnavailable())
+                ->reject(fn ($box) => $box->expired_status === 'handled')
                 ->map(function ($box) use ($originLogs) {
                     $log = $originLogs->get($box->id);
                     $origin = $log?->getOldValuesArray()['from_pallet'] ?? null;
@@ -900,6 +915,8 @@ class StockViewController extends Controller
                         'created_at' => $box->created_at->format('d M Y H:i'),
                         'stored_at_raw' => $box->created_at->format('Y-m-d H:i:s'),
                         'origin_pallet' => $origin,
+                        'is_expired' => $box->isExpiryUnavailable(),
+                        'status_label' => $box->isExpiryUnavailable() ? 'Expired' : ($box->expired_status === 'warning' ? 'Warning' : 'Aktif'),
                         'is_not_full' => (bool) $box->is_not_full,
                         'not_full_reason' => $box->not_full_reason,
                     ];

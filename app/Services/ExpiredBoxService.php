@@ -86,8 +86,8 @@ class ExpiredBoxService
             if ($box->reactivated_until && $box->reactivated_until->gt(now()) && $box->expired_status === 'active') {
                 return;
             }
-            if (! in_array((string) $box->expired_status, ['warning', 'expired'], true)) {
-                throw new \RuntimeException('Hanya box berstatus warning atau expired yang dapat diaktifkan kembali.');
+            if ($box->expired_status !== 'expired') {
+                throw new \RuntimeException('Hanya box expired yang dapat di-Handle. Box warning belum expired dan tetap dapat masuk FIFO.');
             }
             if ($box->assigned_delivery_order_id !== null) {
                 throw new \RuntimeException('Box masih di-assign ke delivery. Lepaskan atau selesaikan proses delivery sebelum mengaktifkan box.');
@@ -106,8 +106,8 @@ class ExpiredBoxService
                 throw new \RuntimeException('Riwayat penyimpanan box tidak valid.');
             }
             $ageMonths = Carbon::parse($row->stored_at)->diffInMonths(now());
-            if ($ageMonths < 9 && ! $box->reactivated_until) {
-                throw new \RuntimeException('Box belum memasuki periode warning.');
+            if ($ageMonths < 12 && ! $box->reactivated_until) {
+                throw new \RuntimeException('Box belum expired dan tidak dapat di-Handle.');
             }
 
             $pallet = \App\Models\Pallet::whereKey($row->pallet_id)->lockForUpdate()->firstOrFail();
