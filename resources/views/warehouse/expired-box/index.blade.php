@@ -2,21 +2,68 @@
 
 @section('title', 'Expired Box')
 
+@section('styles')
+<style>
+    .warning-stock-note {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 8px;
+        color: #78350f;
+        font-size: .875rem;
+        line-height: 1.6;
+    }
+    .warning-stock-note .badge { flex-shrink: 0; margin-top: 3px; }
+    .warning-stock-table { min-width: 640px; table-layout: fixed; }
+    .warning-stock-table th,
+    .warning-stock-table td {
+        padding: 12px !important;
+        vertical-align: middle;
+        white-space: normal !important;
+        overflow-wrap: anywhere;
+        line-height: 1.5;
+    }
+    .warning-stock-table .badge {
+        max-width: 100%;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.5;
+    }
+    @media (max-width: 575.98px) {
+        .warning-stock-note { flex-direction: column; gap: 6px; }
+    }
+</style>
+@endsection
+
 @section('content')
 <x-page-header 
     title="Expired Box Management"
     icon="clock-history"
-    subtitle="Warning tetap dapat masuk FIFO dan tidak dapat di-Handle. Handle hanya untuk expired, berlaku selama 1 bulan."
+    subtitle="Box warning tetap dapat masuk FIFO dan tidak dapat di-Handle. Handle hanya untuk expired box, berlaku selama 1 bulan."
 />
 
 
 
 <div class="row g-4 mb-4">
-    <div class="col-lg-6">
+    <div class="col-12 col-xxl-6">
         <x-card title="Warning (9-12 Bulan)" icon="exclamation-triangle">
-            
-            <div class="table-responsive">
-                <table class="table table-sm table-striped align-middle mb-0">
+            <div class="warning-stock-note">
+                <span class="badge bg-warning text-dark">Warning</span>
+                <div>Box belum expired, tidak perlu Handle. Tetap dapat masuk FIFO.</div>
+            </div>
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Daftar box warning, geser tabel untuk melihat semua kolom">
+                <table class="table table-sm table-striped align-middle mb-0 warning-stock-table">
+                    <colgroup>
+                        <col style="width: 17%;">
+                        <col style="width: 25%;">
+                        <col style="width: 20%;">
+                        <col style="width: 17%;">
+                        <col style="width: 21%;">
+                    </colgroup>
                     <thead class="bg-light">
                         <tr>
                             <th class="fw-semibold">Box</th>
@@ -24,7 +71,6 @@
                             <th class="fw-semibold">Pallet</th>
                             <th class="fw-semibold">Lokasi</th>
                             <th class="fw-semibold">Umur</th>
-                            <th class="fw-semibold"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -38,11 +84,10 @@
                                 <td>{{ $box->pallet_number ?? '-' }}</td>
                                 <td><span class="badge bg-light text-dark border">{{ $box->warehouse_location ?? '-' }}</span></td>
                                 <td><span class="badge bg-warning text-dark">{{ $age }}</span></td>
-                                <td><span class="badge bg-warning text-dark">Warning</span><small class="d-block text-muted mt-1">Belum expired; tidak perlu Handle. Tetap dapat masuk FIFO.</small></td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="p-4">
+                                <td colspan="5" class="p-4">
                                     <x-empty-state 
                                         message="Tidak ada box dengan status warning" 
                                         icon="check-circle" />
@@ -54,7 +99,7 @@
             </div>
         </x-card>
     </div>
-    <div class="col-lg-6">
+    <div class="col-12 col-xxl-6">
         <x-card title="Expired / Masa Aktif Habis" icon="exclamation-octagon">
             
             <div class="table-responsive">
