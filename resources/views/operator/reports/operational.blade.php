@@ -273,7 +273,7 @@
                         <div class="card card-body border-0 shadow-sm">
                             <div id="fulfillment-full" class="d-none">
                                 <div class="text-muted small mb-2">Order Full (Top 5)</div>
-                                <div class="table-responsive">
+                                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                                     <table class="table table-sm table-striped align-middle mb-0">
                                         <thead>
                                             <tr>
@@ -300,7 +300,7 @@
                             </div>
                             <div id="fulfillment-partial" class="d-none">
                                 <div class="text-muted small mb-2">Order Partial (Top 5)</div>
-                                <div class="table-responsive">
+                                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                                     <table class="table table-sm table-striped align-middle mb-0">
                                         <thead>
                                             <tr>
@@ -484,7 +484,7 @@
                 Catatan: Scan di sini adalah scan saat pengambilan (picking/delivery), bukan scan saat input stok.
                 Durasi Proses = waktu dari mulai picking sampai selesai. Durasi Scan = waktu dari scan pertama sampai scan terakhir.
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
             <table class="table table-sm table-striped align-middle">
                 <thead>
                     <tr>
@@ -684,7 +684,7 @@
                 <div class="text-muted small mb-2">
                     User = nama operator/admin yang melakukan aksi.
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                     <table class="table table-sm table-striped align-middle">
                         <thead>
                             <tr>

@@ -5,7 +5,7 @@
     <!-- Modern Gradient Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
+            <div class="app-page-banner" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                         color: white; 
                         padding: 40px 30px; 
                         border-radius: 12px; 
@@ -39,7 +39,7 @@
                     <h6 class="m-0 fw-bold"><i class="bi bi-list-ul"></i> Daftar Semua User</h6>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                         <table class="table table-hover align-middle mb-0" style="font-size: 15px;">
                             <thead style="background-color: #f8f9fa; border-bottom: 2px solid #e9ecef;">
                                 <tr>

@@ -39,7 +39,7 @@
 
     <div class="col-md-8">
         <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                 <table class="table table-hover align-middle mb-0">
                     <thead style="background-color: #f8f9fa;">
                         <tr>
@@ -68,11 +68,11 @@
                             </td>
                             <td class="text-center">
                                 <div class="d-inline-flex gap-1">
-                                    <a href="{{ route('locations.edit', $location->id) }}" class="btn btn-sm btn-outline-primary border-0">
+                                    <a href="{{ route('locations.edit', $location->id) }}" class="btn btn-sm btn-outline-primary border-0" aria-label="Edit lokasi {{ $location->code }}">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                     <button type="button"
-                                        class="btn btn-sm btn-outline-danger border-0 js-delete-location"
+                                        class="btn btn-sm btn-outline-danger border-0 js-delete-location" aria-label="Hapus lokasi {{ $location->code }}"
                                         data-delete-url="{{ route('locations.destroy', $location->id) }}"
                                         data-location-code="{{ $location->code }}"
                                         data-location-status="{{ $isOccupied ? 'terisi' : 'kosong' }}">

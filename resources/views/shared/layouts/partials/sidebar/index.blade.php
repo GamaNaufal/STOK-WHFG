@@ -1,8 +1,8 @@
 <!-- Sidebar (Offcanvas on Mobile) -->
-<nav class="col-md-2 sidebar offcanvas offcanvas-start offcanvas-lg" tabindex="-1" id="mobileSidebar">
+<nav class="col-md-2 sidebar offcanvas offcanvas-start offcanvas-lg" tabindex="-1" id="mobileSidebar" aria-label="Navigasi utama">
     <div class="offcanvas-header d-lg-none">
         <h5 class="offcanvas-title"><img src="{{ asset('logo.png') }}" alt="Logo" class="brand-logo"> Warehouse FG</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup navigasi"></button>
     </div>
     <div class="offcanvas-body p-0">
         <div class="position-sticky pt-3">

@@ -350,7 +350,7 @@
                     </h6>
                 </div>
                 <div class="card-body p-0">
-                    <div class="table-responsive">
+                    <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
@@ -421,7 +421,7 @@
                                 @empty
                                 <tr>
                                     <td colspan="4" class="text-center py-4">
-                                        <i class="bi bi-inbox" style="font-size: 2rem; color: #9ca3af;"></i>
+                                        <i class="bi bi-inbox" style="font-size: 2rem; color: #52636e;"></i>
                                         <p class="text-muted mt-2 mb-0">Belum ada pesanan</p>
                                     </td>
                                 </tr>

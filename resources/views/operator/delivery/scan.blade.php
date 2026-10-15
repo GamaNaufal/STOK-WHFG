@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="row mb-4">
-    <div class="col-12 d-flex justify-content-between align-items-center">
+    <div class="col-12 d-flex flex-wrap gap-3 justify-content-between align-items-center">
         <div>
             <h1 class="h3 text-gray-800">
                 <i class="bi bi-upc-scan"></i> Scan Box Pengambilan
@@ -31,13 +31,13 @@
             <div class="card-header bg-light fw-bold">Scan ID Box</div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label fw-bold">ID Box</label>
+                    <label for="scanInput" class="form-label fw-bold">ID Box</label>
                     <input type="text" id="scanInput" class="form-control" placeholder="Scan / input ID Box" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" autofocus>
                 </div>
                 <button class="btn btn-primary" id="btnScan">
                     <i class="bi bi-check2-circle"></i> Submit Scan
                 </button>
-                <div id="scanMessage" class="mt-3"></div>
+                <div id="scanMessage" class="mt-3" role="status" aria-live="polite"></div>
             </div>
         </div>
 
@@ -60,7 +60,7 @@
         <div class="card shadow-sm border-0">
             <div class="card-header bg-light fw-bold">Daftar Box Wajib</div>
             <div class="card-body p-0">
-                <div class="table-responsive">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                     <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>

@@ -44,7 +44,7 @@
     <div class="row mt-4">
         <div class="col-12">
             <x-card title="Daftar Master No Part" icon="table" borderColor="#249E94" headerColor="#249E94" :noPadding="true">
-                <div class="table-responsive">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                     <table class="table table-hover mb-0">
                         <thead style="background-color: #f5f7fa; color: #0C7779;">
                             <tr>

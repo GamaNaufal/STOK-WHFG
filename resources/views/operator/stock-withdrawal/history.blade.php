@@ -28,7 +28,7 @@
             </div>
             <div class="card-body p-0">
                 @if($withdrawals->count() > 0)
-                    <div class="table-responsive">
+                    <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                         <table class="table table-hover mb-0">
                             <thead style="background-color: #f5f7fa; color: #0C7779;">
                                 <tr>

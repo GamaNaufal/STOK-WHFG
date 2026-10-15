@@ -1,5 +1,5 @@
 <div class="dropdown">
-    <button class="avatar-trigger" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+    <button class="avatar-trigger" aria-label="Menu akun" type="button" data-bs-toggle="dropdown" aria-expanded="false">
         <span class="avatar-circle">{{ $avatarInitials }}</span>
         <span class="d-none d-md-inline" style="font-size: 0.9rem; color:#374151;">{{ auth()->user()->name }}</span>
         <i class="bi bi-chevron-down" style="font-size: 0.8rem; color:#6b7280;"></i>

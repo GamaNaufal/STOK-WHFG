@@ -327,6 +327,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="{{ asset('css/login-ui.css') }}">
 </head>
 <body>
     <div class="login-page">
@@ -351,7 +352,7 @@
             <!-- Form -->
             <div class="login-body">
                 @if ($errors->any())
-                    <div class="alert-error">
+                    <div class="alert-error" role="alert">
                         <i class="bi bi-exclamation-circle-fill"></i>
                         <div>
                             <strong>Gagal Login</strong><br>
@@ -365,21 +366,21 @@
 
                     <!-- Email -->
                     <div class="form-group">
-                        <label class="form-label">
+                        <label for="email" class="form-label">
                             <i class="bi bi-envelope-fill"></i> Email
                         </label>
-                        <input type="email" class="form-control @error('email') is-invalid @enderror" 
+                        <input id="email" autocomplete="username" type="email" class="form-control @error('email') is-invalid @enderror" 
                                name="email" value="{{ old('email') }}" 
                                placeholder="Masukkan email Anda" required autofocus>
                     </div>
 
                     <!-- Password -->
                     <div class="form-group">
-                        <label class="form-label">
+                        <label for="password" class="form-label">
                             <i class="bi bi-lock-fill"></i> Password
                         </label>
                         <div class="password-wrapper">
-                            <input id="password" type="password" class="form-control password-input @error('password') is-invalid @enderror" 
+                            <input id="password" autocomplete="current-password" type="password" class="form-control password-input @error('password') is-invalid @enderror" 
                                    name="password" placeholder="Masukkan password" required>
                             <button type="button" class="password-toggle" id="togglePassword" aria-label="Tampilkan password">
                                 <i class="bi bi-eye" id="togglePasswordIcon"></i>

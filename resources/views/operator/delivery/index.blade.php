@@ -277,7 +277,7 @@
 
         .btn-insufficient {
             background: #f3f4f6;
-            color: #9ca3af;
+            color: #52636e;
             border: 1px solid #e5e7eb;
             padding: 0.4rem 0.8rem;
             border-radius: 5px;
@@ -398,7 +398,7 @@
         .empty-state {
             padding: 3rem 2rem;
             text-align: center;
-            color: #9ca3af;
+            color: #52636e;
         }
 
         .empty-state i {
@@ -431,7 +431,7 @@
             <i class="bi bi-clock-history"></i>
             <h5>Pesanan Selesai (Redo 5 Hari)</h5>
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
             <table class="table modern-table">
                 <thead>
                     <tr>
@@ -476,7 +476,7 @@
             <i class="bi bi-calendar-check"></i>
             <h5>Jadwal Delivery Terdaftar</h5>
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
             <table class="table modern-table">
                 <thead>
                     <tr>
@@ -646,7 +646,7 @@
             <i class="bi bi-archive"></i>
             <h5>Riwayat Pesanan</h5>
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
             <table class="table modern-table">
                 <thead>
                     <tr>

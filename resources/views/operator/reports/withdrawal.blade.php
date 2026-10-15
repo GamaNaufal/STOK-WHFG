@@ -6,7 +6,7 @@
 <!-- Modern Header Banner -->
 <div class="row mb-4">
     <div class="col-12">
-        <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
+        <div class="app-page-banner" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                     color: white; 
                     padding: 40px 30px; 
                     border-radius: 12px; 
@@ -129,7 +129,7 @@
     </div>
     <div class="card-body p-0">
         @if($withdrawals->count() > 0)
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                 <table class="table table-hover mb-0">
                     <thead style="background-color: #f9fafb; color: #0C7779; border-bottom: 2px solid #e5e7eb;">
                         <tr>

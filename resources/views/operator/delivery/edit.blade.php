@@ -36,7 +36,7 @@
     <!-- Modern Gradient Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
+            <div class="app-page-banner" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); 
                         color: white; 
                         padding: 40px 30px; 
                         border-radius: 12px; 

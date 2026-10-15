@@ -7,7 +7,7 @@
     <!-- Modern Gradient Header -->
     <div class="row mb-4">
         <div class="col-12">
-            <div style="background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); 
+            <div class="app-page-banner" style="background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); 
                         color: white; 
                         padding: 40px 30px; 
                         border-radius: 12px; 
@@ -36,7 +36,7 @@
             @endif
         </div>
         <div class="card-body">
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                 <table class="table table-hover align-middle">
                     <thead style="background-color: #f8f9fa;">
                         <tr>
@@ -105,7 +105,7 @@
             <i class="bi bi-clock-history"></i> History Issues
         </div>
         <div class="card-body">
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                 <table class="table table-hover align-middle">
                     <thead style="background-color: #f8f9fa;">
                         <tr>

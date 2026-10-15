@@ -17,7 +17,7 @@
 <div class="row">
     <div class="col-12">
         <x-card title="Barang untuk Diambil">
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>

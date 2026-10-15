@@ -9,7 +9,7 @@
 <div class="card shadow-sm border-0" style="border-left: 4px solid {{ $borderColor }}; border-radius: 12px; overflow: hidden;">
     @if($title)
         <div class="card-header text-white" style="background-color: {{ $headerColor }}; border: none;">
-            <i class="bi bi-{{ $icon }}"></i> {{ $title }}
+            <i class="bi {{ str_starts_with($icon, 'bi-') ? $icon : 'bi-'.$icon }}"></i> {{ $title }}
         </div>
     @endif
     <div class="card-body {{ $noPadding ? 'p-0' : 'p-4' }}">

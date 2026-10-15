@@ -52,7 +52,7 @@
                 <span class="input-group-text border-0" style="background: #0C7779; color: white; border-radius: 10px 0 0 10px; font-size: 1.2rem;">
                     <i class="bi bi-search"></i>
                 </span>
-                <input type="text" name="search" id="searchInput" class="form-control form-control-lg border-0" 
+                <input type="text" name="search" id="searchInput" aria-label="Cari nomor part, pallet, atau ID box" class="form-control form-control-lg border-0" 
                       placeholder="Cari part number, no pallet, atau ID box..." 
                        value="{{ $search ?? '' }}"
                        autocomplete="off"
@@ -212,7 +212,7 @@
                     </div>
                 </div>
 
-                <div class="table-responsive" style="overflow: hidden;">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel stok, geser untuk melihat kolom lainnya">
                     <table class="table table-hover mb-0" style="margin-bottom: 0;">
                         <thead style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
                             <tr>

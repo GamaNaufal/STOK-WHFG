@@ -102,7 +102,7 @@
     <div class="col-12 col-xxl-6">
         <x-card title="Expired / Masa Aktif Habis" icon="exclamation-octagon">
             
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                 <table class="table table-sm table-striped align-middle mb-0">
                     <thead class="bg-light">
                         <tr>
@@ -170,7 +170,7 @@
             <x-slot name="header">
                 <i class="bi bi-clock-history"></i> Riwayat Handle / Aktivasi
             </x-slot>
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                 <table class="table table-sm table-striped align-middle mb-0">
                     <thead class="bg-light">
                         <tr>

@@ -74,7 +74,7 @@
 
     .btn-verify:disabled {
         background: #e5e7eb;
-        color: #9ca3af;
+        color: #52636e;
         cursor: not-allowed;
     }
 </style>
@@ -94,7 +94,7 @@
 <div class="card verification-card">
     <div class="card-header"><i class="bi bi-calendar-check"></i> Jadwal Delivery Aktif</div>
     <div class="card-body p-0">
-        <div class="table-responsive">
+        <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
             <table class="table verification-table align-middle mb-0">
                 <thead>
                     <tr>

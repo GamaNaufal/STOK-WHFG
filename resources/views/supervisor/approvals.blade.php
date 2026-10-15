@@ -47,7 +47,7 @@
                     message="Semua permintaan box not full telah diproses"
                 />
             @else
-                <div class="table-responsive">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>
@@ -167,7 +167,7 @@
                     message="Riwayat persetujuan akan muncul di sini setelah ada permintaan yang diproses"
                 />
             @else
-                <div class="table-responsive">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                     <table class="table table-hover mb-0">
                         <thead class="table-light">
                             <tr>

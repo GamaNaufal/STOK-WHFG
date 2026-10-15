@@ -2,16 +2,16 @@
 
 @if ($paginator->hasPages())
     <div class="p-4" style="background-color: #f8f9fa; border-top: 1px solid #e5e7eb;">
-        <nav aria-label="Pagination Navigation" class="d-flex flex-wrap justify-content-between align-items-center gap-3">
-            <!-- Previous Button -->
+        <nav aria-label="Navigasi halaman" class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <!-- Sebelumnya Button -->
             <div>
                 @if ($paginator->onFirstPage())
                     <button class="btn btn-sm" style="background-color: #e5e7eb; color: #9ca3af; border: none; padding: 8px 16px; border-radius: 8px; cursor: not-allowed;" disabled>
-                        <i class="bi bi-chevron-left"></i> Previous
+                        <i class="bi bi-chevron-left"></i> Sebelumnya
                     </button>
                 @else
-                    <a href="{{ $paginator->previousPageUrl() }}" class="btn btn-sm" style="background-color: #0C7779; color: white; border: none; padding: 8px 16px; border-radius: 8px; transition: all 0.3s ease;" onmouseover="this.style.backgroundColor='#249E94'" onmouseout="this.style.backgroundColor='#0C7779'">
-                        <i class="bi bi-chevron-left"></i> Previous
+                    <a href="{{ $paginator->previousPageUrl() }}" class="btn btn-sm" style="background-color: #0C7779; color: white; border: none; padding: 8px 16px; border-radius: 8px; transition: background-color 150ms ease;">
+                        <i class="bi bi-chevron-left"></i> Sebelumnya
                     </a>
                 @endif
             </div>
@@ -29,12 +29,12 @@
             <!-- Next Button -->
             <div>
                 @if ($paginator->hasMorePages())
-                    <a href="{{ $paginator->nextPageUrl() }}" class="btn btn-sm" style="background-color: #0C7779; color: white; border: none; padding: 8px 16px; border-radius: 8px; transition: all 0.3s ease;" onmouseover="this.style.backgroundColor='#249E94'" onmouseout="this.style.backgroundColor='#0C7779'">
-                        Next <i class="bi bi-chevron-right"></i>
+                    <a href="{{ $paginator->nextPageUrl() }}" class="btn btn-sm" style="background-color: #0C7779; color: white; border: none; padding: 8px 16px; border-radius: 8px; transition: background-color 150ms ease;">
+                        Berikutnya <i class="bi bi-chevron-right"></i>
                     </a>
                 @else
                     <button class="btn btn-sm" style="background-color: #e5e7eb; color: #9ca3af; border: none; padding: 8px 16px; border-radius: 8px; cursor: not-allowed;" disabled>
-                        Next <i class="bi bi-chevron-right"></i>
+                        Berikutnya <i class="bi bi-chevron-right"></i>
                     </button>
                 @endif
             </div>
@@ -45,11 +45,11 @@
         <div class="mt-3 d-flex justify-content-center flex-wrap gap-2">
             @foreach ($paginator->getUrlRange(1, $paginator->lastPage()) as $page => $url)
                 @if ($page == $paginator->currentPage())
-                    <span class="btn btn-sm" style="background-color: #0C7779; color: white; border: none; min-width: 40px; padding: 6px 10px; border-radius: 6px;">
+                    <span aria-current="page" class="btn btn-sm" style="background-color: #0C7779; color: white; border: none; min-width: 40px; padding: 6px 10px; border-radius: 6px;">
                         {{ $page }}
                     </span>
                 @else
-                    <a href="{{ $url }}" class="btn btn-sm" style="background-color: #f3f4f6; color: #0C7779; border: 1px solid #e5e7eb; min-width: 40px; padding: 6px 10px; border-radius: 6px; transition: all 0.3s ease;" onmouseover="this.style.backgroundColor='#e5e7eb'" onmouseout="this.style.backgroundColor='#f3f4f6'">
+                    <a href="{{ $url }}" class="btn btn-sm" style="background-color: #f3f4f6; color: #0C7779; border: 1px solid #e5e7eb; min-width: 40px; padding: 6px 10px; border-radius: 6px; transition: background-color 150ms ease;">
                         {{ $page }}
                     </a>
                 @endif

@@ -119,7 +119,7 @@
 
     <div class="card border-0 shadow-sm mt-4">
         <div class="card-header bg-light fw-bold"><i class="bi bi-clock-history"></i> Pemindahan Terakhir</div>
-        <div class="table-responsive">
+        <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
             <table class="table table-sm table-hover mb-0">
                 <thead><tr><th>Pallet</th><th>Perpindahan</th><th>Oleh</th><th>Waktu</th></tr></thead>
                 <tbody>

@@ -8,11 +8,11 @@
 
 @php
     $variants = [
-        'primary' => ['bg' => '#0C7779', 'hover' => '#249E94'],
-        'secondary' => ['bg' => '#249E94', 'hover' => '#0C7779'],
-        'success' => ['bg' => '#10b981', 'hover' => '#059669'],
-        'danger' => ['bg' => '#ef4444', 'hover' => '#dc2626'],
-        'warning' => ['bg' => '#f59e0b', 'hover' => '#d97706'],
+        'primary' => ['bg' => '#0C7779', 'hover' => '#086365'],
+        'secondary' => ['bg' => '#086365', 'hover' => '#0C7779'],
+        'success' => ['bg' => '#15803d', 'hover' => '#166534'],
+        'danger' => ['bg' => '#b91c1c', 'hover' => '#dc2626'],
+        'warning' => ['bg' => '#fbbf24', 'hover' => '#f59e0b', 'text' => '#422006'],
         'light' => ['bg' => '#e5e7eb', 'hover' => '#d1d5db', 'text' => '#374151']
     ];
     
@@ -35,23 +35,19 @@
 
 @if($href)
     <a href="{{ $href }}" 
-       class="btn {{ $sizeClass }}" 
-       style="background-color: {{ $baseBg }}; color: {{ $textColor }}; border: none; padding: {{ $padding }}; border-radius: 8px; transition: all 0.3s ease;"
-       onmouseover="this.style.backgroundColor='{{ $hoverBg }}'"
-       onmouseout="this.style.backgroundColor='{{ $baseBg }}'">
+       {{ $attributes->merge(['class' => 'btn app-button ' . $sizeClass]) }} 
+       style="--button-bg: {{ $baseBg }}; --button-hover: {{ $hoverBg }}; color: {{ $textColor }}; border: none; padding: {{ $padding }}; border-radius: 8px; transition: background-color 150ms ease;">
         @if($icon)
-            <i class="bi bi-{{ $icon }}"></i>
+            <i class="bi {{ str_starts_with($icon, 'bi-') ? $icon : 'bi-'.$icon }}"></i>
         @endif
         {{ $slot }}
     </a>
 @else
     <button type="{{ $type }}" 
-            {{ $attributes->merge(['class' => 'btn ' . $sizeClass]) }}
-            style="background-color: {{ $baseBg }}; color: {{ $textColor }}; border: none; padding: {{ $padding }}; border-radius: 8px; transition: all 0.3s ease;"
-            onmouseover="this.style.backgroundColor='{{ $hoverBg }}'"
-            onmouseout="this.style.backgroundColor='{{ $baseBg }}'">
+            {{ $attributes->merge(['class' => 'btn app-button ' . $sizeClass]) }}
+            style="--button-bg: {{ $baseBg }}; --button-hover: {{ $hoverBg }}; color: {{ $textColor }}; border: none; padding: {{ $padding }}; border-radius: 8px; transition: background-color 150ms ease;">
         @if($icon)
-            <i class="bi bi-{{ $icon }}"></i>
+            <i class="bi {{ str_starts_with($icon, 'bi-') ? $icon : 'bi-'.$icon }}"></i>
         @endif
         {{ $slot }}
     </button>

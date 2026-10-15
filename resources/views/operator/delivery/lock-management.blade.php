@@ -24,7 +24,7 @@
             <span class="badge bg-secondary">{{ $activeLocks->count() }}</span>
         </div>
         <div class="card-body">
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                 <table class="table table-hover align-middle">
                     <thead>
                         <tr>

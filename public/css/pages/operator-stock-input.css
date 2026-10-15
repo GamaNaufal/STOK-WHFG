@@ -32,30 +32,30 @@
     outline: none;
     border-color: var(--color-teal) !important;
     box-shadow: 0 0 0 4px rgba(12, 119, 121, 0.1);
-    transform: translateY(-2px);
+    transform: none;
 }
 
 #clear-pallet-btn:hover {
     background: #d97706 !important;
     box-shadow: 0 6px 20px rgba(245, 158, 11, 0.3) !important;
-    transform: translateY(-2px);
+    transform: none;
 }
 
 #cancel-btn:hover {
     background: #4b5563 !important;
     box-shadow: 0 4px 12px rgba(107, 114, 128, 0.2) !important;
-    transform: translateY(-2px);
+    transform: none;
 }
 
 #save-btn:hover {
     box-shadow: 0 8px 24px rgba(12, 119, 121, 0.3) !important;
-    transform: translateY(-2px);
+    transform: none;
 }
 
 #print-pallet-btn:hover {
     background: linear-gradient(135deg, #d97706 0%, #ea580c 100%) !important;
     box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3) !important;
-    transform: translateY(-2px);
+    transform: none;
 }
 
 #print-pallet-btn:active {
@@ -68,7 +68,7 @@
     border: 1px solid var(--color-gray-light);
     border-radius: 10px;
     padding: 14px 16px;
-    transition: all 0.3s ease;
+    transition: background-color 150ms ease, border-color 150ms ease;
 }
 
 #itemsList > div:hover {

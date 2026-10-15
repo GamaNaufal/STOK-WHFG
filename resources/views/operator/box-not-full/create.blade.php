@@ -44,7 +44,7 @@
 
     <div class="row mb-4">
         <div class="col-12">
-            <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
+            <div class="app-page-banner" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                         color: white;
                         padding: 30px 24px;
                         border-radius: 12px;

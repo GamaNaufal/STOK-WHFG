@@ -6,7 +6,7 @@
 <div class="container-fluid">
     <div class="row mb-4">
         <div class="col-12">
-            <div class="p-3 p-md-4" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
+            <div class="app-page-banner p-3 p-md-4" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                         color: white;
                         border-radius: 12px;
                         box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);">

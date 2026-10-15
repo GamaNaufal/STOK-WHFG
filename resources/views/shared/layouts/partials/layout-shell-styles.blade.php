@@ -376,7 +376,7 @@
     }
 
     @media (max-width: 991.98px) {
-        .container-fluid > .row {
+        body > .container-fluid > .row {
             flex-direction: column;
         }
 
@@ -458,7 +458,7 @@
     }
 
     @media (min-width: 992px) {
-        .container-fluid > .row {
+        body > .container-fluid > .row {
             flex-wrap: nowrap;
             align-items: stretch;
         }

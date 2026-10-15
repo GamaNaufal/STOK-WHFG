@@ -93,7 +93,7 @@
         }
 
         .info-label {
-            color: #9ca3af;
+            color: #52636e;
             font-size: 0.85rem;
             font-weight: 500;
             text-transform: uppercase;
@@ -284,7 +284,7 @@
         }
 
         .empty-state p {
-            color: #9ca3af;
+            color: #52636e;
         }
 
         /* History Section */
@@ -343,7 +343,7 @@
         .empty-history {
             padding: 2rem;
             text-align: center;
-            color: #9ca3af;
+            color: #52636e;
         }
 
         /* Modal Styling */
@@ -495,7 +495,7 @@
                     Belum ada riwayat persetujuan
                 </div>
             @else
-                <div class="table-responsive">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                     <table class="table history-table">
                         <thead>
                             <tr>
