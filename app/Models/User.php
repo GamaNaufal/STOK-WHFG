@@ -14,6 +14,16 @@ use Illuminate\Notifications\Notifiable;
  */
 class User extends Authenticatable
 {
+    public function canAccess(string $feature): bool
+    {
+        return app(\App\Services\FeatureAccessService::class)->allows($this, $feature);
+    }
+
+    public function canAccessRoute(string $route): bool
+    {
+        return app(\App\Services\FeatureAccessService::class)->allowsRoute($this, $route);
+    }
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 

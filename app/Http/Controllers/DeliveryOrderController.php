@@ -221,14 +221,7 @@ class DeliveryOrderController extends Controller
     {
         $user = Auth::user();
 
-        // Strict Role Check: Admin & Warehouse Operator only
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse', 'ppc'], true)) {
-            if ($user->role === 'sales') {
-                return redirect()->route('delivery.create');
-            }
-
-            return redirect('/')->with('error', 'Unauthorized access to Schedule.');
-        }
+        abort_unless($user->canAccess('delivery_schedule'), 403);
 
         $approvedOrders = DeliveryOrder::with(['items', 'salesUser'])
             ->withCount(['childDeliveryOrders as split_children_count'])
@@ -477,7 +470,7 @@ class DeliveryOrderController extends Controller
     public function split(Request $request, $id)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_split')) {
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
 
@@ -587,7 +580,7 @@ class DeliveryOrderController extends Controller
     public function restoreSplit($id)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_split')) {
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
 
@@ -669,26 +662,13 @@ class DeliveryOrderController extends Controller
     public function createOrder()
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['sales', 'admin', 'ppc'])) {
-            return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
-        }
+        abort_unless($user->canAccess('delivery_order'), 403);
 
-        if ($user->role === 'ppc') {
-            return redirect()->route('delivery.index');
-        }
-
-        if (in_array($user->role, ['sales', 'admin'])) {
-            $myOrders = DeliveryOrder::with(['items'])
-                ->where('sales_user_id', $user->id)
-                ->orderBy('created_at', 'desc')
-                ->limit(50)
-                ->get();
-        } else {
-            $myOrders = DeliveryOrder::with(['items'])
-                ->orderBy('created_at', 'desc')
-                ->limit(100)
-                ->get();
-        }
+        $myOrders = DeliveryOrder::with(['items'])
+            ->where('sales_user_id', $user->id)
+            ->orderBy('created_at', 'desc')
+            ->limit(50)
+            ->get();
 
         $partNumbers = PartSetting::orderBy('part_number', 'asc')
             ->pluck('part_number');
@@ -700,7 +680,7 @@ class DeliveryOrderController extends Controller
     public function pendingApprovals()
     {
         $user = Auth::user();
-        if ($user->role !== 'ppc' && $user->role !== 'admin') {
+        if (! $user->canAccess('delivery_approval')) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
         }
 
@@ -765,7 +745,7 @@ class DeliveryOrderController extends Controller
     public function fulfillData($id)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -806,7 +786,7 @@ class DeliveryOrderController extends Controller
         $user = Auth::user();
         $order = DeliveryOrder::with(['items'])->findOrFail($id);
 
-        if ($user->role !== 'sales' && $user->role !== 'admin') {
+        if (! $user->canAccess('delivery_order')) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
         }
 
@@ -830,7 +810,7 @@ class DeliveryOrderController extends Controller
         $user = Auth::user();
         $order = DeliveryOrder::with('items')->findOrFail($id);
 
-        if ($user->role !== 'sales' && $user->role !== 'admin') {
+        if (! $user->canAccess('delivery_order')) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized access.');
         }
 
@@ -896,7 +876,7 @@ class DeliveryOrderController extends Controller
     public function store(Request $request)
     {
         $user = Auth::user();
-        if ($user->role !== 'sales' && $user->role !== 'admin') {
+        if (! $user->canAccess('delivery_order')) {
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
 
@@ -951,7 +931,7 @@ class DeliveryOrderController extends Controller
     public function updateStatus(Request $request, $id)
     {
         $user = Auth::user();
-        if ($user->role !== 'ppc' && $user->role !== 'admin') {
+        if (! $user->canAccess('delivery_approval')) {
             return redirect()->back()->with('error', 'Unauthorized access.');
         }
 
@@ -997,7 +977,7 @@ class DeliveryOrderController extends Controller
     public function destroy($id)
     {
         $user = Auth::user();
-        if ($user->role !== 'admin') {
+        if (! $user->canAccess('delivery_delete')) {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
@@ -1067,7 +1047,7 @@ class DeliveryOrderController extends Controller
     public function approvalImpact($id)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['ppc', 'admin'], true)) {
+        if (! $user->canAccess('delivery_approval')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 

@@ -65,7 +65,7 @@ class ExpiredBoxReactivationTest extends TestCase
         [, $supervisor, $box, $pallet, $location] = $this->inventory(10);
         $this->actingAs($supervisor)->get(route('expired-box.index'))->assertOk()
             ->assertViewHas('warningBoxes', fn ($boxes) => $boxes->contains('id', $box->id))
-            ->assertSee('Belum expired; tidak perlu Handle.')
+            ->assertSee('Box belum expired, tidak perlu Handle.')
             ->assertDontSee('class="js-handle-btn"', false);
         $this->post(route('expired-box.handle', $box->id), ['location_id' => $location->id])
             ->assertSessionHas('error');

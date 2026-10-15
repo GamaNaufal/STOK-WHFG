@@ -1,6 +1,7 @@
 <script id="stockViewBootstrap" type="application/json">
 {!! json_encode([
-    'currentUserRole' => Auth::user()->role ?? null,
+    'canEditBox' => Auth::user()->canAccess('stock_edit'),
+    'canDeleteStock' => Auth::user()->canAccess('stock_delete'),
     'allParts' => $allParts,
     'masterParts' => $masterPartNumbers,
     'masterPartCapacities' => $masterPartCapacities ?? [],

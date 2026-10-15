@@ -2,6 +2,8 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
+Verifikasi tambahan 15 Oktober 2026: pengaturan hak akses fitur per role oleh Admin Utama, pembatasan server dan navigasi dinamis.
+
 Verifikasi tambahan 14 Oktober 2026: Stock View menampilkan stok expired dengan label, dan Handle dibatasi untuk box expired.
 
 Verifikasi tambahan 13 Oktober 2026: audio scan, pembatalan dan timeout Picking Verification, serta aktivasi ulang box melalui Handle selama satu bulan.
@@ -49,6 +51,8 @@ Entry point penting:
 
 ## Aktor dan Tanggung Jawab
 
+Daftar berikut menjelaskan akses bawaan. Sejak 15 Oktober 2026, Admin Utama dapat mengubah akses fitur setiap role melalui Hak Akses; aturan kepemilikan transaksi dan integritas stok tetap berlaku.
+
 ### Sales
 
 - Membuat delivery order.
@@ -93,8 +97,9 @@ Entry point penting:
 
 ### Admin
 
-- Memiliki akses penuh melalui middleware role.
+- Role `admin` adalah Admin Utama dan selalu memiliki akses penuh.
 - Mengelola user.
+- Mengatur hak akses fitur untuk Warehouse Operator, Admin Warehouse, Sales, PPC, dan Supervisi melalui menu Administrasi > Hak Akses.
 - Menjalankan seluruh fungsi operasional dan administrasi.
 - Mengelola serta menghentikan lock picking yang macet.
 
@@ -153,16 +158,32 @@ Halaman `Lihat Stok` menampilkan stok fisik aktif dan expired, termasuk box tanp
 - User login melalui email dan password.
 - Semua halaman utama dilindungi middleware `auth`.
 - Akun dengan `is_active = false` ditolak saat login dan pada request terautentikasi berikutnya.
-- Hak akses dibatasi berdasarkan role.
-- Role `admin` selalu diizinkan oleh middleware role.
+- Hak akses fitur berdasarkan role dikelola melalui `config/feature_access.php` dan tabel `role_feature_access`.
+- Role tanpa pengaturan tersimpan memakai akses bawaan sesuai pembatasan sebelumnya. Pengaturan tersimpan mengganti seluruh daftar akses role tersebut; daftar kosong berarti seluruh fitur yang dapat diatur dinonaktifkan.
+- Role `admin` (Admin Utama) selalu memiliki akses penuh. Hak Akses, Kelola User, dan Lock Management tidak dapat diberikan ke role lain; ini juga mencegah eskalasi melalui pengubahan role akun.
+- Middleware `features` memeriksa setiap route terlindungi, termasuk POST/PUT/DELETE, export, dan API pendukung. Route fitur yang tidak memiliki pemetaan ditolak. Request tanpa izin mengembalikan 403, termasuk Sales/PPC yang sebelumnya dialihkan ke halaman lain.
+- Sidebar, pencarian fitur, tautan dashboard, serta tombol aksi stok dan delivery mengikuti izin yang sama. Dashboard dan profil tetap tersedia untuk seluruh akun aktif; ringkasan dashboard tetap mengikuti role.
+- Perubahan berlaku pada request berikutnya tanpa login ulang. Izin hanya di-cache selama satu request, bukan di session atau cache lintas request.
+- Edit/hapus stok memerlukan Lihat Stok; picking, split/restore, hapus dan redo delivery memerlukan Jadwal Delivery. Form menyelaraskan pilihan dependensi, dan backend menolak kombinasi yang tidak valid.
+- Izin fitur tidak menghapus pembatasan kepemilikan order/sesi maupun aturan integritas inventory/delivery. Role baru yang diberi picking hanya boleh membaca picklist sesi miliknya; Admin Warehouse/Admin mempertahankan hak melihat picklist sesuai aturan sebelumnya.
+- Setiap penyimpanan izin dicatat sebagai audit `role_feature_access`, berisi role, izin sebelum/sesudah, dan admin pelaksana, dalam transaksi yang sama.
 - Semua user yang login dapat memperbarui profil.
 
 File utama:
 
 - `app/Http/Controllers/AuthController.php`
 - `app/Http/Controllers/ProfileController.php`
-- `app/Http/Middleware/CheckRole.php`
+- `app/Http/Middleware/CheckFeatureAccess.php`
+- `app/Services/FeatureAccessService.php`
+- `app/Http/Controllers/FeatureAccessController.php`
+- `app/Models/RoleFeatureAccess.php`
+- `config/feature_access.php`
+- `resources/views/admin/access/index.blade.php`
+- `resources/views/shared/layouts/partials/sidebar/features.blade.php`
+- `tests/Feature/FeatureAccessManagementTest.php`
 - `routes/web.php`
+
+Migration `2026_10_15_000001_create_role_feature_access_table` telah diterapkan ke database lokal pada 15 Oktober 2026. Deployment lain memerlukan migration ini sebelum menggunakan versi aplikasi baru. Role dan akun yang sudah ada tidak diubah oleh migration.
 
 ### 2. Pengelolaan master data
 
@@ -713,7 +734,7 @@ Status yang digunakan:
 - Seluruh migration sampai `2026_06_19_000005_make_audit_log_type_extensible` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.
-- Full regression suite terakhir: diverifikasi 2 Oktober 2026, seluruh unit & feature test lulus.
+- Full regression suite terakhir: diverifikasi 15 Oktober 2026, 199 unit & feature test lulus (1.227 assertions), termasuk 12 test pengaturan hak akses. Form juga diverifikasi di browser untuk pilihan massal, dependensi, dan pembatasan fitur Admin Utama.
 - Kolom `audit_logs.type` menggunakan string terindeks, bukan enum tertutup, sehingga audit fitur baru seperti `delivery_assignment` dapat disimpan tanpa melanggar constraint.
 
 ## Catatan yang Belum Diputuskan

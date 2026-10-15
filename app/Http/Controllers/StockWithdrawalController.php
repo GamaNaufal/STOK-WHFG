@@ -10,7 +10,6 @@ use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
-use App\Models\StockLocation;
 use App\Models\StockWithdrawal;
 use App\Services\LocationAssignmentService;
 use Carbon\Carbon;
@@ -23,16 +22,13 @@ class StockWithdrawalController extends Controller
 {
     private const DELIVERY_APPROVAL_PENDING_MESSAGE = 'Delivery diblokir: masih ada request box not full yang menunggu approval supervisi.';
 
-    private const WAREHOUSE_ROLES = ['warehouse_operator', 'admin_warehouse', 'admin'];
-
     public function __construct(
         private readonly LocationAssignmentService $locationAssignmentService
-    ) {
-    }
+    ) {}
 
     private function ensureWarehouseRole(): void
     {
-        abort_unless(Auth::check() && in_array(Auth::user()->role, self::WAREHOUSE_ROLES, true), 403);
+        abort_unless(Auth::check() && Auth::user()->canAccess('delivery_pick'), 403);
     }
 
     private function applyStoredLocationExistsFilter($query)

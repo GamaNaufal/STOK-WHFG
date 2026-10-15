@@ -267,7 +267,7 @@
     <div class="row g-4">
         <!-- Form Section -->
         <div class="col-lg-5">
-            @if(in_array(auth()->user()->role, ['sales', 'admin']))
+            @if(auth()->user()->canAccess('delivery_order'))
                 <form action="{{ route('delivery.store') }}" method="POST" class="form-card">
                     @csrf
                     <div class="card-header">
@@ -391,7 +391,7 @@
                                             <div class="alert-correction">
                                                 <strong>Perlu Koreksi:</strong> {{ $order->notes }}
                                             </div>
-                                            @if(in_array(auth()->user()->role, ['sales', 'admin']))
+                                            @if(auth()->user()->canAccess('delivery_order'))
                                                 <a href="{{ route('delivery.edit', $order->id) }}" class="btn btn-edit-correction btn-sm">
                                                     <i class="bi bi-pencil-square"></i> Edit Koreksi
                                                 </a>

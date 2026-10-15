@@ -9,9 +9,8 @@
         console.error('Failed to parse stockViewBootstrap JSON:', error);
     }
 
-    const currentUserRole = bootstrapData.currentUserRole ?? null;
-    const canEditBox = currentUserRole === 'admin_warehouse' || currentUserRole === 'admin';
-    const canDeleteStock = ['admin_warehouse', 'supervisi', 'admin'].includes(currentUserRole);
+    const canEditBox = bootstrapData.canEditBox === true;
+    const canDeleteStock = bootstrapData.canDeleteStock === true;
     const csrfToken = bootstrapData.csrfToken || '';
     const editBoxModalEl = document.getElementById('editBoxModal');
     const boxHistoryModalEl = document.getElementById('boxHistoryModal');

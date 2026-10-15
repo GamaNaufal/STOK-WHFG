@@ -17,31 +17,7 @@
                     </a>
                 </li>
 
-                @php($role = auth()->user()->role)
-
-                @if($role === 'warehouse_operator')
-                    @include('shared.layouts.partials.sidebar.role-warehouse-operator')
-                @endif
-
-                @if($role === 'sales')
-                    @include('shared.layouts.partials.sidebar.role-sales')
-                @endif
-
-                @if($role === 'ppc')
-                    @include('shared.layouts.partials.sidebar.role-ppc')
-                @endif
-
-                @if($role === 'supervisi')
-                    @include('shared.layouts.partials.sidebar.role-supervisi')
-                @endif
-
-                @if($role === 'admin_warehouse')
-                    @include('shared.layouts.partials.sidebar.role-admin-warehouse')
-                @endif
-
-                @if($role === 'admin')
-                    @include('shared.layouts.partials.sidebar.role-admin')
-                @endif
+                @include('shared.layouts.partials.sidebar.features')
             @endif
         </ul>
 

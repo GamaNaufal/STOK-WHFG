@@ -113,9 +113,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Scan pallet dan input lokasi penyimpanan
                 </p>
+                @if(auth()->user()->canAccessRoute('stock-input.index'))
                 <a href="{{ route('stock-input.index') }}" class="btn" style="background: #0C7779; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Mulai Input
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -129,9 +131,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Cek status stok produk yang tersedia
                 </p>
+                @if(auth()->user()->canAccessRoute('stock-view.index'))
                 <a href="{{ route('stock-view.index') }}" class="btn" style="background: #249E94; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat Stok
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -221,9 +225,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Buat order penjualan baru
                 </p>
+                @if(auth()->user()->canAccessRoute('delivery.create'))
                 <a href="{{ route('delivery.create') }}" class="btn" style="background: #0C7779; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Buat Order
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -313,9 +319,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Review dan approve order yang menunggu
                 </p>
+                @if(auth()->user()->canAccessRoute('delivery.approvals'))
                 <a href="{{ route('delivery.approvals') }}" class="btn" style="background: #ff6b6b; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat Approval
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -329,9 +337,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Lihat jadwal delivery (read-only)
                 </p>
+                @if(auth()->user()->canAccessRoute('delivery.index'))
                 <a href="{{ route('delivery.index') }}" class="btn" style="background: #0C7779; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat Jadwal
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -434,9 +444,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Monitor stok produk yang tersedia
                 </p>
+                @if(auth()->user()->canAccessRoute('stock-view.index'))
                 <a href="{{ route('stock-view.index') }}" class="btn" style="background: #0C7779; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat Stok
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -450,9 +462,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Lihat laporan input stok dan pengambilan
                 </p>
+                @if(auth()->user()->canAccessRoute('reports.stock-input'))
                 <a href="{{ route('reports.stock-input') }}" class="btn" style="background: #28a745; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat Laporan
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -555,9 +569,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Atur lokasi penyimpanan gudang
                 </p>
+                @if(auth()->user()->canAccessRoute('locations.index'))
                 <a href="{{ route('locations.index') }}" class="btn" style="background: #0C7779; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Manage
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -571,9 +587,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Kelola masalah scan
                 </p>
+                @if(auth()->user()->canAccessRoute('delivery.pick.issues'))
                 <a href="{{ route('delivery.pick.issues') }}" class="btn" style="background: #ff6b6b; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat Issues
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -587,9 +605,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem;">
                     Monitor stok warehouse
                 </p>
+                @if(auth()->user()->canAccessRoute('stock-view.index'))
                 <a href="{{ route('stock-view.index') }}" class="btn" style="background: #249E94; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -707,9 +727,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem; font-size: 0.9rem;">
                     Setup lokasi penyimpanan
                 </p>
+                @if(auth()->user()->canAccessRoute('locations.index'))
                 <a href="{{ route('locations.index') }}" class="btn btn-sm" style="background: #0C7779; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Manage
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -723,9 +745,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem; font-size: 0.9rem;">
                     Pantau semua aktivitas
                 </p>
+                @if(auth()->user()->canAccessRoute('audit.index'))
                 <a href="{{ route('audit.index') }}" class="btn btn-sm" style="background: #17a2b8; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat
                 </a>
+                @endif
             </div>
         </div>
     </div>
@@ -739,9 +763,11 @@
                 <p class="card-text" style="color: #9ca3af; margin-bottom: 1.5rem; font-size: 0.9rem;">
                     Lihat semua laporan
                 </p>
+                @if(auth()->user()->canAccessRoute('reports.stock-input'))
                 <a href="{{ route('reports.stock-input') }}" class="btn btn-sm" style="background: #28a745; color: white; border: none;">
                     <i class="bi bi-arrow-right"></i> Lihat
                 </a>
+                @endif
             </div>
         </div>
     </div>

@@ -2,20 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\AuditTrailExport;
 use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\AuditService;
-use App\Exports\AuditTrailExport;
-use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Maatwebsite\Excel\Facades\Excel;
 
 class AuditController extends Controller
 {
     public function index(Request $request)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin', 'supervisi'], true)) {
+        if (! $user->canAccess('audit')) {
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
@@ -42,8 +42,8 @@ class AuditController extends Controller
         $auditLogs = AuditService::getAuditTrail($filters, 50);
 
         // Get summary statistics
-        $startDate = $filters['start_date'] ? $filters['start_date'] . ' 00:00:00' : null;
-        $endDate = $filters['end_date'] ? $filters['end_date'] . ' 23:59:59' : null;
+        $startDate = $filters['start_date'] ? $filters['start_date'].' 00:00:00' : null;
+        $endDate = $filters['end_date'] ? $filters['end_date'].' 23:59:59' : null;
         $summary = AuditService::getSummary($startDate, $endDate);
 
         // Get all users untuk dropdown
@@ -55,7 +55,7 @@ class AuditController extends Controller
     public function export(Request $request)
     {
         $user = Auth::user();
-        if (!in_array($user->role, ['admin', 'supervisi'], true)) {
+        if (! $user->canAccess('audit')) {
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 
@@ -81,26 +81,26 @@ class AuditController extends Controller
         // Get all audit logs (no pagination for export)
         $query = AuditLog::query();
 
-        if (!empty($filters['type'])) {
+        if (! empty($filters['type'])) {
             $query->where('type', $filters['type']);
         }
-        if (!empty($filters['action'])) {
+        if (! empty($filters['action'])) {
             $query->where('action', $filters['action']);
         }
-        if (!empty($filters['user_id'])) {
+        if (! empty($filters['user_id'])) {
             $query->where('user_id', $filters['user_id']);
         }
-        if (!empty($filters['start_date'])) {
-            $query->where('created_at', '>=', $filters['start_date'] . ' 00:00:00');
+        if (! empty($filters['start_date'])) {
+            $query->where('created_at', '>=', $filters['start_date'].' 00:00:00');
         }
-        if (!empty($filters['end_date'])) {
-            $query->where('created_at', '<=', $filters['end_date'] . ' 23:59:59');
+        if (! empty($filters['end_date'])) {
+            $query->where('created_at', '<=', $filters['end_date'].' 23:59:59');
         }
 
         $auditLogs = $query->with('user')->orderBy('created_at', 'desc')->get();
 
         // Export ke Excel
-        $fileName = 'audit-trail-' . now()->format('Y-m-d-H-i-s') . '.xlsx';
+        $fileName = 'audit-trail-'.now()->format('Y-m-d-H-i-s').'.xlsx';
 
         return Excel::download(new AuditTrailExport($auditLogs), $fileName);
     }

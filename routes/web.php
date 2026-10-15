@@ -1,16 +1,16 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
-// use App\Http\Controllers\BoxController; // DISABLED - fitur tidak dipakai
 use App\Http\Controllers\DashboardController;
+// use App\Http\Controllers\BoxController; // DISABLED - fitur tidak dipakai
 use App\Http\Controllers\DeliveryAssignController;
 use App\Http\Controllers\DeliveryPickController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\StockInputController;
 use App\Http\Controllers\StockViewController;
 use App\Http\Controllers\StockWithdrawalController;
-use App\Http\Controllers\ReportController;
-use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Route;
 
 // Auth Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -18,33 +18,37 @@ Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10
 Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 // Protected Routes
-Route::middleware(['auth', 'active'])->group(function () {
+Route::middleware(['auth', 'active', 'features'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Profile Routes - Available to all authenticated users
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
+    Route::get('/access-management', [\App\Http\Controllers\FeatureAccessController::class, 'index'])->name('access.index');
+    Route::put('/access-management', [\App\Http\Controllers\FeatureAccessController::class, 'update'])->name('access.update');
+
+    // Feature access is enforced centrally using config/feature_access.php.
     // Admin Routes - User Management
-    Route::middleware('role:admin')->group(function () {
+    Route::group([], function () {
         // CRUD Users (Kelola User)
         Route::resource('users', \App\Http\Controllers\UserController::class);
     });
 
     // Master Locations - Admin Warehouse + Admin IT
-    Route::middleware('role:admin_warehouse,admin')->group(function () {
+    Route::group([], function () {
         Route::resource('locations', \App\Http\Controllers\MasterLocationController::class)
             ->except(['show', 'create']);
     });
 
     // Admin Warehouse Routes - Master Part & Qty
-    Route::middleware('role:admin_warehouse,admin')->group(function () {
+    Route::group([], function () {
         Route::get('part-settings/search', [\App\Http\Controllers\PartSettingController::class, 'search'])->name('part-settings.search');
         Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
     });
 
     // Stock Input Routes (Warehouse Operator/Admin Warehouse/Admin) - Scan QR Box
-    Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
+    Route::group([], function () {
         Route::get('/stock-input', [StockInputController::class, 'index'])->name('stock-input.index');
         Route::post('/stock-input/scan-box', [StockInputController::class, 'scanBox'])->name('stock-input.scan-box');
         Route::post('/stock-input/scan-barcode', [StockInputController::class, 'scanBarcode'])->name('stock-input.scan-barcode');
@@ -57,13 +61,13 @@ Route::middleware(['auth', 'active'])->group(function () {
     });
 
     // Box Not Full Request (Warehouse Operator/Admin Warehouse/Admin)
-    Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
+    Route::group([], function () {
         Route::get('/box-not-full', [\App\Http\Controllers\NotFullBoxRequestController::class, 'create'])->name('box-not-full.create');
         Route::post('/box-not-full', [\App\Http\Controllers\NotFullBoxRequestController::class, 'store'])->name('box-not-full.store');
     });
 
     // Box Not Full Approvals (Supervisi & Admin)
-    Route::middleware('role:supervisi,admin')->group(function () {
+    Route::group([], function () {
         Route::get('/box-not-full/approvals', [\App\Http\Controllers\NotFullBoxRequestController::class, 'approvals'])->name('box-not-full.approvals');
         Route::post('/box-not-full/{id}/approve', [\App\Http\Controllers\NotFullBoxRequestController::class, 'approve'])->name('box-not-full.approve');
         Route::post('/box-not-full/{id}/reject', [\App\Http\Controllers\NotFullBoxRequestController::class, 'reject'])->name('box-not-full.reject');
@@ -71,26 +75,26 @@ Route::middleware(['auth', 'active'])->group(function () {
 
     // Delivery Stock Routes (Sales, PPC, Warehouse, Admin) - Replaces Stock Withdrawal
     Route::middleware('auth')->group(function () {
-        
+
         // Main Dashboard (Schedule Only)
         Route::get('/delivery-stock', [\App\Http\Controllers\DeliveryOrderController::class, 'index'])->name('delivery.index');
-        Route::post('/delivery-stock/{id}/split', [\App\Http\Controllers\DeliveryOrderController::class, 'split'])->middleware('role:admin_warehouse,admin')->name('delivery.split');
-        Route::post('/delivery-stock/{id}/restore-split', [\App\Http\Controllers\DeliveryOrderController::class, 'restoreSplit'])->middleware('role:admin_warehouse,admin')->name('delivery.restore-split');
-        
+        Route::post('/delivery-stock/{id}/split', [\App\Http\Controllers\DeliveryOrderController::class, 'split'])->name('delivery.split');
+        Route::post('/delivery-stock/{id}/restore-split', [\App\Http\Controllers\DeliveryOrderController::class, 'restoreSplit'])->name('delivery.restore-split');
+
         // Sales Side (Input & History)
         Route::get('/delivery-stock/sales-input', [\App\Http\Controllers\DeliveryOrderController::class, 'createOrder'])->name('delivery.create');
         Route::post('/delivery-stock/store', [\App\Http\Controllers\DeliveryOrderController::class, 'store'])->name('delivery.store');
         Route::get('/delivery-stock/{id}/edit', [\App\Http\Controllers\DeliveryOrderController::class, 'edit'])->name('delivery.edit');
         Route::put('/delivery-stock/{id}', [\App\Http\Controllers\DeliveryOrderController::class, 'update'])->name('delivery.update');
-        
+
         // PPC Side (Approvals)
         Route::get('/delivery-stock/approvals', [\App\Http\Controllers\DeliveryOrderController::class, 'pendingApprovals'])->name('delivery.approvals');
         Route::get('/delivery-stock/{id}/approval-impact', [\App\Http\Controllers\DeliveryOrderController::class, 'approvalImpact'])->name('delivery.approval-impact');
         Route::post('/delivery-stock/{id}/status', [\App\Http\Controllers\DeliveryOrderController::class, 'updateStatus'])->name('delivery.status');
         Route::delete('/delivery-stock/{id}', [\App\Http\Controllers\DeliveryOrderController::class, 'destroy'])->name('delivery.destroy');
-        
+
         // Warehouse Execution (Fulfillment) - Uses StockWithdrawalController logic
-        Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
+        Route::group([], function () {
             Route::get('/delivery-stock/{id}/fulfill', [StockWithdrawalController::class, 'fulfillOrder'])->name('delivery.fulfill');
             Route::get('/delivery-stock/{id}/fulfill-data', [\App\Http\Controllers\DeliveryOrderController::class, 'fulfillData'])->name('delivery.fulfill-data');
             Route::post('/delivery-stock/confirm-withdrawal', [StockWithdrawalController::class, 'confirm'])->name('stock-withdrawal.confirm');
@@ -113,11 +117,11 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/delivery-pick/{session}/verification-activity', [DeliveryPickController::class, 'verificationActivity'])->name('delivery.pick.verify.activity');
         Route::post('/delivery-pick/{session}/scan', [DeliveryPickController::class, 'scanBox'])->name('delivery.pick.scan.submit');
         Route::post('/delivery-pick/{session}/complete', [DeliveryPickController::class, 'complete'])->name('delivery.pick.complete');
-        
+
     });
 
     // Merge Pallet Routes (Warehouse Operator + Admin Warehouse + Admin)
-    Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
+    Route::group([], function () {
         Route::get('/merge-pallet', [\App\Http\Controllers\MergePalletController::class, 'index'])->name('merge-pallet.index');
         Route::get('/merge-pallet/search', [\App\Http\Controllers\MergePalletController::class, 'searchPallet'])->name('merge-pallet.search');
         Route::post('/merge-pallet/store', [\App\Http\Controllers\MergePalletController::class, 'store'])->name('merge-pallet.store');
@@ -127,7 +131,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     });
 
     // Stock View Routes (Warehouse Operator, PPC, Admin Warehouse, Supervisi, Admin)
-    Route::middleware('role:warehouse_operator,ppc,admin_warehouse,supervisi,admin')->group(function () {
+    Route::group([], function () {
         Route::get('/stock-view', [StockViewController::class, 'index'])->name('stock-view.index');
         Route::get('/stock-view/export-part', [StockViewController::class, 'exportByPart'])->name('stock-view.export-part');
         Route::get('/stock-view/export-box-id', [StockViewController::class, 'exportByBoxId'])->name('stock-view.export-box-id');
@@ -137,7 +141,7 @@ Route::middleware(['auth', 'active'])->group(function () {
     });
 
     // Delivery Assignment Routes (Warehouse Operator, Admin Warehouse, Admin)
-    Route::middleware('role:warehouse_operator,admin_warehouse,admin')->group(function () {
+    Route::group([], function () {
         Route::get('/delivery-assign', [DeliveryAssignController::class, 'index'])->name('delivery-assign.index');
         Route::get('/delivery-assign/delivery-orders/{deliveryOrderId}/parts', [DeliveryAssignController::class, 'deliveryOrderParts'])->name('delivery-assign.delivery-order-parts');
         Route::get('/delivery-assign/search', [DeliveryAssignController::class, 'search'])->name('delivery-assign.search');
@@ -146,17 +150,17 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/delivery-assign/assign', [DeliveryAssignController::class, 'assign'])->name('delivery-assign.assign');
     });
 
-    Route::middleware('role:admin_warehouse,admin')->group(function () {
+    Route::group([], function () {
         Route::post('/stock-view/boxes/{boxId}/update', [StockViewController::class, 'updateBox'])->name('stock-view.box-update');
     });
 
-    Route::middleware('role:admin_warehouse,supervisi,admin')->group(function () {
+    Route::group([], function () {
         Route::delete('/stock-view/boxes/{boxId}', [StockViewController::class, 'deleteBox'])->name('stock-view.box-delete');
         Route::delete('/stock-view/pallets/{palletId}', [StockViewController::class, 'deletePallet'])->name('stock-view.pallet-delete');
     });
 
     // Reports - Supervisi + Admin IT
-    Route::middleware('role:supervisi,admin')->group(function () {
+    Route::group([], function () {
         Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');
         Route::get('/reports/stock-input', [ReportController::class, 'stockInputReport'])->name('reports.stock-input');
         Route::get('/reports/operational/export', [ReportController::class, 'exportOperationalExcel'])->name('reports.operational.export');
@@ -174,22 +178,22 @@ Route::middleware(['auth', 'active'])->group(function () {
     });
 
     // Scan Issue Notifications (Admin Warehouse + Admin IT)
-    Route::middleware('role:admin_warehouse,admin')->group(function () {
+    Route::group([], function () {
         Route::get('/delivery-scan-issues', [DeliveryPickController::class, 'issues'])->name('delivery.pick.issues');
         Route::post('/delivery-scan-issues/{issue}/approve', [DeliveryPickController::class, 'approveIssue'])->name('delivery.pick.issue.approve');
         Route::get('/delivery-completions/{completion}/redo-options', [DeliveryPickController::class, 'redoOptions'])->name('delivery.pick.redo-options');
         Route::post('/delivery-completions/{completion}/redo', [DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');
     });
 
-    Route::middleware('role:admin')->group(function () {
+    Route::group([], function () {
         Route::get('/delivery-locks', [DeliveryPickController::class, 'lockManagement'])->name('delivery.pick.locks');
         Route::post('/delivery-locks/{session}/terminate', [DeliveryPickController::class, 'terminateLock'])->name('delivery.pick.lock.terminate');
     });
 
     // API Routes (Accessible by auth users, usually consumed by frontend scripts on allowed pages)
-    Route::get('/api/stock/by-part', [StockViewController::class, 'apiGetStockByPart']);
-    Route::get('/api/stock/part-detail/{partNumber}', [StockViewController::class, 'apiGetPartDetail']);
-    Route::get('/api/stock/pallet-detail/{palletId}', [StockViewController::class, 'apiGetPalletDetail']);
-    Route::get('/api/locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable']); // Search Available Locations
+    Route::get('/api/stock/by-part', [StockViewController::class, 'apiGetStockByPart'])->name('api.stock.by-part');
+    Route::get('/api/stock/part-detail/{partNumber}', [StockViewController::class, 'apiGetPartDetail'])->name('api.stock.part-detail');
+    Route::get('/api/stock/pallet-detail/{palletId}', [StockViewController::class, 'apiGetPalletDetail'])->name('api.stock.pallet-detail');
+    Route::get('/api/locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable'])->name('api.locations.search'); // Search Available Locations
 
 });

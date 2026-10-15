@@ -450,7 +450,7 @@
                             <td>{{ is_object($completion->completed_at) ? $completion->completed_at->format('d M Y H:i') : \Carbon\Carbon::parse($completion->completed_at)->format('d M Y H:i') }}</td>
                             <td>{{ is_object($completion->redo_until) ? $completion->redo_until->format('d M Y H:i') : \Carbon\Carbon::parse($completion->redo_until)->format('d M Y H:i') }}</td>
                             <td class="text-end">
-                                @if(Auth::user()->role === 'admin_warehouse' || Auth::user()->role === 'admin')
+                                @if(Auth::user()->canAccess('delivery_redo'))
                                     <form method="POST" action="{{ route('delivery.pick.redo', $completion->id) }}" class="d-inline js-redo-form" data-redo-options-url="{{ route('delivery.pick.redo-options', $completion->id) }}">
                                         @csrf
                                         <input type="hidden" name="relocation_location" value="">
@@ -484,7 +484,7 @@
                         <th style="width: 18%">Customer</th>
                         <th>Detail Pesanan (Part No. & Qty)</th>
                         <th style="width: 10%">Status</th>
-                        @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
+                        @if((Auth::user()->canAccess('delivery_pick') || Auth::user()->canAccess('delivery_split') || Auth::user()->canAccess('delivery_delete')))
                         <th style="width: 18%" class="text-end">Action</th>
                         @endif
                     </tr>
@@ -551,9 +551,10 @@
                                 </div>
                             @endif
                         </td>
-                        @if(in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true))
+                        @if((Auth::user()->canAccess('delivery_pick') || Auth::user()->canAccess('delivery_split') || Auth::user()->canAccess('delivery_delete')))
                         <td class="text-end">
                             <div class="action-buttons">
+                                @if(Auth::user()->canAccess('delivery_pick'))
                                 @if($order->status === 'completed')
                                     <span class="btn-completed">
                                         <i class="bi bi-check-circle"></i> Selesai
@@ -583,7 +584,8 @@
                                         <i class="bi bi-info-circle"></i> Detail FIFO
                                     </button>
                                 @endif
-                                @if(in_array(Auth::user()->role, ['admin', 'admin_warehouse'], true))
+                                @endif
+                                @if(Auth::user()->canAccess('delivery_split'))
                                     @if(!empty($order->can_restore_split))
                                         <form method="POST" action="{{ route('delivery.restore-split', $order->id) }}" class="d-inline js-restore-split-form">
                                             @csrf
@@ -610,7 +612,7 @@
                                         </button>
                                     @endif
                                 @endif
-                                @if(Auth::user()->role === 'admin')
+                                @if(Auth::user()->canAccess('delivery_delete'))
                                     <button type="button"
                                         class="btn-delete js-delete-delivery"
                                         data-delete-url="{{ route('delivery.destroy', $order->id) }}"
@@ -624,7 +626,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="{{ (in_array(Auth::user()->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) ? 5 : 4 }}" class="text-center py-5">
+                        <td colspan="{{ ((Auth::user()->canAccess('delivery_pick') || Auth::user()->canAccess('delivery_split') || Auth::user()->canAccess('delivery_delete'))) ? 5 : 4 }}" class="text-center py-5">
                             <div class="empty-state">
                                 <i class="bi bi-inbox"></i>
                                 <h5>Tidak ada jadwal pengiriman</h5>

@@ -42,11 +42,11 @@ class DeliveryPickController extends Controller
     {
         $user = Auth::user();
         abort_unless(
-            $user && in_array($user->role, ['warehouse_operator', 'admin_warehouse', 'admin'], true),
+            $user && $user->canAccess('delivery_pick'),
             403
         );
 
-        if ($user->role === 'warehouse_operator') {
+        if (! in_array($user->role, ['admin', 'admin_warehouse'], true)) {
             abort_unless((int) $session->created_by === (int) $user->id, 403);
         }
     }
@@ -238,7 +238,7 @@ class DeliveryPickController extends Controller
     {
         $this->verificationActivityService->expireDue();
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
@@ -562,7 +562,7 @@ class DeliveryPickController extends Controller
     public function startPick($orderId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -593,7 +593,7 @@ class DeliveryPickController extends Controller
     public function startVerification($orderId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return response()->json(['message' => 'Unauthorized'], 403);
         }
 
@@ -625,7 +625,7 @@ class DeliveryPickController extends Controller
     public function showScan($orderId, $sessionId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
@@ -653,7 +653,7 @@ class DeliveryPickController extends Controller
     public function showVerificationScan($orderId, $sessionId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return redirect()->route('delivery.index')->with('error', 'Unauthorized.');
         }
 
@@ -737,7 +737,7 @@ class DeliveryPickController extends Controller
     public function cancel($sessionId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -784,7 +784,7 @@ class DeliveryPickController extends Controller
     public function scanBox(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -915,7 +915,7 @@ class DeliveryPickController extends Controller
     public function verifyScanBox(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -1020,7 +1020,7 @@ class DeliveryPickController extends Controller
     public function approveIssue(Request $request, $issueId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! $user->canAccess('delivery_issues')) {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
@@ -1051,7 +1051,7 @@ class DeliveryPickController extends Controller
     public function complete(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['warehouse_operator', 'admin', 'admin_warehouse'], true)) {
+        if (! $user->canAccess('delivery_pick')) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
@@ -1282,7 +1282,7 @@ class DeliveryPickController extends Controller
     public function redo(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! $user->canAccess('delivery_redo')) {
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
@@ -1430,7 +1430,7 @@ class DeliveryPickController extends Controller
     public function redoOptions(Request $request, $sessionId)
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! $user->canAccess('delivery_redo')) {
             return response()->json(['success' => false, 'message' => 'Unauthorized.'], 403);
         }
 
@@ -2217,7 +2217,7 @@ class DeliveryPickController extends Controller
     public function issues()
     {
         $user = Auth::user();
-        if (! in_array($user->role, ['admin_warehouse', 'admin'], true)) {
+        if (! $user->canAccess('delivery_issues')) {
             return redirect()->route('dashboard')->with('error', 'Unauthorized.');
         }
 

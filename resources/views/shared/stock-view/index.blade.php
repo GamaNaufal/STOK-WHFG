@@ -398,9 +398,8 @@
                                 @endforeach
                             @elseif($viewMode === 'box_id')
                                 @php
-                                    $currentUserRole = auth()->user()->role ?? null;
-                                    $canEditBox = in_array($currentUserRole, ['admin_warehouse', 'admin'], true);
-                                    $canDeleteStock = in_array($currentUserRole, ['admin_warehouse', 'supervisi', 'admin'], true);
+                                    $canEditBox = auth()->user()->canAccess('stock_edit');
+                                    $canDeleteStock = auth()->user()->canAccess('stock_delete');
                                 @endphp
                                 @foreach($groupedByBoxId as $boxData)
                                     <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;" onmouseenter="this.style.backgroundColor='#f9fafb';" onmouseleave="this.style.backgroundColor='transparent';">

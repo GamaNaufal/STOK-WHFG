@@ -151,13 +151,13 @@ class DeliverySalesPpcWorkflowTest extends TestCase
         });
     }
 
-    public function test_ppc_cannot_use_sales_input_page_and_gets_redirected_to_schedule(): void
+    public function test_ppc_cannot_use_sales_input_page_without_permission(): void
     {
         $ppc = User::factory()->create(['role' => 'ppc']);
 
         $response = $this->actingAs($ppc)->get(route('delivery.create'));
 
-        $response->assertRedirect(route('delivery.index'));
+        $response->assertForbidden();
     }
 
     public function test_sales_cannot_access_ppc_approvals_or_update_status(): void
@@ -171,14 +171,14 @@ class DeliverySalesPpcWorkflowTest extends TestCase
         ]);
 
         $respApprovals = $this->actingAs($sales)->get(route('delivery.approvals'));
-        $respApprovals->assertRedirect(route('delivery.index'));
+        $respApprovals->assertForbidden();
 
         $respStatus = $this->actingAs($sales)->post(route('delivery.status', $order->id), [
             'status' => 'approved',
             'notes' => 'try force approve',
         ]);
 
-        $respStatus->assertRedirect();
+        $respStatus->assertForbidden();
 
         $this->assertDatabaseHas('delivery_orders', [
             'id' => $order->id,
@@ -268,8 +268,8 @@ class DeliverySalesPpcWorkflowTest extends TestCase
 
         $splitResponse = $this->actingAs($admin)->post(route('delivery.split', $parentOrder->id), [
             'items' => [
-                ['part_number' => 'P-SPLIT-01', 'quantity' => 50]
-            ]
+                ['part_number' => 'P-SPLIT-01', 'quantity' => 50],
+            ],
         ]);
 
         $splitResponse->assertRedirect();
@@ -346,8 +346,8 @@ class DeliverySalesPpcWorkflowTest extends TestCase
 
         $this->actingAs($admin)->post(route('delivery.split', $parentOrder->id), [
             'items' => [
-                ['part_number' => 'P-BLOCK-01', 'quantity' => 40]
-            ]
+                ['part_number' => 'P-BLOCK-01', 'quantity' => 40],
+            ],
         ])->assertRedirect();
 
         $childOrder = DeliveryOrder::query()
@@ -356,8 +356,8 @@ class DeliverySalesPpcWorkflowTest extends TestCase
 
         $response = $this->actingAs($admin)->post(route('delivery.split', $childOrder->id), [
             'items' => [
-                ['part_number' => 'P-BLOCK-01', 'quantity' => 10]
-            ]
+                ['part_number' => 'P-BLOCK-01', 'quantity' => 10],
+            ],
         ]);
 
         $response->assertRedirect();
