@@ -23,7 +23,7 @@
 <div class="row">
     <div class="col-12">
         <div class="card shadow-sm border-0" style="border-left: 4px solid #0C7779;">
-            <div class="card-header text-white" style="background-color: #0C7779;">
+            <div class="app-section-heading card-header text-white" style="background-color: #0C7779;">
                 <i class="bi bi-table"></i> Daftar Pengambilan
             </div>
             <div class="card-body p-0">

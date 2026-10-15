@@ -129,7 +129,7 @@
 
 <!-- Filter Form -->
 <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px; overflow: hidden;">
-    <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
+    <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
         <i class="bi bi-funnel"></i> Filter Laporan
     </div>
     <div class="card-body">
@@ -203,7 +203,7 @@
 
 <!-- Audit Trail Table -->
 <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
-    <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
+    <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
         <i class="bi bi-table"></i> Riwayat Audit Trail
     </div>
     <div class="card-body p-0">

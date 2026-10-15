@@ -80,7 +80,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Part Numbers</p>
-                        <h2 class="fw-bold" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $summaryTotalParts }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $summaryTotalParts }}</h2>
                     </div>
                     <i class="bi bi-tag d-none d-sm-block" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
                 </div>
@@ -93,7 +93,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Pallet</p>
-                        <h2 class="fw-bold" style="color: #005461; margin: 0; font-size: 2.5rem;">{{ $totalPallets }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #005461; margin: 0; font-size: 2.5rem;">{{ $totalPallets }}</h2>
                     </div>
                     <i class="bi bi-layers d-none d-sm-block" style="font-size: 2.5rem; color: #005461; opacity: 0.2;"></i>
                 </div>
@@ -106,7 +106,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Box</p>
-                        <h2 class="fw-bold" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ (int) $summaryTotalBox }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ (int) $summaryTotalBox }}</h2>
                     </div>
                     <i class="bi bi-box2 d-none d-sm-block" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
                 </div>
@@ -119,7 +119,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total PCS</p>
-                        <h2 class="fw-bold" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $summaryTotalPcs }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $summaryTotalPcs }}</h2>
                     </div>
                     <i class="bi bi-stack d-none d-sm-block" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
                 </div>
@@ -187,7 +187,7 @@
     <div class="col-12">
         @if(($viewMode === 'part' && $groupedByPart->count() > 0) || ($viewMode === 'box_id' && $groupedByBoxId->count() > 0) || ($viewMode === 'pallet' && $groupedByPallet->count() > 0) || ($viewMode === 'not_full' && $notFullBoxes->count() > 0))
             <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-                <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
+                <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                             color: white; 
                             padding: 20px 24px; 
                             font-weight: 600;

@@ -75,6 +75,8 @@
 
         function hideSuggestions() {
             if (!globalSearchDropdown) return;
+            globalSearchInput?.setAttribute('aria-expanded', 'false');
+            globalSearchInput?.removeAttribute('aria-activedescendant');
             globalSearchDropdown.style.display = 'none';
             globalSearchDropdown.innerHTML = '';
             activeSuggestionIndex = -1;
@@ -83,9 +85,11 @@
 
         function renderSuggestions(items) {
             if (!globalSearchDropdown) return;
+            globalSearchInput?.setAttribute('aria-expanded', 'true');
+            globalSearchInput?.removeAttribute('aria-activedescendant');
 
             if (items.length === 0) {
-                globalSearchDropdown.innerHTML = '<div class="global-search-empty">Fitur tidak ditemukan.</div>';
+                globalSearchDropdown.innerHTML = '<div class="global-search-empty" role="status">Fitur tidak ditemukan.</div>';
                 globalSearchDropdown.style.display = 'block';
                 activeSuggestionIndex = -1;
                 currentSuggestions = [];
@@ -94,7 +98,7 @@
 
             currentSuggestions = items.slice(0, 8);
             globalSearchDropdown.innerHTML = currentSuggestions.map((item, index) => `
-                <button type="button" class="global-search-item" data-index="${index}" data-route="${item.route}" role="option" aria-selected="false">
+                <button type="button" class="global-search-item" id="global-search-option-${index}" data-index="${index}" data-route="${item.route}" role="option" aria-selected="false" tabindex="-1">
                     <span class="feature-label"><i class="bi bi-${item.icon || 'arrow-right-circle'}"></i> ${item.label}</span>
                     <span class="feature-group">${item.group || ''}</span>
                 </button>
@@ -137,6 +141,12 @@
         function setActiveSuggestion(index) {
             if (!globalSearchDropdown) return;
             const nodes = Array.from(globalSearchDropdown.querySelectorAll('.global-search-item'));
+            if (nodes[index]) {
+                globalSearchInput?.setAttribute('aria-activedescendant', nodes[index].id);
+                nodes[index].scrollIntoView({ block: 'nearest' });
+            } else {
+                globalSearchInput?.removeAttribute('aria-activedescendant');
+            }
             nodes.forEach((node, idx) => {
                 const isActive = idx === index;
                 node.classList.toggle('active', isActive);
@@ -246,6 +256,10 @@
             });
 
             globalSearchInput.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' || event.key === 'Tab') {
+                    hideSuggestions();
+                    return;
+                }
                 const visibleItems = Array.from(globalSearchDropdown.querySelectorAll('.global-search-item'));
                 if (!visibleItems.length) return;
 
@@ -261,8 +275,6 @@
                     event.preventDefault();
                     const targetIndex = activeSuggestionIndex >= 0 ? activeSuggestionIndex : 0;
                     navigateToSuggestion(targetIndex);
-                } else if (event.key === 'Escape') {
-                    hideSuggestions();
                 }
             });
 

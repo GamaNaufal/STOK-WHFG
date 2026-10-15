@@ -1,7 +1,7 @@
 <!-- STEP 3: Input Lokasi -->
 <div id="step-3" style="display: none;">
     <div class="card" style="border: 2px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-        <div class="card-header" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
+        <div class="app-section-heading card-header" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                                         color: white;
                                         border: none;
                                         padding: 20px;

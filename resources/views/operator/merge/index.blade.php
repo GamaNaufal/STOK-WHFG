@@ -28,7 +28,7 @@
     <!-- LEFT: Search & Add -->
     <div class="col-md-5 mb-4">
         <div class="card shadow-sm h-100 border-0">
-            <div class="card-header text-white fw-bold" style="background-color: #0C7779;">
+            <div class="app-section-heading card-header text-white fw-bold" style="background-color: #0C7779;">
                 <i class="bi bi-search"></i> Cari Pallet
             </div>
             <div class="card-body">

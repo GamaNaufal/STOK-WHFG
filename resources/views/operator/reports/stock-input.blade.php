@@ -37,7 +37,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Pencatatan Input</p>
-                        <h2 class="fw-bold" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $totalRecords }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $totalRecords }}</h2>
                     </div>
                     <i class="bi bi-box2" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
                 </div>
@@ -50,7 +50,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total PCS Masuk</p>
-                        <h2 class="fw-bold" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ number_format($totalItems) }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ number_format($totalItems) }}</h2>
                     </div>
                     <i class="bi bi-stack" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
                 </div>
@@ -63,7 +63,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Box</p>
-                        <h2 class="fw-bold" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ number_format((int) $totalBoxes) }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ number_format((int) $totalBoxes) }}</h2>
                     </div>
                     <i class="bi bi-box" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
                 </div>
@@ -74,7 +74,7 @@
 
 <!-- Filter Form -->
 <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px; overflow: hidden;">
-    <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
+    <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
         <i class="bi bi-funnel"></i> Filter Laporan
     </div>
     <div class="card-body">
@@ -116,7 +116,7 @@
 
 <!-- Report Table -->
 <div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
-    <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
+    <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
         <i class="bi bi-table"></i> Detail Input Stok
     </div>
     <div class="card-body p-0">

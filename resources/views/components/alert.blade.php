@@ -1,7 +1,8 @@
 @props([
     'type' => 'success', // success, error, warning, info
     'dismissible' => true,
-    'message' => ''
+    'message' => '',
+    'icon' => null
 ])
 
 @php
@@ -32,17 +33,24 @@
         ]
     ];
     
-    $style = $styles[$type] ?? $styles['info'];
+    $resolvedType = $type === 'danger' ? 'error' : $type;
+    $style = $styles[$resolvedType] ?? $styles['info'];
+    $resolvedIcon = $icon ?: $style['icon'];
 @endphp
 
-<div class="alert {{ $dismissible ? 'alert-dismissible' : '' }} fade show" 
+<div class="alert {{ $dismissible ? 'alert-dismissible' : '' }} fade show" role="{{ $resolvedType === 'error' ? 'alert' : 'status' }}"
      style="background-color: {{ $style['bg'] }}; 
             color: {{ $style['color'] }}; 
             border: 1px solid {{ $style['border'] }}; 
             border-radius: 8px;
             border-left: 4px solid {{ $style['color'] }};">
-    <i class="bi bi-{{ $style['icon'] }}"></i> {{ $message ?? $slot }}
+    <i class="bi {{ str_starts_with($resolvedIcon, 'bi-') ? $resolvedIcon : 'bi-'.$resolvedIcon }}" aria-hidden="true"></i>
+    @if($message !== '' && $message !== null)
+        {{ $message }}
+    @else
+        {{ $slot }}
+    @endif
     @if($dismissible)
-        <button type="button" class="btn-close" style="color: {{ $style['color'] }};" data-bs-dismiss="alert" aria-label="Close"></button>
+        <button type="button" class="btn-close" style="color: {{ $style['color'] }};" data-bs-dismiss="alert" aria-label="Tutup pesan"></button>
     @endif
 </div>

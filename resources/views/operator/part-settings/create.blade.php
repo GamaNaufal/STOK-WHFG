@@ -25,7 +25,7 @@
     <div class="row justify-content-center">
         <div class="col-lg-8">
             <div class="card shadow-sm border-0" style="border-left: 4px solid #0C7779; border-radius: 12px; overflow: hidden;">
-                <div class="card-header text-white" style="background-color: #0C7779; border: none;">
+                <div class="app-section-heading card-header text-white" style="background-color: #0C7779; border: none;">
                     <i class="bi bi-file-earmark-plus"></i> Form Data No Part
                 </div>
                 <div class="card-body p-4">

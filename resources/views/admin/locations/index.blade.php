@@ -15,7 +15,7 @@
 <div class="row">
     <div class="col-md-4 mb-4">
         <div class="card border-0 shadow-sm" style="border-radius: 12px;">
-            <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 16px; border-radius: 12px 12px 0 0;">
+            <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 16px; border-radius: 12px 12px 0 0;">
                 <h6 class="m-0 fw-bold"><i class="bi bi-plus-circle"></i> Tambah Lokasi Baru</h6>
             </div>
             <div class="card-body">

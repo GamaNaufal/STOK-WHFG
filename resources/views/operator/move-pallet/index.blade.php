@@ -17,7 +17,7 @@
     <div class="row g-4">
         <div class="col-lg-5">
             <div class="card border-0 shadow-sm">
-                <div class="card-header text-white fw-bold" style="background-color: #0C7779;">
+                <div class="app-section-heading card-header text-white fw-bold" style="background-color: #0C7779;">
                     <i class="bi bi-upc-scan"></i> 1. Pilih Pallet
                 </div>
                 <div class="card-body">

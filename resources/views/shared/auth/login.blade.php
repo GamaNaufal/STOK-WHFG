@@ -328,8 +328,9 @@
         }
     </style>
     <link rel="stylesheet" href="{{ asset('css/login-ui.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/apple-design.css') }}">
 </head>
-<body>
+<body class="login-apple">
     <div class="login-page">
         <div class="login-wrapper">
         <!-- Left Side - Info -->

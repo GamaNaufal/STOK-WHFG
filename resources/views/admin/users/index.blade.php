@@ -35,7 +35,7 @@
     <div class="row">
         <div class="col-12">
             <div class="card shadow-sm border-0" style="border-left: 4px solid #0C7779; border-radius: 12px; overflow: hidden;">
-                <div class="card-header text-white" style="background-color: #0C7779; border: none; padding: 15px 20px;">
+                <div class="app-section-heading card-header text-white" style="background-color: #0C7779; border: none; padding: 15px 20px;">
                     <h6 class="m-0 fw-bold"><i class="bi bi-list-ul"></i> Daftar Semua User</h6>
                 </div>
                 <div class="card-body p-0">

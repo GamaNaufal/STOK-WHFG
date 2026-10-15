@@ -16,7 +16,7 @@
 >
     <x-slot:action>
     @if(isset($stats['role_label']))
-        <span class="dashboard-role">{{ $stats['role_label'] }}</span>
+        <span class="dashboard-role">{{ $userRole === 'admin' ? 'Admin Utama' : $stats['role_label'] }}</span>
     @endif
     </x-slot:action>
 </x-page-header>

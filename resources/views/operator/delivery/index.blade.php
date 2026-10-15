@@ -615,6 +615,7 @@
                                 @if(Auth::user()->canAccess('delivery_delete'))
                                     <button type="button"
                                         class="btn-delete js-delete-delivery"
+                                        aria-label="Hapus delivery #{{ $order->id }}"
                                         data-delete-url="{{ route('delivery.destroy', $order->id) }}"
                                         data-order-id="{{ $order->id }}">
                                         <i class="bi bi-trash"></i>
@@ -710,7 +711,7 @@
         <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <div class="modal-header" style="background: linear-gradient(135deg, #0C7779 0%, #005461 100%); color: white; border: none; padding: 1.5rem;">
                 <h5 class="modal-title"><i class="bi bi-file-earmark-pdf"></i> Dokumen Pengambilan</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup dialog"></button>
             </div>
             <div class="modal-body" style="padding: 1.5rem;">
                 <p>Silakan klik tombol print untuk mencetak atau pilih <strong>Save as PDF</strong> dari dialog browser sebelum scan.</p>
@@ -728,25 +729,25 @@
 </div>
 
 <!-- Split Modal -->
-<div class="modal fade" id="splitDeliveryModal" tabindex="-1">
+<div class="modal fade" id="splitDeliveryModal" tabindex="-1" aria-labelledby="splitDeliveryTitle">
     <div class="modal-dialog modal-lg">
         <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 1.5rem;">
-                <h5 class="modal-title"><i class="bi bi-scissors"></i> Split Delivery</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="splitDeliveryTitle"><i class="bi bi-scissors"></i> Split Delivery</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup dialog"></button>
             </div>
             <form id="splitDeliveryForm" method="POST" action="">
                 @csrf
                 <div class="modal-body" style="padding: 1.5rem;">
                     <div id="splitDeliveryInfo" class="mb-3 small text-muted"></div>
-                    <div id="splitItemsContainer">
+                    <div id="splitItemsContainer" class="table-responsive" tabindex="0" role="region" aria-label="Item split, geser untuk melihat seluruh kolom">
                         <!-- rows injected by JS: checkbox, part_number, available qty, qty input -->
                     </div>
                     <div class="form-text mt-2">Pilih satu atau lebih part lalu isi nominal split untuk setiap part (harus lebih kecil dari qty sumber).</div>
                 </div>
                 <div class="modal-footer" style="border-top: 1px solid #e9ecef; padding: 1.5rem;">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; font-weight: 600;">
+                    <button type="submit" class="btn btn-warning">
                         <i class="bi bi-scissors"></i> Simpan Split
                     </button>
                 </div>
@@ -768,7 +769,7 @@
         <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
             <div class="modal-header" style="background: linear-gradient(135deg, #0C7779 0%, #005461 100%); color: white; border: none; padding: 1.5rem;">
                 <h5 class="modal-title"><i class="bi bi-box-seam"></i> Rekomendasi Pengambilan (FIFO)</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup dialog"></button>
             </div>
             <div class="modal-body" style="padding: 1.5rem;">
                 <div id="fulfillInfo" class="mb-3"></div>
@@ -824,11 +825,11 @@
             const max = Math.max(1, available - 1);
 
             tr.innerHTML = `
-                <td class="align-middle text-center"><input type="checkbox" class="form-check-input js-split-check" data-idx="${idx}"></td>
+                <td class="align-middle text-center"><input type="checkbox" class="form-check-input js-split-check" aria-label="Pilih item untuk split" data-idx="${idx}"></td>
                 <td class="align-middle">${item.part_number}</td>
                 <td class="align-middle">${available} PCS</td>
                 <td class="align-middle">
-                    <input type="number" class="form-control form-control-sm js-split-qty" data-idx="${idx}" min="1" max="${max}" value="1" style="max-width:120px;" disabled>
+                    <input type="number" class="form-control form-control-sm js-split-qty" aria-label="Jumlah split" data-idx="${idx}" min="1" max="${max}" value="1" style="max-width:120px;" disabled>
                 </td>
             `;
 

@@ -1,8 +1,8 @@
 <!-- TABS: Barcode Scanner -->
 <div class="mb-4">
-    <div class="card-header" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
+    <div class="app-section-heading card-header stock-scan-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                                      color: white;
-                                     margin: -30px -30px 20px -30px;
+                                     margin: 0 0 20px;
                                      padding: 20px 30px;
                                      border: none;
                                      border-radius: 12px 12px 0 0;
@@ -12,7 +12,7 @@
     </div>
 
     <form id="scanForm" autocomplete="off">
-        <label class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
+        <label for="barcodeInput" class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
             <i class="bi bi-barcode" style="color: #0C7779;"></i> Input ID Box
         </label>
 
@@ -50,7 +50,7 @@
         </small>
 
         <div class="mt-4">
-            <label class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
+            <label for="partInput" class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
                 <i class="bi bi-upc" style="color: #0C7779;"></i> Input No Part
             </label>
 

@@ -33,7 +33,7 @@
     <div class="row">
         <div class="col-12">
             <div class="card shadow-sm border-0" style="border-left: 4px solid #0C7779; border-radius: 12px; overflow: hidden;">
-                <div class="card-header text-white" style="background-color: #0C7779; border: none;">
+                <div class="app-section-heading card-header text-white" style="background-color: #0C7779; border: none;">
                     <i class="bi bi-search"></i> Cari & Filter Data
                 </div>
                 <div class="card-body p-4" style="background-color: #f8f9fa;">
@@ -62,7 +62,7 @@
     <div class="row mt-4">
         <div class="col-12">
             <div class="card shadow-sm border-0" style="border-left: 4px solid #249E94; border-radius: 12px; overflow: hidden;">
-                <div class="card-header text-white" style="background-color: #249E94; border: none;">
+                <div class="app-section-heading card-header text-white" style="background-color: #249E94; border: none;">
                     <i class="bi bi-table"></i> Daftar Master No Part
                 </div>
                 <div class="card-body p-0">

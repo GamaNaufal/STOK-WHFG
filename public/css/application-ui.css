@@ -43,6 +43,8 @@
     .warehouse-app .form-check-input:checked { background-color: var(--ui-accent); border-color: var(--ui-accent); }
     .warehouse-app .btn { min-height: 40px; border-radius: 8px; font-weight: 600; line-height: 1.4; white-space: normal; }
     .warehouse-app .btn-sm { min-height: 36px; }
+    .warehouse-app :is(.btn-process, .btn-delete, .btn-split, .btn-restore, .btn-redo, .btn-insufficient, .btn-approve, .btn-correction, .btn-reject) { min-height: 40px; min-width: 40px; white-space: normal; }
+    .warehouse-app :is(.btn-process, .btn-delete, .btn-split, .btn-restore, .btn-redo, .btn-approve, .btn-correction, .btn-reject):hover { transform: none; }
     .warehouse-app .app-button { background-color: var(--button-bg); }
     @media (hover: hover) and (pointer: fine) {
         .warehouse-app .app-button:hover { background-color: var(--button-hover); }
@@ -62,6 +64,9 @@
     .warehouse-app .modal-header, .warehouse-app .modal-footer { padding: 1rem 1.25rem; border-color: var(--ui-border); gap: .75rem; }
     .warehouse-app .modal-body { padding: 1.25rem; }
     .warehouse-app .modal-title { font-size: 1.1rem; font-weight: 650; }
+    .warehouse-app .modal-header[style*="#f59e0b"] { background: #fef3c7 !important; color: #78350f !important; }
+    .warehouse-app .modal-header[style*="#f59e0b"] .btn-close { filter: none; }
+    .warehouse-app .btn-split { color: #422006; }
     .warehouse-app .btn-close { min-width: 32px; min-height: 32px; }
     .warehouse-app .dropdown-item { padding: .65rem 1rem; white-space: normal; }
     .warehouse-app .app-empty-state { padding: 2.5rem 1rem; color: var(--ui-muted); }
@@ -89,6 +94,8 @@
     .warehouse-app .stock-sort-pill:hover { color: #075e60; background: #d4ebe5; }
     .warehouse-app .stock-sort-pill.is-active:hover { color: #fff; background: #085e60; }
     .warehouse-app #scanInput, .warehouse-app #barcodeInput { min-height: 52px; font-size: 1.125rem; font-variant-numeric: tabular-nums; letter-spacing: .025em; }
+    .warehouse-app .stock-scan-heading { padding: 1rem !important; border-radius: 8px !important; line-height: 1.5; }
+    .warehouse-app .app-summary-value { color: #075e60 !important; font-size: 2rem !important; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
     .warehouse-app #scanMessage:empty { margin-top: 0 !important; }
     .warehouse-app .item-row { margin-bottom: .75rem; }
     .warehouse-app .select2-container--default .select2-selection--single { min-height: 44px; border-color: #bccbd1; border-radius: 8px; }
@@ -109,6 +116,7 @@
         .warehouse-app .modern-table tbody td { display: table-cell; width: auto !important; white-space: normal; min-width: 130px; }
         .warehouse-app .sidebar.offcanvas { height: calc(100dvh - var(--top-navbar-height)); }
         .warehouse-app .btn, .warehouse-app .btn-sm, .warehouse-app .page-link { min-height: 44px; }
+        .warehouse-app :is(.btn-process, .btn-delete, .btn-split, .btn-restore, .btn-redo, .btn-insufficient, .btn-approve, .btn-correction, .btn-reject) { min-height: 44px; min-width: 44px; }
     }
     @media (max-width: 575.98px) {
         .warehouse-app .form-control, .warehouse-app .form-select { font-size: 16px; }

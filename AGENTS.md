@@ -16,3 +16,6 @@ Memo tersebut berisi:
 Gunakan memo sebagai baseline agar tidak melakukan eksplorasi seluruh repository dari awal. Untuk tugas implementasi atau diagnosis, inspeksi hanya file yang relevan dan tetap perlakukan source code sebagai sumber kebenaran jika terdapat perbedaan.
 
 Setelah perubahan proses bisnis yang signifikan, perbarui memo beserta tanggal verifikasinya.
+
+Untuk audit dan perubahan UI/UX, gunakan skill `apple-design` sebagai preferensi utama
+dan baca `docs/DESIGN_PREFERENCES.md`. Pertahankan fungsi bisnis serta hak akses.
