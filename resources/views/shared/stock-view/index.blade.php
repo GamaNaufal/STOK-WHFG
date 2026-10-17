@@ -5,6 +5,7 @@
 @section('styles')
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 @include('shared.stock-view.partials.styles')
+<link href="{{ asset('css/stock-view-toolbar.css') }}" rel="stylesheet">
 @endsection
 
 @section('content')
@@ -43,35 +44,7 @@
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="position-relative">
-            <form method="GET" action="{{ route('stock-view.index') }}" id="searchForm" class="input-group input-group-lg">
-                <input type="hidden" name="view_mode" value="{{ $viewMode }}">
-                <input type="hidden" name="sort" value="{{ $sortMode }}">
-                <span class="input-group-text border-0" style="background: #0C7779; color: white; border-radius: 10px 0 0 10px; font-size: 1.2rem;">
-                    <i class="bi bi-search"></i>
-                </span>
-                <input type="text" name="search" id="searchInput" aria-label="Cari nomor part, pallet, atau ID box" class="form-control form-control-lg border-0" 
-                      placeholder="Cari part number, no pallet, atau ID box..." 
-                       value="{{ $search ?? '' }}"
-                       autocomplete="off"
-                       style="font-size: 1rem; padding: 14px 16px;">
-                <button class="btn btn-outline-secondary border-0" type="submit" style="border-radius: 0 10px 10px 0; background: white; color: #0C7779; font-weight: 600;">
-                    <i class="bi bi-search"></i> Cari
-                </button>
-                @if($search)
-                    <a href="{{ route('stock-view.index', ['view_mode' => $viewMode, 'sort' => $sortMode]) }}" class="btn btn-outline-danger border-0" style="border-radius: 0 10px 10px 0; background: white;">
-                        <i class="bi bi-x-circle"></i> Atur Ulang
-                    </a>
-                @endif
-            </form>
-            <div id="searchDropdown" class="search-dropdown dropdown-list border-0 bg-white rounded-3 mt-2" 
-                 style="display: none; max-height: 300px; overflow-y: auto; position: absolute; width: 100%; z-index: 1000; box-shadow: 0 8px 16px rgba(0,0,0,0.12); border: 1px solid #e5e7eb;">
-            </div>
-        </div>
-    </div>
-</div>
+@include('shared.stock-view.partials.toolbar')
 
 <div class="row mb-4 g-3">
     <div class="col-6 col-md-3">
@@ -124,33 +97,6 @@
                     <i class="bi bi-stack d-none d-sm-block" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-3">
-    <div class="col-12 d-flex justify-content-end">
-        <div class="btn-group shadow-sm" style="border-radius: 8px;">
-            <a href="{{ route('stock-view.index', ['view_mode' => 'part', 'search' => $search, 'sort' => $sortMode]) }}" 
-               class="btn {{ $viewMode === 'part' ? 'btn-primary' : 'btn-light' }}"
-               @if($viewMode === 'part') style="background: #0C7779; border-color: #0C7779;" @endif>
-                <i class="bi bi-tag"></i> By Part Number
-            </a>
-            <a href="{{ route('stock-view.index', ['view_mode' => 'box_id', 'search' => $search, 'sort' => $sortMode]) }}" 
-               class="btn {{ $viewMode === 'box_id' ? 'btn-primary' : 'btn-light' }}"
-               @if($viewMode === 'box_id') style="background: #0C7779; border-color: #0C7779;" @endif>
-                <i class="bi bi-upc-scan"></i> By Box ID
-            </a>
-            <a href="{{ route('stock-view.index', ['view_mode' => 'pallet', 'search' => $search, 'sort' => $sortMode]) }}" 
-               class="btn {{ $viewMode === 'pallet' ? 'btn-primary' : 'btn-light' }}"
-               @if($viewMode === 'pallet') style="background: #0C7779; border-color: #0C7779;" @endif>
-                <i class="bi bi-layers"></i> By Pallet
-            </a>
-            <a href="{{ route('stock-view.index', ['view_mode' => 'not_full', 'search' => $search, 'sort' => $sortMode]) }}" 
-               class="btn {{ $viewMode === 'not_full' ? 'btn-primary' : 'btn-light' }}"
-               @if($viewMode === 'not_full') style="background: #0C7779; border-color: #0C7779;" @endif>
-                <i class="bi bi-exclamation-circle"></i> By Not Full
-            </a>
         </div>
     </div>
 </div>

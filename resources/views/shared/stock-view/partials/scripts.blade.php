@@ -451,93 +451,54 @@
 
     function loadSearchSuggestions(searchTerm) {
         if (!hasSearchUi) return;
-        const dataSource = sortedAllSearchTerms;
-        let filtered = dataSource;
-        
-        if (searchTerm.trim()) {
-            filtered = dataSource.filter(item => 
-                item.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+        const filtered = sortedAllSearchTerms.filter(item =>
+            item.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        searchDropdown.replaceChildren();
+        if (!filtered.length) {
+            const message = document.createElement('div');
+            message.className = 'stock-toolbar__message';
+            message.textContent = searchTerm.trim()
+                ? 'Tidak ada saran yang cocok. Tekan Terapkan untuk mencari.'
+                : 'Belum ada saran pencarian.';
+            searchDropdown.appendChild(message);
         }
-        
-        searchDropdown.innerHTML = '';
-        
-        if (filtered.length === 0 && searchTerm.trim()) {
-            const noResult = document.createElement('div');
-            noResult.className = 'dropdown-item text-muted';
-            noResult.style.padding = '12px 16px';
-            noResult.innerHTML = '<i class="bi bi-search me-2"></i>Tidak ada hasil untuk "' + searchTerm + '"';
-            searchDropdown.appendChild(noResult);
-            return;
-        }
-        
-        if (!searchTerm.trim() && filtered.length > 0) {
-            const header = document.createElement('div');
-            header.style.cssText = 'padding: 12px 16px; font-weight: 600; color: #0C7779; border-bottom: 1px solid #e5e7eb; font-size: 12px; text-transform: uppercase;';
-            header.textContent = 'Rekomendasi Pencarian';
-            searchDropdown.appendChild(header);
-        }
-        
         filtered.slice(0, 8).forEach(item => {
-            const suggestion = document.createElement('div');
-            suggestion.className = 'dropdown-item';
-            suggestion.style.cssText = 'padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: all 0.2s ease; font-size: 14px; background: white;';
-
-            const typeBadges = getSearchTermTypes(item)
-                .map(type => `<span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background:#ecfeff; color:#0f766e; font-size:11px; font-weight:700;">${escapeHtml(type)}</span>`)
-                .join('');
-
-            suggestion.innerHTML = `
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                    <div style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                        <i class="bi bi-check-circle" style="color: #0C7779; margin-right: 8px; opacity: 0;"></i>${escapeHtml(item)}
-                    </div>
-                    <div style="display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
-                        ${typeBadges}
-                    </div>
-                </div>
-            `;
-            
-            suggestion.addEventListener('click', function(e) {
-                e.stopPropagation();
+            const suggestion = document.createElement('button');
+            suggestion.type = 'button';
+            suggestion.className = 'stock-toolbar__suggestion';
+            suggestion.innerHTML = `<span>${escapeHtml(item)}</span><span class="stock-toolbar__types">${
+                getSearchTermTypes(item).map(type => `<span>${escapeHtml(type)}</span>`).join('')
+            }</span>`;
+            suggestion.addEventListener('click', () => {
                 searchInput.value = item;
                 searchDropdown.style.display = 'none';
                 searchForm.submit();
             });
-            
-            suggestion.addEventListener('mouseover', function() {
-                this.style.backgroundColor = '#f0f4f8';
-                this.style.color = '#0C7779';
-                this.style.fontWeight = '600';
-                this.querySelector('i').style.opacity = '1';
-            });
-            
-            suggestion.addEventListener('mouseout', function() {
-                this.style.backgroundColor = 'white';
-                this.style.color = '#374151';
-                this.style.fontWeight = '400';
-                this.querySelector('i').style.opacity = '0';
-            });
-            
             searchDropdown.appendChild(suggestion);
         });
     }
 
     if (hasSearchUi) {
-        searchInput.addEventListener('focus', function() {
+        const searchRegion = searchInput.closest('.stock-toolbar__search');
+        const showSuggestions = () => {
             loadSearchSuggestions(searchInput.value);
             searchDropdown.style.display = 'block';
+        };
+        searchInput.addEventListener('focus', showSuggestions);
+        searchInput.addEventListener('input', showSuggestions);
+        searchRegion.addEventListener('focusout', event => {
+            if (!searchRegion.contains(event.relatedTarget)) searchDropdown.style.display = 'none';
         });
-
-        searchInput.addEventListener('input', function() {
-            loadSearchSuggestions(this.value);
-            searchDropdown.style.display = 'block';
+        document.addEventListener('pointerdown', event => {
+            if (!searchRegion.contains(event.target)) searchDropdown.style.display = 'none';
         });
-
-        searchInput.addEventListener('blur', function() {
-            setTimeout(() => {
+        searchRegion.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                searchInput.focus();
                 searchDropdown.style.display = 'none';
-            }, 150);
+            }
         });
     }
 
