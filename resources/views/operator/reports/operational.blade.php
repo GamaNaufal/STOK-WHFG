@@ -3,19 +3,35 @@
 @section('title', 'Operational Warehouse Reports')
 
 @section('styles')
+@if(request()->routeIs('dashboard'))
+    <link rel="stylesheet" href="{{ asset('css/dashboard-summary.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-filters.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-charts.css') }}">
+@endif
 <style>
     .popover.popover-wide {
-        max-width: 520px;
+        --bs-popover-bg: #fff;
+        --bs-popover-header-bg: #f5f6f7;
+        --bs-popover-max-width: min(520px, calc(100vw - 32px));
+        max-width: min(520px, calc(100vw - 32px));
+        z-index: 1105;
+        background: #fff;
+        box-shadow: 0 8px 24px rgb(20 25 32 / 12%);
     }
     .popover.popover-wide .popover-body {
-        max-width: 520px;
+        max-height: min(360px, 60vh);
+        overflow: auto;
+        overscroll-behavior: contain;
+        overflow-wrap: normal;
     }
-    
-    @media (max-width: 576px) {
-        .popover.popover-wide,
-        .popover.popover-wide .popover-body {
-            max-width: 320px;
-        }
+    .popover.popover-wide th { white-space: nowrap; }
+    .warehouse-app .popover.popover-wide .table > thead > tr > th,
+    .warehouse-app .popover.popover-wide .table > tbody > tr > td {
+        padding: .65rem .5rem;
+    }
+    .warehouse-app .popover.popover-wide .table > tbody > tr > td {
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 </style>
 @endsection
@@ -32,6 +48,9 @@
         </a>
     </div>
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-filters')
+    @else
     <div class="card shadow-sm border-0 mb-4" id="audit-report">
         <div class="card-body">
             <form method="GET" action="{{ url()->current() }}" class="row g-3 align-items-end">
@@ -77,6 +96,8 @@
         </div>
     </div>
 
+    @endif
+
     @php
         $activeBoxPreview = $currentHandling->sortByDesc('created_at')->take(5);
         $activePallets = $currentHandling->groupBy('pallet_number')->map(function ($rows) {
@@ -98,6 +119,9 @@
         $scanPreview = $issueList->take(5);
     @endphp
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.supervisor-summary')
+    @else
     <div class="row g-4 mb-4">
         <div class="col-md-3">
             @php
@@ -143,6 +167,8 @@
             </div>
         </div>
     </div>
+
+    @endif
 
     <div id="fulfillment-popover" class="d-none">
         <table class="table table-sm mb-0">
@@ -244,6 +270,9 @@
         </table>
     </div>
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-charts')
+    @else
     <div class="row g-4 mb-4">
         <div class="col-lg-8">
             <div class="card shadow-sm border-0 h-100">
@@ -262,6 +291,8 @@
             </div>
         </div>
     </div>
+
+    @endif
 
     <div class="row g-4 mb-4">
         <div class="col-lg-6">
@@ -743,6 +774,24 @@
     const throughputLabels = JSON.parse(document.getElementById('throughput-labels').textContent || '[]');
     const inboundData = JSON.parse(document.getElementById('throughput-inbound').textContent || '[]');
     const outboundData = JSON.parse(document.getElementById('throughput-outbound').textContent || '[]');
+    const dashboardCharts = Boolean(document.querySelector('.dashboard-charts'));
+    const stockChartOptions = (dates = false) => dashboardCharts ? {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 10, padding: 16, color: '#595d65' } } },
+        scales: {
+            x: { grid: { display: false }, ticks: {
+                maxRotation: 0, autoSkip: true, maxTicksLimit: 6, color: '#595d65',
+                ...(dates ? { callback: (value) => {
+                    const label = throughputLabels[value] || '';
+                    return /^\d{4}-\d{2}-\d{2}$/.test(label) ? `${label.slice(8, 10)}/${label.slice(5, 7)}` : label;
+                } } : {}),
+            } },
+            y: { beginAtZero: true, title: { display: true, text: 'PCS' }, ticks: { precision: 0, maxTicksLimit: 5, color: '#595d65' }, grid: { color: '#eef0f2' } },
+        },
+    } : { responsive: true, scales: { y: { beginAtZero: true } } };
 
     new Chart(document.getElementById('trendChart'), {
         type: 'line',
@@ -761,11 +810,12 @@
                     data: outboundData,
                     borderColor: '#f97316',
                     backgroundColor: 'rgba(249,115,22,0.2)',
+                    ...(dashboardCharts ? { borderDash: [6, 4], pointStyle: 'rectRot' } : {}),
                     tension: 0.3,
                 }
             ]
         },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        options: stockChartOptions(true)
     });
 
     const peakLabels = JSON.parse(document.getElementById('peak-labels').textContent || '[]');
@@ -781,7 +831,7 @@
                 { label: 'Outbound', data: peakOutbound, backgroundColor: '#f97316' }
             ]
         },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        options: stockChartOptions()
     });
 
     const deliveryLabels = JSON.parse(document.getElementById('delivery-labels').textContent || '[]');
@@ -837,6 +887,7 @@
     });
 
     const popoverTriggers = document.querySelectorAll('[data-bs-toggle="popover"]');
+    const popoverBoundary = document.getElementById('main-content');
     popoverTriggers.forEach((el) => {
         const targetId = el.getAttribute('data-popover-target');
         const title = el.getAttribute('data-popover-title') || '';
@@ -847,15 +898,31 @@
                 content = template.innerHTML;
             }
         }
-        new bootstrap.Popover(el, {
+        const popover = new bootstrap.Popover(el, {
             html: true,
             sanitize: false,
             trigger: 'hover focus',
-            placement: 'left',
+            placement: 'bottom',
+            animation: false,
+            boundary: popoverBoundary,
             customClass: 'popover-wide',
             title,
             content,
-            container: 'body'
+            container: 'body',
+            popperConfig(defaultConfig) {
+                return {
+                    ...defaultConfig,
+                    placement: 'bottom-start',
+                    modifiers: [
+                        ...defaultConfig.modifiers,
+                        { name: 'flip', options: { boundary: popoverBoundary, fallbackPlacements: ['top-start', 'bottom-end', 'top-end'], padding: 12 } },
+                        { name: 'preventOverflow', options: { boundary: popoverBoundary, padding: 12, tether: false } },
+                    ],
+                };
+            },
+        });
+        el.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') popover.hide();
         });
     });
 

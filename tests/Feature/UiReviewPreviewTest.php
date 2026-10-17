@@ -12,6 +12,26 @@ class UiReviewPreviewTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_dashboard_renders_for_every_role_and_preserves_supervisor_detail_links(): void
+    {
+        foreach (['warehouse_operator', 'sales', 'ppc', 'admin_warehouse', 'admin', 'supervisi'] as $role) {
+            $user = User::factory()->create(['role' => $role]);
+            $response = $this->actingAs($user)->get(route('dashboard'));
+            $response->assertOk();
+            if (in_array($role, ['supervisi', 'admin'], true)) {
+                $response->assertViewIs('operator.reports.operational');
+                foreach (['#fulfillment-report', '#current-handling', '#active-pallets', '#scan-issues'] as $target) {
+                    $response->assertSee('href="'.$target.'"', false);
+                }
+                $response->assertSee('Fulfillment Rate (Order Full)');
+                $this->get(route('dashboard', ['fulfillment_filter' => 'partial']))
+                    ->assertOk()->assertSee('Fulfillment Rate (Order Partial)');
+            } else {
+                $response->assertViewIs('shared.dashboard')->assertSee('Akses cepat');
+            }
+        }
+    }
+
     public function test_module_pages_render(): void
     {
         $user = User::factory()->create(['name' => 'Admin Preview', 'email' => 'preview@example.test', 'role' => 'admin']);

@@ -2,6 +2,12 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
+Verifikasi tambahan 16 Oktober 2026 (presentasi dashboard): role `admin` (Admin Utama)
+dan `supervisi` menggunakan dashboard laporan operasional yang sama melalui
+`OperationalReportService` dan `operator.reports.operational`. Role lain tetap
+menggunakan `shared.dashboard`. Statistik stok serta sinkronisasi expiry Admin
+Utama tetap dijalankan; hak akses dan proses transaksi tidak berubah.
+
 Verifikasi tambahan 15 Oktober 2026: pengaturan hak akses fitur per role oleh Admin Utama, pembatasan server dan navigasi dinamis.
 
 Verifikasi tambahan 14 Oktober 2026: Stock View menampilkan stok expired dengan label, dan Handle dibatasi untuk box expired.
