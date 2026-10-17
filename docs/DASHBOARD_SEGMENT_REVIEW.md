@@ -1,5 +1,84 @@
 # Review segmen ringkasan dashboard — 16 Oktober 2026
 
+## Iterasi Current Handling dan Active Pallet — 17 Oktober 2026
+
+Segmen selesai pada dashboard SPV/Admin Utama. Route laporan lainnya tetap
+menggunakan tabel sebelumnya. ID `current-handling` dan `active-pallets` tetap
+menjadi tujuan tautan ringkasan. Query, urutan, grouping pallet, serta data tetap.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Batas dataset tidak terlihat | Keterangan maksimal 200 baris dan jumlah baris/pallet yang ditampilkan | Tidak memberi kesan bahwa ringkasan mencakup seluruh gudang |
+| Tabel panjang kehilangan konteks saat digulir | Header dan kolom Box/Pallet tetap terlihat dalam wadah gulir | Menjaga orientasi pada data panjang dan layar kecil |
+| Angka rata kiri tanpa pemisah ribuan | Angka rata kanan dengan pemisah ribuan dan tabular numerals | Mempermudah perbandingan PCS/box |
+| Kode panjang melebar, kondisi kosong masih berupa tabel | Teks membungkus; pesan kosong tanpa tabel lebar | Mencegah overflow halaman dan menjelaskan kondisi kosong |
+
+Keterangan batas mengacu source `OperationalReportService::buildCurrentHandling`:
+query dibatasi 200 baris, diurutkan `boxes.created_at` ascending, tidak memakai
+filter periode. `activePallets` berasal dari grouping koleksi tersebut di view.
+Tidak ada perubahan aturan bisnis dalam iterasi ini.
+
+File: `resources/views/shared/partials/dashboard-stock-tables.blade.php`,
+`public/css/dashboard-stock-tables.css`,
+`resources/views/operator/reports/operational.blade.php`, dan dokumen ini.
+
+Validasi:
+
+- 2 tes render existing / 56 assertion lulus; preview sementara 1 tes / 16
+  assertion lulus untuk kedua role. Data contoh menghasilkan 40 baris dan 10
+  pallet, termasuk nilai 999,999,999 PCS serta agregat 1,000,113,999 PCS.
+- Data contoh hanya pada render view, menggunakan SQLite in-memory. Lokasi null
+  tetap tampil `Unknown`; grouping dan seluruh field sumber dipertahankan.
+- Browser pada 1440, 768, 390px, kedua role, kondisi kosong/berisi: tidak ada
+  overflow panel atau sel numerik. Tabel lebar digulir di dalam wadahnya.
+- Page Down mengubah scrollTop menjadi 364px dengan posisi header tetap sama
+  dengan atas wadah. Arrow Right mengubah scrollLeft 40px pada kedua tabel,
+  sementara kolom pertama tetap sejajar dengan sisi kiri wadah.
+- Fokus keyboard 3px terlihat. Teks part/lokasi panjang membungkus; tampilan
+  desktop, ponsel, dan pesan kosong diperiksa. Tidak ada error browser tercatat.
+- `git diff --check` lulus. Belum diuji pada perangkat fisik/pembaca layar.
+
+Usulan berikutnya: tabel Inbound vs Outbound Matching dan Schedule Fulfillment.
+Berhenti untuk review pengguna; laporan tanpa screenshot.
+
+## Iterasi rencana/aktual delivery dan scan mismatch — 17 Oktober 2026
+
+Dilanjutkan atas arahan pengguna setelah pemeriksaan grafik aktivitas stok.
+Cakupan: satu bagian dashboard SPV/Admin Utama yang berisi grafik fulfillment
+dan ringkasan mismatch. Halaman laporan non-dashboard tetap memakai presentasi
+sebelumnya; data, status, filtering, dan perhitungan tidak berubah.
+
+| Before | After | Why |
+| --- | --- | --- |
+| Grafik Highcharts gelap di halaman terang | Latar putih, teks gelap, grid halus ditetapkan pada dashboard | Kontras konsisten dengan tema aplikasi |
+| Judul fulfillment tidak menjelaskan seri | Rencana dan aktual delivery, deskripsi QTY, tabel alternatif | Makna grafik dan angka dapat dibaca tanpa interaksi pointer |
+| Label tanggal berdesakan pada ponsel | Jumlah label responsif dan rotasi pada grafik sempit | Seluruh titik tetap ada, label tidak bertabrakan |
+| Jumlah mismatch hanya tersebar per jenis | Total mismatch memakai jumlah yang sudah dihitung view | Ringkasan lebih cepat dibaca |
+| Kode scan dan tanggal saling berebut lebar | Kode membungkus, timestamp pada baris berikutnya | Kode panjang tetap terbaca pada ponsel |
+
+File iterasi ini: `public/css/dashboard-performance.css`,
+`resources/views/shared/partials/dashboard-delivery-data.blade.php`,
+`resources/views/operator/reports/operational.blade.php`, serta dokumen ini.
+Warna/pola seri, legenda, tooltip, tabel detail lama, dan data grafik tetap.
+Animasi grafik dashboard dimatikan; styling dibatasi dengan class dashboard.
+
+Validasi:
+
+- 2 tes render existing lulus / 56 assertion, termasuk dashboard keenam role.
+- 1 tes preview sementara / 12 assertion lulus untuk SPV dan Admin Utama:
+  kondisi kosong, rencana/aktual contoh, dan total 23 mismatch dari dua jenis.
+  Data contoh diberikan pada view, menggunakan SQLite in-memory.
+- Browser 1440, 768, 390px: tidak ada overflow pada panel maupun baris mismatch;
+  latar SVG terverifikasi `#ffffff`. Pemeriksaan visual desktop dan ponsel selesai.
+- Enter membuka tabel dengan 7 periode contoh; fokus outline 3px terlihat.
+- Label ponsel yang sempat rapat diperbaiki dan diperiksa ulang; kode scan panjang
+  membungkus tanpa memotong timestamp. Tidak ada error browser tercatat.
+- `git diff --check` lulus. Belum diuji pada perangkat fisik/pembaca layar maupun
+  seluruh kombinasi periode; tooltip/legenda tidak diuji langsung.
+
+Usulan berikutnya: tabel Current Handling dan Active Pallet pada dashboard.
+Berhenti untuk review pengguna. Screenshot tidak disertakan pada laporan.
+
 ## Iterasi grafik aktivitas stok — 17 Oktober 2026
 
 Segmen selesai: grafik tren inbound/outbound dan aktivitas per jam pada dashboard

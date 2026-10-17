@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="{{ asset('css/dashboard-summary.css') }}">
     <link rel="stylesheet" href="{{ asset('css/dashboard-filters.css') }}">
     <link rel="stylesheet" href="{{ asset('css/dashboard-charts.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-performance.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-stock-tables.css') }}">
 @endif
 <style>
     .popover.popover-wide {
@@ -294,12 +296,23 @@
 
     @endif
 
-    <div class="row g-4 mb-4">
+    <div class="row g-4 mb-4 {{ request()->routeIs('dashboard') ? 'dashboard-performance' : '' }}">
         <div class="col-lg-6">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-3">Schedule Fulfillment Performance</h6>
+                    @if(request()->routeIs('dashboard'))
+                        <h2 id="dashboard-delivery-title">Rencana dan aktual delivery</h2>
+                        <p class="dashboard-performance-description">Perbandingan Rencana Sales dan Aktual Delivery dalam QTY, mengikuti pengelompokan periode yang dipilih.</p>
+                        @if(!collect($deliveryTrend)->contains(fn ($row) => $row['planned_qty'] != 0 || $row['actual_qty'] != 0))
+                            <p class="dashboard-performance-description">Belum ada rencana atau aktual delivery pada periode ini.</p>
+                        @endif
+                    @else
+                        <h6 class="fw-bold mb-3">Schedule Fulfillment Performance</h6>
+                    @endif
                     <div id="fulfillmentChart" style="height: 260px;"></div>
+                    @if(request()->routeIs('dashboard'))
+                        @include('shared.partials.dashboard-delivery-data')
+                    @endif
                     <div class="collapse mt-3" id="fulfillment-detail">
                         <div class="card card-body border-0 shadow-sm">
                             <div id="fulfillment-full" class="d-none">
@@ -364,7 +377,11 @@
         <div class="col-lg-6">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-3">Scan Mismatch Summary</h6>
+                    @if(request()->routeIs('dashboard'))
+                        <h2>Ringkasan scan mismatch</h2>
+                    @else
+                        <h6 class="fw-bold mb-3">Scan Mismatch Summary</h6>
+                    @endif
                     @php
                         $scanTotal = $issueSummary->sum('total');
                         $scanTypes = $issueSummary->count();
@@ -376,6 +393,9 @@
                         $recentIssues = $issueList->take(5);
                     @endphp
                     <div class="text-muted small mb-2">Ringkasan mismatch dari periode terpilih.</div>
+                    @if(request()->routeIs('dashboard'))
+                        <div class="dashboard-mismatch-total"><strong>{{ number_format($scanTotal) }}</strong><span>total mismatch</span></div>
+                    @endif
                     <ul class="list-group list-group-flush">
                         @forelse($issueSummary as $row)
                             <li class="list-group-item d-flex justify-content-between">
@@ -387,10 +407,10 @@
                         @endforelse
                     </ul>
                     <div class="mt-3">
-                        <div class="text-muted small mb-2">5 mismatch terbaru</div>
+                        <div class="text-muted small mb-2 dashboard-recent-title">5 mismatch terbaru</div>
                         <ul class="list-unstyled small mb-0">
                             @forelse($recentIssues as $row)
-                                <li class="d-flex justify-content-between border-bottom py-1">
+                                <li class="d-flex justify-content-between border-bottom py-1 dashboard-recent-issue">
                                     <span>#{{ $row['order_id'] ?? '-' }} · {{ $row['scanned_code'] ?? '-' }}</span>
                                     <span class="text-muted">{{ $row['created_at'] ?? '-' }}</span>
                                 </li>
@@ -404,6 +424,9 @@
         </div>
     </div>
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-stock-tables')
+    @else
     <div class="card shadow-sm border-0 mb-4" id="current-handling">
         <div class="card-header bg-white">
             <strong>Current Handling Report (Barang Aktif)</strong>
@@ -469,6 +492,8 @@
             </table>
         </div>
     </div>
+
+    @endif
 
     <div class="card shadow-sm border-0 mb-4" id="fulfillment-report">
         <div class="card-header bg-white">
@@ -839,21 +864,32 @@
     const deliveryActual = JSON.parse(document.getElementById('delivery-actual').textContent || '[]');
 
     Highcharts.chart('fulfillmentChart', {
-        chart: { type: 'column' },
+        chart: { type: 'column', ...(dashboardCharts ? { backgroundColor: '#ffffff', plotBackgroundColor: '#ffffff', animation: false, style: { fontFamily: 'system-ui, sans-serif' } } : {}) },
         title: { text: null },
+        ...(dashboardCharts ? { responsive: { rules: [{
+            condition: { maxWidth: 480 },
+            chartOptions: {
+                xAxis: { labels: { rotation: -45, step: Math.max(1, Math.ceil(deliveryLabels.length / 3)) } },
+                legend: { itemStyle: { fontSize: '11px' }, itemDistance: 12 },
+            },
+        }] } } : {}),
         xAxis: {
             categories: deliveryLabels,
-            crosshair: true
+            crosshair: true,
+            ...(dashboardCharts ? { lineColor: '#dfe1e5', labels: { step: Math.max(1, Math.ceil(deliveryLabels.length / 5)), style: { color: '#595d65', fontSize: '11px' } } } : {})
         },
         yAxis: {
             min: 0,
-            title: { text: 'QTY' }
+            title: { text: 'QTY', ...(dashboardCharts ? { style: { color: '#595d65' } } : {}) },
+            ...(dashboardCharts ? { gridLineColor: '#eef0f2', labels: { style: { color: '#595d65' } }, allowDecimals: false } : {})
         },
         tooltip: {
             shared: true,
-            valueSuffix: ' QTY'
+            valueSuffix: ' QTY',
+            ...(dashboardCharts ? { backgroundColor: '#ffffff', borderColor: '#dfe1e5', style: { color: '#202124' }, animation: false } : {})
         },
         plotOptions: {
+            ...(dashboardCharts ? { series: { animation: false } } : {}),
             column: {
                 pointPadding: 0.1,
                 borderWidth: 0
@@ -883,7 +919,7 @@
             }
         ],
         credits: { enabled: false },
-        legend: { align: 'center', verticalAlign: 'bottom' }
+        legend: { align: 'center', verticalAlign: 'bottom', ...(dashboardCharts ? { itemStyle: { color: '#595d65', fontWeight: 'normal' }, itemHoverStyle: { color: '#202124' } } : {}) }
     });
 
     const popoverTriggers = document.querySelectorAll('[data-bs-toggle="popover"]');
