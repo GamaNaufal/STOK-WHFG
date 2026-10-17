@@ -7,7 +7,7 @@
                                         padding: 20px;
                                         font-weight: 600;
                                         font-size: 15px;">
-            <i class="bi bi-pin-map"></i> Step 2: Tentukan Lokasi Penyimpanan
+            <i class="bi bi-pin-map"></i> 2. Tentukan Tujuan dan Simpan Stok
         </div>
         <div class="card-body" style="padding: 24px;">
             <label class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
@@ -29,7 +29,7 @@
                 <div id="existingPalletPicker" class="position-relative" style="display: none;">
                     <div class="input-group">
                         <span class="input-group-text bg-white border-end-0" style="border: 2px solid #e5e7eb; border-right: none; border-radius: 10px 0 0 10px;"><i class="bi bi-search"></i></span>
-                        <input type="text" id="existingPalletSearchInput" class="form-control border-start-0 border-end-0"
+                        <input aria-label="Cari pallet existing" type="text" id="existingPalletSearchInput" class="form-control border-start-0 border-end-0"
                                placeholder="Cari nomor pallet (contoh: PLT-001)..." autocomplete="off"
                                style="border-top: 2px solid #e5e7eb; border-bottom: 2px solid #e5e7eb; padding: 10px 12px;">
                     </div>
@@ -52,10 +52,10 @@
             <div class="position-relative" id="locationPickerSection">
                 <div class="input-group">
                     <span class="input-group-text bg-white border-end-0" style="border: 2px solid #e5e7eb; border-right: none; border-radius: 10px 0 0 10px;"><i class="bi bi-search"></i></span>
-                    <input type="text" id="locationSearchInput" class="form-control form-control-lg border-start-0 border-end-0"
+                    <input aria-label="Lokasi Penyimpanan" aria-describedby="locationStatusText" type="text" id="locationSearchInput" class="form-control form-control-lg border-start-0 border-end-0"
                            placeholder="Pilih atau ketik kode lokasi..." autocomplete="off"
                            style="border-top: 2px solid #e5e7eb; border-bottom: 2px solid #e5e7eb; padding: 12px 16px; font-size: 16px;">
-                    <button class="btn btn-outline-secondary border-start-0" type="button" id="locationDropdownBtn"
+                    <button class="btn btn-outline-secondary border-start-0" type="button" id="locationDropdownBtn" aria-label="Tampilkan pilihan lokasi"
                             style="border-color: #e5e7eb; border-top: 2px solid #e5e7eb; border-bottom: 2px solid #e5e7eb; border-right: 2px solid #e5e7eb; border-radius: 0 10px 10px 0;">
                         <i class="bi bi-chevron-down"></i>
                     </button>
@@ -82,7 +82,7 @@
                     <span class="input-group-text" style="border: 2px solid #86efac; background: white;">
                         <i class="bi bi-calendar3"></i>
                     </span>
-                    <input type="date" id="inputDateField" class="form-control" 
+                    <input aria-label="Tanggal Input Box dan Pallet" type="date" id="inputDateField" class="form-control"
                            style="border: 2px solid #86efac; padding: 10px 12px;"
                            max="{{ date('Y-m-d') }}">
                 </div>
@@ -91,8 +91,10 @@
                 </small>
             </div>
 
+            <div id="stockActionError" class="alert alert-danger mt-3" role="alert" tabindex="-1" style="display: none;"></div>
+
             <!-- Action Buttons -->
-            <div class="d-grid gap-3 d-md-flex justify-content-md-end mt-4">
+            <div class="stock-input-actions mt-4">
                 <button type="button" class="btn btn-lg" id="cancel-btn"
                         style="background: #6b7280;
                                color: white;

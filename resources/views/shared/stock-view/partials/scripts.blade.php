@@ -316,7 +316,7 @@
                 id: dataset.boxNumber || boxId,
                 part_number: dataset.partNumber || '-',
                 pcs_quantity: dataset.pcsQuantity || 0,
-                note: 'Box ini akan dihapus permanen',
+                note: 'Dikeluarkan dari stok aktif; riwayat tetap tersimpan',
             }],
             action: {
                 type: 'box',
@@ -808,12 +808,12 @@
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || 'Gagal mengambil history box');
+                throw new Error(data.message || 'Gagal mengambil riwayat box');
             }
 
             const historyRows = data.history || [];
             if (historyRows.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada history perubahan.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada riwayat perubahan.</td></tr>';
             } else {
                 tableBody.innerHTML = historyRows.map((row) => {
                     const oldVal = row.old_values || {};
@@ -826,9 +826,9 @@
                         badgeClass = 'bg-warning text-dark';
                         actionLabel = 'Edit Box';
                         const diffLines = [
-                            `Part: ${escapeHtml(oldVal.part_number ?? '-')} → ${escapeHtml(newVal.part_number ?? '-')}`,
-                            `PCS: ${escapeHtml(String(oldVal.pcs_quantity ?? '-'))} → ${escapeHtml(String(newVal.pcs_quantity ?? '-'))}`,
-                            `Tanggal: ${escapeHtml(oldVal.stored_at ?? '-')} → ${escapeHtml(newVal.stored_at ?? '-')}`,
+                            `Part: ${escapeHtml(oldVal.part_number ?? '-')} â†’ ${escapeHtml(newVal.part_number ?? '-')}`,
+                            `PCS: ${escapeHtml(String(oldVal.pcs_quantity ?? '-'))} â†’ ${escapeHtml(String(newVal.pcs_quantity ?? '-'))}`,
+                            `Tanggal: ${escapeHtml(oldVal.stored_at ?? '-')} â†’ ${escapeHtml(newVal.stored_at ?? '-')}`,
                         ];
                         if (newVal.reason) {
                             diffLines.push(`Alasan: ${escapeHtml(newVal.reason)}`);
@@ -861,7 +861,7 @@
                 }).join('');
             }
         } catch (error) {
-            tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${error.message}</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${escapeHtml(error.message)}</td></tr>`;
         } finally {
             loading.style.display = 'none';
         }

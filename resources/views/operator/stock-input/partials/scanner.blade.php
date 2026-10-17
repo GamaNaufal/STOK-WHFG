@@ -8,7 +8,7 @@
                                      border-radius: 12px 12px 0 0;
                                      font-weight: 600;
                                      font-size: 16px;">
-        <i class="bi bi-upc-scan"></i> Step 1: Scan Barcode dengan Alat Scanner
+        <i class="bi bi-upc-scan"></i> 1. Scan ID Box dan No Part
     </div>
 
     <form id="scanForm" autocomplete="off">
@@ -25,7 +25,7 @@
                 <i class="bi bi-barcode"></i>
             </span>
             <input type="text"
-                   id="barcodeInput"
+                   id="barcodeInput" aria-describedby="barcodeHint barcode-error-text"
                    class="form-control"
                    placeholder="Scan/ketik ID Box..."
                      minlength="8"
@@ -45,9 +45,31 @@
             </button>
         </div>
 
-        <small class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
+        <small id="barcodeHint" class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
             <i class="bi bi-info-circle"></i> ID Box wajib 8 angka (tanpa huruf). Scan ID Box terlebih dahulu, lalu scan No Part
         </small>
+
+<!-- Barcode Result -->
+<div id="barcode-status" role="status" class="alert mt-3" style="display: none;
+                                                   background: #e8f5e9;
+                                                   border: 2px solid #10b981;
+                                                   color: #047857;
+                                                   border-radius: 10px;
+                                                   padding: 14px 16px;">
+    <i class="bi bi-check-circle"></i> <span id="barcode-status-text">-</span>
+</div>
+
+<!-- Barcode Error -->
+<div id="barcode-error" role="alert" class="alert alert-dismissible fade show mt-3" style="display: none;
+                                                                               background: #fee2e2;
+                                                                               border: 2px solid #dc2626;
+                                                                               color: #991b1b;
+                                                                               border-radius: 10px;
+                                                                               padding: 14px 16px;">
+    <i class="bi bi-exclamation-triangle"></i> <span id="barcode-error-text"></span>
+    <button type="button" class="btn-close" aria-label="Tutup pesan kesalahan" onclick="document.getElementById('barcode-error').style.display='none';" style="filter: invert(0.3);"></button>
+</div>
+
 
         <div class="mt-4">
             <label for="partInput" class="form-label fw-bold" style="font-size: 15px; color: #333; margin-bottom: 12px;">
@@ -63,7 +85,7 @@
                     <i class="bi bi-upc"></i>
                 </span>
                 <input type="text"
-                       id="partInput"
+                       id="partInput" aria-describedby="partHint part-error-text"
                        class="form-control"
                        placeholder="Scan no part untuk konfirmasi..."
                        style="font-size: 16px;
@@ -79,14 +101,14 @@
                 </button>
             </div>
 
-            <small class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
+            <small id="partHint" class="form-text text-muted mt-3 d-block" style="font-size: 14px;">
                 <i class="bi bi-info-circle"></i> Scan No Part setelah scan ID Box
             </small>
         </div>
     </form>
 
     <!-- Part Status -->
-    <div id="part-status" class="alert mt-3" style="display: none;
+    <div id="part-status" role="status" class="alert mt-3" style="display: none;
                                                        background: #e8f5e9;
                                                        border: 2px solid #10b981;
                                                        color: #047857;
@@ -96,40 +118,19 @@
     </div>
 
     <!-- Part Error -->
-    <div id="part-error" class="alert alert-dismissible fade show mt-3" style="display: none;
+    <div id="part-error" role="alert" class="alert alert-dismissible fade show mt-3" style="display: none;
                                                                                    background: #fee2e2;
                                                                                    border: 2px solid #dc2626;
                                                                                    color: #991b1b;
                                                                                    border-radius: 10px;
                                                                                    padding: 14px 16px;">
         <i class="bi bi-exclamation-triangle"></i> <span id="part-error-text"></span>
-        <button type="button" class="btn-close" onclick="document.getElementById('part-error').style.display='none';" style="filter: invert(0.3);"></button>
+        <button type="button" class="btn-close" aria-label="Tutup pesan kesalahan" onclick="document.getElementById('part-error').style.display='none';" style="filter: invert(0.3);"></button>
     </div>
 </div>
 
-<!-- Barcode Result -->
-<div id="barcode-status" class="alert mt-3" style="display: none;
-                                                   background: #e8f5e9;
-                                                   border: 2px solid #10b981;
-                                                   color: #047857;
-                                                   border-radius: 10px;
-                                                   padding: 14px 16px;">
-    <i class="bi bi-check-circle"></i> <span id="barcode-status-text">-</span>
-</div>
-
-<!-- Barcode Error -->
-<div id="barcode-error" class="alert alert-dismissible fade show mt-3" style="display: none;
-                                                                               background: #fee2e2;
-                                                                               border: 2px solid #dc2626;
-                                                                               color: #991b1b;
-                                                                               border-radius: 10px;
-                                                                               padding: 14px 16px;">
-    <i class="bi bi-exclamation-triangle"></i> <span id="barcode-error-text"></span>
-    <button type="button" class="btn-close" onclick="document.getElementById('barcode-error').style.display='none';" style="filter: invert(0.3);"></button>
-</div>
-
 <!-- Info Box -->
-<div id="info-box" class="alert mt-3" style="display: none;
+<div id="info-box" role="status" class="alert mt-3" style="display: none;
                                               background: #e0f2fe;
                                               border: 2px solid #0284c7;
                                               color: #0c4a6e;
@@ -140,12 +141,12 @@
 </div>
 
 <!-- Error Message -->
-<div id="error-message" class="alert alert-dismissible fade show mt-3" style="display: none;
+<div id="error-message" role="alert" class="alert alert-dismissible fade show mt-3" style="display: none;
                                                                               background: #fee2e2;
                                                                               border: 2px solid #dc2626;
                                                                               color: #991b1b;
                                                                               border-radius: 10px;
                                                                               padding: 14px 16px;">
     <i class="bi bi-exclamation-triangle"></i> <span id="error-text"></span>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" style="filter: invert(0.3);"></button>
+    <button type="button" class="btn-close" aria-label="Tutup pesan kesalahan" onclick="document.getElementById('error-message').style.display='none';" style="filter: invert(0.3);"></button>
 </div>

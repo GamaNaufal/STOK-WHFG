@@ -44,6 +44,8 @@
     let existingPalletSearchTimeout;
     let isSelectingExistingPallet = false;
     let isSaving = false;
+    let isScanning = false;
+    let isClearing = false;
 
     function normalizeBarcodeInput(rawValue) {
         return String(rawValue || "")
@@ -52,9 +54,12 @@
     }
 
     function validateBarcodeInput(rawValue) {
+        if (isScanning) return null;
         const barcode = normalizeBarcodeInput(rawValue);
 
         if (!barcode) {
+            showBarcodeError("Scan atau ketik ID Box terlebih dahulu.");
+            barcodeInput.focus();
             return null;
         }
 
@@ -148,6 +153,7 @@
     }
 
     function showBarcodeStatus(text) {
+        barcodeInput.removeAttribute("aria-invalid");
         const statusEl = document.getElementById("barcode-status");
         document.getElementById("barcode-status-text").textContent = text;
         statusEl.style.display = "block";
@@ -155,6 +161,7 @@
     }
 
     function showBarcodeError(text) {
+        barcodeInput.setAttribute("aria-invalid", "true");
         const errorEl = document.getElementById("barcode-error");
         document.getElementById("barcode-error-text").textContent = text;
         errorEl.style.display = "block";
@@ -163,6 +170,7 @@
     }
 
     function showPartStatus(text) {
+        partInput.removeAttribute("aria-invalid");
         const statusEl = document.getElementById("part-status");
         document.getElementById("part-status-text").textContent = text;
         statusEl.style.display = "block";
@@ -170,6 +178,7 @@
     }
 
     function showPartError(text) {
+        partInput.setAttribute("aria-invalid", "true");
         const errorEl = document.getElementById("part-error");
         document.getElementById("part-error-text").textContent = text;
         errorEl.style.display = "block";
@@ -179,12 +188,36 @@
 
     function showError(message) {
         errorText.textContent = message;
-        errorMessage.style.display = "block";
+        const actionError = document.getElementById("stockActionError");
+        if (actionError && step3.style.display !== "none") {
+            actionError.textContent = message;
+            actionError.style.display = "block";
+            actionError.focus();
+            errorMessage.style.display = "none";
+        } else {
+            errorMessage.style.display = "block";
+        }
         infoBox.style.display = "none";
         window.ScanFeedback?.error();
     }
 
+    function clearActionError() {
+        const actionError = document.getElementById("stockActionError");
+        if (actionError) actionError.style.display = "none";
+    }
+
+    async function readResponse(response) {
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error("Respons server tidak dapat dibaca. Silakan coba lagi."); }
+        if (!response.ok || data?.success === false) {
+            throw new Error(data?.message || "Permintaan gagal. Silakan coba lagi.");
+        }
+        return data;
+    }
+
     function showInfo(message) {
+        clearActionError();
         infoText.textContent = message;
         infoBox.style.display = "block";
         errorMessage.style.display = "none";
@@ -319,7 +352,7 @@
                 "X-CSRF-TOKEN": config.csrfToken,
             },
         })
-            .then((response) => response.json())
+            .then(readResponse)
             .then((data) => {
                 if (!data.success || !data.pallet) {
                     throw new Error(
@@ -436,6 +469,9 @@
     }
 
     function scanBarcodeHardware(barcode) {
+        if (isScanning) return;
+        isScanning = true;
+        if (barcodeSubmitBtn) barcodeSubmitBtn.disabled = true;
         showBarcodeStatus("Memproses: " + barcode);
 
         $.ajax({
@@ -476,6 +512,11 @@
                     setTimeout(() => barcodeInput.focus(), 300);
                 }
             },
+            complete: function () {
+                isScanning = false;
+                if (barcodeSubmitBtn) barcodeSubmitBtn.disabled = barcodeInput.disabled;
+                if (partSubmitBtn) partSubmitBtn.disabled = partInput.disabled;
+            },
             error: function (xhr) {
                 let msg = "Terjadi kesalahan";
                 if (xhr.responseJSON && xhr.responseJSON.message) {
@@ -491,7 +532,21 @@
         });
     }
 
+    function validatePartInput(value) {
+        if (isScanning) return null;
+        const part = value.trim();
+        if (!part) {
+            showPartError("Scan atau ketik No Part terlebih dahulu.");
+            partInput.focus();
+            return null;
+        }
+        return part;
+    }
+
     function scanPartNumber(partNumber) {
+        if (isScanning) return;
+        isScanning = true;
+        if (partSubmitBtn) partSubmitBtn.disabled = true;
         showPartStatus("Memproses: " + partNumber);
 
         $.ajax({
@@ -520,6 +575,11 @@
                     showPartError(response.message);
                     setTimeout(() => partInput.focus(), 300);
                 }
+            },
+            complete: function () {
+                isScanning = false;
+                if (barcodeSubmitBtn) barcodeSubmitBtn.disabled = barcodeInput.disabled;
+                if (partSubmitBtn) partSubmitBtn.disabled = partInput.disabled;
             },
             error: function (xhr) {
                 let msg = "Terjadi kesalahan";
@@ -557,7 +617,7 @@
                 },
             },
         )
-            .then((response) => response.json())
+            .then(readResponse)
             .then((rows) => {
                 existingPalletSearchResults.innerHTML = "";
 
@@ -588,7 +648,8 @@
                 });
             })
             .catch(() => {
-                existingPalletSearchResults.style.display = "none";
+                existingPalletSearchResults.innerHTML = '<div class="list-group-item text-danger" role="alert">Gagal memuat pallet. Ketik ulang pencarian untuk mencoba lagi.</div>';
+                existingPalletSearchResults.style.display = "block";
             });
     }
 
@@ -670,7 +731,7 @@
         }
 
         if (!partInput.disabled) {
-            const partNumber = partInput.value.trim();
+            const partNumber = validatePartInput(partInput.value);
             if (partNumber) {
                 scanPartNumber(partNumber);
                 partInput.value = "";
@@ -692,7 +753,7 @@
     if (partSubmitBtn) {
         partSubmitBtn.addEventListener("click", function () {
             if (partInput.disabled) return;
-            const partNumber = partInput.value.trim();
+            const partNumber = validatePartInput(partInput.value);
             if (partNumber) {
                 scanPartNumber(partNumber);
                 partInput.value = "";
@@ -702,6 +763,7 @@
 
     barcodeInput.addEventListener("keydown", function (e) {
         if (e.key === "Enter" || e.keyCode === 13) {
+            e.stopPropagation();
             e.preventDefault();
             const barcode = validateBarcodeInput(this.value);
             if (barcode) {
@@ -712,6 +774,7 @@
     });
 
     barcodeInput.addEventListener("input", function () {
+        barcodeInput.removeAttribute("aria-invalid");
         const currentValue = normalizeBarcodeInput(this.value);
 
         if (!currentValue) {
@@ -730,10 +793,16 @@
         }
     });
 
+    partInput.addEventListener("input", () => {
+        partInput.removeAttribute("aria-invalid");
+        document.getElementById("part-error").style.display = "none";
+    });
+
     partInput.addEventListener("keydown", function (e) {
         if (e.key === "Enter" || e.keyCode === 13) {
+            e.stopPropagation();
             e.preventDefault();
-            const partNumber = this.value.trim();
+            const partNumber = validatePartInput(this.value);
             if (partNumber) {
                 scanPartNumber(partNumber);
                 this.value = "";
@@ -754,7 +823,7 @@
             }
             if (active === partInput && !partInput.disabled) {
                 e.preventDefault();
-                const partNumber = partInput.value.trim();
+                const partNumber = validatePartInput(partInput.value);
                 if (partNumber) {
                     scanPartNumber(partNumber);
                     partInput.value = "";
@@ -763,53 +832,42 @@
         }
     });
 
-    document
-        .getElementById("clear-pallet-btn")
-        .addEventListener("click", function () {
-            showConfirm({
-                title: "Mulai Palet Baru",
-                message:
-                    "Palet saat ini belum disimpan. Jika lanjut, data palet saat ini akan dihapus.",
-                confirmText: "Mulai Baru",
-                onConfirm: () => {
-                    fetch(config.clearSessionUrl, {
-                        method: "POST",
-                        headers: {
-                            "X-CSRF-TOKEN": config.csrfToken,
-                        },
-                    })
-                        .then((response) => response.json())
-                        .then(() => {
-                            lastScannedCode = null;
-                            lastScanTime = 0;
-                            barcodeInput.value = "";
-                            barcodeInput.focus();
-                            location.reload();
-                        });
-                },
-            });
-        });
+    async function clearCurrentSession() {
+        if (isClearing || isSaving) return;
+        isClearing = true;
+        const buttons = [document.getElementById("clear-pallet-btn"), document.getElementById("cancel-btn")];
+        buttons.forEach(button => button.disabled = true);
+        try {
+            await fetch(config.clearSessionUrl, {
+                method: "POST", headers: { "X-CSRF-TOKEN": config.csrfToken },
+            }).then(readResponse);
+            lastScannedCode = null;
+            lastScanTime = 0;
+            location.reload();
+        } catch (error) {
+            showError(error.message || "Gagal membersihkan sesi. Silakan coba lagi.");
+        } finally {
+            isClearing = false;
+            buttons.forEach(button => button.disabled = false);
+        }
+    }
 
-    document
-        .getElementById("cancel-btn")
-        .addEventListener("click", function () {
-            showConfirm({
-                title: "Batalkan Input",
-                message: "Data palet saat ini akan hilang jika dibatalkan.",
-                confirmText: "Batalkan",
-                onConfirm: () => {
-                    lastScannedCode = null;
-                    lastScanTime = 0;
-
-                    fetch(config.clearSessionUrl, {
-                        method: "POST",
-                        headers: {
-                            "X-CSRF-TOKEN": config.csrfToken,
-                        },
-                    }).then(() => location.reload());
-                },
-            });
+    document.getElementById("clear-pallet-btn").addEventListener("click", () => {
+        if (isSaving || isClearing) return;
+        showConfirm({
+            title: "Mulai Palet Baru",
+            message: "Input yang belum disimpan akan dibersihkan. Stok yang sudah tersimpan tetap ada.",
+            confirmText: "Mulai Baru", onConfirm: clearCurrentSession,
         });
+    });
+    document.getElementById("cancel-btn").addEventListener("click", () => {
+        if (isSaving || isClearing) return;
+        showConfirm({
+            title: "Batalkan Input",
+            message: "Input yang belum disimpan akan dibersihkan. Stok yang sudah tersimpan tetap ada.",
+            confirmText: "Batalkan", onConfirm: clearCurrentSession,
+        });
+    });
 
     if (printPalletBtn) {
         printPalletBtn.addEventListener("click", function () {
@@ -818,7 +876,7 @@
     }
 
     document.getElementById("save-btn").addEventListener("click", function () {
-        if (isSaving) {
+        if (isSaving || isClearing) {
             return;
         }
 
@@ -861,6 +919,12 @@
         const inputDateField = document.getElementById("inputDateField");
         const inputDate = inputDateField ? inputDateField.value : null;
 
+        if (inputDateField && !inputDateField.checkValidity()) {
+            showError("Tanggal input tidak valid atau melebihi hari ini.");
+            inputDateField.reportValidity();
+            return;
+        }
+        clearActionError();
         const form = new FormData();
         form.append("pallet_id", currentPalletId);
         if (selectedId && selectedCode) {
@@ -890,14 +954,7 @@
             },
             body: form,
         })
-            .then((response) => {
-                if (!response.ok) {
-                    return response.json().then((err) => {
-                        throw new Error(err.message || "Error saving stock");
-                    });
-                }
-                return response.json();
-            })
+            .then(readResponse)
             .then((data) => {
                 const savedLocation =
                     selectedCode ||
@@ -982,12 +1039,11 @@
                 const isLocationConflict =
                     /lokasi|location|duplicate|23000|1062/i.test(message);
 
-                showToast(
+                showError(
                     isLocationConflict
                         ? "Lokasi baru saja digunakan oleh proses lain. Pilih lokasi lain lalu coba lagi."
                         : message ||
                               "Terjadi kesalahan saat menyimpan data. Silakan coba lagi.",
-                    "danger",
                 );
 
                 if (isLocationConflict) {
@@ -1013,7 +1069,7 @@
             '<div class="list-group-item text-muted">Mencari...</div>';
 
         fetch(config.locationSearchUrl + "?q=" + encodeURIComponent(query))
-            .then((res) => res.json())
+            .then(readResponse)
             .then((data) => {
                 searchResults.innerHTML = "";
                 if (data.length > 0) {
@@ -1050,8 +1106,8 @@
                 }
             })
             .catch((err) => {
-                console.error("Search error:", err);
-                searchResults.style.display = "none";
+                searchResults.innerHTML = '<div class="list-group-item text-danger" role="alert">Gagal memuat lokasi. Tekan tombol pilihan lokasi untuk mencoba lagi.</div>';
+                searchResults.style.display = "block";
             });
     }
 

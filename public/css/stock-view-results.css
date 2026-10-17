@@ -1,0 +1,90 @@
+/* Scoped to stock results and read-only detail dialogs; print templates are separate. */
+.warehouse-app .stock-maintenance #editBoxForm { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.warehouse-app .stock-maintenance .modal-footer { flex-shrink: 0; padding: 1rem 1.25rem; gap: .5rem; background: var(--ui-surface); }
+.warehouse-app .stock-maintenance .form-label { font-weight: 600; margin-bottom: .375rem; }
+.warehouse-app .stock-maintenance :is(.form-control, .form-select) { font-size: 1rem; min-height: 44px; }
+.warehouse-app .stock-maintenance textarea { resize: vertical; }
+.warehouse-app .stock-maintenance .modal-title { overflow-wrap: anywhere; }
+.warehouse-app .stock-maintenance #deleteConfirmSummary { padding: 1rem; border: 1px solid var(--ui-border); border-radius: .625rem; background: var(--ui-canvas); overflow-wrap: anywhere; }
+.warehouse-app .stock-maintenance #boxHistoryTableBody td:nth-child(3) { min-width: 18rem; line-height: 1.7; }
+.warehouse-app .stock-maintenance .select2-selection--single { min-height: 44px; }
+.warehouse-app .stock-maintenance .select2-selection__rendered { line-height: 42px; }
+.warehouse-app .stock-maintenance .select2-selection__arrow { height: 42px; }
+.warehouse-app :is(.stock-results, .stock-detail) .table {
+    font-size: .9375rem; font-variant-numeric: tabular-nums;
+}
+.warehouse-app :is(.stock-results, .stock-detail) .table :is(th, td) {
+    padding: .875rem 1rem !important; vertical-align: middle;
+    font-size: .875rem !important; line-height: 1.5;
+    border-color: var(--ui-border); overflow-wrap: anywhere;
+}
+.warehouse-app :is(.stock-results, .stock-detail) .table th {
+    background: var(--ui-canvas); color: var(--ui-muted) !important;
+    text-transform: none !important; font-weight: 600 !important;
+}
+.warehouse-app .stock-results .table { min-width: 40rem; }
+.warehouse-app .stock-detail .table { min-width: 42rem; }
+.warehouse-app :is(.stock-results, .stock-detail) .table tr { transition: none !important; }
+.warehouse-app .stock-results td > span:not(.badge) {
+    background: transparent !important; box-shadow: none !important;
+    padding: 0 !important; font-size: inherit !important; color: inherit !important;
+}
+.warehouse-app :is(.stock-results, .stock-detail) .badge { white-space: normal; line-height: 1.4; }
+.warehouse-app :is(.stock-results, .stock-detail) .btn {
+    min-height: 44px; min-width: 44px; box-shadow: none !important;
+    transition: none !important; margin-block: .125rem; white-space: nowrap;
+}
+.warehouse-app .stock-results :is(.js-detail-part, .js-detail-pallet) {
+    background: var(--ui-soft) !important; color: var(--ui-accent) !important;
+    border: 1px solid var(--ui-border) !important;
+}
+.warehouse-app .stock-results .stock-sort-link { min-height: 44px; }
+.warehouse-app .stock-results .stock-sort-pill {
+    min-height: 44px; color: var(--ui-accent); background: var(--ui-surface);
+    border: 1px solid var(--ui-border); box-shadow: none; transition: none;
+}
+.warehouse-app .stock-results .stock-sort-pill.is-active { background: var(--ui-soft); border-color: var(--ui-accent); }
+.warehouse-app .stock-detail .modal-content { background: var(--ui-surface); }
+.warehouse-app .stock-detail .modal-header {
+    padding: 1rem 1.25rem; gap: 1rem; background: var(--ui-surface);
+    border-bottom: 1px solid var(--ui-border); flex-shrink: 0;
+}
+.warehouse-app .stock-detail .modal-title { font-size: 1.125rem !important; line-height: 1.4; color: var(--ui-ink); }
+.warehouse-app .stock-detail .btn-close { flex-shrink: 0; min-width: 44px; min-height: 44px; padding: 0; margin: 0; }
+.warehouse-app .stock-detail .modal-body { padding: 1.25rem !important; }
+.warehouse-app .stock-detail :is(#modalPartNumber, #modalPalletNumber, #modalPalletLocation) { overflow-wrap: anywhere; }
+.warehouse-app .stock-detail :is(#modalTotalBox, #modalTotalPcs, #modalPalletCount) { color: var(--ui-ink) !important; font-variant-numeric: tabular-nums; }
+.warehouse-app :is(.stock-results, .stock-detail) :is(button, a, [tabindex]):focus-visible {
+    outline: 3px solid var(--ui-accent); outline-offset: -3px;
+}
+@media (max-width: 575.98px) {
+    .warehouse-app .stock-detail .modal-dialog { width: 100%; max-width: none; height: 100%; margin: 0; }
+    .warehouse-app .stock-detail .modal-content { border-radius: 0 !important; }
+    .warehouse-app .stock-detail .modal-body { padding: 1rem !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .stock-detail.fade, .stock-detail.fade .modal-dialog { transition: none !important; }
+}
+
+/* Highlight the identifier only, leaving headers and cells neutral. */
+.warehouse-app .stock-results td:first-child > div > span:first-child {
+    background: transparent !important; padding: 0 !important; box-shadow: none !important;
+}
+.warehouse-app .stock-results .stock-identity {
+    display: inline-block; padding: .375rem .75rem;
+    border-radius: .5rem; background: var(--ui-soft); color: var(--ui-accent);
+    font-weight: 600; line-height: 1.5; overflow-wrap: anywhere;
+}
+
+.warehouse-app .stock-results[data-stock-view="part"] .stock-identity {
+    background: #e8f3f1; color: #075b5d;
+}
+.warehouse-app .stock-results[data-stock-view="box_id"] .stock-identity {
+    background: #eaf2ff; color: #1e40af;
+}
+.warehouse-app .stock-results[data-stock-view="pallet"] .stock-identity {
+    background: #fff4d6; color: #854d0e;
+}
+.warehouse-app .stock-results[data-stock-view="not_full"] .stock-identity {
+    background: #f3eaff; color: #6b21a8;
+}

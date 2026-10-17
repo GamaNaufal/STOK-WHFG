@@ -31,3 +31,36 @@ Pilihan urutan menggunakan sortOptions yang sudah disediakan controller.
   melalui browser; regresi backend diperiksa lewat tes aplikasi.
 
 Tahap selanjutnya: audit tabel hasil dan modal detail Lihat Stok.
+
+## Tabel hasil dan modal detail — 18 Oktober 2026
+
+- Tabel hasil empat mode: ukuran teks dan padding konsisten, angka tabular,
+  dekorasi identitas dikurangi, kontrol minimal 44px, caption serta scope kolom.
+- Modal part/pallet: judul aksesibel, tombol tutup berlabel, header solid,
+  area isi bergulir, tabel dapat difokuskan dan digulir pada layar kecil.
+- Pesan pencarian kosong kini menyebut stok, bukan hanya nomor part.
+- Backend, syarat izin, aksi edit/hapus, endpoint, dan template cetak tidak diubah.
+- 31 tes regresi lulus (389 assertions): StockViewApiContractTest,
+  StockViewBoxEditAuditTest, FeatureAccessManagementTest, UiReviewPreviewTest.
+- Render sementara SQLite memory: empat mode dan dua endpoint detail sukses
+  (6 assertions). Fixture awal Sales ditolak 403 sesuai hak akses; preview memakai Admin.
+- Browser: modal part dan pallet berisi data fixture diperiksa, termasuk viewport
+  390px. Isi modal tidak overflow horizontal; tabel lebar bergulir dalam wadah.
+  API browser memakai respons fixture hasil tes, bukan database operasional.
+- Tidak menjalankan aksi edit, hapus, atau cetak dari browser. Perangkat fisik
+  dan data besar belum diverifikasi. Berkas/server preview sudah dibersihkan.
+
+## Edit Box, riwayat, dan konfirmasi hapus — 18 Oktober 2026
+
+- Ketiga modal memakai header solid, judul aksesibel, tombol tutup berlabel,
+  area gulir, kontrol 44px, dan footer yang tetap terlihat.
+- Label Edit Box terhubung dengan field; alasan koreksi memiliki petunjuk
+  minimal 3 karakter dan pencatatan audit. Aturan/payload koreksi tetap.
+- Riwayat memiliki kolom detail lebih lebar dan indikator loading berstatus.
+  Pesan error di-escape sebelum dimasukkan ke HTML.
+- Teks hapus permanen dikoreksi menjadi hapus dari stok aktif sesuai soft delete
+  pada controller. Riwayat tetap tersimpan; tidak menjanjikan fasilitas restore.
+- 31 tes lulus, 389 assertions. Render fixture dan endpoint history: 2 assertions.
+- Browser fixture: Edit Box termasuk peringatan part tidak ada di master,
+  riwayat kosong, serta konfirmasi hapus pada 390px. Tidak mengirim simpan/hapus.
+  Riwayat panjang dan perangkat fisik belum diuji. Preview dibersihkan.
