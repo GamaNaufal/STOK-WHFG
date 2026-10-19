@@ -1,5 +1,5 @@
 <!-- Detail Modal -->
-<div class="modal fade stock-detail" id="detailModal" tabindex="-1" aria-hidden="true" aria-labelledby="stockPartDetailTitle">
+<div class="modal stock-detail" id="detailModal" tabindex="-1" aria-hidden="true" aria-labelledby="stockPartDetailTitle">
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
             <div class="modal-header">
@@ -11,7 +11,7 @@
             <div class="modal-body" style="padding: 24px;">
                 <div id="detailLoadingSpinner" style="text-align: center; padding: 40px;">
                     <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Memuat detail stokâ€¦</span>
+                        <span class="visually-hidden">Memuat detail stok...</span>
                     </div>
                 </div>
                 <div id="detailContent" style="display: none;">
@@ -65,7 +65,7 @@
                                     </thead>
                                     <tbody id="palletDetailsTable">
                                         <tr>
-                                            <td colspan="6" class="text-center text-muted py-4">Memuat detail stokâ€¦</td>
+                                            <td colspan="6" class="text-center text-muted py-4">Memuat detail stok...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -80,7 +80,7 @@
 </div>
 
 <!-- Modal Pallet Detail -->
-<div class="modal fade stock-detail" id="palletDetailModal" tabindex="-1" aria-hidden="true" aria-labelledby="stockPalletDetailTitle">
+<div class="modal stock-detail" id="palletDetailModal" tabindex="-1" aria-hidden="true" aria-labelledby="stockPalletDetailTitle">
     <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
             <div class="modal-header">
@@ -92,7 +92,7 @@
             <div class="modal-body" style="padding: 24px;">
                 <div id="palletDetailLoadingSpinner" style="text-align: center; padding: 40px;">
                     <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Memuat detail stokâ€¦</span>
+                        <span class="visually-hidden">Memuat detail stok...</span>
                     </div>
                 </div>
                 <div id="palletDetailContent" style="display: none;">
@@ -133,7 +133,7 @@
                                     </thead>
                                     <tbody id="palletItemsTable">
                                         <tr>
-                                            <td colspan="8" class="text-center text-muted py-4">Memuat detail stokâ€¦</td>
+                                            <td colspan="8" class="text-center text-muted py-4">Memuat detail stok...</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -171,7 +171,7 @@
     </div>
 </div>
 
-<div class="modal fade stock-detail stock-maintenance" id="editBoxModal" tabindex="-1" aria-hidden="true" aria-labelledby="editBoxTitle">
+<div class="modal stock-detail stock-maintenance" id="editBoxModal" tabindex="-1" aria-hidden="true" aria-labelledby="editBoxTitle">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
             <div class="modal-header">
@@ -181,7 +181,7 @@
             <form id="editBoxForm">
                 <div class="modal-body" style="padding: 20px;">
                     <input type="hidden" id="editBoxId" name="box_id">
-                    <div id="editBoxInlineAlert" class="alert d-none" role="alert" style="margin-bottom: 12px;"></div>
+                    <div id="editBoxInlineAlert" tabindex="-1" class="alert d-none" role="alert" style="margin-bottom: 12px;"></div>
                     <div class="mb-3">
                         <label for="editBoxNumber" class="form-label">ID Box</label>
                         <input type="text" id="editBoxNumber" class="form-control" disabled>
@@ -218,7 +218,7 @@
     </div>
 </div>
 
-<div class="modal fade stock-detail stock-maintenance" id="boxHistoryModal" tabindex="-1" aria-hidden="true" aria-labelledby="boxHistoryTitle">
+<div class="modal stock-detail stock-maintenance" id="boxHistoryModal" tabindex="-1" aria-hidden="true" aria-labelledby="boxHistoryTitle">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
             <div class="modal-header">
@@ -249,7 +249,7 @@
     </div>
 </div>
 
-<div class="modal fade stock-detail stock-maintenance" id="deleteConfirmModal" tabindex="-1" aria-hidden="true" aria-labelledby="deleteConfirmTitle">
+<div class="modal stock-detail stock-maintenance" id="deleteConfirmModal" tabindex="-1" aria-hidden="true" aria-labelledby="deleteConfirmTitle">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down modal-lg">
         <div class="modal-content border-0 shadow-lg" style="border-radius: 14px; overflow: hidden;">
             <div class="modal-header">
@@ -260,6 +260,7 @@
                 <div class="alert shadow-sm" style="background: #FFFBEB; border: none; border-left: 4px solid #F59E0B; color: #92400E; margin-bottom: 14px; border-radius: 8px;">
                     <i class="bi bi-exclamation-triangle"></i> Stok berikut akan dikeluarkan dari daftar stok aktif. Riwayat tetap tersimpan. Periksa identitas dan jumlah sebelum menghapus.
                 </div>
+                <div id="deleteConfirmError" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
                 <div id="deleteConfirmSummary" class="mb-3 text-muted"></div>
                 <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel rincian, geser untuk melihat kolom lainnya">
                     <table class="table table-sm table-hover" style="margin:0;">

@@ -510,7 +510,7 @@
                             Belum ada stok tersimpan
                         @endif
                     </h5>
-                    <p class="text-muted">Mulai dengan melakukan input stok untuk melihat data di sini</p>
+                    <p class="text-muted">{{ $search ? 'Coba kata kunci lain atau hapus pencarian untuk melihat stok yang tersedia.' : 'Belum ada stok pada tampilan ini.' }}</p>
                 </div>
             </div>
         @endif

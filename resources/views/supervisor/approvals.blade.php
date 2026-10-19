@@ -2,33 +2,13 @@
 
 @section('title', 'Persetujuan Box Not Full')
 
-@push('styles')
-<style>
-    @media (max-width: 768px) {
-        .table-responsive {
-            font-size: 0.875rem;
-        }
-        .badge {
-            font-size: 0.75rem;
-            padding: 0.25rem 0.5rem;
-        }
-        .btn-sm {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.75rem;
-        }
-    }
-    
-    .bg-outline-primary {
-        background-color: transparent !important;
-    }
-    
-    .bg-outline-success {
-        background-color: transparent !important;
-    }
-</style>
-@endpush
+@section('styles')
+<link rel="stylesheet" href="{{ asset('css/not-full.css') }}">
+@endsection
 
 @section('content')
+<div class="not-full-page">
+@include('shared.not-full-feedback')
 <!-- Page Header Component -->
 <x-page-header 
     title="Persetujuan Box Not Full" 
@@ -48,47 +28,48 @@
                 />
             @else
                 <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 not-full-pending-table">
+                        <caption class="visually-hidden">Rincian request Box Not Full</caption>
                         <thead class="table-light">
                             <tr>
-                                <th class="text-nowrap">ID Box</th>
-                                <th class="text-nowrap">No Part</th>
-                                <th class="text-nowrap text-center">PCS</th>
-                                <th class="text-nowrap text-center">Fixed</th>
-                                <th class="text-nowrap">Delivery Order</th>
-                                <th class="text-nowrap">Tipe</th>
-                                <th class="text-nowrap">Target</th>
-                                <th class="text-nowrap">Alasan</th>
-                                <th class="text-nowrap">Requester</th>
-                                <th class="text-nowrap text-center">Aksi</th>
+                                <th scope="col" class="text-nowrap">ID Box</th>
+                                <th scope="col" class="text-nowrap">No Part</th>
+                                <th scope="col" class="text-nowrap text-center">PCS</th>
+                                <th scope="col" class="text-nowrap text-center">Fixed</th>
+                                <th scope="col" class="text-nowrap">Delivery Order</th>
+                                <th scope="col" class="text-nowrap">Tipe</th>
+                                <th scope="col" class="text-nowrap">Target</th>
+                                <th scope="col" class="text-nowrap">Alasan</th>
+                                <th scope="col" class="text-nowrap">Requester</th>
+                                <th scope="col" class="text-nowrap text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($requests as $req)
                                 <tr>
-                                    <td>
-                                        <span class="badge bg-primary">{{ $req->box_number }}</span>
+                                    <td data-label="ID Box">
+                                        <span class="not-full-identity">{{ $req->box_number }}</span>
                                     </td>
-                                    <td>
-                                        <code class="text-primary bg-light px-2 py-1 rounded">{{ $req->part_number }}</code>
+                                    <td data-label="No Part">
+                                        <span class="not-full-part">{{ $req->part_number }}</span>
                                     </td>
-                                    <td class="text-center">
+                                    <td data-label="PCS" class="text-center">
                                         <strong>{{ number_format($req->pcs_quantity) }}</strong>
                                         <small class="text-muted d-block">PCS</small>
                                     </td>
-                                    <td class="text-center">
+                                    <td data-label="Kapasitas" class="text-center">
                                         <strong>{{ number_format($req->fixed_qty) }}</strong>
                                     </td>
-                                    <td>
+                                    <td data-label="Delivery">
                                         <div class="d-flex flex-column">
                                             <span class="badge bg-info mb-1">#{{ $req->delivery_order_id }}</span>
                                             @if($req->deliveryOrder)
-                                                <small class="text-muted">{{ Str::limit($req->deliveryOrder->customer_name, 20) }}</small>
+                                                <small class="text-muted">{{ $req->deliveryOrder->customer_name }}</small>
                                                 <small class="text-muted">{{ $req->deliveryOrder->delivery_date->format('d M Y') }}</small>
                                             @endif
                                         </div>
                                     </td>
-                                    <td>
+                                    <td data-label="Tipe">
                                         @if($req->request_type === 'additional')
                                             <span class="badge bg-info">
                                                 <i class="bi bi-plus-circle"></i> Tambahan
@@ -99,7 +80,7 @@
                                             </span>
                                         @endif
                                     </td>
-                                    <td>
+                                    <td data-label="Tujuan">
                                         @if($req->targetPallet)
                                             <span class="badge bg-outline-primary border border-primary text-primary">
                                                 <i class="bi bi-box"></i> {{ $req->targetPallet->pallet_number }}
@@ -112,15 +93,15 @@
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
-                                    <td>
-                                        <small class="text-muted">{{ Str::limit($req->reason, 30) }}</small>
+                                    <td data-label="Alasan">
+                                        <small class="text-muted">{{ $req->reason }}</small>
                                     </td>
-                                    <td>
+                                    <td data-label="Pemohon">
                                         <strong class="text-dark">{{ $req->requester?->name ?? '-' }}</strong>
                                     </td>
-                                    <td>
+                                    <td data-label="Keputusan">
                                         <div class="d-flex gap-1 justify-content-center flex-wrap">
-                                            <form method="POST" action="{{ route('box-not-full.approve', $req->id) }}" class="d-inline js-approve-form">
+                                            <form method="POST" action="{{ route('box-not-full.approve', $req->id) }}" class="d-inline js-approve-form" data-box="{{ $req->box_number }}" data-part="{{ $req->part_number }}" data-quantity="{{ $req->pcs_quantity }}" data-delivery="{{ $req->delivery_order_id }}" data-type="{{ $req->request_type }}">
                                                 @csrf
                                                 <x-button 
                                                     type="submit" 
@@ -129,10 +110,10 @@
                                                     title="Setujui permintaan ini"
                                                 >
                                                     <i class="bi bi-check-circle"></i>
-                                                    <span class="d-none d-lg-inline">Approve</span>
+                                                    <span>Setujui</span>
                                                 </x-button>
                                             </form>
-                                            <form method="POST" action="{{ route('box-not-full.reject', $req->id) }}" class="d-inline js-reject-form">
+                                            <form method="POST" action="{{ route('box-not-full.reject', $req->id) }}" class="d-inline js-reject-form" data-box="{{ $req->box_number }}" data-part="{{ $req->part_number }}" data-quantity="{{ $req->pcs_quantity }}" data-delivery="{{ $req->delivery_order_id }}">
                                                 @csrf
                                                 <x-button 
                                                     type="submit" 
@@ -141,7 +122,7 @@
                                                     title="Tolak permintaan ini"
                                                 >
                                                     <i class="bi bi-x-circle"></i>
-                                                    <span class="d-none d-lg-inline">Reject</span>
+                                                    <span>Tolak</span>
                                                 </x-button>
                                             </form>
                                         </div>
@@ -169,16 +150,17 @@
             @else
                 <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                     <table class="table table-hover mb-0">
+                        <caption class="visually-hidden">Riwayat keputusan Box Not Full</caption>
                         <thead class="table-light">
                             <tr>
-                                <th class="text-nowrap">Tanggal</th>
-                                <th class="text-nowrap">ID Box</th>
-                                <th class="text-nowrap">No Part</th>
-                                <th class="text-nowrap text-center">PCS</th>
-                                <th class="text-nowrap">Delivery Order</th>
-                                <th class="text-nowrap">Status</th>
-                                <th class="text-nowrap">Requester</th>
-                                <th class="text-nowrap">Approver</th>
+                                <th scope="col" class="text-nowrap">Tanggal</th>
+                                <th scope="col" class="text-nowrap">ID Box</th>
+                                <th scope="col" class="text-nowrap">No Part</th>
+                                <th scope="col" class="text-nowrap text-center">PCS</th>
+                                <th scope="col" class="text-nowrap">Delivery Order</th>
+                                <th scope="col" class="text-nowrap">Status</th>
+                                <th scope="col" class="text-nowrap">Requester</th>
+                                <th scope="col" class="text-nowrap">Approver</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -188,10 +170,10 @@
                                         <small class="text-muted">{{ $req->updated_at->format('d/m/Y H:i') }}</small>
                                     </td>
                                     <td>
-                                        <span class="badge bg-primary">{{ $req->box_number }}</span>
+                                        <span class="not-full-identity">{{ $req->box_number }}</span>
                                     </td>
                                     <td>
-                                        <code class="text-primary bg-light px-2 py-1 rounded">{{ $req->part_number }}</code>
+                                        <span class="not-full-part">{{ $req->part_number }}</span>
                                     </td>
                                     <td class="text-center">
                                         <strong>{{ number_format($req->pcs_quantity) }}</strong>
@@ -201,7 +183,7 @@
                                         <div class="d-flex flex-column">
                                             <span class="badge bg-info mb-1">#{{ $req->delivery_order_id }}</span>
                                             @if($req->deliveryOrder)
-                                                <small class="text-muted">{{ Str::limit($req->deliveryOrder->customer_name, 20) }}</small>
+                                                <small class="text-muted">{{ $req->deliveryOrder->customer_name }}</small>
                                             @endif
                                         </div>
                                     </td>
@@ -231,48 +213,9 @@
         </x-card>
     </div>
 </div>
+</div>
 @endsection
 
 @push('scripts')
-<script>
-    document.querySelectorAll('.js-approve-form').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            WarehouseAlert.confirm({
-                title: 'Setujui Permintaan?',
-                message: 'Apakah Anda yakin ingin menyetujui permintaan ini?',
-                confirmText: 'Ya, Setujui',
-                confirmColor: '#10B981',
-                onConfirm: () => {
-                    const button = form.querySelector('button[type="submit"]');
-                    if (button) {
-                        button.disabled = true;
-                        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Memproses...';
-                    }
-                    window.setTimeout(() => form.submit(), 150);
-                }
-            });
-        });
-    });
-
-    document.querySelectorAll('.js-reject-form').forEach(form => {
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            WarehouseAlert.confirm({
-                title: 'Tolak Permintaan?',
-                message: 'Apakah Anda yakin ingin menolak permintaan ini?',
-                confirmText: 'Ya, Tolak',
-                confirmColor: '#DC2626',
-                onConfirm: () => {
-                    const button = form.querySelector('button[type="submit"]');
-                    if (button) {
-                        button.disabled = true;
-                        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Memproses...';
-                    }
-                    window.setTimeout(() => form.submit(), 150);
-                }
-            });
-        });
-    });
-</script>
+<script src="{{ asset('js/pages/not-full.js') }}"></script>
 @endpush
