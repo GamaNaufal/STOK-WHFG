@@ -1,7 +1,7 @@
 # UI Redesign Progress
 
-Repository checked: 19 October 2026 (Asia/Jakarta).
-Baseline: branch `REDESIGN`, HEAD `d0e9467`. This records local implementation;
+Repository checked: 20 October 2026 (Asia/Jakarta).
+Baseline: branch `REDESIGN`, HEAD `c495070`. This records local implementation;
 the exact revision deployed to production has not been verified.
 
 ## 1. Frontend architecture
@@ -12,8 +12,7 @@ the exact revision deployed to production has not been verified.
   shell styles/scripts live under `resources/views/shared/layouts/partials/`.
 - CSS order: Bootstrap → shell styles → page `@section('styles')` →
   `public/css/application-ui.css` → `public/css/apple-design.css`.
-  Global overrides therefore load after page styles. No `@stack('styles')` slot;
-  scripts support both `@section('scripts')` and `@push('scripts')`.
+  Global overrides load after page styles; no `@stack('styles')`. Scripts support sections/stacks.
 - Main shell loads public assets directly, including `public/js/alert-helper.js`.
   Vite/Tailwind 4 are configured in `vite.config.js`, `resources/css/app.css`,
   and `resources/js/app.js`, but this shell does not load them with `@vite`.
@@ -48,17 +47,10 @@ the exact revision deployed to production has not been verified.
 
 ## 4. Unfinished work and verification gaps
 
-- Processing Time is implemented with `resources/views/shared/partials/dashboard-processing-table.blade.php`;
-  dashboard-only definitions, displayed session count, sticky/keyboard-scroll table,
-  right-aligned durations and explicit missing values. No duration rounding added.
-- Warehouse Throughput is implemented in `resources/views/shared/partials/dashboard-throughput-table.blade.php`:
-  daily count, explicit PCS direction, grouped numbers, sticky date/header and empty state.
-- Scan Mismatch detail is implemented in `resources/views/shared/partials/dashboard-issues-table.blade.php`:
-  explicit 50-row limit, wrapped codes, full multiline notes, neutral text statuses, sticky Order/header.
-- Audit toolbar: `resources/views/shared/partials/dashboard-audit-filters.blade.php`,
-  `public/css/dashboard-filters.css`; grouped fields, linked labels, 44px controls.
-- Audit results: `resources/views/shared/partials/dashboard-audit-results.blade.php`;
-  scoped summary counts, full multiline descriptions, sticky table and 44px pagination.
+- Dashboard processing, throughput and mismatch tables are implemented in
+  `resources/views/shared/partials/dashboard-{processing,throughput,issues}-table.blade.php`.
+  Audit filters/results live in `resources/views/shared/partials/dashboard-audit-{filters,results}.blade.php`;
+  they retain scoped counts, keyboard-scrollable tables and 44px controls.
 - Delivery Schedule header/toolbar: `resources/views/operator/delivery/partials/schedule-{header,filters}.blade.php`,
   `public/css/pages/delivery-schedule-toolbar.css`, `public/js/pages/delivery-schedule-filters.js`.
   Existing page had no list filter/API parameters. New client-only search (order/customer/part)
@@ -66,24 +58,56 @@ the exact revision deployed to production has not been verified.
   Completed/history sections unaffected; no-JS retains all rows and hides filter controls.
 - Active delivery results implemented in the same index and `public/css/pages/delivery-schedule-results.css`:
   sticky date/order and header, keyboard scroll, grouped FIFO-ready/required PCS, text sufficiency,
-  wrapped part/customer data, 44px actions and responsive empty state. Existing action rules preserved.
-- Dashboard audit AJAX repaired in `public/js/pages/dashboard-audit.js`: delegated
-  Reset/pagination, loading/error/retry, 20s timeout, stale-response guards and focus recovery.
-  Existing non-dashboard AJAX remains unchanged. Isolated browser interaction checks passed.
+  wrapped part/customer data, 44px actions and responsive empty state. Post-split action buttons
+  keep readable labels and wrap as units. Hapus is hidden for split children and parents with
+  active children; `DeliveryOrderController::destroy` rejects both direct-route deletions.
+- Completed/Redo table implemented in the same index and `public/css/pages/delivery-completed.css`:
+  explicit 20-row scope/count, date/time hierarchy, emphasized deadline, sticky Order/header,
+  keyboard scroll and 44px Redo buttons. Empty collection still hides the section; guards unchanged.
+- Delivery history table implemented in the same index and `public/css/pages/delivery-history.css`:
+  combined-source scope/count, accurate event-time label, grouped PCS, textual status chips,
+  sticky Order/header and keyboard scroll. Empty collection still hides the section.
+- Redo location dialogs use `public/css/pages/delivery-redo-dialog.css`: shared hierarchy,
+  explicit single-location guidance, conflict notice, 44px choices, visible focus/loading/error.
+  Multiple-pallet required and single-pallet conditional selection remain unchanged.
+- Split Delivery modal uses `public/css/pages/delivery-split-modal.css`: order/effect context,
+  selected-part count, scoped scroll/sticky part, labeled PCS bounds and responsive controls.
+  Existing payload/validation retained; impossible/empty selections disable Save.
+- FIFO recommendation modal uses `public/css/pages/delivery-fifo-modal.css`: clear order
+  context, per-part PCS hierarchy, keyboard-scrollable box table and stable Process footer.
+  FIFO preview, blocking, start-pick endpoints and payloads are unchanged.
+- Picklist handoff modal uses `public/css/pages/delivery-picklist-modal.css`: active session
+  context, two-step print/PDF then scan guidance, and distinct 44px actions that stack on phones.
+  Existing preview/PDF fallback URL, new-tab behavior, scan URL and start-pick flow remain intact.
+- Final delivery scan screen uses `resources/views/operator/delivery/scan.blade.php` and
+  `public/css/pages/delivery-scan.css`: scanner-first layout, session progress, 44px actions,
+  sticky ID box in scrollable picklist. IDs, Enter/focus, audio, routes and permissions are unchanged.
+- Picking Verification list/scan use `resources/views/operator/delivery/{picking-verification,verify-scan}.blade.php`
+  and `public/css/pages/{picking-verification-list,delivery-verification}.css`: the list has
+  scoped counts, contextual status, 44px actions and sticky Order; scan has clear progress/timer
+  and sticky picklist ID. Start/resume, Enter/focus, timeout, cancel and permissions are unchanged.
+- Wrong scans in verification/final create a pending issue and block for unmatched short,
+  nonnumeric, empty or absent codes and withdrawn/expired boxes. Both screens submit any
+  input, stop queued scans on `session_status=blocked`, and require approval/reload.
+  Issue codes cap at 255 characters; empty codes are recorded as `(kosong)`.
+- Scan Issues management uses `resources/views/operator/delivery/scan-issues.blade.php`
+  and `public/css/pages/delivery-scan-issues.css`: pending/history hierarchy, visible
+  reason/code, linked notes, 44px approval and sticky Order. Confirmation clarifies that
+  approval unlocks the session without counting the bad scan; routes/statuses are unchanged.
+- Split backend/schema: MySQL `db_stock` lacked enum value `partial`, causing Split to fail when
+  updating its parent. `database/migrations/2026_10_20_000001_add_partial_to_existing_delivery_order_status.php`
+  adds the missing value to existing MySQL enums; applied locally on 20 October. No Split rule changed.
 - Delivery, merge/move pallet, expired boxes, reports/audit, master/admin screens
   have shared styling but are not documented as completing the same detailed
   segment-by-segment interaction review as Stock View/Input/Not Full.
-- Some legacy/dynamic labels still need accessibility review. Stock Input's
-  delayed focus changes require physical scanner testing before alteration.
 - Physical scanner/printer/touch devices, screen readers, large datasets and
   all network/session combinations remain unverified. Stock Input lookup races
   and successful print dialog output also need validation.
 
 ## 5. Recommended next segment
 
-Continue with **Delivery Schedule completed orders / Redo window table** in
-`resources/views/operator/delivery/index.blade.php`. Preserve eligibility, expiry, permissions
-and Redo handlers; scope work to table presentation. Keep transactional modals separate.
+Continue with **Delivery lock management** in `resources/views/operator/delivery/lock-management.blade.php`.
+Preserve Admin-only access and the existing stop/unlock behavior.
 
 ## 6. Production safety
 
@@ -101,50 +125,26 @@ and Redo handlers; scope work to table presentation. Keep transactional modals s
 
 ## 7. Relevant validation
 
-- Earlier dashboard checks: 17 tests / 288 assertions passed (`UiReviewPreviewTest`,
-  `OperationalReportServiceTest`, `FeatureAccessManagementTest`), SQLite `:memory:`.
-- Dashboard fixtures cover empty/populated, large PCS, null/zero durations and long text;
-  1440/768/390px checks passed for overflow, keyboard/sticky context and control sizes.
-- Audit AJAX: 17 Laravel tests / 288 assertions and 7 Node regression tests passed
-  (`tests/Frontend/dashboard-audit.test.js`): repeated Reset, failures/retry, invalid
-  response, timeout, races, filter edits and focus. JS syntax/diff checks passed.
-  Node uses DOM/network doubles. Browser fixture with actual JS passed submit,
-  Reset twice, HTTP 500 → retry, pagination and focus restoration. Mobile error
-  feedback at 390px has no overflow and a 44px retry button. No operational DB used.
-- Audit results: 17 Laravel tests/288 assertions + 7 AJAX tests passed; escaping,
-  fallback users/types and pagination query/fragment checked; responsive pagination 44px.
-- Delivery toolbar/results: 36 Laravel tests/394 assertions (`UiReviewPreviewTest`,
-  `FeatureAccessManagementTest`, `DeliveryFlowConsistencyTest`) + 4 frontend tests passed.
-  Browser fixture 1440/768/390px: controls 44px, no toolbar overflow; combined search,
-  timing, no-results and reset/focus verified. No transactions executed; JS/diff checks pass.
-- Actual active-table Blade fixtures: long text, nine-digit PCS, empty and no-action permissions
-  passed; 1440/768/390px no page/cell overflow, sticky/keyboard scroll and 44px actions verified.
-  Final empty-state adjustment: `UiReviewPreviewTest` rerun passed (2 tests / 56 assertions).
-- Browser checks use isolated Blade/CSS fixtures, not full-dashboard visual QA.
-  No screenshots or physical-device checks. Temporary files/server removed; diff check passed.
-
-### 19 October design decision
-
-| Before | After | Why |
-| --- | --- | --- |
-| Two generic striped order tables | Shared table partial, clear title/context and displayed-order count | Consistent comparison with existing stock tables |
-| Unformatted, left-aligned quantities | Grouped right-aligned PCS, tabular numerals, emphasized rate, text status chips | Faster comparison without changing values or relying on color alone |
-| Wide tables with generic empty rows | Named keyboard-scroll regions, sticky header/Order column, explicit empty state | Preserve orientation and explain missing results |
-| Audit labels unlinked; User ID displays names | Grouped linked fields, Petugas label, aligned Terapkan/Reset | Clearer filtering and keyboard use |
-| Reset listener lost; failures silent; stale results overwrite | Delegation, live feedback/retry, cancellation and request sequence | Recover without losing results or newer selections |
-| Audit summary scope unclear and description crowded | Explicit all-results summary, wider multiline description, scoped pagination | Distinguish filtered totals from current page |
-| Delivery header oversized; no list filters | Compact header/count and scoped live search/timing toolbar | Find active schedules without changing order or loading data |
-| Active delivery context lost on scroll; PCS meaning unclear | Sticky date/order, FIFO-ready/required label and Cukup/Belum cukup text | Retain orientation and distinguish available stock from shipped quantity |
-
-Dashboard report-route anchors remain; delivery filtering is display-only. No backend/dependency changes.
+- Final delivery scan: 45 Laravel tests/443 assertions; 1440/768/390px layout fixture passed.
+- Wrong-scan repair: 55 focused Laravel tests/455 assertions and 8 Node tests passed;
+  short/nonnumeric/empty/absent/long codes block in both scan stages, with approval recovery
+  and queued-scan cancellation. No live scans or physical scanner test.
+- Picking Verification layout: 34 Laravel tests/290 assertions and 12 Node tests passed;
+  these cover blocked scan, cancellation, timer and Enter queue. Responsive layout was
+  reviewed in CSS only; physical scanner, screen reader and device testing remain open.
+- Picking Verification list: 14 Laravel tests/229 assertions passed (module render and
+  verification flow); responsive styling reviewed in CSS, without live operational requests.
+- Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering,
+  approval/unblock and permission checks; responsive layout reviewed in CSS only.
 
 ## 8. Changes to preserve
 
-- Current uncommitted work: this document, `public/css/dashboard-stock-tables.css`,
-  `public/css/dashboard-filters.css`, `resources/views/operator/reports/operational.blade.php`,
-  and new `resources/views/shared/partials/dashboard-{order-table,processing-table,
-  throughput-table,issues-table,audit-filters,audit-results}.blade.php`, plus
-  `public/js/pages/dashboard-audit.js` and `tests/Frontend/dashboard-audit.test.js`.
-  Also preserve `resources/views/operator/delivery/index.blade.php`, both new schedule
-  partials, delivery toolbar/results CSS and filter JS listed above, `tests/Frontend/delivery-schedule-filters.test.js`.
-  No commits or deployment performed in these iterations.
+- Current uncommitted work: this document, `resources/views/operator/delivery/index.blade.php`,
+  `resources/views/operator/delivery/{picking-verification,scan,scan-issues,verify-scan}.blade.php`, `public/css/pages/{delivery-scan,delivery-scan-issues,picking-verification-list}.css`,
+  `app/Http/Controllers/{DeliveryOrder,DeliveryPick}Controller.php`,
+  `tests/Feature/{DeliverySalesPpcWorkflowTest,DeliveryFlowConsistencyTest,PickingVerificationActivityTest,ExpiredBoxReactivationTest}.php`,
+  `tests/Frontend/delivery-scan-blocking.test.js`,
+  `public/css/pages/delivery-{schedule-results,fifo-modal,picklist-modal}.css`,
+  new `public/css/pages/delivery-{completed,history,redo-dialog,split-modal,verification}.css`,
+  `docs/AGENT_SYSTEM_MEMO.md` and the 20 October status migration. Preserve these files;
+  the migration ran only on local `db_stock`, with no production deployment.

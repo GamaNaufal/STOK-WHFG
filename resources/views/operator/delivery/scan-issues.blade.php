@@ -2,171 +2,145 @@
 
 @section('title', 'Scan Issues')
 
+@section('styles')
+<link rel="stylesheet" href="{{ asset('css/pages/delivery-scan-issues.css') }}">
+@endsection
+
 @section('content')
-<div class="container-fluid">
-    <!-- Modern Gradient Header -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="app-page-banner" style="background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%); 
-                        color: white; 
-                        padding: 40px 30px; 
-                        border-radius: 12px; 
-                        box-shadow: 0 8px 24px rgba(239, 68, 68, 0.15);">
-                <div>
-                    <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
-                        <i class="bi bi-exclamation-triangle-fill"></i> Scan Issues
-                    </h1>
-                    <p style="margin: 0; opacity: 0.95; font-size: 15px;">
-                        Permintaan approval untuk error scan delivery
-                    </p>
-                </div>
-            </div>
+<div id="deliveryScanIssuesPage" class="delivery-scan-issues-page">
+    <header class="scan-issues-header">
+        <div>
+            <span class="scan-issues-eyebrow">Delivery / Penanganan scan</span>
+            <h1><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Issue scan delivery</h1>
+            <p>Tinjau hasil scan yang bermasalah sebelum membuka kembali sesi picking.</p>
         </div>
-    </div>
+        <a href="{{ route('delivery.pick.verification') }}" class="btn scan-issues-back">
+            <i class="bi bi-arrow-left" aria-hidden="true"></i> Picking Verification
+        </a>
+    </header>
 
-    <!-- Pending Issues Card -->
-    <div class="card shadow-sm border-0 mb-4">
-        <div class="card-header text-white fw-bold" style="background-color: #EF4444;">
-            <i class="bi bi-bell-fill"></i> Pending Issues
-            @php
-                $pendingIssueCount = is_countable($issues) ? count($issues) : 0;
-            @endphp
-            @if($pendingIssueCount > 0)
-                <span class="badge bg-white text-danger ms-2">{{ $pendingIssueCount }}</span>
-            @endif
-        </div>
-        <div class="card-body">
-            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
-                <table class="table table-hover align-middle">
-                    <thead style="background-color: #f8f9fa;">
-                        <tr>
-                            <th style="width: 10%;">Order</th>
-                            <th style="width: 20%;">Scanned Code</th>
-                            <th style="width: 15%;">Waktu</th>
-                            <th style="width: 30%;">Notes Admin</th>
-                            <th class="text-center" style="width: 15%;">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($issues as $issue)
-                            <tr>
-                                <td>
-                                    <span class="badge" style="background-color: #DBEAFE; color: #1E40AF; font-size: 0.9rem;">
-                                        #{{ $issue->session->delivery_order_id }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <code style="background-color: #FEE2E2; color: #991B1B; padding: 4px 8px; border-radius: 4px; font-size: 0.9rem;">
-                                        {{ $issue->scanned_code }}
-                                    </code>
-                                </td>
-                                <td>
-                                    <small class="text-muted">
-                                        <i class="bi bi-clock"></i> {{ $issue->created_at->format('d M Y H:i') }}
-                                    </small>
-                                </td>
-                                <td>
-                                    <input type="text" 
-                                           name="notes" 
-                                           class="form-control form-control-sm" 
-                                           form="approve-issue-{{ $issue->id }}" 
-                                           required 
-                                           maxlength="500" 
-                                           placeholder="Masukkan catatan approval...">
-                                </td>
-                                <td class="text-center">
-                                    <form id="approve-issue-{{ $issue->id }}" 
-                                          method="POST" 
-                                          action="{{ route('delivery.pick.issue.approve', $issue->id) }}">
-                                        @csrf
-                                        <button class="btn btn-sm btn-success">
-                                            <i class="bi bi-check-circle"></i> Approve
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="5" class="text-center py-5">
-                                    <i class="bi bi-check-circle display-5 text-success d-block mb-2"></i>
-                                    <p class="text-muted mb-0">Tidak ada issue pending</p>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+    <section class="card scan-issues-panel" aria-labelledby="pendingIssuesTitle">
+        <div class="scan-issues-panel-header">
+            <div>
+                <span class="scan-issues-eyebrow">Perlu keputusan</span>
+                <h2 id="pendingIssuesTitle">Menunggu approval</h2>
+                <p>Menyetujui issue membuka blokir sesi; kode yang salah tidak dihitung sebagai box terverifikasi.</p>
             </div>
+            <span class="scan-issues-count scan-issues-count-pending">{{ $issues->count() }} pending</span>
         </div>
-    </div>
+        <div class="scan-issues-scroll" tabindex="0" role="region" aria-label="Issue scan yang menunggu approval" aria-describedby="pendingIssuesHelp">
+            <table class="table scan-issues-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Order</th>
+                        <th scope="col">Scan &amp; alasan</th>
+                        <th scope="col">Waktu</th>
+                        <th scope="col">Catatan admin</th>
+                        <th scope="col">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($issues as $issue)
+                        <tr>
+                            <td class="scan-issues-order">
+                                <strong>#{{ $issue->session->delivery_order_id }}</strong>
+                                <small>{{ $issue->session->order?->customer_name ?? 'Customer tidak tersedia' }}</small>
+                            </td>
+                            <td>
+                                <code class="scan-issues-code">{{ $issue->scanned_code }}</code>
+                                <small class="scan-issues-reason">{{ $issue->reason }}</small>
+                            </td>
+                            <td>
+                                <span class="scan-issues-date">{{ $issue->created_at->format('d M Y') }}</span>
+                                <small class="scan-issues-time">{{ $issue->created_at->format('H:i') }}</small>
+                            </td>
+                            <td>
+                                <label class="visually-hidden" for="issue-notes-{{ $issue->id }}">Catatan approval untuk order #{{ $issue->session->delivery_order_id }}</label>
+                                <input type="text" id="issue-notes-{{ $issue->id }}" name="notes" class="form-control scan-issues-notes"
+                                       form="approve-issue-{{ $issue->id }}" required maxlength="500"
+                                       placeholder="Alasan / tindak lanjut">
+                            </td>
+                            <td class="scan-issues-action">
+                                <form id="approve-issue-{{ $issue->id }}" method="POST" action="{{ route('delivery.pick.issue.approve', $issue->id) }}">
+                                    @csrf
+                                    <button type="submit" class="btn scan-issues-approve">
+                                        <i class="bi bi-check-circle" aria-hidden="true"></i> Setujui issue
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="scan-issues-empty">
+                                <i class="bi bi-check-circle" aria-hidden="true"></i>
+                                <strong>Tidak ada issue yang menunggu</strong>
+                                <span>Tidak ada scan yang menunggu keputusan admin saat ini.</span>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        <p id="pendingIssuesHelp" class="scan-issues-table-hint">Geser tabel untuk melihat semua kolom. Nomor order tetap terlihat saat digeser.</p>
+    </section>
 
-    <!-- History Card -->
-    <div class="card shadow-sm border-0">
-        <div class="card-header text-white fw-bold" style="background-color: #6B7280;">
-            <i class="bi bi-clock-history"></i> History Issues
-        </div>
-        <div class="card-body">
-            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
-                <table class="table table-hover align-middle">
-                    <thead style="background-color: #f8f9fa;">
-                        <tr>
-                            <th style="width: 10%;">Order</th>
-                            <th style="width: 20%;">Scanned Code</th>
-                            <th style="width: 15%;">Waktu Resolved</th>
-                            <th style="width: 10%;">Status</th>
-                            <th style="width: 35%;">Notes Admin</th>
-                            <th class="text-center" style="width: 10%;">-</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($historyIssues as $issue)
-                            <tr>
-                                <td>
-                                    <span class="badge" style="background-color: #DBEAFE; color: #1E40AF; font-size: 0.9rem;">
-                                        #{{ $issue->session->delivery_order_id }}
-                                    </span>
-                                </td>
-                                <td>
-                                    <code style="background-color: #F3F4F6; color: #374151; padding: 4px 8px; border-radius: 4px; font-size: 0.9rem;">
-                                        {{ $issue->scanned_code }}
-                                    </code>
-                                </td>
-                                <td>
-                                    <small class="text-muted">
-                                        <i class="bi bi-clock"></i> 
-                                        {{ optional($issue->resolved_at)->format('d M Y H:i') ?? '-' }}
-                                    </small>
-                                </td>
-                                <td>
-                                    @if($issue->status === 'approved')
-                                        <span class="badge bg-success">
-                                            <i class="bi bi-check-circle"></i> APPROVED
-                                        </span>
-                                    @else
-                                        <span class="badge bg-secondary">
-                                            {{ strtoupper($issue->status) }}
-                                        </span>
-                                    @endif
-                                </td>
-                                <td>
-                                    <small>{{ $issue->notes ?? '-' }}</small>
-                                </td>
-                                <td class="text-center">
-                                    <span class="text-muted">-</span>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="text-center py-5">
-                                    <i class="bi bi-inbox display-5 text-muted d-block mb-2"></i>
-                                    <p class="text-muted mb-0">Belum ada history issues</p>
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
+    <section class="card scan-issues-panel" aria-labelledby="historyIssuesTitle">
+        <div class="scan-issues-panel-header">
+            <div>
+                <span class="scan-issues-eyebrow">Keputusan sebelumnya</span>
+                <h2 id="historyIssuesTitle">Riwayat issue</h2>
+                <p>Menampilkan {{ $historyIssues->count() }} keputusan terbaru, maksimal 200.</p>
             </div>
         </div>
-    </div>
+        <div class="scan-issues-scroll" tabindex="0" role="region" aria-label="Riwayat issue scan" aria-describedby="historyIssuesHelp">
+            <table class="table scan-issues-table scan-issues-history-table align-middle mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Order</th>
+                        <th scope="col">Scan &amp; alasan</th>
+                        <th scope="col">Diselesaikan</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Catatan admin</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($historyIssues as $issue)
+                        <tr>
+                            <td class="scan-issues-order">
+                                <strong>#{{ $issue->session->delivery_order_id }}</strong>
+                                <small>{{ $issue->session->order?->customer_name ?? 'Customer tidak tersedia' }}</small>
+                            </td>
+                            <td>
+                                <code class="scan-issues-code is-history">{{ $issue->scanned_code }}</code>
+                                <small class="scan-issues-reason">{{ $issue->reason }}</small>
+                            </td>
+                            <td>
+                                <span class="scan-issues-date">{{ optional($issue->resolved_at)->format('d M Y') ?? 'Belum tercatat' }}</span>
+                                @if($issue->resolved_at)
+                                    <small class="scan-issues-time">{{ $issue->resolved_at->format('H:i') }}</small>
+                                @endif
+                            </td>
+                            <td>
+                                <span class="scan-issues-status {{ $issue->status === 'approved' ? 'is-approved' : 'is-other' }}">
+                                    {{ strtoupper($issue->status) }}
+                                </span>
+                            </td>
+                            <td class="scan-issues-history-notes">{{ $issue->notes ?? '—' }}</td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="scan-issues-empty">
+                                <i class="bi bi-inbox" aria-hidden="true"></i>
+                                <strong>Belum ada riwayat issue</strong>
+                                <span>Keputusan issue yang selesai akan tampil di sini.</span>
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+        <p id="historyIssuesHelp" class="scan-issues-table-hint">Geser tabel untuk membaca kode scan dan catatan lengkap.</p>
+    </section>
 </div>
 @endsection
 
@@ -184,7 +158,7 @@
                 return;
             }
             const notes = notesInput.value.trim();
-            
+
             if (!notes) {
                 WarehouseAlert.error({
                     title: 'Notes Diperlukan',
@@ -193,17 +167,20 @@
                 notesInput.focus();
                 return;
             }
-            
+
+            const safeNotes = document.createElement('span');
+            safeNotes.textContent = notes;
+
             WarehouseAlert.confirm({
-                title: 'Approve Scan Issue?',
-                message: 'Anda akan menyetujui issue scan ini.',
+                title: 'Setujui issue scan?',
+                message: 'Approval membuka blokir sesi picking. Scan bermasalah tidak otomatis diverifikasi.',
                 warningItems: [
-                    'Scan yang error akan <strong>diterima</strong>',
-                    'Catatan akan tersimpan di history'
+                    'Scan yang salah tidak dihitung sebagai box terverifikasi',
+                    'Catatan akan tersimpan di riwayat'
                 ],
-                infoText: `<strong>Catatan:</strong> ${notes}`,
-                confirmText: 'Ya, Approve',
-                confirmColor: '#10B981',
+                infoText: `<strong>Catatan:</strong> ${safeNotes.innerHTML}`,
+                confirmText: 'Ya, Setujui',
+                confirmColor: '#0b7072',
                 onConfirm: () => {
                     this.submit();
                 }

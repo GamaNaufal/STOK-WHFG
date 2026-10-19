@@ -796,12 +796,6 @@ class DeliveryPickController extends Controller
             ], 423);
         }
 
-        $request->validate([
-            'box_number' => 'required|digits:8',
-        ], [
-            'box_number.digits' => 'ID Box harus 8 angka.',
-        ]);
-
         $result = DB::transaction(function () use ($request, $sessionId, $user) {
             $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
 
@@ -825,7 +819,7 @@ class DeliveryPickController extends Controller
             }
 
             if ($session->status === 'blocked') {
-                return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423];
+                return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423, 'session_status' => 'blocked'];
             }
 
             if ($session->status === 'stale') {
@@ -836,13 +830,18 @@ class DeliveryPickController extends Controller
                 return ['success' => false, 'message' => 'Session sudah completed.', 'status' => 409];
             }
 
-            $box = Box::where('box_number', $request->box_number)->lockForUpdate()->first();
+            $submittedCode = $request->input('box_number');
+            $boxNumber = is_scalar($submittedCode) ? trim((string) $submittedCode) : '';
+            $scannedCode = $boxNumber === '' ? '(kosong)' : mb_substr($boxNumber, 0, 255);
+            $box = $boxNumber !== '' && mb_strlen($boxNumber) <= 255
+                ? Box::where('box_number', $boxNumber)->lockForUpdate()->first()
+                : null;
 
             if ($box && ($box->is_withdrawn || $box->isExpiryUnavailable())) {
                 DeliveryIssue::create([
                     'pick_session_id' => $session->id,
                     'box_id' => $box->id,
-                    'scanned_code' => $request->box_number,
+                    'scanned_code' => $scannedCode,
                     'issue_type' => $box->is_withdrawn ? 'box_withdrawn' : 'box_expired',
                     'status' => 'pending',
                 ]);
@@ -854,6 +853,7 @@ class DeliveryPickController extends Controller
                     'success' => false,
                     'message' => $box->is_withdrawn ? 'Box sudah withdrawn. Menunggu approval admin.' : 'Box sudah expired/handled. Menunggu approval admin.',
                     'status' => 422,
+                    'session_status' => 'blocked',
                 ];
             }
 
@@ -868,7 +868,7 @@ class DeliveryPickController extends Controller
                 DeliveryIssue::create([
                     'pick_session_id' => $session->id,
                     'box_id' => $box?->id,
-                    'scanned_code' => $request->box_number,
+                    'scanned_code' => $scannedCode,
                     'issue_type' => 'scan_mismatch',
                     'status' => 'pending',
                 ]);
@@ -876,7 +876,7 @@ class DeliveryPickController extends Controller
                 $session->status = 'blocked';
                 $session->save();
 
-                return ['success' => false, 'message' => 'Box tidak sesuai. Menunggu approval admin.', 'status' => 422];
+                return ['success' => false, 'message' => 'Box tidak sesuai. Menunggu approval admin.', 'status' => 422, 'session_status' => 'blocked'];
             }
 
             $updated = DeliveryPickItem::whereKey($pickItem->id)
@@ -909,6 +909,7 @@ class DeliveryPickController extends Controller
             'message' => $result['message'] ?? null,
             'remaining' => $result['remaining'] ?? null,
             'box_id' => $result['box_id'] ?? null,
+            'session_status' => $result['session_status'] ?? null,
         ], (int) ($result['status'] ?? 200));
     }
 
@@ -926,12 +927,6 @@ class DeliveryPickController extends Controller
                 'message' => self::DELIVERY_APPROVAL_PENDING_MESSAGE,
             ], 423);
         }
-
-        $request->validate([
-            'box_number' => 'required|digits:8',
-        ], [
-            'box_number.digits' => 'ID Box harus 8 angka.',
-        ]);
 
         $result = DB::transaction(function () use ($request, $sessionId, $user) {
             $session = DeliveryPickSession::whereKey($sessionId)->lockForUpdate()->firstOrFail();
@@ -956,7 +951,7 @@ class DeliveryPickController extends Controller
             }
 
             if ($session->status === 'blocked') {
-                return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423];
+                return ['success' => false, 'message' => 'Scan diblokir. Tunggu approval admin.', 'status' => 423, 'session_status' => 'blocked'];
             }
 
             if ($session->status === 'stale') {
@@ -967,21 +962,35 @@ class DeliveryPickController extends Controller
                 return ['success' => false, 'message' => 'Session sudah completed.', 'status' => 409];
             }
 
-            $box = Box::where('box_number', $request->box_number)->lockForUpdate()->first();
-            if (! $box) {
-                return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
-            }
-
-            if ($box->is_withdrawn || $box->isExpiryUnavailable()) {
-                return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
-            }
-
-            $pickItemExists = DeliveryPickItem::where('pick_session_id', $session->id)
+            $submittedCode = $request->input('box_number');
+            $boxNumber = is_scalar($submittedCode) ? trim((string) $submittedCode) : '';
+            $scannedCode = $boxNumber === '' ? '(kosong)' : mb_substr($boxNumber, 0, 255);
+            $box = $boxNumber !== '' && mb_strlen($boxNumber) <= 255
+                ? Box::where('box_number', $boxNumber)->lockForUpdate()->first()
+                : null;
+            $isUnavailable = $box && ($box->is_withdrawn || $box->isExpiryUnavailable());
+            $pickItemExists = $box && ! $isUnavailable && DeliveryPickItem::where('pick_session_id', $session->id)
                 ->where('box_id', $box->id)
                 ->exists();
 
             if (! $pickItemExists) {
-                return ['success' => false, 'message' => 'Box tidak sesuai daftar picking.', 'status' => 422];
+                DeliveryIssue::create([
+                    'pick_session_id' => $session->id,
+                    'box_id' => $box?->id,
+                    'scanned_code' => $scannedCode,
+                    'issue_type' => $isUnavailable ? ($box->is_withdrawn ? 'box_withdrawn' : 'box_expired') : 'scan_mismatch',
+                    'status' => 'pending',
+                ]);
+
+                $session->status = 'blocked';
+                $session->save();
+
+                return [
+                    'success' => false,
+                    'message' => 'Box tidak sesuai daftar picking. Sesi diblokir; menunggu approval admin.',
+                    'status' => 422,
+                    'session_status' => 'blocked',
+                ];
             }
 
             $verifiedBoxIds = collect($session->verification_box_ids ?? [])
@@ -1014,6 +1023,7 @@ class DeliveryPickController extends Controller
             'message' => $result['message'] ?? null,
             'remaining' => $result['remaining'] ?? null,
             'box_id' => $result['box_id'] ?? null,
+            'session_status' => $result['session_status'] ?? null,
         ], (int) ($result['status'] ?? 200));
     }
 

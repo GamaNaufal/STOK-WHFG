@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Box;
+use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryPickItem;
@@ -196,11 +197,21 @@ class ExpiredBoxReactivationTest extends TestCase
         $session = DeliveryPickSession::create(['delivery_order_id' => $order->id, 'created_by' => $operator->id, 'status' => 'scanning', 'started_at' => now()]);
         DeliveryPickItem::create(['pick_session_id' => $session->id, 'box_id' => $box->id, 'part_number' => 'P-RENEW', 'pcs_quantity' => 20, 'status' => 'scanned']);
         $this->travelTo($box->fresh()->reactivated_until);
-        $this->actingAs($operator)->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $box->box_number])->assertStatus(422);
-        $this->postJson(route('delivery.pick.complete', $session->id))->assertStatus(409);
-        $this->postJson(route('delivery.pick.scan.submit', $session->id), ['box_number' => $box->box_number])->assertStatus(422);
+        $this->actingAs($operator)->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $box->box_number])
+            ->assertStatus(422)->assertJson(['session_status' => 'blocked']);
+        $this->postJson(route('delivery.pick.complete', $session->id))->assertStatus(423);
+        $this->postJson(route('delivery.pick.scan.submit', $session->id), ['box_number' => $box->box_number])
+            ->assertStatus(423)->assertJson(['session_status' => 'blocked']);
         $this->assertSame('blocked', $session->fresh()->status);
         $this->assertDatabaseHas('delivery_issues', ['pick_session_id' => $session->id, 'issue_type' => 'box_expired']);
+        $this->assertSame(1, DeliveryIssue::where('pick_session_id', $session->id)->count());
+
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $issue = DeliveryIssue::where('pick_session_id', $session->id)->firstOrFail();
+        $this->actingAs($adminWarehouse)->post(route('delivery.pick.issue.approve', $issue->id))->assertRedirect();
+        $this->actingAs($operator)->postJson(route('delivery.pick.scan.submit', $session->id), ['box_number' => $box->box_number])
+            ->assertStatus(422)->assertJson(['session_status' => 'blocked']);
+        $this->assertSame(2, DeliveryIssue::where('pick_session_id', $session->id)->count());
         $this->postJson(route('delivery.pick.scan.submit', $session->id), ['box_number' => $box->box_number])->assertStatus(423);
         $this->assertFalse($box->fresh()->is_withdrawn);
         $this->assertDatabaseCount('stock_withdrawals', 0);

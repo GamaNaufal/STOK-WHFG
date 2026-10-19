@@ -333,6 +333,13 @@ class DeliveryFlowConsistencyTest extends TestCase
             'status' => 'pending',
         ]);
 
+        $this->actingAs($adminWarehouse)->get(route('delivery.pick.issues'))
+            ->assertOk()
+            ->assertSee('Cust Approve Issue')
+            ->assertSee('BOX-X')
+            ->assertSee('Box tidak sesuai')
+            ->assertSee('form="approve-issue-'.$issue->id.'"', false);
+
         $response = $this->actingAs($adminWarehouse)
             ->post(route('delivery.pick.issue.approve', $issue->id), [
                 'notes' => 'Lanjutkan scan',
@@ -353,6 +360,11 @@ class DeliveryFlowConsistencyTest extends TestCase
             'approved_by' => $adminWarehouse->id,
             'approval_notes' => 'Lanjutkan scan',
         ]);
+
+        $this->get(route('delivery.pick.issues'))
+            ->assertOk()
+            ->assertSee('APPROVED')
+            ->assertSee('Lanjutkan scan');
     }
 
     public function test_non_admin_cannot_approve_issue(): void
@@ -506,6 +518,7 @@ class DeliveryFlowConsistencyTest extends TestCase
         $response->assertStatus(422)
             ->assertJson([
                 'success' => false,
+                'session_status' => 'blocked',
             ]);
 
         $this->assertDatabaseHas('delivery_pick_sessions', [
@@ -519,6 +532,11 @@ class DeliveryFlowConsistencyTest extends TestCase
             'issue_type' => 'scan_mismatch',
             'status' => 'pending',
         ]);
+
+        $this->actingAs($operator)
+            ->postJson(route('delivery.pick.scan.submit', $session->id), ['box_number' => $boxExpected->box_number])
+            ->assertStatus(423)
+            ->assertJson(['session_status' => 'blocked']);
     }
 
     public function test_complete_then_redo_restores_withdrawal_box_and_pallet_item_consistently(): void

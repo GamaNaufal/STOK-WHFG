@@ -2,6 +2,23 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
+Verifikasi tambahan 20 Oktober 2026 (scan salah saat picking): setiap scan yang
+tidak cocok dengan picklist, termasuk satu digit, nonangka, kosong, atau tanpa
+kode, membuat issue `pending` dan memblokir sesi pada Picking Verification maupun
+Scan Final Delivery. Box withdrawn/expired juga memblokir. Respons memuat
+`session_status=blocked`; layar menghentikan scan sampai approval Admin
+Warehouse/Admin, lalu operator memuat ulang sesi. Kode kosong dicatat `(kosong)`;
+kode panjang disimpan maksimal 255 karakter sesuai kolom `delivery_issues`.
+
+Verifikasi tambahan 20 Oktober 2026 (Split Delivery): MySQL lokal `delivery_orders.status`
+sebelumnya tidak memuat `partial` meski migrasi dasar dan alur Split memakainya.
+Migration `2026_10_20_000001_add_partial_to_existing_delivery_order_status` telah
+diterapkan pada `db_stock` lokal; aturan Split/Restore dan data order tidak diubah.
+
+Verifikasi tambahan 20 Oktober 2026 (konsistensi penghapusan Split): hasil split
+tidak boleh dihapus melalui Hapus Jadwal; gunakan Restore Split. Parent dengan
+child split aktif juga tidak boleh dihapus sebelum semua child dipulihkan.
+
 Verifikasi tambahan 16 Oktober 2026 (presentasi dashboard): role `admin` (Admin Utama)
 dan `supervisi` menggunakan dashboard laporan operasional yang sama melalui
 `OperationalReportService` dan `operator.reports.operational`. Role lain tetap
@@ -435,9 +452,11 @@ File utama:
 
 ### 11. Scan issue
 
-Issue dibuat ketika:
+Issue dibuat pada Picking Verification maupun Scan Final Delivery ketika kode
+yang dikirim:
 
-- box yang discan tidak ada dalam picklist (`scan_mismatch`);
+- kosong, tidak ditemukan, atau tidak ada dalam picklist (`scan_mismatch`),
+  tanpa syarat panjang atau format ID;
 - box sudah withdrawn (`box_withdrawn`);
 - box expired atau handled (`box_expired`).
 
@@ -506,6 +525,8 @@ Aturan:
 - child order dibuat dengan status `approved`;
 - quantity parent dikurangi;
 - parent menjadi `partial`.
+- Hapus Jadwal menolak child hasil split serta parent yang masih memiliki child aktif;
+  child hanya dapat dibatalkan melalui Restore Split agar quantity kembali ke parent.
 
 Restore split:
 
@@ -737,6 +758,8 @@ Status yang digunakan:
 
 ## Status Schema dan Validasi Terakhir
 
+- MySQL lokal `db_stock`: enum `delivery_orders.status` sudah memuat `partial` (20 Oktober 2026).
+  Deployment lain dengan skema lama memerlukan migration perbaikan sebelum Split Delivery digunakan.
 - Seluruh migration sampai `2026_06_19_000005_make_audit_log_type_extensible` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.

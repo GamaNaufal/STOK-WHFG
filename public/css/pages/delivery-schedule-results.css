@@ -22,6 +22,7 @@
 #delivery-schedule-results .part-qty.warning { color: #a12828; }
 #delivery-schedule-results .delivery-qty-status { display: block; font-size: .75rem; font-weight: 400; }
 #delivery-schedule-results .part-item > .badge { grid-column: 1 / -1; justify-self: start; margin-left: 0 !important; }
-#delivery-schedule-results .action-buttons { gap: .5rem; align-items: start; }
-#delivery-schedule-results .action-buttons :is(button,a) { min-height: 44px; min-width: 44px; height: auto; white-space: normal; text-align: center; }
+#delivery-schedule-results .action-buttons { gap: .5rem; align-items: start; flex-wrap: wrap; }
+#delivery-schedule-results .action-buttons > :is(button,a,form) { flex: 0 0 auto; max-width: 100%; }
+#delivery-schedule-results .action-buttons :is(button,a) { min-height: 44px; min-width: 44px; height: auto; white-space: nowrap; overflow-wrap: normal; text-align: center; }
 #delivery-schedule-results .action-buttons :is(button,a):focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 2px; }

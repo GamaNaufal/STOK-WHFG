@@ -122,6 +122,107 @@ class PickingVerificationActivityTest extends TestCase
         $this->assertTrue($session->fresh()->verification_last_activity_at->equalTo(now()));
     }
 
+    public function test_wrong_verification_box_blocks_scan_until_admin_approves_issue(): void
+    {
+        [$user, , $session, $expectedBox] = $this->picking();
+        $session->update(['verification_box_ids' => []]);
+        $wrongBox = Box::create([
+            'box_number' => '87654321', 'part_number' => 'PART-IDLE', 'part_name' => 'Other',
+            'pcs_quantity' => 10, 'qty_box' => 1, 'qr_code' => '87654321', 'user_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $wrongBox->box_number])
+            ->assertStatus(422)
+            ->assertJson(['success' => false, 'session_status' => 'blocked']);
+        $this->assertSame('blocked', $session->fresh()->status);
+        $this->assertSame([], $session->fresh()->verification_box_ids);
+        $this->assertDatabaseHas('delivery_issues', [
+            'pick_session_id' => $session->id, 'box_id' => $wrongBox->id,
+            'issue_type' => 'scan_mismatch', 'status' => 'pending',
+        ]);
+        $this->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $expectedBox->box_number])
+            ->assertStatus(423)
+            ->assertJson(['session_status' => 'blocked']);
+        foreach (['delivery.pick.verify', 'delivery.pick.scan'] as $route) {
+            $response = $this->get(route($route, [$session->delivery_order_id, $session->id]))->assertOk();
+            $response->assertSee('Sesi diblokir');
+            $this->assertMatchesRegularExpression('/id="scanInput"[^>]*disabled/', $response->getContent());
+        }
+
+        $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
+        $issue = DeliveryIssue::where('pick_session_id', $session->id)->where('status', 'pending')->firstOrFail();
+        $this->actingAs($adminWarehouse)
+            ->post(route('delivery.pick.issue.approve', $issue->id), ['notes' => 'Lanjutkan verifikasi'])
+            ->assertRedirect();
+        $this->assertSame('scanning', $session->fresh()->status);
+        $this->actingAs($user)
+            ->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $expectedBox->box_number])
+            ->assertOk()
+            ->assertJson(['success' => true, 'remaining' => 0]);
+
+        $this->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => '99999999'])
+            ->assertStatus(422)
+            ->assertJson(['session_status' => 'blocked']);
+        $this->assertDatabaseHas('delivery_issues', [
+            'pick_session_id' => $session->id, 'box_id' => null,
+            'scanned_code' => '99999999', 'issue_type' => 'scan_mismatch', 'status' => 'pending',
+        ]);
+    }
+
+    public function test_every_wrong_scan_submission_blocks_both_verification_and_final_sessions(): void
+    {
+        [$operator, , $session, $expectedBox] = $this->picking();
+        $admin = User::factory()->create(['role' => 'admin_warehouse']);
+        $attempts = [
+            [['box_number' => '1'], '1'],
+            [['box_number' => 'abc'], 'abc'],
+            [['box_number' => ''], '(kosong)'],
+            [[], '(kosong)'],
+            [['box_number' => str_repeat('9', 300)], str_repeat('9', 255)],
+        ];
+
+        foreach (['delivery.pick.verify.scan', 'delivery.pick.scan.submit'] as $scanRoute) {
+            foreach ($attempts as [$payload, $storedCode]) {
+                $this->actingAs($operator)
+                    ->postJson(route($scanRoute, $session->id), $payload)
+                    ->assertStatus(422)
+                    ->assertJson(['success' => false, 'session_status' => 'blocked']);
+
+                $this->assertSame('blocked', $session->fresh()->status);
+                $issue = DeliveryIssue::where('pick_session_id', $session->id)
+                    ->where('status', 'pending')->sole();
+                $this->assertSame('scan_mismatch', $issue->issue_type);
+                $this->assertSame($storedCode, $issue->scanned_code);
+                $this->assertNull($issue->box_id);
+
+                $this->postJson(route($scanRoute, $session->id), ['box_number' => $expectedBox->box_number])
+                    ->assertStatus(423)->assertJson(['session_status' => 'blocked']);
+
+                $this->actingAs($admin)
+                    ->post(route('delivery.pick.issue.approve', $issue->id), ['notes' => 'Lanjutkan scan'])
+                    ->assertRedirect();
+                $this->assertSame('scanning', $session->fresh()->status);
+            }
+        }
+    }
+
+    public function test_withdrawn_verification_box_creates_issue_and_blocks_session(): void
+    {
+        [$user, , $session, $box] = $this->picking();
+        $box->update(['is_withdrawn' => true]);
+
+        $this->actingAs($user)
+            ->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $box->box_number])
+            ->assertStatus(422)
+            ->assertJson(['session_status' => 'blocked']);
+        $this->assertSame('blocked', $session->fresh()->status);
+        $this->assertDatabaseHas('delivery_issues', [
+            'pick_session_id' => $session->id, 'box_id' => $box->id,
+            'issue_type' => 'box_withdrawn', 'status' => 'pending',
+        ]);
+    }
+
     public function test_final_scan_disables_timer_and_old_tab_cannot_reenable_it(): void
     {
         [$user, $order, $session] = $this->picking();

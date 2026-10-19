@@ -1,0 +1,54 @@
+#deliveryScanIssuesPage { max-width: 88rem; margin: 0 auto; padding: .5rem 0 2rem; }
+#deliveryScanIssuesPage .scan-issues-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 1rem 2rem; margin-bottom: 1.5rem; }
+#deliveryScanIssuesPage .scan-issues-eyebrow { display: block; color: var(--ui-accent, #0b7072); font-size: .75rem; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
+#deliveryScanIssuesPage h1 { display: flex; align-items: center; gap: .625rem; margin: .375rem 0 .5rem; font-size: clamp(1.5rem, 2.5vw, 2rem); letter-spacing: -.02em; }
+#deliveryScanIssuesPage h1 i { color: #b45309; font-size: .9em; }
+#deliveryScanIssuesPage .scan-issues-header p { margin: 0; color: var(--ui-muted, #595d65); font-size: .875rem; line-height: 1.5; }
+#deliveryScanIssuesPage .scan-issues-back { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; padding: .625rem .875rem; border: 1px solid var(--ui-border, #dfe1e5); background: #fff; color: var(--ui-ink, #202124); font-size: .8125rem; font-weight: 600; text-decoration: none; }
+#deliveryScanIssuesPage .scan-issues-back:hover { border-color: #a9c9c6; background: #f5faf9; color: #075e60; }
+#deliveryScanIssuesPage .scan-issues-panel { min-width: 0; margin: 0 0 1.25rem; border: 1px solid var(--ui-border, #dfe1e5); background: #fff; box-shadow: var(--ui-shadow, 0 1px 3px rgb(20 25 32 / 5%)); }
+#deliveryScanIssuesPage .scan-issues-panel-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: .875rem 1.5rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+#deliveryScanIssuesPage .scan-issues-panel-header h2 { margin: .375rem 0 .25rem; color: var(--ui-ink, #202124); font-size: 1.125rem; font-weight: 650; letter-spacing: -.015em; }
+#deliveryScanIssuesPage .scan-issues-panel-header p { max-width: 48rem; margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; line-height: 1.5; }
+#deliveryScanIssuesPage .scan-issues-count { display: inline-flex; align-items: center; min-height: 2rem; padding: .25rem .625rem; border: 1px solid #e8dcc2; border-radius: .5rem; background: #fbf6e8; color: #765414; font-size: .8125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+#deliveryScanIssuesPage .scan-issues-scroll { max-width: 100%; max-height: min(70vh, 45rem); overflow: auto; overscroll-behavior: contain; }
+#deliveryScanIssuesPage .scan-issues-scroll:focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: -3px; }
+#deliveryScanIssuesPage .scan-issues-table { min-width: 62rem; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+#deliveryScanIssuesPage .scan-issues-table > :is(thead, tbody) > tr > :is(th, td) { padding: .875rem .75rem; vertical-align: middle; border-bottom: 1px solid var(--ui-border, #dfe1e5); font-size: .8125rem; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
+#deliveryScanIssuesPage .scan-issues-table > thead > tr > th { position: sticky; top: 0; z-index: 2; background: #f6f7f8; color: #4b515a; font-weight: 650; }
+#deliveryScanIssuesPage .scan-issues-table > :is(thead, tbody) > tr > :first-child:not([colspan]) { position: sticky; left: 0; z-index: 1; width: 10rem; min-width: 10rem; border-right: 1px solid var(--ui-border, #dfe1e5); background: #fff; }
+#deliveryScanIssuesPage .scan-issues-table > thead > tr > :first-child { z-index: 3; background: #f6f7f8; }
+#deliveryScanIssuesPage .scan-issues-table > :is(thead, tbody) > tr > :nth-child(2) { width: 14rem; }
+#deliveryScanIssuesPage .scan-issues-table > :is(thead, tbody) > tr > :nth-child(3) { width: 9rem; }
+#deliveryScanIssuesPage .scan-issues-table > :is(thead, tbody) > tr > :nth-child(4) { width: 17rem; }
+#deliveryScanIssuesPage .scan-issues-table > :is(thead, tbody) > tr > :last-child:not([colspan]) { width: 11rem; }
+#deliveryScanIssuesPage .scan-issues-history-table > :is(thead, tbody) > tr > :nth-child(4) { width: 9rem; }
+#deliveryScanIssuesPage .scan-issues-history-table > :is(thead, tbody) > tr > :last-child:not([colspan]) { width: 20rem; }
+#deliveryScanIssuesPage .scan-issues-order strong { display: block; color: var(--ui-ink, #202124); font-size: .875rem; font-variant-numeric: tabular-nums; }
+#deliveryScanIssuesPage .scan-issues-order small { display: block; margin-top: .2rem; color: var(--ui-muted, #595d65); font-size: .75rem; }
+#deliveryScanIssuesPage .scan-issues-code { display: inline-block; max-width: 100%; padding: .25rem .4rem; border-radius: .375rem; background: #fff3ed; color: #8d3420; font-size: .8125rem; white-space: normal; overflow-wrap: anywhere; }
+#deliveryScanIssuesPage .scan-issues-code.is-history { background: #f2f4f5; color: #3f4a53; }
+#deliveryScanIssuesPage .scan-issues-reason,
+#deliveryScanIssuesPage .scan-issues-time { display: block; margin-top: .2rem; color: var(--ui-muted, #595d65); font-size: .75rem; }
+#deliveryScanIssuesPage .scan-issues-date { display: block; color: var(--ui-ink, #202124); font-variant-numeric: tabular-nums; }
+#deliveryScanIssuesPage .scan-issues-notes { min-height: 44px; font-size: .8125rem; }
+#deliveryScanIssuesPage .scan-issues-notes:focus { border-color: var(--ui-accent, #0b7072); box-shadow: 0 0 0 3px rgb(11 112 114 / 16%); }
+#deliveryScanIssuesPage .scan-issues-action { text-align: right; }
+#deliveryScanIssuesPage .scan-issues-approve { display: inline-flex; align-items: center; justify-content: center; gap: .375rem; min-height: 44px; width: 100%; padding: .55rem .75rem; border: 1px solid var(--ui-accent, #0b7072); background: var(--ui-accent, #0b7072); color: #fff; font-size: .8125rem; font-weight: 650; }
+#deliveryScanIssuesPage .scan-issues-approve:hover { border-color: #075b5d; background: #075b5d; color: #fff; }
+#deliveryScanIssuesPage .scan-issues-status { display: inline-flex; align-items: center; min-height: 1.75rem; max-width: 100%; padding: .25rem .5rem; border: 1px solid; border-radius: .375rem; font-size: .75rem; font-weight: 650; line-height: 1.25; }
+#deliveryScanIssuesPage .scan-issues-status.is-approved { border-color: #bde5ca; background: #e9f7ed; color: #175b35; }
+#deliveryScanIssuesPage .scan-issues-status.is-other { border-color: #d8dce0; background: #f2f4f5; color: #48525d; }
+#deliveryScanIssuesPage .scan-issues-history-notes { white-space: pre-wrap !important; overflow-wrap: anywhere; }
+#deliveryScanIssuesPage .scan-issues-empty { padding: 2rem 1rem !important; color: var(--ui-muted, #595d65); text-align: center; }
+#deliveryScanIssuesPage .scan-issues-empty :is(i, strong, span) { display: block; }
+#deliveryScanIssuesPage .scan-issues-empty i { margin-bottom: .5rem; color: var(--ui-accent, #0b7072); font-size: 1.5rem; }
+#deliveryScanIssuesPage .scan-issues-empty strong { color: var(--ui-ink, #202124); font-size: .875rem; }
+#deliveryScanIssuesPage .scan-issues-empty span { margin-top: .25rem; font-size: .8125rem; }
+#deliveryScanIssuesPage .scan-issues-table-hint { margin: 0; padding: .75rem 1.5rem; border-top: 1px solid var(--ui-border, #dfe1e5); color: var(--ui-muted, #595d65); font-size: .75rem; }
+#deliveryScanIssuesPage :is(.scan-issues-back, .scan-issues-approve):focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 2px; }
+@media (max-width: 575.98px) {
+    #deliveryScanIssuesPage .scan-issues-back { width: 100%; }
+    #deliveryScanIssuesPage .scan-issues-panel-header { padding: 1rem; }
+    #deliveryScanIssuesPage .scan-issues-table-hint { padding: .75rem 1rem; }
+}

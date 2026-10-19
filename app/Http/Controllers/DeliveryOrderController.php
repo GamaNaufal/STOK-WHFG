@@ -985,6 +985,14 @@ class DeliveryOrderController extends Controller
             DB::transaction(function () use ($id, $user) {
                 $order = DeliveryOrder::whereKey($id)->lockForUpdate()->firstOrFail();
 
+                if ($order->parent_delivery_order_id !== null) {
+                    throw new \RuntimeException('Delivery hasil split tidak dapat dihapus. Gunakan Restore Split untuk mengembalikan quantity ke delivery utama.');
+                }
+
+                if ($order->childDeliveryOrders()->exists()) {
+                    throw new \RuntimeException('Delivery utama dengan hasil split aktif tidak dapat dihapus. Restore hasil split terlebih dahulu.');
+                }
+
                 /** @var \Illuminate\Database\Eloquent\Collection<int, DeliveryPickSession> $sessions */
                 $sessions = DeliveryPickSession::where('delivery_order_id', (int) $order->id)
                     ->lockForUpdate()
