@@ -1,0 +1,27 @@
+.warehouse-app .delivery-results-help { margin: 0; padding: .875rem 1.25rem; color: var(--ui-muted, #595d65); font-size: .8125rem; }
+.warehouse-app .delivery-results-scroll { max-height: 40rem; overflow: auto; border-radius: 0; overscroll-behavior: contain; }
+.warehouse-app .delivery-results-scroll:focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: -3px; }
+#delivery-schedule-results { min-width: 78rem; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+#delivery-schedule-results[data-empty="true"] { min-width: 0; }
+#delivery-schedule-results[data-empty="true"] thead { display: none; }
+#delivery-schedule-results > :is(thead,tbody) > tr > :is(th,td) { padding: 1rem; vertical-align: top; text-align: left; white-space: normal; overflow-wrap: anywhere; background: var(--ui-surface, #fff); color: var(--ui-ink, #202124); font-size: .875rem; font-weight: 400; line-height: 1.5; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+#delivery-schedule-results > thead > tr > th { position: sticky; top: 0; z-index: 2; font-weight: 600; background: #f6f7f8; text-transform: none; letter-spacing: 0; }
+#delivery-schedule-results > thead > tr > :first-child { width: 12% !important; z-index: 3; }
+#delivery-schedule-results > thead > tr > :nth-child(2) { width: 18% !important; }
+#delivery-schedule-results > thead > tr > :nth-child(3) { width: 34% !important; }
+#delivery-schedule-results > thead > tr > :nth-child(4) { width: 16% !important; }
+#delivery-schedule-results > thead > tr > :nth-child(5) { width: 20% !important; }
+#delivery-schedule-results > :is(thead,tbody) > tr > th:first-child { position: sticky; left: 0; border-right: 1px solid var(--ui-border, #dfe1e5); }
+#delivery-schedule-results > tbody > tr > th:first-child { z-index: 1; }
+.delivery-order-number, .delivery-column-hint { display: block; margin-top: .25rem; color: var(--ui-muted, #595d65); font-size: .8125rem; font-weight: 400; }
+#delivery-schedule-results .part-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: .375rem .75rem; padding: .625rem 0; }
+#delivery-schedule-results .part-item:first-child { padding-top: 0; }
+#delivery-schedule-results .part-name { min-width: 0; font-weight: 600; }
+#delivery-schedule-results .part-qty { margin: 0; min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; font-size: .8125rem; }
+#delivery-schedule-results .part-qty.ok { color: #17613e; }
+#delivery-schedule-results .part-qty.warning { color: #a12828; }
+#delivery-schedule-results .delivery-qty-status { display: block; font-size: .75rem; font-weight: 400; }
+#delivery-schedule-results .part-item > .badge { grid-column: 1 / -1; justify-self: start; margin-left: 0 !important; }
+#delivery-schedule-results .action-buttons { gap: .5rem; align-items: start; }
+#delivery-schedule-results .action-buttons :is(button,a) { min-height: 44px; min-width: 44px; height: auto; white-space: normal; text-align: center; }
+#delivery-schedule-results .action-buttons :is(button,a):focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 2px; }

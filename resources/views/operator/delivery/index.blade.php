@@ -414,15 +414,12 @@
             margin-bottom: 0.5rem;
         }
     </style>
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-schedule-toolbar.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-schedule-results.css') }}">
 @endsection
 
 @section('content')
-<div class="page-header">
-    <h1>
-        <i class="bi bi-truck" style="color: #0C7779;"></i> Delivery Schedule
-    </h1>
-    <p class="mb-0">Kelola jadwal pengiriman dan status pesanan delivery</p>
-</div>
+@include('operator.delivery.partials.schedule-header')
 
 <div class="container-fluid">
     @if(isset($completedOrders) && $completedOrders->count() > 0)
@@ -476,25 +473,29 @@
             <i class="bi bi-calendar-check"></i>
             <h5>Jadwal Delivery Terdaftar</h5>
         </div>
-        <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
-            <table class="table modern-table">
+        @include('operator.delivery.partials.schedule-filters')
+        <p class="delivery-results-help" id="delivery-results-help">PCS siap / kebutuhan mengikuti perhitungan FIFO saat halaman dimuat. Geser tabel untuk melihat status dan aksi; tanggal serta nomor order tetap terlihat.</p>
+        <div class="table-responsive delivery-results-scroll" tabindex="0" role="region" aria-label="Jadwal delivery aktif" aria-describedby="delivery-results-help">
+            <table class="table modern-table" id="delivery-schedule-results" data-empty="{{ $approvedOrders->isEmpty() ? 'true' : 'false' }}">
+                <caption class="visually-hidden">Jadwal delivery aktif, diurutkan berdasarkan tanggal pengiriman</caption>
                 <thead>
                     <tr>
-                        <th style="width: 12%">Tanggal</th>
-                        <th style="width: 18%">Customer</th>
-                        <th>Detail Pesanan (Part No. & Qty)</th>
-                        <th style="width: 10%">Status</th>
+                        <th scope="col" style="width: 12%">Tanggal / Order</th>
+                        <th scope="col" style="width: 18%">Customer</th>
+                        <th scope="col">Part &amp; PCS <span class="delivery-column-hint">Siap / kebutuhan</span></th>
+                        <th scope="col" style="width: 10%">Status</th>
                         @if((Auth::user()->canAccess('delivery_pick') || Auth::user()->canAccess('delivery_split') || Auth::user()->canAccess('delivery_delete')))
-                        <th style="width: 18%" class="text-end">Action</th>
+                        <th scope="col" style="width: 18%">Aksi</th>
                         @endif
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($approvedOrders as $order)
-                    <tr>
-                        <td>
+                    <tr data-schedule-search="{{ $order->id }} {{ $order->customer_name }} {{ $order->items->pluck('part_number')->implode(' ') }}" data-schedule-timing="{{ $order->days_remaining < 0 ? 'overdue' : ($order->days_remaining === 0 ? 'today' : 'upcoming') }}">
+                        <th scope="row">
                             <strong>{{ $order->delivery_date->format('d M Y') }}</strong>
-                        </td>
+                            <span class="delivery-order-number">Order #{{ $order->id }}</span>
+                        </th>
                         <td>
                             {{ $order->customer_name }}
                             @if(!empty($order->notes))
@@ -508,7 +509,8 @@
                                 <div class="part-item">
                                     <span class="part-name">{{ $item->part_number }}</span>
                                     <span class="part-qty {{ ($item->is_fulfillable ?? false) ? 'ok' : 'warning' }}">
-                                        {{ $item->display_fulfilled ?? 0 }} / {{ $item->quantity }}
+                                        {{ number_format($item->display_fulfilled ?? 0) }} / {{ number_format($item->quantity) }}
+                                        <span class="delivery-qty-status">{{ ($item->is_fulfillable ?? false) ? 'Cukup' : 'Belum cukup' }}</span>
                                     </span>
                                     @if(!empty($item->needs_not_full))
                                         <span class="ms-2 badge bg-warning text-dark">Butuh Box Not Full</span>
@@ -552,7 +554,7 @@
                             @endif
                         </td>
                         @if((Auth::user()->canAccess('delivery_pick') || Auth::user()->canAccess('delivery_split') || Auth::user()->canAccess('delivery_delete')))
-                        <td class="text-end">
+                        <td class="delivery-order-actions">
                             <div class="action-buttons">
                                 @if(Auth::user()->canAccess('delivery_pick'))
                                 @if($order->status === 'completed')
@@ -785,6 +787,7 @@
 </div>
 
 @section('scripts')
+<script src="{{ asset('js/pages/delivery-schedule-filters.js') }}?v={{ filemtime(public_path('js/pages/delivery-schedule-filters.js')) }}"></script>
 <script>
     const fulfillModal = new bootstrap.Modal(document.getElementById('fulfillModal'));
     const picklistModal = new bootstrap.Modal(document.getElementById('picklistModal'));

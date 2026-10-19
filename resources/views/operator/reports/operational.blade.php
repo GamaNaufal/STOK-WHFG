@@ -495,6 +495,14 @@
 
     @endif
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-order-table', [
+            'sectionId' => 'fulfillment-report',
+            'title' => 'Inbound vs Outbound Matching Report',
+            'description' => 'Kebutuhan dan pemenuhan order pada periode laporan. Required dan Fulfilled dalam PCS.',
+            'rows' => $matchingReport,
+        ])
+    @else
     <div class="card shadow-sm border-0 mb-4" id="fulfillment-report">
         <div class="card-header bg-white">
             <strong>Inbound vs Outbound Matching Report</strong>
@@ -531,6 +539,11 @@
         </div>
     </div>
 
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-processing-table')
+    @else
     <div class="card shadow-sm border-0 mb-4" id="scan-issues">
         <div class="card-header bg-white">
             <strong>Processing Time (Lead Time)</strong>
@@ -571,6 +584,11 @@
         </div>
     </div>
 
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-throughput-table')
+    @else
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
             <strong>Warehouse Throughput</strong>
@@ -599,6 +617,11 @@
         </div>
     </div>
 
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-issues-table')
+    @else
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
             <strong>Scan Mismatch Report</strong>
@@ -633,6 +656,16 @@
         </div>
     </div>
 
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-order-table', [
+            'sectionId' => 'schedule-fulfillment',
+            'title' => 'Schedule Fulfillment Performance',
+            'description' => 'Pemenuhan jadwal sesuai periode dan filter Full/Partial yang dipilih. Required dan Fulfilled dalam PCS.',
+            'rows' => $fulfillmentRows,
+        ])
+    @else
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
             <strong>Schedule Fulfillment Performance</strong>
@@ -669,11 +702,16 @@
         </div>
     </div>
 
+    @endif
+
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
             <strong>Audit Report</strong>
         </div>
         <div class="card-body">
+            @if(request()->routeIs('dashboard'))
+                @include('shared.partials.dashboard-audit-filters')
+            @else
             <form id="audit-filter-form" method="GET" action="{{ url()->current() }}" class="row g-2 align-items-end mb-3">
                 <div class="col-md-3">
                     <label class="form-label">Type</label>
@@ -709,7 +747,17 @@
                     <a href="{{ url()->current() }}?period={{ request('period', 'week') }}" class="btn btn-outline-secondary w-100" id="audit-filter-reset">Reset</a>
                 </div>
             </form>
-            <div id="audit-report-content">
+            @endif
+            @if(request()->routeIs('dashboard'))
+                <div id="audit-feedback" class="dashboard-audit-feedback">
+                    <p id="audit-feedback-message" role="status" aria-live="polite" aria-atomic="true"></p>
+                    <button type="button" id="audit-retry" class="btn btn-outline-secondary" hidden>Coba lagi</button>
+                </div>
+            @endif
+            <div id="audit-report-content" @if(request()->routeIs('dashboard')) tabindex="-1" aria-label="Hasil laporan audit" @endif>
+                @if(request()->routeIs('dashboard'))
+                    @include('shared.partials.dashboard-audit-results')
+                @else
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <h6 class="fw-bold">Summary</h6>
@@ -775,6 +823,7 @@
                         </div>
                         {{ $auditLogs->onEachSide(1)->fragment('audit-report')->links('pagination::bootstrap-5') }}
                     </div>
+                @endif
                 @endif
             </div>
         </div>
@@ -962,6 +1011,7 @@
         });
     });
 
+    @unless(request()->routeIs('dashboard'))
     const auditForm = document.getElementById('audit-filter-form');
     const auditContent = document.getElementById('audit-report-content');
     const auditReset = document.getElementById('audit-filter-reset');
@@ -1012,5 +1062,9 @@
             loadAuditReport(link.href);
         });
     }
+    @endunless
 </script>
+@if(request()->routeIs('dashboard'))
+    <script src="{{ asset('js/pages/dashboard-audit.js') }}?v={{ filemtime(public_path('js/pages/dashboard-audit.js')) }}"></script>
+@endif
 @endsection
