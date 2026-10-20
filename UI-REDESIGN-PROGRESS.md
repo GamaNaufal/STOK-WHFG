@@ -6,8 +6,7 @@ Repository checked: 20 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 
 - Laravel 12 server-rendered Blade; Bootstrap 5.3, Bootstrap Icons, vanilla JS,
   and page-specific jQuery/Select2. Charts use Chart.js and Highcharts.
-- Main shell: `resources/views/shared/layouts/app.blade.php`; navigation/styles/scripts: `resources/views/shared/layouts/partials/`.
-- CSS order: Bootstrap → shell styles → page `@section('styles')` →
+- Main shell: `resources/views/shared/layouts/app.blade.php`; navigation/styles/scripts: `resources/views/shared/layouts/partials/`. CSS order: Bootstrap → shell styles → page `@section('styles')` →
   `public/css/application-ui.css` → `public/css/apple-design.css`.
   Global overrides load after page styles; no `@stack('styles')`. Scripts support sections/stacks.
 - Main shell loads public assets directly, including `public/js/alert-helper.js`.
@@ -50,6 +49,7 @@ Repository checked: 20 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 - Dashboard throughput table in `resources/views/shared/partials/dashboard-throughput-table.blade.php`: exact inbound/outbound PCS with bars scaled to the largest daily flow, active-day count and zero-day label. Totals/date grouping unchanged.
 - Dashboard scan issues table in `resources/views/shared/partials/dashboard-issues-table.blade.php`: readable reason plus audit code, textual status, full scan/notes and split date/time. `#scan-issues` targets this table (not Processing Time) on dashboard/report branches. 50-row scope, filters and export mapping unchanged; audit remains.
 - Dashboard audit filters in `resources/views/shared/partials/dashboard-audit-filters.blade.php` and `public/css/dashboard-filters.css`: active-filter count/chips, clear applied-vs-pending guidance and responsive hierarchy. Submit carries period/date/group/fulfillment context; Reset clears only audit filters and pagination. Audit query, roles and report route remain unchanged.
+- Standalone audit trail `/audit-trail`: `resources/views/supervisor/audit/index.blade.php` and `public/css/pages/audit-trail.css` now give header, date-scoped metric cards, filters/quick presets and results a calmer responsive hierarchy. Header explains summary vs table filter scope; export parameters, metric queries and detail routes unchanged. Table has sticky header/number, 44px details and distinct empty states. The separate Operational Report Blade branch has no registered GET route.
 - Delivery Schedule header/toolbar: `resources/views/operator/delivery/partials/schedule-{header,filters}.blade.php`,
   `public/css/pages/delivery-schedule-toolbar.css`, `public/js/pages/delivery-schedule-filters.js`.
   Client-only search/timing filter uses rendered active rows; priority order/actions remain. No-JS shows all rows.
@@ -114,7 +114,7 @@ Repository checked: 20 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 
 ## 5. Recommended next segment
 
-Continue with **standalone Operational Report audit filters/results** in `resources/views/operator/reports/operational.blade.php`; keep Dashboard behavior and export parameters intact.
+Continue with **Audit Trail detail modal** in `resources/views/supervisor/audit/partials/detail.blade.php`; preserve historical snapshots and disclosure behavior.
 
 ## 6. Production safety
 
@@ -142,8 +142,8 @@ Continue with **standalone Operational Report audit filters/results** in `resour
   Stock Input, Delivery Assign and Box Not Full; Stock View sibling guard also passed.
 - Expired Box/verification: 23 Laravel tests/253 assertions passed; Delivery Flow Consistency: 22 tests/125 assertions passed. No live scanner check.
 - Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering, approval/unblock and permission checks; responsive layout reviewed in CSS only.
-- Dashboard processing/throughput/issues/audit filters: `UiReviewPreviewTest` 8 Laravel tests/109 assertions passed; report/export sanity 3/24 previously passed. Context-preserving Reset and applied-state labels covered; no browser/device visual check.
+- Dashboard processing/throughput/issues/audit filters: `UiReviewPreviewTest` 8 Laravel tests/109 assertions passed; report/export sanity 3/24 previously passed. Standalone Audit Trail: 10 audit/detail/auth tests/83 assertions passed, covering dated summary, export URL, populated/empty results and quick preset. No browser/device visual check.
 
 ## 8. Changes to preserve
 
-- Preserve uncommitted dashboard/report Blade partials, shared CSS (including `dashboard-filters.css`), test, handoff and `OperationalReportService` edits. The status migration ran only on local `db_stock`; production remains unverified.
+- Preserve uncommitted Audit Trail Blade/CSS/test and this handoff, including prior filter/table edits. The status migration ran only on local `db_stock`; production remains unverified.
