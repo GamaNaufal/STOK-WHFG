@@ -94,21 +94,20 @@ the exact revision deployed to production has not been verified.
   and `public/css/pages/delivery-lock-management.css`: Admin-only summary, clear status/counts,
   sticky session/order header and cells, labeled reason, terminate confirmation and empty state.
 - Delivery Assign page hierarchy is updated in `resources/views/operator/delivery-assign/index.blade.php`
-  and `public/css/pages/delivery-assign.css`: numbered stages, readable stock/selection rows,
-  responsive controls. `public/js/pages/delivery-assign.js` confirms removal/reset, restores
-  per-tab drafts, previews all candidate box IDs, and shows per-part sisa/kelebihan plus request
-  before/after for overage; only confirmation retries assign with quantity increase. New UI pallets
-  use `PalletNumberService`; legacy manual payload remains. Location claims stay atomic; server revalidates.
+  and `public/css/pages/delivery-assign.css`: numbered stages, readable rows, responsive controls.
+  Its JS confirms removal/reset, restores drafts, previews box IDs and explains per-part overage;
+  only confirmation raises request and retries assign. New pallets use `PalletNumberService`; legacy manual payload remains; location claims and server revalidation stay atomic.
+- Move Pallet selection and destination layout uses `resources/views/operator/move-pallet/index.blade.php`
+  and `public/css/pages/move-pallet.css`: numbered stages, clear source/target summaries, responsive lists and controls. Existing scanner, location search, confirmation and transaction behavior remain.
 - Split backend/schema: MySQL `db_stock` lacked enum value `partial`, causing Split to fail when
   updating its parent. `database/migrations/2026_10_20_000001_add_partial_to_existing_delivery_order_status.php`
   adds the missing value to existing MySQL enums; applied locally on 20 October. No Split rule changed.
-- Other Delivery, merge/move pallet, expired boxes, reports/audit and master/admin screens still need detailed review.
+- Other Delivery, merge pallet, expired boxes, reports/audit and master/admin screens still need detailed review.
 - Physical devices, screen readers, large datasets, network/session combinations, Stock Input races and print output remain unverified.
 
 ## 5. Recommended next segment
 
-Continue with **Move Pallet** in `resources/views/operator/move-pallet/index.blade.php`.
-Keep the location workflow, inventory constraints and role permissions unchanged.
+Continue with **Move Pallet confirmation and search feedback**; preserve location constraints and permissions.
 
 ## 6. Production safety
 
@@ -132,6 +131,7 @@ Keep the location workflow, inventory constraints and role permissions unchanged
   rendering and Admin-only access. 390px browser fixture kept header/body aligned at 843px scroll.
 - Delivery Assign: prior 18 Laravel tests/134 assertions; current focused 15/70 and 4 Node
   tests passed. Syntax/diff checks passed; no live stock mutation or device check.
+- Move Pallet: 4 flow tests/16 assertions and 3 UI preview tests/64 assertions passed; no device check.
 - Picking Verification list: 14 Laravel tests/229 assertions passed (module render and
   verification flow); responsive styling reviewed in CSS, without live operational requests.
 - Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering,

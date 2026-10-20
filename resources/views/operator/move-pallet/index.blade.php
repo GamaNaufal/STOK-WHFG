@@ -2,99 +2,109 @@
 
 @section('title', 'Pemindahan Pallet')
 
+@section('styles')
+<link rel="stylesheet" href="{{ asset('css/pages/move-pallet.css') }}">
+@endsection
+
 @section('content')
-<div class="container-fluid">
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="p-4 text-white rounded-3 shadow-sm" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);">
-                <h1 class="h2 mb-2"><i class="bi bi-arrow-left-right"></i> Pemindahan Pallet</h1>
-                <p class="mb-0">Pindahkan pallet yang sama ke lokasi lain tanpa mengubah isi dan nomor pallet.</p>
-            </div>
-        </div>
-    </div>
+<div class="container-fluid move-pallet-page" id="movePalletPage">
+    <header class="move-pallet-header">
+        <span class="move-pallet-eyebrow">Inventory / Lokasi pallet</span>
+        <h1><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Pemindahan Pallet</h1>
+        <p>Pilih pallet aktif, tentukan lokasi kosong, lalu periksa perpindahan sebelum menyimpan. Nomor dan isi pallet tetap sama.</p>
+    </header>
 
     <div id="alertBox" class="alert d-none" role="alert"></div>
-    <div class="row g-4">
+    <div class="row g-3 g-xl-4 move-pallet-workflow">
         <div class="col-lg-5">
-            <div class="card border-0 shadow-sm">
-                <div class="app-section-heading card-header text-white fw-bold" style="background-color: #0C7779;">
-                    <i class="bi bi-upc-scan"></i> 1. Pilih Pallet
+            <div class="card move-pallet-panel h-100">
+                <div class="card-header move-pallet-panel-head">
+                    <span class="move-pallet-step" aria-hidden="true">01</span>
+                    <div>
+                        <h2>Pilih pallet</h2>
+                        <p>Scan nomor pallet atau pilih dari daftar yang tersedia.</p>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <label for="palletCode" class="form-label">Scan atau masukkan nomor pallet</label>
+                    <label for="palletCode" class="form-label fw-semibold">Nomor pallet</label>
                     <div class="input-group">
-                        <input type="text" id="palletCode" class="form-control" placeholder="PLT-XXXX" autofocus>
-                        <button class="btn text-white" id="searchPalletButton" style="background-color: #0C7779;" type="button">
-                            <i class="bi bi-search"></i> Cari
+                        <input type="text" id="palletCode" class="form-control" placeholder="Scan atau masukkan nomor pallet" aria-describedby="palletCodeHint" autofocus>
+                        <button class="btn btn-primary" id="searchPalletButton" type="button">
+                            <i class="bi bi-search" aria-hidden="true"></i> Cari
                         </button>
                     </div>
-                    <div class="form-text">Pallet harus memiliki box aktif dan lokasi yang valid.</div>
-                    <div id="palletSummary" class="border rounded p-3 mt-4 d-none bg-light">
-                        <div class="d-flex justify-content-between">
+                    <div id="palletCodeHint" class="form-text">Pallet harus memiliki box aktif, lokasi valid, dan tidak sedang digunakan delivery atau picking.</div>
+                    <div id="palletSummary" class="move-pallet-summary mt-4 d-none" aria-live="polite">
+                        <div class="move-pallet-summary-head">
+                            <span class="move-pallet-summary-label">Pallet terpilih</span>
                             <strong id="palletNumber"></strong>
-                            <span class="badge bg-success">Siap dipindahkan</span>
                         </div>
-                        <hr>
-                        <div class="row small">
-                            <div class="col-6"><span class="text-muted">Lokasi saat ini</span><br><strong id="currentLocation"></strong></div>
-                            <div class="col-3"><span class="text-muted">Box</span><br><strong id="totalBox"></strong></div>
-                            <div class="col-3"><span class="text-muted">PCS</span><br><strong id="totalPcs"></strong></div>
+                        <div class="move-pallet-summary-stats">
+                            <div><span>Lokasi saat ini</span><strong id="currentLocation"></strong></div>
+                            <div><span>Box aktif</span><strong id="totalBox"></strong></div>
+                            <div><span>Total PCS</span><strong id="totalPcs"></strong></div>
                         </div>
                     </div>
-                    <div class="mt-4">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="fw-bold mb-0"><i class="bi bi-list-check"></i> Pallet yang dapat dipindahkan</h6>
-                            <span class="badge bg-secondary">{{ $pallets->count() }}</span>
+                    <div class="move-pallet-choices mt-4">
+                        <div class="move-pallet-list-head">
+                            <h3 id="availablePalletTitle">Pallet yang dapat dipindahkan</h3>
+                            <span class="move-pallet-count">{{ $pallets->count() }} pallet</span>
                         </div>
-                        <input type="search" id="palletListSearch" class="form-control form-control-sm mb-2" placeholder="Filter nomor pallet atau lokasi...">
-                        <div id="availablePalletList" class="list-group border rounded" style="max-height: 360px; overflow-y: auto;">
+                        <label for="palletListSearch" class="visually-hidden">Filter pallet yang dapat dipindahkan</label>
+                        <input type="search" id="palletListSearch" class="form-control mb-2" placeholder="Filter nomor pallet atau lokasi">
+                        <div id="availablePalletList" class="list-group move-pallet-option-list" aria-labelledby="availablePalletTitle">
                             @forelse($pallets as $availablePallet)
                                 <button type="button"
                                     class="list-group-item list-group-item-action text-start available-pallet"
                                     data-pallet-number="{{ $availablePallet->pallet_number }}"
                                     data-search="{{ strtolower($availablePallet->pallet_number . ' ' . ($availablePallet->stockLocation?->warehouse_location ?? '')) }}">
-                                    <div class="d-flex justify-content-between align-items-center">
+                                    <div class="move-pallet-option-head">
                                         <strong>{{ $availablePallet->pallet_number }}</strong>
-                                        <span class="badge bg-success">Dapat dipindahkan</span>
+                                        <span class="move-pallet-option-status">Tersedia</span>
                                     </div>
-                                    <small class="text-muted">
-                                        <i class="bi bi-geo-alt"></i> {{ $availablePallet->stockLocation?->warehouse_location ?? '-' }}
-                                        &bull; {{ $availablePallet->boxes_count }} Box
-                                        &bull; {{ number_format($availablePallet->boxes->sum('pcs_quantity')) }} PCS
-                                    </small>
+                                    <span class="move-pallet-option-meta">
+                                        <span><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ $availablePallet->stockLocation?->warehouse_location ?? '-' }}</span>
+                                        <span>{{ $availablePallet->boxes_count }} Box</span>
+                                        <span>{{ number_format($availablePallet->boxes->sum('pcs_quantity')) }} PCS</span>
+                                    </span>
                                 </button>
                             @empty
                                 <div class="p-3 text-center text-muted small">Tidak ada pallet yang dapat dipindahkan.</div>
                             @endforelse
                             <div id="noPalletMatch" class="p-3 text-center text-muted small d-none">Pallet tidak ditemukan.</div>
                         </div>
-                        <div class="form-text">Daftar ini dapat berubah jika ada proses delivery atau picking baru.</div>
+                        <div class="form-text">Ketersediaan diperiksa ulang saat pallet dipilih dan saat pemindahan disimpan.</div>
                     </div>
                 </div>
             </div>
         </div>
         <div class="col-lg-7">
-            <div class="card border-0 shadow-sm">
-                <div class="card-header bg-light fw-bold">
-                    <i class="bi bi-geo-alt"></i> 2. Pilih Lokasi Tujuan
+            <div class="card move-pallet-panel h-100">
+                <div class="card-header move-pallet-panel-head">
+                    <span class="move-pallet-step" aria-hidden="true">02</span>
+                    <div>
+                        <h2>Pilih lokasi tujuan</h2>
+                        <p>Lokasi kosong dapat dipilih setelah pallet berhasil dimuat.</p>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <label for="locationSearch" class="form-label">Lokasi tujuan</label>
+                    <label for="locationSearch" class="form-label fw-semibold">Cari lokasi kosong</label>
                     <div class="position-relative">
-                        <input type="text" id="locationSearch" class="form-control" placeholder="Cari lokasi kosong..." autocomplete="off" disabled>
-                        <div id="locationResults" class="list-group position-absolute w-100 shadow" style="z-index: 10; display: none;"></div>
+                        <input type="text" id="locationSearch" class="form-control" placeholder="Ketik kode lokasi tujuan" autocomplete="off" aria-describedby="locationSearchHint" disabled>
+                        <div id="locationResults" class="list-group position-absolute w-100 move-pallet-location-results" style="display: none;"></div>
                     </div>
-                    <div class="mt-2">
-                    <div class="small text-muted mb-1">Lokasi yang bisa ditempati</div>
-                    <div id="availableLocationList" class="list-group border rounded" style="max-height: 180px; overflow-y: auto;">
+                    <div id="locationSearchHint" class="form-text">Pilih kode dari hasil pencarian atau daftar di bawah. Kode lokasi tidak dapat diketik bebas sebagai tujuan.</div>
+                    <div class="move-pallet-choices mt-4">
+                    <div class="move-pallet-list-head"><h3 id="availableLocationTitle">Lokasi yang bisa ditempati</h3><span class="move-pallet-count">{{ $availableLocations->count() }} lokasi</span></div>
+                    <div id="availableLocationList" class="list-group move-pallet-option-list move-pallet-location-list" aria-labelledby="availableLocationTitle">
                         @forelse($availableLocations as $availableLocation)
                             <button type="button"
-                                class="list-group-item list-group-item-action py-2 available-location"
+                                class="list-group-item list-group-item-action available-location"
                                 data-location-id="{{ $availableLocation->id }}"
                                 data-location-code="{{ $availableLocation->code }}"
                                 data-search="{{ strtolower($availableLocation->code) }}"
                                 disabled>
-                                <i class="bi bi-geo-alt me-1"></i>{{ $availableLocation->code }}
+                                <i class="bi bi-geo-alt me-2" aria-hidden="true"></i>{{ $availableLocation->code }}
                             </button>
                         @empty
                             <div class="p-2 text-center text-muted small">Tidak ada lokasi kosong.</div>
@@ -103,13 +113,14 @@
                     </div>
                     </div>
                     <input type="hidden" id="targetLocationId">
-                    <div id="targetSummary" class="small text-success mt-2 d-none"><i class="bi bi-check-circle"></i> Tujuan: <strong id="targetLocationCode"></strong></div>
-                    <div class="alert alert-info small mt-4 mb-0">
-                        <i class="bi bi-info-circle"></i> Lokasi tujuan harus terdaftar di Master Location dan masih kosong saat konfirmasi.
+                    <div id="targetSummary" class="move-pallet-target mt-4 d-none" aria-live="polite">
+                        <span><i class="bi bi-check-circle" aria-hidden="true"></i> Lokasi tujuan terpilih</span>
+                        <strong id="targetLocationCode"></strong>
                     </div>
-                    <div class="d-flex justify-content-end mt-4">
+                    <p class="move-pallet-note mt-4 mb-0"><i class="bi bi-info-circle" aria-hidden="true"></i> Lokasi tujuan harus tetap kosong saat pemindahan dikonfirmasi. Sistem akan memeriksanya kembali sebelum menyimpan.</p>
+                    <div class="move-pallet-action mt-4">
                         <button type="button" id="moveButton" class="btn btn-primary" disabled>
-                            <i class="bi bi-arrow-left-right"></i> Konfirmasi Pemindahan
+                            <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Konfirmasi Pemindahan
                         </button>
                     </div>
                 </div>
@@ -117,8 +128,8 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm mt-4">
-        <div class="card-header bg-light fw-bold"><i class="bi bi-clock-history"></i> Pemindahan Terakhir</div>
+    <div class="card move-pallet-panel move-pallet-history mt-4">
+        <div class="card-header move-pallet-history-head"><h2><i class="bi bi-clock-history" aria-hidden="true"></i> Pemindahan terakhir</h2><span>20 aktivitas terbaru</span></div>
         <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
             <table class="table table-sm table-hover mb-0">
                 <thead><tr><th>Pallet</th><th>Perpindahan</th><th>Oleh</th><th>Waktu</th></tr></thead>
