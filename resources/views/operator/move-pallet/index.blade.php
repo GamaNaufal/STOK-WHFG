@@ -28,12 +28,13 @@
                 <div class="card-body">
                     <label for="palletCode" class="form-label fw-semibold">Nomor pallet</label>
                     <div class="input-group">
-                        <input type="text" id="palletCode" class="form-control" placeholder="Scan atau masukkan nomor pallet" aria-describedby="palletCodeHint" autofocus>
+                        <input type="text" id="palletCode" class="form-control" placeholder="Scan atau masukkan nomor pallet" aria-describedby="palletCodeHint palletSearchStatus" autofocus>
                         <button class="btn btn-primary" id="searchPalletButton" type="button">
                             <i class="bi bi-search" aria-hidden="true"></i> Cari
                         </button>
                     </div>
-                    <div id="palletCodeHint" class="form-text">Pallet harus memiliki box aktif, lokasi valid, dan tidak sedang digunakan delivery atau picking.</div>
+                    <div id="palletCodeHint" class="form-text">Box assigned atau not-full boleh ikut dipindahkan. Sesi picking berstatus scanning, blocked, atau approved tetap mengunci pallet.</div>
+                    <div id="palletSearchStatus" class="move-pallet-search-status d-none" role="status" aria-live="polite"></div>
                     <div id="palletSummary" class="move-pallet-summary mt-4 d-none" aria-live="polite">
                         <div class="move-pallet-summary-head">
                             <span class="move-pallet-summary-label">Pallet terpilih</span>
@@ -90,10 +91,11 @@
                 <div class="card-body">
                     <label for="locationSearch" class="form-label fw-semibold">Cari lokasi kosong</label>
                     <div class="position-relative">
-                        <input type="text" id="locationSearch" class="form-control" placeholder="Ketik kode lokasi tujuan" autocomplete="off" aria-describedby="locationSearchHint" disabled>
+                        <input type="text" id="locationSearch" class="form-control" placeholder="Ketik kode lokasi tujuan" autocomplete="off" aria-describedby="locationSearchHint locationSearchStatus" disabled>
                         <div id="locationResults" class="list-group position-absolute w-100 move-pallet-location-results" style="display: none;"></div>
                     </div>
                     <div id="locationSearchHint" class="form-text">Pilih kode dari hasil pencarian atau daftar di bawah. Kode lokasi tidak dapat diketik bebas sebagai tujuan.</div>
+                    <div id="locationSearchStatus" class="move-pallet-search-status d-none" role="status" aria-live="polite"></div>
                     <div class="move-pallet-choices mt-4">
                     <div class="move-pallet-list-head"><h3 id="availableLocationTitle">Lokasi yang bisa ditempati</h3><span class="move-pallet-count">{{ $availableLocations->count() }} lokasi</span></div>
                     <div id="availableLocationList" class="list-group move-pallet-option-list move-pallet-location-list" aria-labelledby="availableLocationTitle">
@@ -128,28 +130,59 @@
         </div>
     </div>
 
-    <div class="card move-pallet-panel move-pallet-history mt-4">
-        <div class="card-header move-pallet-history-head"><h2><i class="bi bi-clock-history" aria-hidden="true"></i> Pemindahan terakhir</h2><span>20 aktivitas terbaru</span></div>
-        <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
-            <table class="table table-sm table-hover mb-0">
-                <thead><tr><th>Pallet</th><th>Perpindahan</th><th>Oleh</th><th>Waktu</th></tr></thead>
-                <tbody>
-                @forelse($moveHistory as $history)
-                    @php($old = $history->getOldValuesArray())
-                    @php($new = $history->getNewValuesArray())
-                    <tr>
-                        <td>{{ $new['pallet_number'] ?? $history->model_id }}</td>
-                        <td>{{ $old['location'] ?? '-' }} <i class="bi bi-arrow-right"></i> {{ $new['location'] ?? '-' }}</td>
-                        <td>{{ $history->user?->name ?? '-' }}</td>
-                        <td>{{ $history->created_at?->format('d/m/Y H:i') }}</td>
-                    </tr>
-                @empty
-                    <tr><td colspan="4" class="text-center text-muted py-3">Belum ada histori pemindahan.</td></tr>
-                @endforelse
-                </tbody>
-            </table>
-        </div>
-    </div>
+    <section class="card move-pallet-panel move-pallet-history mt-4" aria-labelledby="moveHistoryTitle">
+        <header class="move-pallet-history-head">
+            <div>
+                <span class="move-pallet-eyebrow">Jejak aktivitas</span>
+                <h2 id="moveHistoryTitle">Riwayat pemindahan pallet</h2>
+                <p>Lokasi asal dan tujuan dari setiap pemindahan yang berhasil.</p>
+            </div>
+            <span class="move-pallet-history-count">{{ $moveHistory->count() }} catatan</span>
+        </header>
+        @if($moveHistory->isNotEmpty())
+            <div class="table-responsive move-pallet-history-scroll" tabindex="0" role="region" aria-label="Riwayat pemindahan pallet, geser untuk melihat seluruh kolom">
+                <table class="table mb-0 move-pallet-history-table">
+                    <caption class="visually-hidden">Maksimal 20 pemindahan pallet terbaru.</caption>
+                    <colgroup><col class="move-pallet-history-pallet-col"><col class="move-pallet-history-route-col"><col class="move-pallet-history-actor-col"><col class="move-pallet-history-time-col"></colgroup>
+                    <thead><tr><th scope="col">Pallet</th><th scope="col">Perpindahan lokasi</th><th scope="col">Operator</th><th scope="col">Waktu</th></tr></thead>
+                    <tbody>
+                    @foreach($moveHistory as $history)
+                        @php($old = $history->getOldValuesArray())
+                        @php($new = $history->getNewValuesArray())
+                        <tr>
+                            <th scope="row" class="move-pallet-history-pallet">{{ $new['pallet_number'] ?? $history->model_id }}</th>
+                            <td>
+                                <div class="move-pallet-history-route">
+                                    <div><span>Asal</span><strong>{{ $old['location'] ?? '-' }}</strong></div>
+                                    <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                                    <div><span>Tujuan</span><strong>{{ $new['location'] ?? '-' }}</strong></div>
+                                </div>
+                            </td>
+                            <td class="move-pallet-history-actor">{{ $history->user?->name ?? '-' }}</td>
+                            <td>
+                                @if($history->created_at)
+                                    <time class="move-pallet-history-time" datetime="{{ $history->created_at->toIso8601String() }}">
+                                        <strong>{{ $history->created_at->format('d M Y') }}</strong>
+                                        <span>{{ $history->created_at->format('H:i') }}</span>
+                                    </time>
+                                @else
+                                    <span class="move-pallet-history-muted">-</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <div class="move-pallet-history-foot">Menampilkan maksimal 20 catatan terbaru. Geser tabel untuk melihat kolom lain.</div>
+        @else
+            <div class="move-pallet-history-empty">
+                <i class="bi bi-clock-history" aria-hidden="true"></i>
+                <strong>Belum ada pemindahan</strong>
+                <span>Riwayat akan muncul setelah pallet berhasil dipindahkan.</span>
+            </div>
+        @endif
+    </section>
 </div>
 @endsection
 
@@ -164,8 +197,22 @@
     const targetSummary = document.getElementById('targetSummary');
     const moveButton = document.getElementById('moveButton');
     const availableLocationList = document.getElementById('availableLocationList');
+    const palletSearchStatus = document.getElementById('palletSearchStatus');
+    const locationSearchStatus = document.getElementById('locationSearchStatus');
     let pallet = null;
     let searchTimer = null;
+    let palletSearchToken = 0;
+    let locationSearchToken = 0;
+
+    const setSearchStatus = (element, message, tone = 'neutral') => {
+        element.textContent = message;
+        element.dataset.tone = tone;
+        element.classList.toggle('d-none', !message);
+    };
+
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
 
     const showAlert = (message, type = 'danger') => {
         const alert = document.getElementById('alertBox');
@@ -178,14 +225,32 @@
         targetLocationId.value = '';
         targetSummary.classList.add('d-none');
         moveButton.disabled = true;
+        moveButton.innerHTML = '<i class="bi bi-arrow-left-right" aria-hidden="true"></i> Konfirmasi Pemindahan';
     };
 
     const loadPallet = async (code) => {
-        if (!code) return showAlert('Masukkan nomor pallet terlebih dahulu.');
+        if (!code) {
+            setSearchStatus(palletSearchStatus, 'Masukkan nomor pallet terlebih dahulu.', 'error');
+            return;
+        }
+        const requestToken = ++palletSearchToken;
+        locationSearchToken++;
+        clearTimeout(searchTimer);
+        locationResults.style.display = 'none';
+        setSearchStatus(locationSearchStatus, '');
+        pallet = null;
+        document.getElementById('palletSummary').classList.add('d-none');
+        locationSearch.disabled = true;
+        locationSearch.value = '';
+        resetTarget();
+        document.getElementById('alertBox').classList.add('d-none');
         searchButton.disabled = true;
+        searchButton.textContent = 'Mencari...';
+        setSearchStatus(palletSearchStatus, `Memeriksa pallet ${code}...`);
         try {
             const response = await fetch(`{{ route('move-pallet.search') }}?code=${encodeURIComponent(code)}`);
             const data = await response.json();
+            if (requestToken !== palletSearchToken) return;
             if (!response.ok || !data.success) throw new Error(data.message || 'Pallet tidak dapat dipilih.');
             pallet = data.pallet;
             document.getElementById('palletSummary').classList.remove('d-none');
@@ -200,15 +265,21 @@
             locationSearch.value = '';
             resetTarget();
             document.getElementById('alertBox').classList.add('d-none');
+            setSearchStatus(palletSearchStatus, `Pallet ${pallet.pallet_number} ditemukan. Pilih lokasi tujuan.`, 'success');
+            filterAvailableLocations('');
             locationSearch.focus();
         } catch (error) {
+            if (requestToken !== palletSearchToken) return;
             pallet = null;
             document.getElementById('palletSummary').classList.add('d-none');
             locationSearch.disabled = true;
             resetTarget();
-            showAlert(error.message);
+            setSearchStatus(palletSearchStatus, error.message || 'Pencarian pallet gagal. Coba lagi.', 'error');
         } finally {
-            searchButton.disabled = false;
+            if (requestToken === palletSearchToken) {
+                searchButton.disabled = false;
+                searchButton.innerHTML = '<i class="bi bi-search" aria-hidden="true"></i> Cari';
+            }
         }
     };
 
@@ -238,24 +309,57 @@
 
     locationSearch.addEventListener('input', () => {
         clearTimeout(searchTimer);
+        const requestToken = ++locationSearchToken;
         const query = locationSearch.value.trim();
+        locationResults.style.display = 'none';
         if (!pallet || !query) {
-            locationResults.style.display = 'none';
             resetTarget();
             filterAvailableLocations('');
+            setSearchStatus(locationSearchStatus, '');
             return;
         }
         resetTarget();
         filterAvailableLocations(query);
+        setSearchStatus(locationSearchStatus, `Mencari lokasi kosong untuk “${query}”...`);
         searchTimer = setTimeout(async () => {
-            const response = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`);
-            const locations = await response.json();
-            const filtered = locations.filter(location => Number(location.id) !== Number(pallet.location_id));
-            locationResults.innerHTML = filtered.length
-                ? filtered.map(location => `<button type="button" class="list-group-item list-group-item-action" data-id="${location.id}" data-code="${location.code}"><i class="bi bi-geo-alt"></i> ${location.code}</button>`).join('')
-                : '<div class="list-group-item text-muted">Tidak ada lokasi kosong.</div>';
-            locationResults.style.display = 'block';
+            try {
+                const response = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`);
+                if (!response.ok) throw new Error('Pencarian lokasi gagal. Coba lagi atau pilih dari daftar.');
+                const locations = await response.json();
+                if (requestToken !== locationSearchToken || !pallet) return;
+                const filtered = (Array.isArray(locations) ? locations : [])
+                    .filter(location => Number(location.id) !== Number(pallet.location_id));
+                locationResults.replaceChildren();
+                if (filtered.length) {
+                    filtered.forEach((location) => {
+                        const option = document.createElement('button');
+                        option.type = 'button';
+                        option.className = 'list-group-item list-group-item-action';
+                        option.dataset.id = location.id;
+                        option.dataset.code = location.code;
+                        option.textContent = location.code;
+                        locationResults.appendChild(option);
+                    });
+                } else {
+                    const empty = document.createElement('div');
+                    empty.className = 'list-group-item text-muted';
+                    empty.textContent = 'Tidak ada lokasi kosong.';
+                    locationResults.appendChild(empty);
+                }
+                locationResults.style.display = 'block';
+                setSearchStatus(locationSearchStatus, filtered.length
+                    ? `${filtered.length} lokasi kosong ditemukan. Pilih satu.`
+                    : 'Tidak ada lokasi kosong yang cocok.', filtered.length ? 'success' : 'neutral');
+            } catch (error) {
+                if (requestToken !== locationSearchToken) return;
+                locationResults.style.display = 'none';
+                setSearchStatus(locationSearchStatus, 'Pencarian lokasi gagal. Coba lagi atau pilih dari daftar.', 'error');
+            }
         }, 250);
+    });
+
+    locationSearch.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') locationResults.style.display = 'none';
     });
 
     const filterAvailableLocations = (query) => {
@@ -267,31 +371,33 @@
             button.classList.toggle('d-none', !matches);
             if (matches) visible++;
         });
-        document.getElementById('noLocationMatch').classList.toggle('d-none', visible !== 0);
+        document.getElementById('noLocationMatch').classList.toggle('d-none', !normalizedQuery || visible !== 0);
+    };
+
+    const selectTarget = (id, code, filterList = false) => {
+        locationSearchToken++;
+        clearTimeout(searchTimer);
+        targetLocationId.value = id;
+        document.getElementById('targetLocationCode').textContent = code;
+        targetSummary.classList.remove('d-none');
+        moveButton.disabled = false;
+        moveButton.innerHTML = '<i class="bi bi-arrow-left-right"></i> Konfirmasi Pemindahan';
+        locationSearch.value = code;
+        locationResults.style.display = 'none';
+        filterAvailableLocations(filterList ? code : '');
+        setSearchStatus(locationSearchStatus, `Lokasi ${code} dipilih. Periksa perpindahan sebelum menyimpan.`, 'success');
     };
 
     availableLocationList.addEventListener('click', (event) => {
         const option = event.target.closest('.available-location');
         if (!option || option.disabled || !pallet) return;
-        targetLocationId.value = option.dataset.locationId;
-        document.getElementById('targetLocationCode').textContent = option.dataset.locationCode;
-        targetSummary.classList.remove('d-none');
-        moveButton.disabled = false;
-        moveButton.innerHTML = '<i class="bi bi-arrow-left-right"></i> Konfirmasi Pemindahan';
-        locationSearch.value = option.dataset.locationCode;
-        locationResults.style.display = 'none';
-        filterAvailableLocations(option.dataset.locationCode);
+        selectTarget(option.dataset.locationId, option.dataset.locationCode, true);
     });
 
     locationResults.addEventListener('click', (event) => {
         const option = event.target.closest('[data-id]');
         if (!option) return;
-        targetLocationId.value = option.dataset.id;
-        document.getElementById('targetLocationCode').textContent = option.dataset.code;
-        targetSummary.classList.remove('d-none');
-        moveButton.disabled = false;
-        locationSearch.value = option.dataset.code;
-        locationResults.style.display = 'none';
+        selectTarget(option.dataset.id, option.dataset.code);
     });
 
     const submitMove = async () => {
@@ -316,6 +422,8 @@
             moveButton.disabled = true;
             moveButton.innerHTML = '<i class="bi bi-check2-circle"></i> Pemindahan Berhasil';
             filterAvailableLocations('');
+            setSearchStatus(palletSearchStatus, `Pallet ${pallet.pallet_number} sekarang di lokasi ${pallet.location}.`, 'success');
+            setSearchStatus(locationSearchStatus, 'Pemindahan selesai. Muat ulang halaman untuk melihat daftar lokasi dan riwayat terbaru.', 'success');
         } catch (error) {
             showAlert(error.message);
             moveButton.disabled = false;
@@ -327,26 +435,46 @@
         if (!pallet || !targetLocationId.value) return;
 
         const targetLocation = document.getElementById('targetLocationCode').textContent;
-        WarehouseAlert.confirm({
-            title: 'Konfirmasi Pemindahan Pallet',
-            message: `Anda akan memindahkan <strong style="color: #0C7779;">${pallet.pallet_number}</strong> ke lokasi baru.`,
-            warningItems: [
-                'Pastikan lokasi tujuan sudah sesuai dengan lokasi fisik pallet',
-                'Pallet tetap menggunakan nomor dan isi yang sama',
-                'Lokasi tujuan harus tetap kosong saat proses dikonfirmasi'
-            ],
-            infoText: `
-                <strong>Detail Pemindahan</strong><br>
-                <span class="text-muted">Dari:</span> <strong style="color: #0C7779;">${pallet.location}</strong>
-                <i class="bi bi-arrow-right mx-2"></i>
-                <span class="text-muted">Ke:</span> <strong style="color: #0C7779;">${targetLocation}</strong><br>
-                <span class="text-muted">Isi pallet:</span> ${pallet.total_box} Box &bull; ${Number(pallet.total_pcs).toLocaleString('id-ID')} PCS
-            `,
-            confirmText: 'Ya, Pindahkan!',
-            cancelText: 'Batal',
-            confirmColor: '#0C7779',
-            onConfirm: submitMove
-        });
+        const boxCount = Number(pallet.total_box).toLocaleString('id-ID');
+        const pcsCount = Number(pallet.total_pcs).toLocaleString('id-ID');
+        const html = `
+            <div class="move-pallet-confirm-body">
+                <p>Periksa lokasi fisik pallet sebelum menyimpan perpindahan ini.</p>
+                <div class="move-pallet-confirm-detail">
+                    <span class="move-pallet-confirm-label">Pallet</span>
+                    <strong class="move-pallet-confirm-pallet">${escapeHtml(pallet.pallet_number)}</strong>
+                    <div class="move-pallet-confirm-route">
+                        <div><span>Dari lokasi</span><strong>${escapeHtml(pallet.location)}</strong></div>
+                        <i class="bi bi-arrow-right" aria-hidden="true"></i>
+                        <div><span>Ke lokasi</span><strong>${escapeHtml(targetLocation)}</strong></div>
+                    </div>
+                    <div class="move-pallet-confirm-contents">Isi tetap sama: <strong>${boxCount} Box</strong> · <strong>${pcsCount} PCS</strong></div>
+                </div>
+                <p class="move-pallet-confirm-note">Saat dikonfirmasi, lokasi asal dilepas dan lokasi tujuan ditempati pallet ini. Server memeriksa ulang kelayakan pallet dan ketersediaan lokasi; jika ada konflik, perpindahan ditolak tanpa mengubah stok.</p>
+            </div>`;
+
+        if (window.Swal && typeof window.Swal.fire === 'function') {
+            window.Swal.fire({
+                title: 'Periksa pemindahan pallet',
+                html,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Pindahkan pallet',
+                cancelButtonText: 'Kembali periksa',
+                confirmButtonColor: '#0b7072',
+                reverseButtons: true,
+                focusCancel: true,
+                width: 'min(40rem, calc(100vw - 2rem))',
+                customClass: { popup: 'move-pallet-confirm' },
+            }).then((result) => {
+                if (result.isConfirmed) submitMove();
+            });
+            return;
+        }
+
+        if (window.confirm(`Pindahkan pallet ${pallet.pallet_number} dari ${pallet.location} ke ${targetLocation}?\nIsi: ${boxCount} Box · ${pcsCount} PCS. Lokasi dan kelayakan pallet akan diperiksa ulang.`)) {
+            submitMove();
+        }
     });
 })();
 </script>

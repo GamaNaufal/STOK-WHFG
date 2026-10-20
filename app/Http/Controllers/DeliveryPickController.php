@@ -38,6 +38,25 @@ class DeliveryPickController extends Controller
         private readonly PickingVerificationActivityService $verificationActivityService
     ) {}
 
+    private function unavailableBoxScanMessage(Box $box, bool $finalScan): string
+    {
+        if ($box->is_withdrawn) {
+            return $finalScan
+                ? 'Box sudah withdrawn. Sesi diblokir; tunggu penanganan issue oleh admin.'
+                : 'Box sudah withdrawn dan tidak dapat diverifikasi. Gunakan box lain di picklist; sesi tetap aktif.';
+        }
+
+        if ($box->reactivated_until && $box->reactivated_until->lte(now())) {
+            return $finalScan
+                ? 'Masa aktif Handle box ini sudah habis. Box tidak dapat dikirim; sesi diblokir. Hubungi Admin Warehouse/Admin untuk menangani issue dan penggantian box.'
+                : 'Masa aktif Handle box ini sudah habis. Box tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist; sesi tetap aktif. Laporkan box ini ke Supervisi/Admin.';
+        }
+
+        return $finalScan
+            ? 'Box expired tidak dapat dikirim. Sesi diblokir; hubungi Admin Warehouse/Admin untuk menangani issue.'
+            : 'Box expired tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist; sesi tetap aktif.';
+    }
+
     private function authorizePickSessionView(DeliveryPickSession $session): void
     {
         $user = Auth::user();
@@ -851,7 +870,7 @@ class DeliveryPickController extends Controller
 
                 return [
                     'success' => false,
-                    'message' => $box->is_withdrawn ? 'Box sudah withdrawn. Menunggu approval admin.' : 'Box sudah expired/handled. Menunggu approval admin.',
+                    'message' => $this->unavailableBoxScanMessage($box, true),
                     'status' => 422,
                     'session_status' => 'blocked',
                 ];
@@ -976,7 +995,7 @@ class DeliveryPickController extends Controller
                 return [
                     'success' => false,
                     'message' => $isUnavailable
-                        ? 'Box sudah withdrawn atau expired. Scan box lain pada picklist.'
+                        ? $this->unavailableBoxScanMessage($box, false)
                         : 'Box tidak sesuai daftar picking. Periksa ID box dan coba lagi.',
                     'status' => 422,
                 ];

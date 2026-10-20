@@ -15,6 +15,7 @@ use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletDeliveryLockService;
 use App\Services\PalletNumberService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -27,7 +28,8 @@ class NotFullBoxRequestController extends Controller
 
     public function __construct(
         private readonly LocationAssignmentService $locationAssignmentService,
-        private readonly PalletNumberService $palletNumberService
+        private readonly PalletNumberService $palletNumberService,
+        private readonly PalletDeliveryLockService $palletDeliveryLockService
     ) {
     }
 
@@ -339,6 +341,10 @@ class NotFullBoxRequestController extends Controller
                     $locationCode = $location->warehouse_location;
                 } else {
                     $pallet = Pallet::whereKey($pallet->id)->lockForUpdate()->firstOrFail();
+                    $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets([(int) $pallet->id], true);
+                    if ($blockingBox) {
+                        throw new \RuntimeException('Pallet tujuan tidak dapat diubah karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+                    }
                     $locationCode = $pallet->stockLocation?->warehouse_location;
                     if (! $locationCode || $locationCode === 'Unknown') {
                         throw new \RuntimeException('Pallet tujuan belum memiliki lokasi tersimpan yang valid.');

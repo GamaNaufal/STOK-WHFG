@@ -15,6 +15,7 @@ use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletDeliveryLockService;
 use App\Services\PalletNumberService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -23,11 +24,12 @@ use Illuminate\Support\Facades\DB;
 
 class DeliveryAssignController extends Controller
 {
-    private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
+    private const ACTIVE_LOCK_STATUSES = PalletDeliveryLockService::BLOCKING_SESSION_STATUSES;
 
     public function __construct(
         private readonly LocationAssignmentService $locationAssignmentService,
-        private readonly PalletNumberService $palletNumberService
+        private readonly PalletNumberService $palletNumberService,
+        private readonly PalletDeliveryLockService $palletDeliveryLockService
     ) {
     }
 
@@ -1272,6 +1274,13 @@ class DeliveryAssignController extends Controller
                 $deliveryOrderId
             );
 
+            $existingPalletIds = $eligibleBoxes->flatMap(fn ($box) => $box->pallets->pluck('id'))
+                ->unique()->values()->all();
+            $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets($existingPalletIds, true);
+            if ($blockingBox) {
+                throw new \RuntimeException('Pallet box pilihan tidak dapat diubah karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+            }
+
             $currentCoverage = $this->validateDeliveryOrderPartCoverage(
                 $deliveryOrderId,
                 $eligibleBoxes->all(),
@@ -1362,6 +1371,11 @@ class DeliveryAssignController extends Controller
                         ->with(['stockLocation', 'items'])
                         ->lockForUpdate()
                         ->findOrFail($newBoxesPalletId);
+
+                    $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets([(int) $palletForNewBoxes->id], true);
+                    if ($blockingBox) {
+                        throw new \RuntimeException('Pallet tujuan tidak dapat diubah karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+                    }
 
                     $locationCodeForNewBoxes = (string) ($palletForNewBoxes->stockLocation?->warehouse_location ?? '');
                     if ($locationCodeForNewBoxes === '' || $locationCodeForNewBoxes === 'Unknown') {

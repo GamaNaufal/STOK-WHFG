@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\Schema;
 
 class ExpiredBoxService
 {
+    public function __construct(private readonly PalletDeliveryLockService $palletDeliveryLockService)
+    {
+    }
+
     private function canUseExpiredReports(): bool
     {
         return Schema::hasTable('expired_box_reports');
@@ -111,6 +115,10 @@ class ExpiredBoxService
             }
 
             $pallet = \App\Models\Pallet::whereKey($row->pallet_id)->lockForUpdate()->firstOrFail();
+            $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets([(int) $pallet->id], true);
+            if ($blockingBox) {
+                throw new \RuntimeException('Pallet tidak dapat diubah karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+            }
             $stockLocation = $pallet->stockLocation()->lockForUpdate()->first();
             if ($stockLocation) {
                 $currentLocationId = $stockLocation->master_location_id

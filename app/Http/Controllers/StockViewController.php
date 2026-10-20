@@ -15,6 +15,7 @@ use App\Models\PartSetting;
 use App\Models\StockInput;
 use App\Models\StockWithdrawal;
 use App\Services\AuditService;
+use App\Services\PalletDeliveryLockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -23,6 +24,10 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class StockViewController extends Controller
 {
+    public function __construct(private readonly PalletDeliveryLockService $palletDeliveryLockService)
+    {
+    }
+
     private function resolveDirectBoxTarget(string $search, $items): ?array
     {
         $needle = mb_strtolower(trim($search));
@@ -1140,6 +1145,10 @@ class StockViewController extends Controller
             }
 
             $pallets = $box->pallets()->lockForUpdate()->get();
+            $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets($pallets->pluck('id')->all(), true);
+            if ($blockingBox) {
+                throw new \RuntimeException('Pallet tidak dapat diubah karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+            }
 
             foreach ($pallets as $pallet) {
                 $oldItem = PalletItem::where('pallet_id', $pallet->id)
@@ -1373,6 +1382,10 @@ class StockViewController extends Controller
             }
 
             $pallets = $box->pallets()->lockForUpdate()->get();
+            $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets($pallets->pluck('id')->all(), true);
+            if ($blockingBox) {
+                throw new \RuntimeException('Pallet tidak dapat diubah karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+            }
             $affectedPalletIds = $pallets->pluck('id')->map(fn ($id) => (int) $id)->values();
 
             $oldValues = [
@@ -1511,6 +1524,11 @@ class StockViewController extends Controller
         try {
             $pallet = Pallet::with(['stockLocation', 'items'])->whereKey($palletId)->lockForUpdate()->firstOrFail();
             $attachedBoxes = $pallet->boxes()->lockForUpdate()->get();
+
+            $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets([(int) $pallet->id], true);
+            if ($blockingBox) {
+                throw new \RuntimeException('Pallet tidak dapat dihapus karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+            }
 
             $protectedBox = $attachedBoxes->first(
                 fn ($box) => $this->getBoxMutationBlockReason($box) !== null

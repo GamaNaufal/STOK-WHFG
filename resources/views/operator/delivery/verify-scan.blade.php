@@ -35,7 +35,7 @@
                 <div class="card-body">
                     <span class="verification-section-label">Langkah 1 / Verifikasi</span>
                     <h2 id="verificationScanTitle">Scan ID box</h2>
-                    <p class="verification-supporting">Pindai atau ketik ID box pada picklist, lalu tekan Enter. Jika ID tidak sesuai, periksa box dan scan ulang; progres tidak bertambah.</p>
+                    <p class="verification-supporting">Pindai atau ketik ID box pada picklist, lalu tekan Enter. Jika ID tidak sesuai, periksa box dan scan ulang; progres tidak bertambah. Box expired, termasuk yang masa Handle-nya habis, juga ditolak tanpa memblokir sesi.</p>
                     <div id="verificationBlockedNotice" class="verification-blocked" role="status" @if(! $isVerificationBlocked) hidden @endif>
                         <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
                         <div>

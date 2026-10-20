@@ -1,15 +1,13 @@
 # UI Redesign Progress
 
 Repository checked: 20 October 2026 (Asia/Jakarta).
-Baseline: branch `REDESIGN`, HEAD `681fa80`. This records local implementation;
-the exact revision deployed to production has not been verified.
+Baseline: branch `REDESIGN`, HEAD `681fa80`; local implementation only, production revision unverified.
 
 ## 1. Frontend architecture
 
 - Laravel 12 server-rendered Blade; Bootstrap 5.3, Bootstrap Icons, vanilla JS,
   and page-specific jQuery/Select2. Charts use Chart.js and Highcharts.
-- Main shell: `resources/views/shared/layouts/app.blade.php`; navigation and
-  shell styles/scripts live under `resources/views/shared/layouts/partials/`.
+- Main shell: `resources/views/shared/layouts/app.blade.php`; navigation/styles/scripts: `resources/views/shared/layouts/partials/`.
 - CSS order: Bootstrap → shell styles → page `@section('styles')` →
   `public/css/application-ui.css` → `public/css/apple-design.css`.
   Global overrides load after page styles; no `@stack('styles')`. Scripts support sections/stacks.
@@ -85,7 +83,8 @@ the exact revision deployed to production has not been verified.
 - Picking Verification rejects wrong/empty/unlisted or withdrawn/expired box scans
   without counting them, creating an issue or blocking the session; the next scan can
   proceed. Final Delivery still creates a pending issue and blocks on wrong scans,
-  including short, nonnumeric, empty and long codes, until admin approval.
+  including short, nonnumeric, empty and long codes, until admin approval. Expired
+  Handle renewal now has explicit scan guidance in both stages and a verification hint.
 - Scan Issues management uses `resources/views/operator/delivery/scan-issues.blade.php`
   and `public/css/pages/delivery-scan-issues.css`: pending/history hierarchy, visible
   reason/code, linked notes, 44px approval and sticky Order. Confirmation clarifies that
@@ -97,17 +96,22 @@ the exact revision deployed to production has not been verified.
   and `public/css/pages/delivery-assign.css`: numbered stages, readable rows, responsive controls.
   Its JS confirms removal/reset, restores drafts, previews box IDs and explains per-part overage;
   only confirmation raises request and retries assign. New pallets use `PalletNumberService`; legacy manual payload remains; location claims and server revalidation stay atomic.
-- Move Pallet selection and destination layout uses `resources/views/operator/move-pallet/index.blade.php`
-  and `public/css/pages/move-pallet.css`: numbered stages, clear source/target summaries, responsive lists and controls. Existing scanner, location search, confirmation and transaction behavior remain.
+- Move Pallet uses `resources/views/operator/move-pallet/index.blade.php` and `public/css/pages/move-pallet.css`:
+  numbered stages, search safeguards, route confirmation, and a 20-row audit table with clear origin/destination,
+  operator, date/time, empty state, and aligned mobile scroll. Scan/API unchanged.
+- Merge Pallet uses `resources/views/operator/merge/index.blade.php` and `public/css/pages/merge-pallet.css`:
+  source/selection, location chooser, impact preview and audit history table completed; typed codes require a listed choice, stale results ignored, and source removal clears its location. History shows up to 20 records.
 - Split backend/schema: MySQL `db_stock` lacked enum value `partial`, causing Split to fail when
   updating its parent. `database/migrations/2026_10_20_000001_add_partial_to_existing_delivery_order_status.php`
   adds the missing value to existing MySQL enums; applied locally on 20 October. No Split rule changed.
-- Other Delivery, merge pallet, expired boxes, reports/audit and master/admin screens still need detailed review.
-- Physical devices, screen readers, large datasets, network/session combinations, Stock Input races and print output remain unverified.
+- Other Delivery, expired boxes, reports/audit and master/admin screens need detailed review; physical devices, screen readers, large datasets, network/session combinations, Stock Input races and print output remain unverified.
+- Pallet business guard (20 Oct): assigned/not-full boxes and `pending` pick sessions allow Move/Merge.
+  Any attached box in `scanning`, `blocked`, or `approved` blocks Move/Merge and additions
+  through Stock Input/Box Not Full, plus sibling assignment, Stock View mutation and expired Handle. Merge retargets pending Box Not Full requests; assignment and PCS stay intact.
 
 ## 5. Recommended next segment
 
-Continue with **Move Pallet confirmation and search feedback**; preserve location constraints and permissions.
+Continue with the **Dashboard processing table** in `resources/views/shared/partials/dashboard-processing-table.blade.php`; preserve its operational data and role visibility.
 
 ## 6. Production safety
 
@@ -124,26 +128,22 @@ Continue with **Move Pallet confirmation and search feedback**; preserve locatio
 
 ## 7. Relevant validation
 
-- Scan-stage distinction: 34 focused Laravel tests/264 assertions and 13 Node tests passed;
-  verification rejects wrong input without blocking, while final scan still blocks and
-  requires approval. Status links no longer preload scan audio; no live scanner test.
-- Delivery lock management: 15 Laravel tests/287 assertions passed for populated/empty
-  rendering and Admin-only access. 390px browser fixture kept header/body aligned at 843px scroll.
+- Scan stages: 34 Laravel tests/264 assertions and 13 Node tests passed; verification
+  rejects wrong input without blocking, while final scan blocks pending approval.
+- Delivery lock management: 15 Laravel tests/287 assertions passed; 390px browser fixture
+  kept header/body aligned at 843px scroll.
 - Delivery Assign: prior 18 Laravel tests/134 assertions; current focused 15/70 and 4 Node
   tests passed. Syntax/diff checks passed; no live stock mutation or device check.
-- Move Pallet: 4 flow tests/16 assertions and 3 UI preview tests/64 assertions passed; no device check.
-- Picking Verification list: 14 Laravel tests/229 assertions passed (module render and
-  verification flow); responsive styling reviewed in CSS, without live operational requests.
+- Move/Merge UI: 4/3 Node interaction tests passed; Move history 8 Laravel/63 assertions and Merge history 13 Laravel/120 assertions passed. Browser/device visual check untested.
+- Pallet delivery guard: 60 focused Laravel tests/350 assertions passed across Move, Merge,
+  Stock Input, Delivery Assign and Box Not Full; Stock View sibling guard also passed.
+- Expired Box/verification: 23 Laravel tests/253 assertions passed; Delivery Flow Consistency: 22 tests/125 assertions passed. No live scanner check.
 - Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering,
   approval/unblock and permission checks; responsive layout reviewed in CSS only.
 
 ## 8. Changes to preserve
 
-- Delivery redesign and scan issue changes are in `681fa80`. Preserve uncommitted
-  verification changes in `DeliveryPickController.php`, `verify-scan.blade.php`,
-  `PickingVerificationActivityTest.php`, `delivery-scan-blocking.test.js`,
-  `public/js/scan-feedback.js`, new `tests/Frontend/scan-feedback.test.js`, this document,
-  `lock-management.blade.php`, new `delivery-lock-management.css`, `UiReviewPreviewTest.php`,
-  `docs/AGENT_SYSTEM_MEMO.md`, Delivery Assign controller/route/Blade/JS/CSS and focused tests.
-  The status migration ran only on local `db_stock`;
-  production deployment remains unverified.
+- Preserve uncommitted Move/Merge controllers, Blade/CSS and tests; shared `PalletDeliveryLockService.php`,
+  Stock Input/Delivery Assign/Box Not Full/Stock View controllers, Expired Box service,
+  DeliveryPickController/verification view, related feature tests, this document and `docs/AGENT_SYSTEM_MEMO.md`.
+  The status migration ran only on local `db_stock`; production deployment remains unverified.

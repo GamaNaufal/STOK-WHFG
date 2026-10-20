@@ -190,7 +190,7 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->assertSame(now()->addMonthNoOverflow()->toDateTimeString(), $box->fresh()->reactivated_until->toDateTimeString());
     }
 
-    public function test_expired_renewal_cannot_be_verified_scanned_or_completed(): void
+    public function test_expired_renewal_is_rejected_without_verification_lock_but_blocks_final_scan(): void
     {
         [$operator, $supervisor, $box, , , $order] = $this->inventory();
         app(ExpiredBoxService::class)->handleBox($box->id, $supervisor->id);
@@ -198,10 +198,18 @@ class ExpiredBoxReactivationTest extends TestCase
         DeliveryPickItem::create(['pick_session_id' => $session->id, 'box_id' => $box->id, 'part_number' => 'P-RENEW', 'pcs_quantity' => 20, 'status' => 'scanned']);
         $this->travelTo($box->fresh()->reactivated_until);
         $this->actingAs($operator)->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $box->box_number])
-            ->assertStatus(422)->assertJson(['session_status' => 'blocked']);
-        $this->postJson(route('delivery.pick.complete', $session->id))->assertStatus(423);
+            ->assertStatus(422)
+            ->assertJson(['success' => false, 'session_status' => null])
+            ->assertJsonPath('message', 'Masa aktif Handle box ini sudah habis. Box tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist; sesi tetap aktif. Laporkan box ini ke Supervisi/Admin.');
+        $this->assertSame('scanning', $session->fresh()->status);
+        $this->assertNull($session->fresh()->verification_box_ids);
+        $this->assertDatabaseMissing('delivery_issues', ['pick_session_id' => $session->id]);
+
         $this->postJson(route('delivery.pick.scan.submit', $session->id), ['box_number' => $box->box_number])
-            ->assertStatus(423)->assertJson(['session_status' => 'blocked']);
+            ->assertStatus(422)
+            ->assertJson(['session_status' => 'blocked'])
+            ->assertJsonPath('message', 'Masa aktif Handle box ini sudah habis. Box tidak dapat dikirim; sesi diblokir. Hubungi Admin Warehouse/Admin untuk menangani issue dan penggantian box.');
+        $this->postJson(route('delivery.pick.complete', $session->id))->assertStatus(423);
         $this->assertSame('blocked', $session->fresh()->status);
         $this->assertDatabaseHas('delivery_issues', ['pick_session_id' => $session->id, 'issue_type' => 'box_expired']);
         $this->assertSame(1, DeliveryIssue::where('pick_session_id', $session->id)->count());
