@@ -126,8 +126,12 @@ class OperationalReportService
 
     private function buildProcessingReport(?Carbon $start, ?Carbon $end)
     {
-        $pickSessions = DeliveryPickSession::with(['items:id,pick_session_id,scanned_at'])
-            ->select(['id', 'delivery_order_id', 'started_at', 'completed_at'])
+        $pickSessions = DeliveryPickSession::with([
+            'items:id,pick_session_id,scanned_at',
+            'order:id,customer_name',
+            'creator:id,name',
+        ])
+            ->select(['id', 'delivery_order_id', 'created_by', 'started_at', 'completed_at'])
             ->when($start, fn ($q) => $q->where('started_at', '>=', $start))
             ->when($end, fn ($q) => $q->where('started_at', '<=', $end))
             ->orderBy('started_at', 'desc')
@@ -149,6 +153,8 @@ class OperationalReportService
             return [
                 'session_id' => $session->id,
                 'order_id' => $session->delivery_order_id,
+                'customer_name' => $session->order?->customer_name,
+                'operator_name' => $session->creator?->name,
                 'started_at' => optional($session->started_at)->format('d M Y H:i'),
                 'completed_at' => optional($session->completed_at)->format('d M Y H:i'),
                 'duration_min' => $duration,
@@ -309,6 +315,7 @@ class OperationalReportService
                     'order_id' => $issue->session?->delivery_order_id,
                     'scanned_code' => $issue->scanned_code,
                     'issue_type' => $issue->issue_type,
+                    'reason' => $issue->reason,
                     'status' => $issue->status,
                     'notes' => $issue->notes,
                     'created_at' => $issue->created_at->format('d M Y H:i'),

@@ -11,9 +11,9 @@
 .dashboard-stock-table--boxes { min-width: 54rem; }
 .dashboard-stock-table--pallets { min-width: 44rem; }
 .dashboard-stock-table--orders { min-width: 62rem; }
-.dashboard-stock-table--processing { min-width: 58rem; }
+.dashboard-stock-table--processing { min-width: 78rem; }
 .dashboard-stock-table--throughput { min-width: 32rem; }
-.dashboard-stock-table--issues { min-width: 64rem; }
+.dashboard-stock-table--issues { min-width: 68rem; }
 .dashboard-stock-table--audit { min-width: 68rem; }
 .warehouse-app .dashboard-audit-log .dashboard-stock-table > tbody > tr > :is(th,td) { vertical-align: top; }
 .warehouse-app .dashboard-audit-log .dashboard-audit-description { white-space: pre-wrap; }
@@ -31,13 +31,40 @@
 .dashboard-audit-pagination nav p { display: none; }
 .warehouse-app .dashboard-audit-pagination .page-link { min-width: 44px; min-height: 44px; display: grid; place-items: center; }
 .warehouse-app .dashboard-issues .dashboard-stock-table > tbody > tr > :is(th,td) { vertical-align: top; }
-.warehouse-app .dashboard-issues .dashboard-issue-notes { white-space: pre-wrap; }
-.dashboard-issue-code { font-variant-numeric: tabular-nums; font-weight: 600; }
-.dashboard-issue-status { display: inline-block; padding: .15rem .45rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .375rem; background: var(--ui-canvas, #f5f5f7); font-size: .75rem; line-height: 1.5; }
+.warehouse-app .dashboard-issues .dashboard-issue-notes { white-space: pre-wrap; line-height: 1.5; }
+.dashboard-issue-code { display: inline-block; max-width: 100%; padding: .25rem .375rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .375rem; background: var(--ui-canvas, #f5f5f7); color: var(--ui-ink, #202124); font-size: .75rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; white-space: normal; }
+.dashboard-issue-reason { display: flex; flex-direction: column; gap: .125rem; }
+.dashboard-issue-reason strong { color: var(--ui-ink, #202124); font-weight: 600; }
+.dashboard-issue-reason span { color: var(--ui-muted, #595d65); font-size: .75rem; overflow-wrap: anywhere; }
+.dashboard-issue-status { display: inline-block; padding: .2rem .5rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .375rem; background: var(--ui-canvas, #f5f5f7); color: var(--ui-ink, #202124); font-size: .75rem; font-weight: 600; line-height: 1.5; white-space: nowrap; }
+.dashboard-issue-status.is-pending { border-color: #e5cf9e; background: #fff7e6; color: #795008; }
+.dashboard-issue-status.is-approved { border-color: #b9d9c5; background: #edf7f0; color: #17613e; }
+.dashboard-issue-status.is-rejected { border-color: #ecc8c8; background: #fff1f1; color: #952f2f; }
+.dashboard-issue-date { display: flex; flex-direction: column; gap: .125rem; font-variant-numeric: tabular-nums; }
+.dashboard-issue-date strong { color: var(--ui-ink, #202124); font-weight: 600; }
+.dashboard-issue-date span { color: var(--ui-muted, #595d65); font-size: .75rem; }
 .dashboard-throughput-unit { display: block; margin-top: .125rem; font-size: .75rem; font-weight: 400; }
+.dashboard-stock-table--throughput .dashboard-throughput-date { font-variant-numeric: tabular-nums; }
+.dashboard-throughput-quiet { display: block; margin-top: .125rem; color: var(--ui-muted, #595d65); font-size: .75rem; font-weight: 400; }
+.dashboard-throughput-volume { display: grid; justify-items: end; gap: .375rem; }
+.dashboard-throughput-volume strong { color: var(--ui-ink, #202124); font-size: .9375rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.dashboard-throughput-track { display: block; width: 100%; max-width: 12rem; height: .3rem; overflow: hidden; border-radius: 999px; background: #e7edef; }
+.dashboard-throughput-track > span { display: block; height: 100%; max-width: 100%; border-radius: inherit; background: var(--ui-accent, #0b7072); }
+.dashboard-throughput-volume--outbound .dashboard-throughput-track > span { background: #627987; }
 .dashboard-processing-definitions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0 1.25rem 1rem; padding: 1rem; border-radius: .5rem; background: var(--ui-canvas, #f5f5f7); font-size: .8125rem; }
 .dashboard-processing-definitions dt { margin-bottom: .25rem; color: var(--ui-ink, #202124); font-weight: 600; }
 .dashboard-processing-definitions dd { margin: 0; color: var(--ui-muted, #595d65); }
+.dashboard-stock-table--processing .dashboard-processing-unit { display: block; color: var(--ui-muted, #595d65); font-size: .6875rem; font-weight: 400; line-height: 1.3; }
+.dashboard-stock-table--processing .dashboard-processing-session { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dashboard-stock-table--processing .dashboard-processing-order { color: var(--ui-muted, #595d65); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dashboard-stock-table--processing .dashboard-processing-customer { color: var(--ui-ink, #202124); font-weight: 600; }
+.dashboard-stock-table--processing .dashboard-processing-operator { color: var(--ui-muted, #595d65); }
+.dashboard-stock-table--processing .dashboard-processing-date { display: flex; flex-direction: column; gap: .125rem; font-variant-numeric: tabular-nums; }
+.dashboard-stock-table--processing .dashboard-processing-date strong { color: var(--ui-ink, #202124); font-weight: 600; }
+.dashboard-stock-table--processing .dashboard-processing-date span { color: var(--ui-muted, #595d65); font-size: .75rem; }
+.dashboard-stock-table--processing .dashboard-processing-duration { display: inline-block; max-width: 100%; overflow: hidden; color: var(--ui-ink, #202124); font-size: .9375rem; font-weight: 650; font-variant-numeric: tabular-nums; text-overflow: ellipsis; vertical-align: bottom; }
+.dashboard-stock-table--processing .dashboard-processing-duration--scan { color: #165b59; }
+.dashboard-stock-table--processing .dashboard-processing-unavailable { color: var(--ui-muted, #595d65); }
 .warehouse-app .dashboard-orders .dashboard-order-rate { font-weight: 650; }
 .dashboard-order-status { display: inline-block; padding: .2rem .5rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .375rem; font-size: .75rem; font-weight: 600; line-height: 1.5; }
 .dashboard-order-status--full { color: #17613e; background: #edf7f0; border-color: #b9d9c5; }

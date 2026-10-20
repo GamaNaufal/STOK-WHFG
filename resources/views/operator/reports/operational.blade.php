@@ -544,7 +544,7 @@
     @if(request()->routeIs('dashboard'))
         @include('shared.partials.dashboard-processing-table')
     @else
-    <div class="card shadow-sm border-0 mb-4" id="scan-issues">
+    <div class="card shadow-sm border-0 mb-4" id="processing-time">
         <div class="card-header bg-white">
             <strong>Processing Time (Lead Time)</strong>
         </div>
@@ -622,7 +622,7 @@
     @if(request()->routeIs('dashboard'))
         @include('shared.partials.dashboard-issues-table')
     @else
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="card shadow-sm border-0 mb-4" id="scan-issues">
         <div class="card-header bg-white">
             <strong>Scan Mismatch Report</strong>
         </div>

@@ -1,7 +1,6 @@
 # UI Redesign Progress
 
-Repository checked: 20 October 2026 (Asia/Jakarta).
-Baseline: branch `REDESIGN`, HEAD `681fa80`; local implementation only, production revision unverified.
+Repository checked: 20 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`, HEAD `25e191a`; local implementation only, production revision unverified.
 
 ## 1. Frontend architecture
 
@@ -40,13 +39,17 @@ Baseline: branch `REDESIGN`, HEAD `681fa80`; local implementation only, producti
   Emil principles inform immediate feedback, focus, confirmation and recovery.
   Taste v2's public-site workflow does not apply to this operational dashboard;
   do not introduce marketing heroes, random art direction or decorative motion.
-- Compact groups, readable tables, tabular numbers; scope page CSS and avoid scanner delays.
-- Light theme; dashboard chart animation disabled. Review one bounded segment at a time.
+- Compact groups, readable tables, tabular numbers; scoped CSS, light theme, disabled chart animation and no scanner delays. Review one bounded segment at a time.
 
 ## 4. Unfinished work and verification gaps
 
-- Dashboard processing/throughput/issues tables: `resources/views/shared/partials/dashboard-{processing,throughput,issues}-table.blade.php`.
-  Audit filters/results: `dashboard-audit-{filters,results}.blade.php`; scoped counts, keyboard-scrollable tables, 44px controls.
+- Dashboard processing table in `resources/views/shared/partials/dashboard-processing-table.blade.php` and
+  `public/css/dashboard-stock-tables.css`: session, customer, session creator, date/time and duration hierarchy;
+  durations display as minutes:seconds (e.g. `00:17`), with zero distinct from missing data and bounded cells.
+  `OperationalReportService` eager-loads names; metrics, anchor, roles and export mapping unchanged.
+- Dashboard throughput table in `resources/views/shared/partials/dashboard-throughput-table.blade.php`: exact inbound/outbound PCS with bars scaled to the largest daily flow, active-day count and zero-day label. Totals/date grouping unchanged.
+- Dashboard scan issues table in `resources/views/shared/partials/dashboard-issues-table.blade.php`: readable reason plus audit code, textual status, full scan/notes and split date/time. `#scan-issues` targets this table (not Processing Time) on dashboard/report branches. 50-row scope, filters and export mapping unchanged; audit remains.
+- Dashboard audit filters in `resources/views/shared/partials/dashboard-audit-filters.blade.php` and `public/css/dashboard-filters.css`: active-filter count/chips, clear applied-vs-pending guidance and responsive hierarchy. Submit carries period/date/group/fulfillment context; Reset clears only audit filters and pagination. Audit query, roles and report route remain unchanged.
 - Delivery Schedule header/toolbar: `resources/views/operator/delivery/partials/schedule-{header,filters}.blade.php`,
   `public/css/pages/delivery-schedule-toolbar.css`, `public/js/pages/delivery-schedule-filters.js`.
   Client-only search/timing filter uses rendered active rows; priority order/actions remain. No-JS shows all rows.
@@ -111,7 +114,7 @@ Baseline: branch `REDESIGN`, HEAD `681fa80`; local implementation only, producti
 
 ## 5. Recommended next segment
 
-Continue with the **Dashboard processing table** in `resources/views/shared/partials/dashboard-processing-table.blade.php`; preserve its operational data and role visibility.
+Continue with **standalone Operational Report audit filters/results** in `resources/views/operator/reports/operational.blade.php`; keep Dashboard behavior and export parameters intact.
 
 ## 6. Production safety
 
@@ -138,12 +141,9 @@ Continue with the **Dashboard processing table** in `resources/views/shared/part
 - Pallet delivery guard: 60 focused Laravel tests/350 assertions passed across Move, Merge,
   Stock Input, Delivery Assign and Box Not Full; Stock View sibling guard also passed.
 - Expired Box/verification: 23 Laravel tests/253 assertions passed; Delivery Flow Consistency: 22 tests/125 assertions passed. No live scanner check.
-- Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering,
-  approval/unblock and permission checks; responsive layout reviewed in CSS only.
+- Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering, approval/unblock and permission checks; responsive layout reviewed in CSS only.
+- Dashboard processing/throughput/issues/audit filters: `UiReviewPreviewTest` 8 Laravel tests/109 assertions passed; report/export sanity 3/24 previously passed. Context-preserving Reset and applied-state labels covered; no browser/device visual check.
 
 ## 8. Changes to preserve
 
-- Preserve uncommitted Move/Merge controllers, Blade/CSS and tests; shared `PalletDeliveryLockService.php`,
-  Stock Input/Delivery Assign/Box Not Full/Stock View controllers, Expired Box service,
-  DeliveryPickController/verification view, related feature tests, this document and `docs/AGENT_SYSTEM_MEMO.md`.
-  The status migration ran only on local `db_stock`; production deployment remains unverified.
+- Preserve uncommitted dashboard/report Blade partials, shared CSS (including `dashboard-filters.css`), test, handoff and `OperationalReportService` edits. The status migration ran only on local `db_stock`; production remains unverified.
