@@ -2,99 +2,81 @@
 
 @section('title', 'Laporan Input Stok - Warehouse FG Yamato')
 
-@section('content')
-<!-- Modern Header Banner -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="app-page-banner" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
-                    color: white; 
-                    padding: 40px 30px; 
-                    border-radius: 12px; 
-                    box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;">
-            <div>
-                <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
-                    <i class="bi bi-file-earmark-pdf"></i> Laporan Input Stok
-                </h1>
-                <p style="margin: 0; opacity: 0.95; font-size: 15px;">
-                    Riwayat lengkap input stok masuk dengan filter tanggal dan lokasi
-                </p>
-            </div>
-            <a href="{{ route('reports.stock-input.export', array_filter($filters)) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600;">
-                <i class="bi bi-download"></i> Export CSV
-            </a>
-        </div>
-    </div>
-</div>
+@section('styles')
+<link rel="stylesheet" href="{{ asset('css/pages/report-stock-input.css') }}?v={{ filemtime(public_path('css/pages/report-stock-input.css')) }}">
+@endsection
 
-<!-- Statistics Cards -->
-<div class="row mb-4 g-3">
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
-            <div class="card-body" style="padding: 24px;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Pencatatan Input</p>
-                        <h2 class="fw-bold app-summary-value" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $totalRecords }}</h2>
-                    </div>
-                    <i class="bi bi-box2" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
-                </div>
-            </div>
-        </div>
+@section('content')
+<header class="stock-input-report-header">
+    <div class="stock-input-report-intro">
+        <span class="stock-input-report-eyebrow">Laporan stok</span>
+        <h1>Laporan Input Stok</h1>
+        <p>Telusuri catatan stok masuk berdasarkan tanggal, nomor part, dan lokasi gudang.</p>
     </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
-            <div class="card-body" style="padding: 24px;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total PCS Masuk</p>
-                        <h2 class="fw-bold app-summary-value" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ number_format($totalItems) }}</h2>
-                    </div>
-                    <i class="bi bi-stack" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
-                </div>
-            </div>
-        </div>
+    <div class="stock-input-report-export">
+        <span>Ekspor mengikuti filter yang sedang diterapkan.</span>
+        <a href="{{ route('reports.stock-input.export', array_filter($filters)) }}" class="btn btn-outline-primary">
+            <i class="bi bi-download" aria-hidden="true"></i> Export Excel
+        </a>
     </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
-            <div class="card-body" style="padding: 24px;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Box</p>
-                        <h2 class="fw-bold app-summary-value" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ number_format((int) $totalBoxes) }}</h2>
-                    </div>
-                    <i class="bi bi-box" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
-                </div>
-            </div>
+</header>
+
+<section class="stock-input-report-overview mb-4" aria-labelledby="stock-input-overview-title">
+    <div class="stock-input-report-overview-heading">
+        <div>
+            <span class="stock-input-report-eyebrow">Ringkasan</span>
+            <h2 id="stock-input-overview-title">Seluruh histori input</h2>
         </div>
+        <p>Angka ringkasan tidak berubah saat filter diterapkan.</p>
     </div>
-</div>
+    <div class="stock-input-report-metrics">
+        <dl class="stock-input-report-metric stock-input-report-metric-primary">
+            <dt><i class="bi bi-stack" aria-hidden="true"></i> Total PCS Masuk</dt>
+            <dd><span>{{ number_format($totalItems) }}</span><small>PCS</small></dd>
+        </dl>
+        <dl class="stock-input-report-metric">
+            <dt><i class="bi bi-journal-check" aria-hidden="true"></i> Total Pencatatan Input</dt>
+            <dd><span>{{ number_format($totalRecords) }}</span><small>pencatatan</small></dd>
+        </dl>
+        <dl class="stock-input-report-metric">
+            <dt><i class="bi bi-box" aria-hidden="true"></i> Total Box</dt>
+            <dd><span>{{ number_format((int) $totalBoxes) }}</span><small>box</small></dd>
+        </dl>
+    </div>
+</section>
 
 <!-- Filter Form -->
-<div class="card shadow-sm border-0 mb-4" style="border-radius: 12px; overflow: hidden;">
-    <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
-        <i class="bi bi-funnel"></i> Filter Laporan
-    </div>
+@php
+    $activeFilterCount = collect($filters)
+        ->filter(fn ($value) => is_scalar($value) && filled($value))
+        ->count();
+@endphp
+<section class="card stock-input-report-filters mb-4" aria-labelledby="stock-input-filter-title">
+    <header class="stock-input-report-filter-heading">
+        <div>
+            <h2 id="stock-input-filter-title">Filter catatan</h2>
+            <p>Filter membatasi tabel dan file Excel; angka ringkasan di atas mencakup seluruh histori.</p>
+        </div>
+        <span>{{ $activeFilterCount }} filter aktif</span>
+    </header>
     <div class="card-body">
-        <form method="GET" class="row g-3">
-            <div class="col-md-2">
-                <label class="form-label fw-bold" style="font-size: 13px;">Dari Tanggal</label>
-                <input type="date" class="form-control" name="start_date" value="{{ $filters['start_date'] ?? '' }}" style="border-radius: 8px; border: 1px solid #e5e7eb;">
+        <form method="GET" action="{{ route('reports.stock-input') }}" class="stock-input-report-filter-grid">
+            <div class="stock-input-report-field">
+                <label for="stock-input-report-start" class="form-label">Dari tanggal</label>
+                <input id="stock-input-report-start" type="date" class="form-control" name="start_date" value="{{ $filters['start_date'] ?? '' }}">
             </div>
-            <div class="col-md-2">
-                <label class="form-label fw-bold" style="font-size: 13px;">Sampai Tanggal</label>
-                <input type="date" class="form-control" name="end_date" value="{{ $filters['end_date'] ?? '' }}" style="border-radius: 8px; border: 1px solid #e5e7eb;">
+            <div class="stock-input-report-field">
+                <label for="stock-input-report-end" class="form-label">Sampai tanggal</label>
+                <input id="stock-input-report-end" type="date" class="form-control" name="end_date" value="{{ $filters['end_date'] ?? '' }}">
             </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold" style="font-size: 13px;">Part Number</label>
-                <input type="text" class="form-control" name="part_number" placeholder="Cari part number..." value="{{ $filters['part_number'] ?? '' }}" style="border-radius: 8px; border: 1px solid #e5e7eb;">
+            <div class="stock-input-report-field">
+                <label for="stock-input-report-part" class="form-label">Nomor part</label>
+                <input id="stock-input-report-part" type="text" class="form-control" name="part_number" placeholder="Cari nomor part" value="{{ $filters['part_number'] ?? '' }}">
             </div>
-            <div class="col-md-3">
-                <label class="form-label fw-bold" style="font-size: 13px;">Lokasi Warehouse</label>
-                <select class="form-select" name="warehouse_location" style="border-radius: 8px; border: 1px solid #e5e7eb;">
-                    <option value="">-- Semua Lokasi --</option>
+            <div class="stock-input-report-field">
+                <label for="stock-input-report-location" class="form-label">Lokasi gudang</label>
+                <select id="stock-input-report-location" class="form-select" name="warehouse_location">
+                    <option value="">Semua lokasi</option>
                     @foreach($locations as $location)
                         <option value="{{ $location }}" {{ $filters['warehouse_location'] === $location ? 'selected' : '' }}>
                             {{ $location }}
@@ -102,126 +84,99 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn w-100" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; border: none; border-radius: 8px; font-weight: 600;">
-                    <i class="bi bi-search"></i> Filter
-                </button>
+            <div class="stock-input-report-filter-actions">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-search" aria-hidden="true"></i> Terapkan</button>
+                <a href="{{ route('reports.stock-input') }}" class="btn btn-outline-secondary">Atur ulang</a>
             </div>
         </form>
-        <a href="{{ route('reports.stock-input') }}" class="btn btn-sm mt-2" style="background: #f3f4f6; color: #6b7280; border: none; border-radius: 8px;">
-            <i class="bi bi-arrow-clockwise"></i> Reset
-        </a>
     </div>
-</div>
+</section>
 
-<!-- Report Table -->
-<div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
-    <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
-        <i class="bi bi-table"></i> Detail Input Stok
-    </div>
-    <div class="card-body p-0">
-        @if($stockInputs->count() > 0)
-            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
-                <table class="table table-hover mb-0">
-                    <thead style="background-color: #f9fafb; color: #0C7779; border-bottom: 2px solid #e5e7eb;">
+<section class="stock-input-report-results" aria-labelledby="stock-input-results-title">
+    <header class="stock-input-report-results-heading">
+        <div>
+            <h2 id="stock-input-results-title">Hasil input stok</h2>
+            <p>Menampilkan {{ $stockInputs->firstItem() ?? 0 }}–{{ $stockInputs->lastItem() ?? 0 }} dari {{ number_format($stockInputs->total()) }} pencatatan sesuai filter.</p>
+        </div>
+        <span id="stock-input-table-hint"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Geser tabel untuk melihat semua kolom</span>
+    </header>
+    @if($stockInputs->count() > 0)
+        <div class="table-responsive stock-input-report-table-scroll" tabindex="0" role="region" aria-label="Tabel hasil input stok" aria-describedby="stock-input-table-hint">
+            <table class="table table-hover stock-input-report-table mb-0">
+                <caption class="visually-hidden">Riwayat input stok sesuai filter, termasuk ID dan status audit box.</caption>
+                <thead>
+                    <tr>
+                        <th scope="col" class="stock-input-report-entry-cell">Catatan input</th>
+                        <th scope="col">Pallet</th>
+                        <th scope="col">Part Number</th>
+                        <th scope="col">ID Box</th>
+                        <th scope="col" class="stock-input-report-number">Box</th>
+                        <th scope="col" class="stock-input-report-number">PCS</th>
+                        <th scope="col">Lokasi</th>
+                        <th scope="col">Operator</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @php $counter = $stockInputs->firstItem(); @endphp
+                    @foreach($stockInputs as $input)
                         <tr>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">No</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Tanggal Input</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Pallet Number</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Part Number</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">ID Box</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Box</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">PCS</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Lokasi</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Operator</th>
+                            <th scope="row" class="stock-input-report-entry-cell">
+                                <span class="stock-input-report-entry-number">#{{ $counter }}</span>
+                                <span class="stock-input-report-entry-date">{{ $input->stored_at->format('d/m/Y') }}</span>
+                                <span class="stock-input-report-entry-time">{{ $input->stored_at->format('H:i') }}</span>
+                            </th>
+                            <td class="stock-input-report-pallet">{{ $input->pallet?->pallet_number ?? '-' }}</td>
+                            <td class="stock-input-report-part-cell">
+                                @php
+                                    $partSummaries = collect($input->part_summaries ?? []);
+                                    $partText = $partSummaries->isNotEmpty()
+                                        ? $partSummaries->map(function ($summary) {
+                                            return ($summary['part_number'] ?? '-') . ' (' . ((int) ($summary['box_quantity'] ?? 0)) . ' box)';
+                                        })->implode(', ')
+                                        : '-';
+                                @endphp
+                                <span class="stock-input-report-part-label">{{ $partText }}</span>
+                            </td>
+                            <td class="stock-input-report-box-cell">
+                                @php $boxAuditItems = collect($input->box_audit_items ?? []); @endphp
+                                @if($boxAuditItems->isNotEmpty())
+                                    <div class="stock-input-report-box-list">
+                                        @foreach($boxAuditItems as $boxAudit)
+                                            @php
+                                                $status = $boxAudit['status'] ?? 'active';
+                                                $isDeletedNotShipped = $status === 'deleted_not_shipped';
+                                                $isDeletedShipped = $status === 'deleted_shipped';
+                                            @endphp
+                                            <span class="stock-input-report-box-tag {{ $isDeletedNotShipped ? 'is-deleted-unshipped' : ($isDeletedShipped ? 'is-deleted-shipped' : '') }}">{{ $boxAudit['label'] ?? '-' }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="stock-input-report-muted">–</span>
+                                @endif
+                            </td>
+                            <td class="stock-input-report-number">{{ (int) $input->box_quantity }}</td>
+                            <td class="stock-input-report-number stock-input-report-pcs">{{ $input->pcs_quantity }} <span>PCS</span></td>
+                            <td class="stock-input-report-secondary">{{ $input->warehouse_location }}</td>
+                            <td class="stock-input-report-secondary">{{ $input->user->name }}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        @php
-                            $counter = $stockInputs->firstItem();
-                        @endphp
-                        @foreach($stockInputs as $input)
-                            <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
-                                <td style="padding: 16px 20px;">{{ $counter }}</td>
-                                <td style="padding: 16px 20px;">
-                                    <small class="text-muted">
-                                        {{ $input->stored_at->format('d/m/Y') }}<br>
-                                        <strong style="color: #0C7779;">{{ $input->stored_at->format('H:i') }}</strong>
-                                    </small>
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    <strong style="color: #1f2937;">{{ $input->pallet?->pallet_number ?? '-' }}</strong>
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    @php
-                                        $partSummaries = collect($input->part_summaries ?? []);
-                                        $partText = $partSummaries->isNotEmpty()
-                                            ? $partSummaries->map(function ($summary) {
-                                                return ($summary['part_number'] ?? '-') . ' (' . ((int) ($summary['box_quantity'] ?? 0)) . ' box)';
-                                            })->implode(', ')
-                                            : '-';
-                                    @endphp
-                                    <span class="badge" style="background-color: #f0f4f8; color: #0C7779; white-space: normal; text-align: left; max-width: 360px;">
-                                        {{ $partText }}
-                                    </span>
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    @php
-                                        $boxAuditItems = collect($input->box_audit_items ?? []);
-                                    @endphp
-                                    @if($boxAuditItems->isNotEmpty())
-                                        <div style="display: flex; flex-wrap: wrap; gap: 6px; max-width: 420px;">
-                                            @foreach($boxAuditItems as $boxAudit)
-                                                @php
-                                                    $status = $boxAudit['status'] ?? 'active';
-                                                    $isDeletedNotShipped = $status === 'deleted_not_shipped';
-                                                    $isDeletedShipped = $status === 'deleted_shipped';
-                                                @endphp
-                                                @if($isDeletedNotShipped)
-                                                    <span class="badge" style="background-color: #fee2e2; color: #b91c1c; font-weight: 600; white-space: normal; text-align: left;">
-                                                        {{ $boxAudit['label'] ?? '-' }}
-                                                    </span>
-                                                @elseif($isDeletedShipped)
-                                                    <span class="badge" style="background-color: #fef3c7; color: #92400e; font-weight: 600; white-space: normal; text-align: left;">
-                                                        {{ $boxAudit['label'] ?? '-' }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge" style="background-color: #f3f4f6; color: #4b5563; font-weight: 600; white-space: normal; text-align: left;">
-                                                        {{ $boxAudit['label'] ?? '-' }}
-                                                    </span>
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <small style="color: #6b7280;">-</small>
-                                    @endif
-                                </td>
-                                <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">{{ (int) $input->box_quantity }}</td>
-                                <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">{{ $input->pcs_quantity }} PCS</td>
-                                <td style="padding: 16px 20px;">
-                                    <small style="color: #6b7280;">{{ $input->warehouse_location }}</small>
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    <small style="color: #6b7280;">{{ $input->user->name }}</small>
-                                </td>
-                            </tr>
-                            @php $counter++; @endphp
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            <div class="p-4" style="border-top: 1px solid #e5e7eb;">
-                {{ $stockInputs->appends(request()->query())->links() }}
-            </div>
-        @else
-            <div class="p-5 text-center">
-                <i class="bi bi-inbox" style="font-size: 3rem; color: #e5e7eb;"></i>
-                <h5 class="mt-3 text-muted" style="font-weight: 600;">Tidak ada data input stok</h5>
-            </div>
-        @endif
-    </div>
-</div>
+                        @php $counter++; @endphp
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div class="stock-input-report-pagination">
+            {{ $stockInputs->appends(request()->query())->links('pagination::bootstrap-5') }}
+        </div>
+    @else
+        <div class="stock-input-report-empty">
+            <i class="bi bi-inbox" aria-hidden="true"></i>
+            <h3>Tidak ada data input stok</h3>
+            <p>{{ $activeFilterCount > 0 ? 'Tidak ada pencatatan yang sesuai dengan filter saat ini.' : 'Belum ada pencatatan input stok.' }}</p>
+            @if($activeFilterCount > 0)
+                <a href="{{ route('reports.stock-input') }}" class="btn btn-outline-secondary">Atur ulang filter</a>
+            @endif
+        </div>
+    @endif
+</section>
 
 @endsection

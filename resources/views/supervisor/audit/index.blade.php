@@ -3,7 +3,7 @@
 @section('title', 'Laporan Audit Trail - Warehouse FG Yamato')
 
 @section('styles')
-<link rel="stylesheet" href="{{ asset('css/pages/audit-trail.css') }}">
+<link rel="stylesheet" href="{{ asset('css/pages/audit-trail.css') }}?v={{ filemtime(public_path('css/pages/audit-trail.css')) }}">
 <style>
     .audit-description {
         color: #334155;
@@ -11,29 +11,6 @@
         line-height: 1.65;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
-    }
-    .audit-detail-trigger { min-height: 36px; }
-    .audit-detail-modal .modal-content { border: 0; border-radius: 12px; overflow: hidden; }
-    .audit-detail-modal .modal-header { background: #f0fdfa; }
-    .audit-detail-modal .modal-title { color: #0C7779; font-weight: 700; }
-    .audit-detail-modal .modal-body { padding: 24px; }
-    .audit-detail-modal dt { color: #64748b; font-size: .8rem; font-weight: 500; }
-    .audit-detail-modal dd { color: #1e293b; margin: 4px 0 0; overflow-wrap: anywhere; }
-    .audit-detail-summary { background: #f8fafc; border-left: 3px solid #249E94; padding: 16px; border-radius: 6px; }
-    .audit-change-heading, .audit-change-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; padding: 12px; }
-    .audit-change-heading { background: #f1f5f9; color: #475569; font-size: .8rem; font-weight: 600; }
-    .audit-change-row { border-bottom: 1px solid #e2e8f0; font-size: .875rem; overflow-wrap: anywhere; }
-    .audit-value-after { color: #065f46; font-weight: 600; }
-    .audit-value-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-    .audit-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .audit-detail-table { min-width: 480px; font-size: .875rem; }
-    .audit-detail-table th, .audit-detail-table td { white-space: normal !important; overflow-wrap: anywhere; max-width: 240px; padding: 10px; vertical-align: top; }
-    @media (max-width: 575.98px) {
-        .audit-detail-modal .modal-body { padding: 16px; }
-        .audit-change-heading { display: none; }
-        .audit-change-row { grid-template-columns: 1fr; gap: 6px; }
-        .audit-value-label { position: static; width: auto; height: auto; clip-path: none; font-weight: 500; }
-        .audit-facts { grid-template-columns: 1fr; }
     }
 </style>
 @endsection

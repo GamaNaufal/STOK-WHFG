@@ -1,0 +1,101 @@
+.stock-input-report-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.5rem; padding: .25rem 0 1.25rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+.stock-input-report-intro { min-width: 0; }
+.stock-input-report-eyebrow { display: block; margin-bottom: .375rem; color: #176665; font-size: .6875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.warehouse-app .stock-input-report-intro h1 { margin: 0 0 .375rem; color: var(--ui-ink, #202124); font-size: clamp(1.5rem, 2vw, 1.875rem); font-weight: 700; line-height: 1.2; letter-spacing: -.025em; }
+.warehouse-app .stock-input-report-intro p { max-width: 64ch; margin: 0; color: var(--ui-muted, #595d65); font-size: .875rem; line-height: 1.55; }
+.stock-input-report-export { display: flex; align-items: flex-end; flex-direction: column; gap: .375rem; flex: none; }
+.stock-input-report-export > span { color: var(--ui-muted, #595d65); font-size: .75rem; }
+.warehouse-app .stock-input-report-export .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; white-space: nowrap; }
+.stock-input-report-overview-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: .875rem; }
+.stock-input-report-overview-heading .stock-input-report-eyebrow { margin-bottom: .25rem; }
+.warehouse-app .stock-input-report-overview-heading h2 { margin: 0; color: var(--ui-ink, #202124); font-size: 1.125rem; font-weight: 700; letter-spacing: -.015em; line-height: 1.35; }
+.warehouse-app .stock-input-report-overview-heading p { margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; line-height: 1.5; }
+.stock-input-report-metrics { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.stock-input-report-metric { display: flex; min-width: 0; min-height: 8.5rem; flex-direction: column; justify-content: space-between; gap: 1rem; margin: 0; padding: 1.25rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .75rem; background: var(--ui-surface, #fff); }
+.stock-input-report-metric-primary { border-color: #b9dcd7; background: #f2faf8; }
+.warehouse-app .stock-input-report-metric dt { display: flex; align-items: center; gap: .625rem; margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; font-weight: 600; line-height: 1.4; }
+.stock-input-report-metric dt i { color: #176665; font-size: 1rem; line-height: 1; }
+.warehouse-app .stock-input-report-metric dd { display: flex; align-items: baseline; flex-wrap: wrap; gap: .375rem .625rem; min-width: 0; margin: 0; color: var(--ui-ink, #202124); font-variant-numeric: tabular-nums; }
+.stock-input-report-metric dd > span { min-width: 0; overflow-wrap: anywhere; font-size: clamp(1.75rem, 2.8vw, 2.25rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.1; }
+.stock-input-report-metric-primary dd > span { color: #176665; font-size: clamp(2rem, 3.2vw, 2.625rem); }
+.stock-input-report-metric dd > small { color: var(--ui-muted, #595d65); font-size: .8125rem; font-weight: 500; line-height: 1.4; }
+.warehouse-app .stock-input-report-filters { overflow: hidden; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .75rem; background: var(--ui-surface, #fff); box-shadow: none; }
+.stock-input-report-filter-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+.warehouse-app .stock-input-report-filter-heading h2 { margin: 0 0 .25rem; color: var(--ui-ink, #202124); font-size: 1rem; font-weight: 650; line-height: 1.4; }
+.warehouse-app .stock-input-report-filter-heading p { margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; line-height: 1.5; }
+.stock-input-report-filter-heading > span { flex: none; padding: .25rem .625rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: 999px; color: var(--ui-muted, #595d65); font-size: .8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.warehouse-app .stock-input-report-filters .card-body { padding: 1.25rem 1.5rem; }
+.stock-input-report-filter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)) repeat(2, minmax(0, 1.25fr)); gap: 1rem; }
+.stock-input-report-field { min-width: 0; }
+.warehouse-app .stock-input-report-field .form-label { margin-bottom: .375rem; color: var(--ui-ink, #202124); font-size: .8125rem; font-weight: 600; }
+.warehouse-app .stock-input-report-field :is(.form-control, .form-select) { width: 100%; min-width: 0; min-height: 44px; font-size: 1rem; }
+.stock-input-report-filter-actions { display: flex; justify-content: flex-end; gap: .625rem; grid-column: 1 / -1; padding-top: .25rem; }
+.warehouse-app .stock-input-report-filter-actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: .375rem; min-height: 44px; white-space: nowrap; }
+.warehouse-app .stock-input-report-header a:focus-visible,
+.warehouse-app .stock-input-report-filters :is(input, select, button, a):focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 2px; box-shadow: none; }
+.stock-input-report-results { overflow: hidden; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .75rem; background: var(--ui-surface, #fff); }
+.stock-input-report-results-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+.warehouse-app .stock-input-report-results-heading h2 { margin: 0 0 .25rem; color: var(--ui-ink, #202124); font-size: 1rem; font-weight: 700; line-height: 1.4; }
+.warehouse-app .stock-input-report-results-heading p { margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.stock-input-report-results-heading > span { display: inline-flex; align-items: center; gap: .375rem; flex: none; color: var(--ui-muted, #595d65); font-size: .75rem; line-height: 1.5; }
+.stock-input-report-table-scroll { overflow-x: auto; }
+.stock-input-report-table-scroll:focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: -3px; }
+.warehouse-app .stock-input-report-table { width: 100%; min-width: 1200px; margin: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+.stock-input-report-table thead { background: #f7f8f9; }
+.warehouse-app .stock-input-report-table :is(th, td) { padding: .875rem 1rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); vertical-align: top; font-size: .8125rem; line-height: 1.5; overflow-wrap: anywhere; }
+.warehouse-app .stock-input-report-table thead th { color: var(--ui-muted, #595d65); font-size: .75rem; font-weight: 700; white-space: nowrap; }
+.stock-input-report-table thead th:nth-child(1) { width: 14.5%; }
+.stock-input-report-table thead th:nth-child(2) { width: 10%; }
+.stock-input-report-table thead th:nth-child(3) { width: 18%; }
+.stock-input-report-table thead th:nth-child(4) { width: 25%; }
+.stock-input-report-table thead th:nth-child(5) { width: 6%; }
+.stock-input-report-table thead th:nth-child(6) { width: 9%; }
+.stock-input-report-table thead th:nth-child(7) { width: 9%; }
+.stock-input-report-table thead th:nth-child(8) { width: 8.5%; }
+.warehouse-app .stock-input-report-table .stock-input-report-entry-cell { position: sticky; left: 0; z-index: 1; background: var(--ui-surface, #fff); box-shadow: inset -1px 0 var(--ui-border, #dfe1e5); }
+.warehouse-app .stock-input-report-table thead .stock-input-report-entry-cell { z-index: 2; background: #f7f8f9; }
+.warehouse-app .stock-input-report-table tbody tr:hover > .stock-input-report-entry-cell { background: #f7fbfa; }
+.warehouse-app .stock-input-report-table tbody tr:last-child > :is(th, td) { border-bottom: 0; }
+.stock-input-report-entry-cell > span { display: block; }
+.stock-input-report-entry-number { margin-bottom: .25rem; color: #176665; font-weight: 700; }
+.stock-input-report-entry-date { color: var(--ui-ink, #202124); font-weight: 600; font-variant-numeric: tabular-nums; }
+.stock-input-report-entry-time { color: var(--ui-muted, #595d65); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.stock-input-report-pallet, .stock-input-report-pcs { color: var(--ui-ink, #202124); font-weight: 650; }
+.stock-input-report-part-label { display: inline-block; max-width: 100%; padding: .25rem .5rem; border-radius: .375rem; background: #edf6f5; color: #176665; font-weight: 600; }
+.stock-input-report-box-list { display: flex; flex-wrap: wrap; gap: .375rem; }
+.stock-input-report-box-tag { display: inline-block; max-width: 100%; padding: .25rem .5rem; border-radius: .375rem; background: #f1f3f5; color: #3f4650; font-weight: 600; }
+.stock-input-report-box-tag.is-deleted-unshipped { background: #fce9e9; color: #a5222e; }
+.stock-input-report-box-tag.is-deleted-shipped { background: #fff2d8; color: #805000; }
+.warehouse-app .stock-input-report-table .stock-input-report-number { text-align: right; font-variant-numeric: tabular-nums; }
+.stock-input-report-pcs span, .stock-input-report-secondary, .stock-input-report-muted { color: var(--ui-muted, #595d65); }
+.stock-input-report-pagination { padding: 1rem 1.5rem; border-top: 1px solid var(--ui-border, #dfe1e5); }
+.stock-input-report-pagination .pagination { flex-wrap: wrap; gap: .25rem; margin: 0; }
+.warehouse-app .stock-input-report-pagination .page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; border-radius: .375rem; }
+.stock-input-report-empty { display: flex; align-items: center; flex-direction: column; padding: 3rem 1.5rem; text-align: center; }
+.stock-input-report-empty > i { margin-bottom: .75rem; color: #176665; font-size: 1.5rem; }
+.warehouse-app .stock-input-report-empty h3 { margin: 0 0 .25rem; color: var(--ui-ink, #202124); font-size: 1rem; font-weight: 700; }
+.warehouse-app .stock-input-report-empty p { margin: 0 0 1rem; color: var(--ui-muted, #595d65); font-size: .875rem; }
+.stock-input-report-empty p:last-child { margin-bottom: 0; }
+.warehouse-app .stock-input-report-empty .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+.warehouse-app .stock-input-report-empty .btn:focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 2px; }
+@media (max-width: 991.98px) {
+    .stock-input-report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stock-input-report-metric-primary { grid-column: 1 / -1; }
+    .stock-input-report-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 575.98px) {
+    .stock-input-report-header { align-items: stretch; flex-direction: column; gap: 1rem; }
+    .stock-input-report-export { align-items: stretch; }
+    .stock-input-report-export .btn { width: 100%; }
+    .stock-input-report-overview-heading { align-items: flex-start; flex-direction: column; gap: .25rem; }
+    .stock-input-report-metrics { grid-template-columns: minmax(0, 1fr); }
+    .stock-input-report-metric-primary { grid-column: auto; }
+    .stock-input-report-metric { min-height: 7.25rem; padding: 1rem; }
+    .stock-input-report-filter-heading { align-items: flex-start; flex-direction: column; gap: .625rem; padding: 1rem; }
+    .warehouse-app .stock-input-report-filters .card-body { padding: 1rem; }
+    .stock-input-report-filter-grid { grid-template-columns: minmax(0, 1fr); }
+    .stock-input-report-filter-actions { justify-content: stretch; }
+    .stock-input-report-filter-actions .btn { flex: 1; }
+    .stock-input-report-results-heading { flex-direction: column; gap: .5rem; padding: 1rem; }
+    .stock-input-report-pagination { padding: 1rem; }
+}

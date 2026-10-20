@@ -1,16 +1,14 @@
 # UI Redesign Progress
 
-Repository checked: 20 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`, HEAD `25e191a`; local implementation only, production revision unverified.
+Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`, HEAD `72aac62`; local implementation only, production revision unverified.
 
 ## 1. Frontend architecture
 
-- Laravel 12 server-rendered Blade; Bootstrap 5.3, Bootstrap Icons, vanilla JS,
-  and page-specific jQuery/Select2. Charts use Chart.js and Highcharts.
+- Laravel 12 server-rendered Blade; Bootstrap 5.3, Bootstrap Icons, vanilla JS, and page-specific jQuery/Select2. Charts use Chart.js and Highcharts.
 - Main shell: `resources/views/shared/layouts/app.blade.php`; navigation/styles/scripts: `resources/views/shared/layouts/partials/`. CSS order: Bootstrap → shell styles → page `@section('styles')` →
   `public/css/application-ui.css` → `public/css/apple-design.css`.
   Global overrides load after page styles; no `@stack('styles')`. Scripts support sections/stacks.
-- Main shell loads public assets directly, including `public/js/alert-helper.js`.
-  Vite/Tailwind 4 are configured in `vite.config.js`, `resources/css/app.css`,
+- Main shell loads public assets directly, including `public/js/alert-helper.js`. Vite/Tailwind 4 are configured in `vite.config.js`, `resources/css/app.css`,
   and `resources/js/app.js`, but this shell does not load them with `@vite`.
 - Reusable UI: `resources/views/components/`; standalone login:
   `resources/views/shared/auth/login.blade.php`, `public/css/login-ui.css`.
@@ -49,7 +47,8 @@ Repository checked: 20 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 - Dashboard throughput table in `resources/views/shared/partials/dashboard-throughput-table.blade.php`: exact inbound/outbound PCS with bars scaled to the largest daily flow, active-day count and zero-day label. Totals/date grouping unchanged.
 - Dashboard scan issues table in `resources/views/shared/partials/dashboard-issues-table.blade.php`: readable reason plus audit code, textual status, full scan/notes and split date/time. `#scan-issues` targets this table (not Processing Time) on dashboard/report branches. 50-row scope, filters and export mapping unchanged; audit remains.
 - Dashboard audit filters in `resources/views/shared/partials/dashboard-audit-filters.blade.php` and `public/css/dashboard-filters.css`: active-filter count/chips, clear applied-vs-pending guidance and responsive hierarchy. Submit carries period/date/group/fulfillment context; Reset clears only audit filters and pagination. Audit query, roles and report route remain unchanged.
-- Standalone audit trail `/audit-trail`: `resources/views/supervisor/audit/index.blade.php` and `public/css/pages/audit-trail.css` now give header, date-scoped metric cards, filters/quick presets and results a calmer responsive hierarchy. Header explains summary vs table filter scope; export parameters, metric queries and detail routes unchanged. Table has sticky header/number, 44px details and distinct empty states. The separate Operational Report Blade branch has no registered GET route.
+- Standalone audit trail `/audit-trail`: `resources/views/supervisor/audit/index.blade.php`, `partials/detail.blade.php` and `public/css/pages/audit-trail.css` now give header, date-scoped metrics, filters/results and detail modal a responsive hierarchy. Summary/table scope is explicit; modal separates metadata, changes, facts and nested tables, with mobile before/after labels and keyboard-scrollable tables. Export parameters, snapshot presenter, metric queries and detail routes unchanged. The separate Operational Report Blade branch has no registered GET route.
+- Stock Input report: `resources/views/operator/reports/stock-input.blade.php` and `public/css/pages/report-stock-input.css` have a restrained header, responsive filters, whole-history summary cards and a results table with sticky record/date, wrapped part/box audit labels, filtered count and contextual empty state. `ReportController::stockInputReport` paginates 15 rows; scoped Bootstrap 5 pagination avoids oversized Tailwind arrows and retains filters. Export remains unpaginated. Routes and roles are unchanged; cards cover all history.
 - Delivery Schedule header/toolbar: `resources/views/operator/delivery/partials/schedule-{header,filters}.blade.php`,
   `public/css/pages/delivery-schedule-toolbar.css`, `public/js/pages/delivery-schedule-filters.js`.
   Client-only search/timing filter uses rendered active rows; priority order/actions remain. No-JS shows all rows.
@@ -107,14 +106,14 @@ Repository checked: 20 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 - Split backend/schema: MySQL `db_stock` lacked enum value `partial`, causing Split to fail when
   updating its parent. `database/migrations/2026_10_20_000001_add_partial_to_existing_delivery_order_status.php`
   adds the missing value to existing MySQL enums; applied locally on 20 October. No Split rule changed.
-- Other Delivery, expired boxes, reports/audit and master/admin screens need detailed review; physical devices, screen readers, large datasets, network/session combinations, Stock Input races and print output remain unverified.
+- Other Delivery, expired boxes, remaining reports and master/admin screens need detailed review; physical devices, screen readers, large datasets, network/session combinations, Stock Input races and print output remain unverified.
 - Pallet business guard (20 Oct): assigned/not-full boxes and `pending` pick sessions allow Move/Merge.
   Any attached box in `scanning`, `blocked`, or `approved` blocks Move/Merge and additions
   through Stock Input/Box Not Full, plus sibling assignment, Stock View mutation and expired Handle. Merge retargets pending Box Not Full requests; assignment and PCS stay intact.
 
 ## 5. Recommended next segment
 
-Continue with **Audit Trail detail modal** in `resources/views/supervisor/audit/partials/detail.blade.php`; preserve historical snapshots and disclosure behavior.
+Continue with **Withdrawal report header and filters** in `resources/views/operator/reports/withdrawal.blade.php`; preserve export parameters and role access.
 
 ## 6. Production safety
 
@@ -142,8 +141,9 @@ Continue with **Audit Trail detail modal** in `resources/views/supervisor/audit/
   Stock Input, Delivery Assign and Box Not Full; Stock View sibling guard also passed.
 - Expired Box/verification: 23 Laravel tests/253 assertions passed; Delivery Flow Consistency: 22 tests/125 assertions passed. No live scanner check.
 - Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering, approval/unblock and permission checks; responsive layout reviewed in CSS only.
-- Dashboard processing/throughput/issues/audit filters: `UiReviewPreviewTest` 8 Laravel tests/109 assertions passed; report/export sanity 3/24 previously passed. Standalone Audit Trail: 10 audit/detail/auth tests/83 assertions passed, covering dated summary, export URL, populated/empty results and quick preset. No browser/device visual check.
+- Dashboard processing/throughput/issues/audit filters: `UiReviewPreviewTest` 8 Laravel tests/109 assertions passed; report/export sanity 3/24 previously passed. Standalone Audit Trail: 10 audit/detail/auth tests/89 assertions passed, covering dated summary, export URL, populated/empty results, quick preset and modal snapshots. No browser/device visual check.
+- Stock Input report: 7 focused Laravel tests/39 assertions passed (`ReportFilterMatrixTest`, `AuthorizationAndReportExportSanityTest`), including 15+1 pagination, filter retention and export; prior UI render suite passed. Browser/device visual check remains open.
 
 ## 8. Changes to preserve
 
-- Preserve uncommitted Audit Trail Blade/CSS/test and this handoff, including prior filter/table edits. The status migration ran only on local `db_stock`; production remains unverified.
+- Audit Trail header/filter/table changes are in HEAD `72aac62`; preserve uncommitted modal Blade/CSS/test edits, Stock Input report Blade/new CSS, `ReportController` pagination and `ReportFilterMatrixTest` edits, and this handoff. The status migration ran only on local `db_stock`; production remains unverified.
