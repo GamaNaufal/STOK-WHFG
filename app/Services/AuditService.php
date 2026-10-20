@@ -9,6 +9,31 @@ use Illuminate\Support\Facades\Request;
 
 class AuditService
 {
+    /** Write a required audit entry inside the caller's transaction. */
+    public static function record(
+        string $type,
+        string $action,
+        string $model,
+        int $modelId,
+        ?int $userId,
+        array $oldValues = [],
+        array $newValues = [],
+        ?string $description = null
+    ): AuditLog {
+        return AuditLog::create([
+            'type' => $type,
+            'action' => $action,
+            'model' => $model,
+            'model_id' => $modelId,
+            'old_values' => $oldValues ? json_encode($oldValues, JSON_THROW_ON_ERROR) : null,
+            'new_values' => $newValues ? json_encode($newValues, JSON_THROW_ON_ERROR) : null,
+            'description' => $description,
+            'user_id' => $userId,
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ]);
+    }
+
     /**
      * Log audit trail untuk aksi apapun
      * 

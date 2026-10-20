@@ -76,6 +76,50 @@ class ReportFilterMatrixTest extends TestCase
         });
     }
 
+    public function test_withdrawal_report_paginates_without_losing_filters_or_long_notes(): void
+    {
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $longNote = 'Catatan audit pengambilan yang lebih panjang dari tiga puluh karakter tetap terlihat lengkap.';
+
+        foreach (range(1, 16) as $sequence) {
+            StockWithdrawal::create([
+                'user_id' => $operator->id,
+                'part_number' => 'P-RPT-PAGE',
+                'pcs_quantity' => 10,
+                'box_quantity' => 1,
+                'warehouse_location' => 'LOC-PAGE',
+                'status' => 'completed',
+                'notes' => $sequence === 1 ? $longNote : null,
+                'withdrawn_at' => Carbon::parse('2026-02-10 08:00:00')->addMinutes($sequence),
+            ]);
+        }
+
+        $filters = [
+            'start_date' => '2026-02-09',
+            'end_date' => '2026-02-11',
+            'status' => 'completed',
+            'part_number' => 'P-RPT-PAGE',
+            'user_id' => $operator->id,
+        ];
+        $firstPage = $this->actingAs($supervisi)->get(route('reports.withdrawal', $filters));
+        $firstPage->assertOk();
+        $firstPage->assertViewHas('withdrawals', fn ($rows) => $rows->perPage() === 15
+            && $rows->total() === 16
+            && $rows->count() === 15);
+        $firstPage->assertSee('class="page-item', false);
+        $firstPage->assertSee('part_number=P-RPT-PAGE', false);
+        $firstPage->assertSee('user_id=' . $operator->id, false);
+        $firstPage->assertSee('page=2', false);
+
+        $secondPage = $this->actingAs($supervisi)->get(route('reports.withdrawal', [...$filters, 'page' => 2]));
+        $secondPage->assertOk();
+        $secondPage->assertViewHas('withdrawals', fn ($rows) => $rows->total() === 16
+            && $rows->firstItem() === 16
+            && $rows->count() === 1);
+        $secondPage->assertSee($longNote);
+    }
+
     public function test_stock_input_report_filter_matrix_applies_date_part_and_location(): void
     {
         $supervisi = User::factory()->create(['role' => 'supervisi']);

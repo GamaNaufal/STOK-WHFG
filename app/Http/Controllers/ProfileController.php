@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ProfileController extends Controller
@@ -45,14 +47,19 @@ class ProfileController extends Controller
             }
         }
 
-        $user->name = $validated['name'];
-        $user->email = $validated['email'];
-
-        if (!empty($validated['password'])) {
-            $user->password = Hash::make($validated['password']);
-        }
-
-        $user->save();
+        DB::transaction(function () use ($user, $validated) {
+            $before = ['name' => $user->name, 'email' => $user->email];
+            $user->name = $validated['name'];
+            $user->email = $validated['email'];
+            $passwordChanged = ! empty($validated['password']);
+            if ($passwordChanged) {
+                $user->password = Hash::make($validated['password']);
+            }
+            $user->save();
+            AuditService::record('profile', 'updated', 'User', $user->id, $user->id,
+                $before, ['name' => $user->name, 'email' => $user->email, 'password_changed' => $passwordChanged],
+                'Profil pengguna diperbarui.');
+        });
 
         return redirect()->route('profile.edit')->with('success', 'Profil berhasil diperbarui.');
     }

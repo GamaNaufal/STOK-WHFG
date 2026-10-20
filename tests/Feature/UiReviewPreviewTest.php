@@ -7,6 +7,9 @@ use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryPickSession;
+use App\Models\MasterLocation;
+use App\Models\Pallet;
+use App\Models\PartSetting;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -223,6 +226,70 @@ class UiReviewPreviewTest extends TestCase
         $resetUrl = html_entity_decode($match[1]);
         parse_str(parse_url($resetUrl, PHP_URL_QUERY), $resetQuery);
         $this->assertSame(array_intersect_key($query, array_flip(['period', 'start_date', 'end_date', 'group_by', 'fulfillment_filter'])), $resetQuery);
+    }
+
+    public function test_master_location_pages_show_the_occupied_guard_and_keep_invalid_code_input(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin_warehouse']);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-LOKASI-01']);
+        $location = MasterLocation::create([
+            'code' => 'A-1-1',
+            'is_occupied' => true,
+            'current_pallet_id' => $pallet->id,
+        ]);
+
+        $index = $this->actingAs($admin)->get(route('locations.index'));
+        $index->assertOk()
+            ->assertSee('Tambah lokasi')
+            ->assertSee('PLT-LOKASI-01')
+            ->assertSee('Pindahkan pallet sebelum mengubah atau menghapus.');
+
+        $edit = $this->get(route('locations.edit', $location));
+        $edit->assertOk()
+            ->assertSee('Lokasi sedang terisi')
+            ->assertSee('PLT-LOKASI-01');
+        $this->assertMatchesRegularExpression('/<input[^>]*id="code"[^>]*readonly/s', $edit->getContent());
+        $this->assertMatchesRegularExpression('/<button[^>]*type="submit"[^>]*disabled/s', $edit->getContent());
+
+        $available = MasterLocation::create(['code' => 'B-1-1', 'is_occupied' => false]);
+        $availableEdit = $this->get(route('locations.edit', $available));
+        $availableEdit->assertOk()->assertSee('Simpan perubahan');
+        $this->assertDoesNotMatchRegularExpression('/<input[^>]*id="code"[^>]*readonly/s', $availableEdit->getContent());
+
+        $this->post(route('locations.store'), ['code' => 'A-1-1'])->assertSessionHasErrors('code');
+        $this->get(route('locations.index'))
+            ->assertOk()
+            ->assertSee('name="code" value="A-1-1"', false);
+    }
+
+    public function test_master_part_pages_keep_capacity_units_pagination_and_invalid_input(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin_warehouse']);
+        foreach (range(1, 11) as $number) {
+            PartSetting::create(['part_number' => sprintf('PART-%02d', $number), 'qty_box' => 100]);
+        }
+
+        $this->actingAs($admin)->get(route('part-settings.index'))
+            ->assertOk()
+            ->assertSee('Menampilkan 1–10 dari 11 nomor part')
+            ->assertSee('PCS / box')
+            ->assertDontSee('PART-11');
+        $this->get(route('part-settings.index', ['page' => 2]))
+            ->assertOk()
+            ->assertSee('PART-11');
+        $this->get(route('part-settings.search', ['q' => 'PART-']))
+            ->assertOk()
+            ->assertJsonCount(11, 'data');
+        $this->get(route('part-settings.edit', PartSetting::where('part_number', 'PART-01')->sole()))
+            ->assertOk()
+            ->assertSee('PCS standar per box')
+            ->assertSee('value="100"', false);
+
+        $this->post(route('part-settings.store'), ['part_number' => 'PART-01', 'qty_box' => 100])
+            ->assertSessionHasErrors('part_number');
+        $this->get(route('part-settings.create'))
+            ->assertOk()
+            ->assertSee('value="PART-01"', false);
     }
 
     public function test_module_pages_render(): void

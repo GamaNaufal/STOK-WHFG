@@ -15,6 +15,14 @@ class AuditLogPresenter
         'total_boxes' => 'Total box', 'completed_boxes' => 'Box selesai', 'box_count' => 'Jumlah box',
         'warehouse_location' => 'Lokasi gudang', 'location' => 'Lokasi gudang',
         'pallet' => 'Pallet', 'stored_at' => 'Tanggal masuk', 'withdrawn_at' => 'Tanggal pengambilan',
+        'age_months' => 'Umur stok (bulan)', 'handled_at' => 'Tanggal Handle',
+        'reactivated_until' => 'Aktif sampai',
+        'qty_box' => 'PCS per box', 'name' => 'Nama', 'email' => 'Email',
+        'role' => 'Role', 'is_active' => 'Akun aktif', 'password_changed' => 'Sandi diubah',
+        'request_type' => 'Jenis permintaan', 'issue_type' => 'Jenis issue',
+        'scanned_code' => 'Kode scan', 'session_status' => 'Status sesi',
+        'verification' => 'Mode verifikasi',
+        'verified_count' => 'Box diverifikasi', 'notes' => 'Catatan',
         'status' => 'Status', 'completion_status' => 'Status penyelesaian',
         'deleted' => 'Dihapus dari stok aktif', 'soft_deleted_box_count' => 'Box dihapus dari stok aktif',
         'hard_deleted_box_count' => 'Box dihapus permanen',
@@ -30,6 +38,12 @@ class AuditLogPresenter
             'created' => 'Dibuat', 'updated' => 'Diperbarui', 'completed' => 'Diselesaikan',
             'reversed' => 'Dibatalkan / dikembalikan', 'redo' => 'Ulangi delivery',
             'moved' => 'Dipindahkan', 'merged' => 'Pallet digabung',
+            'handled' => 'Box di-Handle',
+            'approved' => 'Disetujui', 'rejected' => 'Ditolak',
+            'started' => 'Dimulai', 'cancelled' => 'Dibatalkan',
+            'verified' => 'Diverifikasi', 'scanned' => 'Dipindai',
+            'terminated' => 'Lock dihentikan', 'timed_out' => 'Waktu habis',
+            'deleted' => 'Dihapus', 'deactivated' => 'Dinonaktifkan',
             'box_updated_by_admin_warehouse' => 'Edit Box (Admin Warehouse)',
             'box_deleted_by_stock_view' => 'Hapus Box (Stock View)',
             'pallet_deleted_by_stock_view' => 'Hapus Pallet (Stock View)',
@@ -43,6 +57,12 @@ class AuditLogPresenter
             'stock_input' => 'Input stok', 'stock_withdrawal' => 'Pengambilan stok',
             'delivery_pickup' => 'Pengiriman', 'delivery_assignment' => 'Assignment delivery',
             'delivery_redo' => 'Redo delivery', 'box_pallet_moved' => 'Pemindahan box',
+            'expired_box' => 'Penanganan box expired',
+            'not_full_box' => 'Box Not Full', 'delivery_pick' => 'Picking delivery',
+            'delivery_issue' => 'Issue scan delivery',
+            'master_location' => 'Master lokasi', 'master_part' => 'Master part',
+            'user_management' => 'Kelola user', 'profile' => 'Profil pengguna',
+            'role_feature_access' => 'Hak akses role',
             'pallet_location_moved' => 'Pemindahan lokasi pallet', 'pallet_merged' => 'Penggabungan pallet',
             default => 'Aktivitas stok',
         };
@@ -151,19 +171,24 @@ class AuditLogPresenter
         if ($key === 'deleted') {
             return $value ? 'Ya' : 'Tidak';
         }
-        if (in_array($key, ['stored_at', 'withdrawn_at'], true)) {
+        if (in_array($key, ['is_active', 'password_changed', 'verification'], true)) {
+            return $value ? 'Ya' : 'Tidak';
+        }
+        if (in_array($key, ['stored_at', 'withdrawn_at', 'handled_at', 'reactivated_until'], true)) {
             try {
                 return CarbonImmutable::parse($value)->format('d/m/Y H:i:s');
             } catch (\Throwable) {
                 return 'Tanggal tidak valid';
             }
         }
-        if (in_array($key, ['status', 'completion_status'], true)) {
+        if (in_array($key, ['status', 'completion_status', 'session_status'], true)) {
             return match ((string) $value) {
                 'pending' => 'Menunggu', 'completed' => 'Selesai', 'partial' => 'Sebagian selesai',
                 'in_progress' => 'Sedang diproses', 'cancelled', 'canceled' => 'Dibatalkan',
                 'reversed' => 'Dikembalikan', 'active' => 'Aktif', 'expired' => 'Kedaluwarsa',
-                'warning' => 'Peringatan', default => ucfirst(str_replace('_', ' ', (string) $value)),
+                'warning' => 'Peringatan', 'approved' => 'Disetujui', 'rejected' => 'Ditolak',
+                'scanning' => 'Sedang dipindai', 'blocked' => 'Diblokir',
+                default => ucfirst(str_replace('_', ' ', (string) $value)),
             };
         }
         if ($key === 'delivery_order_id') {

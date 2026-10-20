@@ -1,6 +1,6 @@
 # UI Redesign Progress
 
-Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`, HEAD `72aac62`; local implementation only, production revision unverified.
+Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`, HEAD `ae67525`; local implementation only, production revision unverified.
 
 ## 1. Frontend architecture
 
@@ -10,8 +10,7 @@ Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
   Global overrides load after page styles; no `@stack('styles')`. Scripts support sections/stacks.
 - Main shell loads public assets directly, including `public/js/alert-helper.js`. Vite/Tailwind 4 are configured in `vite.config.js`, `resources/css/app.css`,
   and `resources/js/app.js`, but this shell does not load them with `@vite`.
-- Reusable UI: `resources/views/components/`; standalone login:
-  `resources/views/shared/auth/login.blade.php`, `public/css/login-ui.css`.
+- Reusable UI: `resources/views/components/`; standalone login: `resources/views/shared/auth/login.blade.php`, `public/css/login-ui.css`.
 - Dashboard: `resources/views/shared/dashboard.blade.php` for Operator, Sales,
   PPC, Admin Warehouse; `resources/views/operator/reports/operational.blade.php`
   for Admin Utama/Supervisi. Dashboard partials are in
@@ -47,8 +46,9 @@ Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 - Dashboard throughput table in `resources/views/shared/partials/dashboard-throughput-table.blade.php`: exact inbound/outbound PCS with bars scaled to the largest daily flow, active-day count and zero-day label. Totals/date grouping unchanged.
 - Dashboard scan issues table in `resources/views/shared/partials/dashboard-issues-table.blade.php`: readable reason plus audit code, textual status, full scan/notes and split date/time. `#scan-issues` targets this table (not Processing Time) on dashboard/report branches. 50-row scope, filters and export mapping unchanged; audit remains.
 - Dashboard audit filters in `resources/views/shared/partials/dashboard-audit-filters.blade.php` and `public/css/dashboard-filters.css`: active-filter count/chips, clear applied-vs-pending guidance and responsive hierarchy. Submit carries period/date/group/fulfillment context; Reset clears only audit filters and pagination. Audit query, roles and report route remain unchanged.
-- Standalone audit trail `/audit-trail`: `resources/views/supervisor/audit/index.blade.php`, `partials/detail.blade.php` and `public/css/pages/audit-trail.css` now give header, date-scoped metrics, filters/results and detail modal a responsive hierarchy. Summary/table scope is explicit; modal separates metadata, changes, facts and nested tables, with mobile before/after labels and keyboard-scrollable tables. Export parameters, snapshot presenter, metric queries and detail routes unchanged. The separate Operational Report Blade branch has no registered GET route.
+- Standalone audit trail `/audit-trail`: `resources/views/supervisor/audit/index.blade.php`, `partials/detail.blade.php` and `public/css/pages/audit-trail.css` give header, date-scoped metrics, filters/results and detail modal a responsive hierarchy. On 21 Oct, filters/presenter gained Handle, Box Not Full, picking/issue, master/admin and profile audit types; `AuditService::record` makes new entries transactional. Delivery Order mutation audit remains excluded; legacy `AuditService::log` remains best-effort. Export uses the same generic type/action query; the separate Operational Report Blade branch has no registered GET route.
 - Stock Input report: `resources/views/operator/reports/stock-input.blade.php` and `public/css/pages/report-stock-input.css` have a restrained header, responsive filters, whole-history summary cards and a results table with sticky record/date, wrapped part/box audit labels, filtered count and contextual empty state. `ReportController::stockInputReport` paginates 15 rows; scoped Bootstrap 5 pagination avoids oversized Tailwind arrows and retains filters. Export remains unpaginated. Routes and roles are unchanged; cards cover all history.
+- Withdrawal report: `resources/views/operator/reports/withdrawal.blade.php` and `public/css/pages/report-withdrawal.css` now cover header, whole-history summary cards, five labeled filters, sticky-date result table, full notes, contextual empty state and Bootstrap pagination. `reversed` is labeled Dikembalikan/Redo throughout the UI. `ReportController::withdrawalReport` paginates 15 rows. Excel still applies only date/status (not part/operator); this difference is disclosed in UI. Routes, roles and status queries remain unchanged.
 - Delivery Schedule header/toolbar: `resources/views/operator/delivery/partials/schedule-{header,filters}.blade.php`,
   `public/css/pages/delivery-schedule-toolbar.css`, `public/js/pages/delivery-schedule-filters.js`.
   Client-only search/timing filter uses rendered active rows; priority order/actions remain. No-JS shows all rows.
@@ -103,17 +103,19 @@ Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
   operator, date/time, empty state, and aligned mobile scroll. Scan/API unchanged.
 - Merge Pallet uses `resources/views/operator/merge/index.blade.php` and `public/css/pages/merge-pallet.css`:
   source/selection, location chooser, impact preview and audit history table completed; typed codes require a listed choice, stale results ignored, and source removal clears its location. History shows up to 20 records.
-- Split backend/schema: MySQL `db_stock` lacked enum value `partial`, causing Split to fail when
-  updating its parent. `database/migrations/2026_10_20_000001_add_partial_to_existing_delivery_order_status.php`
+- Split backend/schema: MySQL `db_stock` lacked enum value `partial`, causing Split to fail when updating its parent. `database/migrations/2026_10_20_000001_add_partial_to_existing_delivery_order_status.php`
   adds the missing value to existing MySQL enums; applied locally on 20 October. No Split rule changed.
-- Other Delivery, expired boxes, remaining reports and master/admin screens need detailed review; physical devices, screen readers, large datasets, network/session combinations, Stock Input races and print output remain unverified.
+- `/expired-box`: `resources/views/warehouse/expired-box/index.blade.php`, `public/css/pages/expired-box.css`, `public/js/pages/expired-box.js` give status counts, FIFO/Handle guidance, current-row search, scrollable tables, elapsed-Handle label, contextual location choice, confirmation and 15-row Handle history. Handle now also records one transactional `expired_box` Audit Trail entry per successful activation; FIFO/role rules unchanged.
+- Master Location complete: `resources/views/admin/locations/{index,edit}.blade.php` and `public/css/pages/master-locations.css` cover page headers, create/edit forms, validation feedback, occupancy context, labeled table actions, empty state and bounded pagination. Occupied edit is read-only; occupied deletion is disabled in UI while server guards remain. Other Delivery, remaining reports/master screens, devices, screen readers and large datasets remain unverified.
+- Master Part & Qty complete: `resources/views/operator/part-settings/{index,create,edit}.blade.php`, `public/css/pages/master-parts.css`, `public/js/pages/master-parts.js` cover header, capped global search with loading/error/reset, consistent PCS/box units, bounded pagination, create/edit guidance and deletion context. Existing 10-row pages, 50-result search API, validation, referenced-part guards, routes and roles remain.
+- User Management complete: `resources/views/admin/users/{index,create,edit}.blade.php`, `public/css/pages/user-management.css`, `public/js/pages/user-management-forms.js`, and `UserController::index` cover account totals, server-side name/email search, role/status filters, 15-row pagination, responsive table, labeled create/edit fields, role/status guidance, matching password feedback and contextual confirmations. Own-account deactivation is unavailable in the list; routes, server validation, role options, activation and audit behavior remain.
 - Pallet business guard (20 Oct): assigned/not-full boxes and `pending` pick sessions allow Move/Merge.
   Any attached box in `scanning`, `blocked`, or `approved` blocks Move/Merge and additions
   through Stock Input/Box Not Full, plus sibling assignment, Stock View mutation and expired Handle. Merge retargets pending Box Not Full requests; assignment and PCS stay intact.
 
 ## 5. Recommended next segment
 
-Continue with **Withdrawal report header and filters** in `resources/views/operator/reports/withdrawal.blade.php`; preserve export parameters and role access.
+Continue with **Hak Akses / Access Management** in `resources/views/admin/access/index.blade.php`; preserve role-feature rules and Admin-only permissions.
 
 ## 6. Production safety
 
@@ -130,8 +132,7 @@ Continue with **Withdrawal report header and filters** in `resources/views/opera
 
 ## 7. Relevant validation
 
-- Scan stages: 34 Laravel tests/264 assertions and 13 Node tests passed; verification
-  rejects wrong input without blocking, while final scan blocks pending approval.
+- Scan stages: 34 Laravel tests/264 assertions and 13 Node tests passed; verification rejects wrong input without blocking, while final scan blocks pending approval.
 - Delivery lock management: 15 Laravel tests/287 assertions passed; 390px browser fixture
   kept header/body aligned at 843px scroll.
 - Delivery Assign: prior 18 Laravel tests/134 assertions; current focused 15/70 and 4 Node
@@ -139,11 +140,12 @@ Continue with **Withdrawal report header and filters** in `resources/views/opera
 - Move/Merge UI: 4/3 Node interaction tests passed; Move history 8 Laravel/63 assertions and Merge history 13 Laravel/120 assertions passed. Browser/device visual check untested.
 - Pallet delivery guard: 60 focused Laravel tests/350 assertions passed across Move, Merge,
   Stock Input, Delivery Assign and Box Not Full; Stock View sibling guard also passed.
-- Expired Box/verification: 23 Laravel tests/253 assertions passed; Delivery Flow Consistency: 22 tests/125 assertions passed. No live scanner check.
+- Expired Box/verification: 20 focused Laravel tests/230 assertions and 3 Node interaction tests passed after page redesign; Handle audit tests 12/133 passed on 21 Oct. Earlier Delivery Flow Consistency 22/125 passed. No browser/device visual or live scanner check.
 - Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering, approval/unblock and permission checks; responsive layout reviewed in CSS only.
-- Dashboard processing/throughput/issues/audit filters: `UiReviewPreviewTest` 8 Laravel tests/109 assertions passed; report/export sanity 3/24 previously passed. Standalone Audit Trail: 10 audit/detail/auth tests/89 assertions passed, covering dated summary, export URL, populated/empty results, quick preset and modal snapshots. No browser/device visual check.
-- Stock Input report: 7 focused Laravel tests/39 assertions passed (`ReportFilterMatrixTest`, `AuthorizationAndReportExportSanityTest`), including 15+1 pagination, filter retention and export; prior UI render suite passed. Browser/device visual check remains open.
+- Dashboard processing/throughput/issues/audit filters: prior `UiReviewPreviewTest` 8/109 and report/export sanity 3/24 passed. Standalone Audit Trail: 10 audit/detail/auth tests/89 assertions passed; full Laravel suite on 21 Oct passed 233 tests/1,723 assertions after broader audit coverage. Master Location and Master Part & Qty: 42 focused Laravel tests/447 assertions plus 2 Node search/delete tests passed; browser/device visual check remains open.
+- Stock Input/Withdrawal reports: 16 focused Laravel tests/157 assertions passed; after Withdrawal wording revision, 8 filter/auth/export tests/48 assertions passed. Coverage includes 15+1 pagination, filter retention and full notes; browser/device visual check remains open.
+- User Management list/forms: 28 focused Laravel tests/409 assertions passed (rendering, filters, pagination, access and audit); JS syntax and diff checks passed. Browser/device visual check remains open.
 
 ## 8. Changes to preserve
 
-- Audit Trail header/filter/table changes are in HEAD `72aac62`; preserve uncommitted modal Blade/CSS/test edits, Stock Input report Blade/new CSS, `ReportController` pagination and `ReportFilterMatrixTest` edits, and this handoff. The status migration ran only on local `db_stock`; production remains unverified.
+- Earlier Audit Trail/Stock Input edits are in HEAD `ae67525`; preserve all uncommitted audit/controller/service/test work, Withdrawal and Expired Box UI assets, Master Location, Master Part and User Management Blade/CSS/tests, and this handoff. The status migration ran only on local `db_stock`; production remains unverified.

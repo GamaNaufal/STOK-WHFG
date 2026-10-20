@@ -2,6 +2,18 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
+Verifikasi tambahan 21 Oktober 2026 (Audit Trail): Handle box expired kini membuat
+`audit_logs` bertipe `expired_box` dalam transaksi yang sama dengan aktivasi dan
+`expired_box_reports`; request berulang saat box masih aktif tidak membuat entri baru.
+Pengajuan/keputusan Box Not Full, perubahan sesi picking (mulai, verifikasi sukses,
+scan final sukses, batal/timeout/selesai, terminate lock), pembuatan dan approval
+issue scan, withdrawal langsung, CRUD master lokasi/part dan user, serta pembaruan profil kini
+memiliki entri audit tersendiri. Jalur baru memakai `AuditService::record` yang
+mewajibkan audit tersimpan dalam transaksi mutasi; sandi tidak masuk snapshot.
+CRUD/status PPC/split/restore/hapus Delivery Order tetap dikecualikan atas permintaan
+pengguna. Jalur audit lama yang memakai `AuditService::log` masih best-effort dan
+menelan kegagalan tulis; riwayat lama tidak di-backfill.
+
 Verifikasi tambahan 20 Oktober 2026 (mutasi pallet saat delivery): box assigned delivery
 atau not-full tetap boleh ikut Move/Merge jika sesi pick baru `pending` atau tidak ada.
 Box mana pun yang masih terhubung ke pallet dan berada dalam sesi `scanning`, `blocked`,

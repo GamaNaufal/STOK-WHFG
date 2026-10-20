@@ -1,0 +1,113 @@
+.withdrawal-report-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; margin-bottom: 1.5rem; padding: .25rem 0 1.25rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+.withdrawal-report-intro { min-width: 0; }
+.withdrawal-report-eyebrow { display: block; margin-bottom: .375rem; color: #176665; font-size: .6875rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.warehouse-app .withdrawal-report-intro h1 { margin: 0 0 .375rem; color: var(--ui-ink, #202124); font-size: clamp(1.5rem, 2vw, 1.875rem); font-weight: 700; line-height: 1.2; letter-spacing: -.025em; }
+.warehouse-app .withdrawal-report-intro p { max-width: 64ch; margin: 0; color: var(--ui-muted, #595d65); font-size: .875rem; line-height: 1.55; }
+.withdrawal-report-export { display: flex; align-items: flex-end; flex: none; flex-direction: column; gap: .375rem; max-width: 25rem; }
+.withdrawal-report-export > span { color: var(--ui-muted, #595d65); font-size: .75rem; line-height: 1.45; text-align: right; }
+.warehouse-app .withdrawal-report-export .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; white-space: nowrap; }
+.withdrawal-report-overview-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: .875rem; }
+.withdrawal-report-overview-heading .withdrawal-report-eyebrow { margin-bottom: .25rem; }
+.warehouse-app .withdrawal-report-overview-heading h2 { margin: 0; color: var(--ui-ink, #202124); font-size: 1.125rem; font-weight: 700; letter-spacing: -.015em; line-height: 1.35; }
+.warehouse-app .withdrawal-report-overview-heading p { margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; line-height: 1.5; }
+.withdrawal-report-metrics { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.withdrawal-report-metric { display: flex; min-width: 0; min-height: 8.5rem; flex-direction: column; justify-content: space-between; gap: 1rem; margin: 0; padding: 1.25rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .75rem; background: var(--ui-surface, #fff); }
+.withdrawal-report-metric-primary { border-color: #b9dcd7; background: #f2faf8; }
+.withdrawal-report-metric-reversed { border-color: #eadbbd; background: #fffbf3; }
+.warehouse-app .withdrawal-report-metric dt { display: flex; align-items: center; gap: .625rem; margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; font-weight: 600; line-height: 1.4; }
+.withdrawal-report-metric dt i { color: #176665; font-size: 1rem; line-height: 1; }
+.withdrawal-report-metric-reversed dt i { color: #805000; }
+.warehouse-app .withdrawal-report-metric dd { display: flex; align-items: baseline; flex-wrap: wrap; gap: .375rem .625rem; min-width: 0; margin: 0; color: var(--ui-ink, #202124); font-variant-numeric: tabular-nums; }
+.withdrawal-report-metric dd > span { min-width: 0; overflow-wrap: anywhere; font-size: clamp(1.75rem, 2.8vw, 2.25rem); font-weight: 700; letter-spacing: -.035em; line-height: 1.1; }
+.withdrawal-report-metric-primary dd > span { color: #176665; font-size: clamp(2rem, 3.2vw, 2.625rem); }
+.withdrawal-report-metric-reversed dd > span { color: #805000; }
+.withdrawal-report-metric dd > small { color: var(--ui-muted, #595d65); font-size: .8125rem; font-weight: 500; line-height: 1.4; }
+.warehouse-app .withdrawal-report-filters { overflow: hidden; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .75rem; background: var(--ui-surface, #fff); box-shadow: none; }
+.withdrawal-report-filter-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+.warehouse-app .withdrawal-report-filter-heading h2 { margin: 0 0 .25rem; color: var(--ui-ink, #202124); font-size: 1rem; font-weight: 650; line-height: 1.4; }
+.warehouse-app .withdrawal-report-filter-heading p { margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; line-height: 1.5; }
+.withdrawal-report-filter-heading > span { flex: none; padding: .25rem .625rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: 999px; color: var(--ui-muted, #595d65); font-size: .8125rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.warehouse-app .withdrawal-report-filters .card-body { padding: 1.25rem 1.5rem; }
+.withdrawal-report-filter-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 1rem; }
+.withdrawal-report-field { min-width: 0; }
+.warehouse-app .withdrawal-report-field .form-label { margin-bottom: .375rem; color: var(--ui-ink, #202124); font-size: .8125rem; font-weight: 600; }
+.warehouse-app .withdrawal-report-field :is(.form-control, .form-select) { width: 100%; min-width: 0; min-height: 44px; font-size: 1rem; }
+.withdrawal-report-filter-actions { display: flex; justify-content: flex-end; gap: .625rem; grid-column: 1 / -1; padding-top: .25rem; }
+.warehouse-app .withdrawal-report-filter-actions .btn { display: inline-flex; align-items: center; justify-content: center; gap: .375rem; min-height: 44px; white-space: nowrap; }
+.warehouse-app .withdrawal-report-header a:focus-visible,
+.warehouse-app .withdrawal-report-filters :is(input, select, button, a):focus-visible,
+.warehouse-app .withdrawal-report-empty .btn:focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 2px; box-shadow: none; }
+.withdrawal-report-results { overflow: hidden; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .75rem; background: var(--ui-surface, #fff); }
+.withdrawal-report-results-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+.warehouse-app .withdrawal-report-results-heading h2 { margin: 0 0 .25rem; color: var(--ui-ink, #202124); font-size: 1rem; font-weight: 700; line-height: 1.4; }
+.warehouse-app .withdrawal-report-results-heading p { margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.withdrawal-report-results-heading > span { display: inline-flex; align-items: center; gap: .375rem; flex: none; color: var(--ui-muted, #595d65); font-size: .75rem; line-height: 1.5; }
+.withdrawal-report-table-scroll { overflow-x: auto; }
+.withdrawal-report-table-scroll:focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: -3px; }
+.warehouse-app .withdrawal-report-table { width: 100%; min-width: 1300px; margin: 0; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+.withdrawal-report-table thead { background: #f7f8f9; }
+.warehouse-app .withdrawal-report-table :is(th, td) { padding: .875rem 1rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); vertical-align: top; font-size: .8125rem; line-height: 1.5; overflow-wrap: anywhere; }
+.warehouse-app .withdrawal-report-table thead th { color: var(--ui-muted, #595d65); font-size: .75rem; font-weight: 700; white-space: nowrap; }
+.withdrawal-report-table thead th:nth-child(1) { width: 13%; }
+.withdrawal-report-table thead th:nth-child(2) { width: 12%; }
+.withdrawal-report-table thead th:nth-child(3) { width: 11%; }
+.withdrawal-report-table thead th:nth-child(4) { width: 9%; }
+.withdrawal-report-table thead th:nth-child(5) { width: 10%; }
+.withdrawal-report-table thead th:nth-child(6) { width: 9%; }
+.withdrawal-report-table thead th:nth-child(7) { width: 11%; }
+.withdrawal-report-table thead th:nth-child(8) { width: 10%; }
+.withdrawal-report-table thead th:nth-child(9) { width: 15%; }
+.warehouse-app .withdrawal-report-table .withdrawal-report-entry-cell { position: sticky; left: 0; z-index: 1; background: var(--ui-surface, #fff); box-shadow: inset -1px 0 var(--ui-border, #dfe1e5); }
+.warehouse-app .withdrawal-report-table thead .withdrawal-report-entry-cell { z-index: 2; background: #f7f8f9; }
+.warehouse-app .withdrawal-report-table tbody tr:hover > .withdrawal-report-entry-cell { background: #f7fbfa; }
+.warehouse-app .withdrawal-report-table tbody tr:last-child > :is(th, td) { border-bottom: 0; }
+.withdrawal-report-entry-cell > span { display: block; }
+.withdrawal-report-entry-number { margin-bottom: .25rem; color: #176665; font-weight: 700; }
+.withdrawal-report-entry-date { color: var(--ui-ink, #202124); font-weight: 600; font-variant-numeric: tabular-nums; }
+.withdrawal-report-entry-time { color: var(--ui-muted, #595d65); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.withdrawal-report-part-label { display: inline-block; max-width: 100%; padding: .25rem .5rem; border-radius: .375rem; background: #edf6f5; color: #176665; font-weight: 600; }
+.withdrawal-report-box-id, .withdrawal-report-pcs { color: var(--ui-ink, #202124); font-weight: 650; }
+.warehouse-app .withdrawal-report-table .withdrawal-report-number { text-align: right; font-variant-numeric: tabular-nums; }
+.withdrawal-report-number span, .withdrawal-report-secondary { color: var(--ui-muted, #595d65); }
+.withdrawal-report-status { display: inline-block; max-width: 100%; padding: .25rem .5rem; border-radius: .375rem; background: #f1f3f5; color: #3f4650; font-weight: 650; }
+.withdrawal-report-status.is-completed { background: #e1f5eb; color: #12683d; }
+.withdrawal-report-status.is-reversed { background: #fff2d8; color: #805000; }
+.withdrawal-report-notes { color: var(--ui-muted, #595d65); white-space: pre-line; }
+.withdrawal-report-pagination { padding: 1rem 1.5rem; border-top: 1px solid var(--ui-border, #dfe1e5); }
+.withdrawal-report-pagination .pagination { flex-wrap: wrap; gap: .25rem; margin: 0; }
+.warehouse-app .withdrawal-report-pagination .page-link { display: inline-flex; align-items: center; justify-content: center; min-width: 2.75rem; min-height: 2.75rem; border-radius: .375rem; }
+.withdrawal-report-empty { display: flex; align-items: center; flex-direction: column; padding: 3rem 1.5rem; text-align: center; }
+.withdrawal-report-empty > i { margin-bottom: .75rem; color: #176665; font-size: 1.5rem; }
+.warehouse-app .withdrawal-report-empty h3 { margin: 0 0 .25rem; color: var(--ui-ink, #202124); font-size: 1rem; font-weight: 700; }
+.warehouse-app .withdrawal-report-empty p { margin: 0 0 1rem; color: var(--ui-muted, #595d65); font-size: .875rem; }
+.withdrawal-report-empty p:last-child { margin-bottom: 0; }
+.warehouse-app .withdrawal-report-empty .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; }
+@media (max-width: 1199.98px) {
+    .withdrawal-report-filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 991.98px) {
+    .withdrawal-report-header { align-items: flex-start; flex-direction: column; }
+    .withdrawal-report-export { align-items: flex-start; max-width: none; }
+    .withdrawal-report-export > span { text-align: left; }
+    .withdrawal-report-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .withdrawal-report-metric-primary { grid-column: 1 / -1; }
+}
+@media (max-width: 767.98px) {
+    .withdrawal-report-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 575.98px) {
+    .withdrawal-report-header { gap: 1rem; }
+    .withdrawal-report-export { align-items: stretch; width: 100%; }
+    .withdrawal-report-export .btn { width: 100%; }
+    .withdrawal-report-overview-heading { align-items: flex-start; flex-direction: column; gap: .25rem; }
+    .withdrawal-report-metrics { grid-template-columns: minmax(0, 1fr); }
+    .withdrawal-report-metric-primary { grid-column: auto; }
+    .withdrawal-report-metric { min-height: 7.25rem; padding: 1rem; }
+    .withdrawal-report-filter-heading { align-items: flex-start; flex-direction: column; gap: .625rem; padding: 1rem; }
+    .warehouse-app .withdrawal-report-filters .card-body { padding: 1rem; }
+    .withdrawal-report-filter-grid { grid-template-columns: minmax(0, 1fr); }
+    .withdrawal-report-filter-actions { justify-content: stretch; }
+    .withdrawal-report-filter-actions .btn { flex: 1; }
+    .withdrawal-report-results-heading { flex-direction: column; gap: .5rem; padding: 1rem; }
+    .withdrawal-report-pagination { padding: 1rem; }
+}

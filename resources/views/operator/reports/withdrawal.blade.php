@@ -2,107 +2,88 @@
 
 @section('title', 'Laporan Pengambilan Stok - Warehouse FG Yamato')
 
+@section('styles')
+<link rel="stylesheet" href="{{ asset('css/pages/report-withdrawal.css') }}?v={{ filemtime(public_path('css/pages/report-withdrawal.css')) }}">
+@endsection
+
 @section('content')
-<!-- Modern Header Banner -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="app-page-banner" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
-                    color: white; 
-                    padding: 40px 30px; 
-                    border-radius: 12px; 
-                    box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;">
-            <div>
-                <h1 class="h2" style="margin: 0 0 10px 0; font-weight: 700;">
-                    <i class="bi bi-file-earmark-pdf"></i> Laporan Pengambilan Stok
-                </h1>
-                <p style="margin: 0; opacity: 0.95; font-size: 15px;">
-                    Riwayat lengkap pengambilan stok dengan filter tanggal dan operator
-                </p>
-            </div>
-            <a href="{{ route('reports.withdrawal.export', array_filter($filters)) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600;">
-                <i class="bi bi-download"></i> Export CSV
-            </a>
-        </div>
+<header class="withdrawal-report-header">
+    <div class="withdrawal-report-intro">
+        <span class="withdrawal-report-eyebrow">Laporan stok</span>
+        <h1>Laporan Pengambilan Stok</h1>
+        <p>Telusuri pengambilan, pengembalian/redo, jumlah PCS, dan catatan operator.</p>
     </div>
-</div>
+    <div class="withdrawal-report-export">
+        <span>Excel mengikuti tanggal dan status; filter part dan operator hanya untuk tabel.</span>
+        <a href="{{ route('reports.withdrawal.export', array_filter($filters)) }}" class="btn btn-outline-primary">
+            <i class="bi bi-download" aria-hidden="true"></i> Export Excel
+        </a>
+    </div>
+</header>
 
-<!-- Statistics Cards -->
-<div class="row mb-4 g-3">
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
-            <div class="card-body" style="padding: 24px;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Pengambilan</p>
-                        <h2 class="fw-bold app-summary-value" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $totalWithdrawals }}</h2>
-                    </div>
-                    <i class="bi bi-box-seam" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
-                </div>
-            </div>
+<section class="withdrawal-report-overview mb-4" aria-labelledby="withdrawal-overview-title">
+    <div class="withdrawal-report-overview-heading">
+        <div>
+            <span class="withdrawal-report-eyebrow">Ringkasan</span>
+            <h2 id="withdrawal-overview-title">Seluruh histori pengambilan</h2>
         </div>
+        <p>Angka ringkasan tidak berubah saat filter diterapkan.</p>
     </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
-            <div class="card-body" style="padding: 24px;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total PCS Diambil</p>
-                        <h2 class="fw-bold app-summary-value" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ number_format($totalPcsWithdrawn) }}</h2>
-                    </div>
-                    <i class="bi bi-stack" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
-                </div>
-            </div>
-        </div>
+    <div class="withdrawal-report-metrics">
+        <dl class="withdrawal-report-metric withdrawal-report-metric-primary">
+            <dt><i class="bi bi-stack" aria-hidden="true"></i> Total PCS Diambil</dt>
+            <dd><span>{{ number_format($totalPcsWithdrawn) }}</span><small>PCS</small></dd>
+        </dl>
+        <dl class="withdrawal-report-metric">
+            <dt><i class="bi bi-box-seam" aria-hidden="true"></i> Total Pengambilan</dt>
+            <dd><span>{{ number_format($totalWithdrawals) }}</span><small>selesai</small></dd>
+        </dl>
+        <dl class="withdrawal-report-metric withdrawal-report-metric-reversed">
+            <dt><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Total Dikembalikan/Redo</dt>
+            <dd><span>{{ number_format($totalReversed) }}</span><small>transaksi</small></dd>
+        </dl>
     </div>
-    <div class="col-md-4">
-        <div class="card border-0 shadow-sm" style="background: #f9fafb; border-radius: 12px;">
-            <div class="card-body" style="padding: 24px;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Pembatalan</p>
-                        <h2 class="fw-bold app-summary-value" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $totalReversed }}</h2>
-                    </div>
-                    <i class="bi bi-exclamation-circle" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+</section>
 
-<!-- Filter Form -->
-<div class="card shadow-sm border-0 mb-4" style="border-radius: 12px; overflow: hidden;">
-    <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
-        <i class="bi bi-funnel"></i> Filter Laporan
-    </div>
+@php
+    $activeFilterCount = collect($filters)
+        ->filter(fn ($value) => is_scalar($value) && filled($value))
+        ->count();
+@endphp
+<section class="card withdrawal-report-filters mb-4" aria-labelledby="withdrawal-filter-title">
+    <header class="withdrawal-report-filter-heading">
+        <div>
+            <h2 id="withdrawal-filter-title">Filter catatan</h2>
+            <p>Kelima filter membatasi tabel. Excel mengikuti tanggal dan status; ringkasan mencakup seluruh histori.</p>
+        </div>
+        <span>{{ $activeFilterCount }} filter aktif</span>
+    </header>
     <div class="card-body">
-        <form method="GET" class="row g-3">
-            <div class="col-md-2">
-                <label class="form-label fw-bold" style="font-size: 13px;">Dari Tanggal</label>
-                <input type="date" class="form-control" name="start_date" value="{{ $filters['start_date'] ?? '' }}" style="border-radius: 8px; border: 1px solid #e5e7eb;">
+        <form method="GET" action="{{ route('reports.withdrawal') }}" class="withdrawal-report-filter-grid">
+            <div class="withdrawal-report-field">
+                <label for="withdrawal-report-start" class="form-label">Dari tanggal</label>
+                <input id="withdrawal-report-start" type="date" class="form-control" name="start_date" value="{{ $filters['start_date'] ?? '' }}">
             </div>
-            <div class="col-md-2">
-                <label class="form-label fw-bold" style="font-size: 13px;">Sampai Tanggal</label>
-                <input type="date" class="form-control" name="end_date" value="{{ $filters['end_date'] ?? '' }}" style="border-radius: 8px; border: 1px solid #e5e7eb;">
+            <div class="withdrawal-report-field">
+                <label for="withdrawal-report-end" class="form-label">Sampai tanggal</label>
+                <input id="withdrawal-report-end" type="date" class="form-control" name="end_date" value="{{ $filters['end_date'] ?? '' }}">
             </div>
-            <div class="col-md-2">
-                <label class="form-label fw-bold" style="font-size: 13px;">Status</label>
-                <select class="form-select" name="status" style="border-radius: 8px; border: 1px solid #e5e7eb;">
-                    <option value="">-- Semua Status --</option>
+            <div class="withdrawal-report-field">
+                <label for="withdrawal-report-status" class="form-label">Status</label>
+                <select id="withdrawal-report-status" class="form-select" name="status">
+                    <option value="">Semua status</option>
                     <option value="completed" {{ $filters['status'] === 'completed' ? 'selected' : '' }}>Selesai</option>
-                    <option value="reversed" {{ $filters['status'] === 'reversed' ? 'selected' : '' }}>Dibatalkan</option>
+                    <option value="reversed" {{ $filters['status'] === 'reversed' ? 'selected' : '' }}>Dikembalikan/Redo</option>
                 </select>
             </div>
-            <div class="col-md-2">
-                <label class="form-label fw-bold" style="font-size: 13px;">Part Number</label>
-                <input type="text" class="form-control" name="part_number" placeholder="Cari part..." value="{{ $filters['part_number'] ?? '' }}" style="border-radius: 8px; border: 1px solid #e5e7eb;">
+            <div class="withdrawal-report-field">
+                <label for="withdrawal-report-part" class="form-label">Nomor part</label>
+                <input id="withdrawal-report-part" type="text" class="form-control" name="part_number" placeholder="Cari nomor part" value="{{ $filters['part_number'] ?? '' }}">
             </div>
-            <div class="col-md-2">
-                <label class="form-label fw-bold" style="font-size: 13px;">Operator</label>
-                <select class="form-select" name="user_id" style="border-radius: 8px; border: 1px solid #e5e7eb;">
-                    <option value="">-- Semua --</option>
+            <div class="withdrawal-report-field">
+                <label for="withdrawal-report-operator" class="form-label">Operator</label>
+                <select id="withdrawal-report-operator" class="form-select" name="user_id">
+                    <option value="">Semua operator</option>
                     @foreach($users as $user)
                         <option value="{{ $user->id }}" {{ $filters['user_id'] == $user->id ? 'selected' : '' }}>
                             {{ $user->name }}
@@ -110,104 +91,81 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn w-100" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; border: none; border-radius: 8px; font-weight: 600;">
-                    <i class="bi bi-search"></i> Filter
-                </button>
+            <div class="withdrawal-report-filter-actions">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-search" aria-hidden="true"></i> Terapkan</button>
+                <a href="{{ route('reports.withdrawal') }}" class="btn btn-outline-secondary">Atur ulang</a>
             </div>
         </form>
-        <a href="{{ route('reports.withdrawal') }}" class="btn btn-sm mt-2" style="background: #f3f4f6; color: #6b7280; border: none; border-radius: 8px;">
-            <i class="bi bi-arrow-clockwise"></i> Reset
-        </a>
     </div>
-</div>
+</section>
 
-<!-- Report Table -->
-<div class="card shadow-sm border-0" style="border-radius: 12px; overflow: hidden;">
-    <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); color: white; padding: 20px 24px; font-weight: 600; font-size: 15px;">
-        <i class="bi bi-table"></i> Detail Pengambilan Stok
-    </div>
-    <div class="card-body p-0">
-        @if($withdrawals->count() > 0)
-            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
-                <table class="table table-hover mb-0">
-                    <thead style="background-color: #f9fafb; color: #0C7779; border-bottom: 2px solid #e5e7eb;">
+<section class="withdrawal-report-results" aria-labelledby="withdrawal-results-title">
+    <header class="withdrawal-report-results-heading">
+        <div>
+            <h2 id="withdrawal-results-title">Hasil pengambilan stok</h2>
+            <p>Menampilkan {{ $withdrawals->firstItem() ?? 0 }}–{{ $withdrawals->lastItem() ?? 0 }} dari {{ number_format($withdrawals->total()) }} pencatatan sesuai filter.</p>
+        </div>
+        <span id="withdrawal-table-hint"><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Geser tabel untuk melihat semua kolom</span>
+    </header>
+    @if($withdrawals->count() > 0)
+        <div class="table-responsive withdrawal-report-table-scroll" tabindex="0" role="region" aria-label="Tabel hasil pengambilan stok" aria-describedby="withdrawal-table-hint">
+            <table class="table table-hover withdrawal-report-table mb-0">
+                <caption class="visually-hidden">Riwayat pengambilan stok sesuai filter, termasuk status dan catatan transaksi.</caption>
+                <thead>
+                    <tr>
+                        <th scope="col" class="withdrawal-report-entry-cell">Catatan</th>
+                        <th scope="col">Part Number</th>
+                        <th scope="col">ID Box</th>
+                        <th scope="col" class="withdrawal-report-number">Box Diambil</th>
+                        <th scope="col" class="withdrawal-report-number">PCS Diambil</th>
+                        <th scope="col">Lokasi</th>
+                        <th scope="col">Operator</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Keterangan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($withdrawals as $key => $withdrawal)
                         <tr>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">No</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Tanggal</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Part Number</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">ID Box</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Box Diambil</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">PCS Diambil</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Lokasi</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Operator</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Status</th>
-                            <th style="padding: 16px 20px; font-weight: 700; font-size: 13px; text-transform: uppercase;">Keterangan</th>
+                            <th scope="row" class="withdrawal-report-entry-cell">
+                                <span class="withdrawal-report-entry-number">#{{ $withdrawals->firstItem() + $key }}</span>
+                                <span class="withdrawal-report-entry-date">{{ $withdrawal->withdrawn_at->format('d/m/Y') }}</span>
+                                <span class="withdrawal-report-entry-time">{{ $withdrawal->withdrawn_at->format('H:i') }}</span>
+                            </th>
+                            <td><span class="withdrawal-report-part-label">{{ $withdrawal->part_number }}</span></td>
+                            <td class="withdrawal-report-box-id">{{ $withdrawal->box->box_number ?? $withdrawal->box_id ?? '-' }}</td>
+                            <td class="withdrawal-report-number">{{ (int) $withdrawal->box_quantity }} <span>Box</span></td>
+                            <td class="withdrawal-report-number withdrawal-report-pcs">{{ number_format((int) $withdrawal->pcs_quantity) }} <span>PCS</span></td>
+                            <td class="withdrawal-report-secondary">{{ $withdrawal->warehouse_location }}</td>
+                            <td class="withdrawal-report-secondary">{{ $withdrawal->user?->name ?? '-' }}</td>
+                            <td>
+                                @if($withdrawal->status === 'completed')
+                                    <span class="withdrawal-report-status is-completed">Selesai</span>
+                                @elseif($withdrawal->status === 'reversed')
+                                    <span class="withdrawal-report-status is-reversed">Dikembalikan/Redo</span>
+                                @else
+                                    <span class="withdrawal-report-status">{{ ucfirst((string) $withdrawal->status) }}</span>
+                                @endif
+                            </td>
+                            <td class="withdrawal-report-notes">{{ $withdrawal->notes ?: '–' }}</td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($withdrawals as $key => $withdrawal)
-                            <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
-                                <td style="padding: 16px 20px;">{{ $withdrawals->firstItem() + $key }}</td>
-                                <td style="padding: 16px 20px;">
-                                    <small class="text-muted">
-                                        {{ $withdrawal->withdrawn_at->format('d/m/Y') }}<br>
-                                        <strong style="color: #0C7779;">{{ $withdrawal->withdrawn_at->format('H:i') }}</strong>
-                                    </small>
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    <span class="badge" style="background-color: #f0f4f8; color: #0C7779;">
-                                        {{ $withdrawal->part_number }}
-                                    </span>
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    <small style="color: #6b7280;">{{ $withdrawal->box->box_number ?? $withdrawal->box_id ?? '-' }}</small>
-                                </td>
-                                <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">{{ (int) $withdrawal->box_quantity }} Box</td>
-                                <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">{{ $withdrawal->pcs_quantity }} PCS</td>
-                                <td style="padding: 16px 20px;">
-                                    <small style="color: #6b7280;">{{ $withdrawal->warehouse_location }}</small>
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    <small style="color: #6b7280;">{{ $withdrawal->user->name }}</small>
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    @if($withdrawal->status === 'completed')
-                                        <span class="badge" style="background-color: #10b981; color: white;">
-                                            <i class="bi bi-check-circle"></i> Selesai
-                                        </span>
-                                    @else
-                                        <span class="badge" style="background-color: #9ca3af; color: white;">
-                                            <i class="bi bi-x-circle"></i> Dibatalkan
-                                        </span>
-                                    @endif
-                                </td>
-                                <td style="padding: 16px 20px;">
-                                    <small class="text-muted" title="{{ $withdrawal->notes ?? '-' }}">
-                                        {{ $withdrawal->notes ? substr($withdrawal->notes, 0, 30) . '...' : '-' }}
-                                    </small>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- Pagination -->
-            <div class="p-4" style="border-top: 1px solid #e5e7eb;">
-                {{ $withdrawals->appends(request()->query())->links() }}
-            </div>
-        @else
-            <div class="p-5 text-center">
-                <i class="bi bi-inbox" style="font-size: 3rem; color: #e5e7eb;"></i>
-                <x-empty-state 
-                    icon="bi-box-arrow-right"
-                    title="Belum Ada Data Pengambilan"
-                    message="Data pengambilan stok akan muncul setelah ada transaksi pengambilan"
-                />
-            </div>
-        @endif
-    </div>
-</div>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+        <div class="withdrawal-report-pagination">
+            {{ $withdrawals->appends(request()->query())->links('pagination::bootstrap-5') }}
+        </div>
+    @else
+        <div class="withdrawal-report-empty">
+            <i class="bi bi-inbox" aria-hidden="true"></i>
+            <h3>Tidak ada data pengambilan stok</h3>
+            <p>{{ $activeFilterCount > 0 ? 'Tidak ada pencatatan yang sesuai dengan filter saat ini.' : 'Data pengambilan stok akan muncul setelah ada transaksi.' }}</p>
+            @if($activeFilterCount > 0)
+                <a href="{{ route('reports.withdrawal') }}" class="btn btn-outline-secondary">Atur ulang filter</a>
+            @endif
+        </div>
+    @endif
+</section>
 
 @endsection

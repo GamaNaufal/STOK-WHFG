@@ -11,6 +11,7 @@ use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\PartSetting;
 use App\Models\StockWithdrawal;
+use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -488,6 +489,7 @@ class StockWithdrawalController extends Controller
                 }
 
                 $actualWithdrawnQty = 0;
+                $boxDetails = [];
 
                 foreach ($selectedBoxes as $selectedBox) {
                     $box = Box::whereKey($selectedBox->id)->lockForUpdate()->first();
@@ -525,6 +527,12 @@ class StockWithdrawalController extends Controller
 
                     $withdrawals[] = $withdrawal;
                     $actualWithdrawnQty += (int) $box->pcs_quantity;
+                    $boxDetails[] = [
+                        'box_number' => $box->box_number,
+                        'part_number' => $box->part_number,
+                        'pcs_quantity' => (int) $box->pcs_quantity,
+                        'warehouse_location' => $withdrawal->warehouse_location,
+                    ];
 
                     $box->is_withdrawn = true;
                     $box->withdrawn_at = now();
@@ -569,6 +577,12 @@ class StockWithdrawalController extends Controller
                         }
                     }
                 }
+
+                AuditService::record('stock_withdrawal', 'completed', 'StockWithdrawal', $withdrawals[0]->id, Auth::id(),
+                    [], ['withdrawal_batch_id' => (string) $batchId, 'delivery_order_id' => $deliveryOrderId ?: null,
+                        'part_number' => $partNumber, 'pcs_quantity' => $actualWithdrawnQty,
+                        'box_quantity' => count($withdrawals), 'boxes' => $boxDetails, 'notes' => $notes],
+                    "Withdrawal langsung {$actualWithdrawnQty} PCS ({$partNumber}) selesai.");
 
                 return [
                     'withdrawals' => $withdrawals,
@@ -617,6 +631,8 @@ class StockWithdrawalController extends Controller
         try {
             DB::transaction(function () use ($items) {
                 $batchId = Str::uuid();
+                $boxDetails = [];
+                $totalPcs = 0;
 
                 foreach ($items as $cartItem) {
                     $partNumber = (string) $cartItem['part_number'];
@@ -650,7 +666,7 @@ class StockWithdrawalController extends Controller
                             ->lockForUpdate()
                             ->first();
 
-                        StockWithdrawal::create([
+                        $withdrawal = StockWithdrawal::create([
                             'withdrawal_batch_id' => $batchId,
                             'user_id' => Auth::id(),
                             'pallet_item_id' => $palletItem?->id,
@@ -663,6 +679,10 @@ class StockWithdrawalController extends Controller
                             'notes' => null,
                             'withdrawn_at' => now(),
                         ]);
+                        $totalPcs += (int) $box->pcs_quantity;
+                        $boxDetails[] = ['box_number' => $box->box_number, 'part_number' => $box->part_number,
+                            'pcs_quantity' => (int) $box->pcs_quantity,
+                            'warehouse_location' => $withdrawal->warehouse_location];
 
                         $box->is_withdrawn = true;
                         $box->withdrawn_at = now();
@@ -671,6 +691,10 @@ class StockWithdrawalController extends Controller
                         $this->syncLinkedPalletsAfterBoxDeactivation($box, false);
                     }
                 }
+                AuditService::record('stock_withdrawal', 'completed', 'StockWithdrawal', $withdrawal->id, Auth::id(),
+                    [], ['withdrawal_batch_id' => (string) $batchId, 'pcs_quantity' => $totalPcs,
+                        'box_quantity' => count($boxDetails), 'boxes' => $boxDetails],
+                    "Withdrawal langsung {$totalPcs} PCS selesai.");
             });
 
             return response()->json([
@@ -895,6 +919,13 @@ class StockWithdrawalController extends Controller
                     $batchWithdrawal->status = 'reversed';
                     $batchWithdrawal->save();
                 }
+
+                AuditService::record('stock_withdrawal', 'reversed', 'StockWithdrawal', $withdrawal->id, Auth::id(),
+                    ['status' => 'completed'], ['status' => 'reversed',
+                        'withdrawal_batch_id' => (string) $batchId,
+                        'pcs_quantity' => (int) $batchWithdrawals->sum('pcs_quantity'),
+                        'box_quantity' => $batchWithdrawals->count()],
+                    "Withdrawal batch {$batchId} dikembalikan.");
 
                 return [
                     'success' => true,

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Box;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
@@ -74,6 +75,7 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->assertNull($box->fresh()->reactivated_until);
         $this->assertNull($box->fresh()->handled_at);
         $this->assertDatabaseMissing('expired_box_reports', ['box_id' => $box->id, 'status' => 'handled']);
+        $this->assertDatabaseMissing('audit_logs', ['model' => 'Box', 'model_id' => $box->id, 'action' => 'handled']);
         $this->assertDatabaseHas('stock_locations', ['pallet_id' => $pallet->id, 'master_location_id' => $location->id]);
         $this->assertTrue(Box::active()->whereKey($box->id)->exists());
     }
@@ -147,6 +149,15 @@ class ExpiredBoxReactivationTest extends TestCase
         $box->refresh();
         $this->assertSame('active', $box->expired_status);
         $this->assertSame('2026-02-28 10:00:00', $box->reactivated_until->toDateTimeString());
+        $audit = AuditLog::where('type', 'expired_box')->where('action', 'handled')->sole();
+        $this->assertSame($box->id, (int) $audit->model_id);
+        $this->assertSame($supervisor->id, (int) $audit->user_id);
+        $this->assertSame('expired', $audit->getOldValuesArray()['status']);
+        $this->assertSame('2026-02-28 10:00:00', $audit->getNewValuesArray()['reactivated_until']);
+        $this->assertSame($location->code, $audit->getNewValuesArray()['warehouse_location']);
+        $this->actingAs($supervisor)->get(route('audit.index', ['type' => 'expired_box', 'action' => 'handled']))
+            ->assertOk()->assertSee('Penanganan Box Expired')->assertSee($box->box_number)
+            ->assertSee('Aktif sampai');
         $this->assertSame($storedAt, $box->created_at->toDateTimeString());
         $service->syncStatuses();
         $this->assertSame('active', $box->fresh()->expired_status);
@@ -171,6 +182,8 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->assertSame('expired', $box->fresh()->expired_status);
         $this->assertDatabaseMissing('stock_locations', ['pallet_id' => $pallet->id]);
         $this->assertDatabaseHas('pallet_items', ['pallet_id' => $pallet->id, 'box_quantity' => 0, 'pcs_quantity' => 0]);
+        $this->actingAs($supervisor)->get(route('expired-box.index'))->assertOk()
+            ->assertSee('<span class="expired-page-status is-expired">Masa Handle habis</span>', false);
     }
 
     public function test_repeated_handle_creates_separate_history_and_duplicate_active_request_does_not_extend(): void
@@ -183,9 +196,11 @@ class ExpiredBoxReactivationTest extends TestCase
         $service->handleBox($box->id, $supervisor->id);
         $this->assertSame($first->toDateTimeString(), $box->fresh()->reactivated_until->toDateTimeString());
         $this->assertSame(1, ExpiredBoxReport::where('status', 'handled')->count());
+        $this->assertSame(1, AuditLog::where('type', 'expired_box')->where('action', 'handled')->count());
         $this->travelTo($first->copy()->addDay());
         $service->handleBox($box->id, $supervisor->id);
         $this->assertSame(2, ExpiredBoxReport::where('status', 'handled')->count());
+        $this->assertSame(2, AuditLog::where('type', 'expired_box')->where('action', 'handled')->count());
         $this->assertSame($first->toDateTimeString(), ExpiredBoxReport::where('status', 'handled')->oldest('id')->first()->reactivated_until->toDateTimeString());
         $this->assertSame(now()->addMonthNoOverflow()->toDateTimeString(), $box->fresh()->reactivated_until->toDateTimeString());
     }
@@ -248,5 +263,39 @@ class ExpiredBoxReactivationTest extends TestCase
         app(ExpiredBoxService::class)->handleBox($box->id, $supervisor->id);
         $this->actingAs($supervisor)->get(route('expired-box.index'))->assertOk()
             ->assertSee('Aktif Sampai')->assertSee('28 Feb 2026 10:00');
+    }
+
+    public function test_handle_history_uses_compact_bootstrap_pagination(): void
+    {
+        [, $supervisor, $box, $pallet, $location] = $this->inventory();
+
+        foreach (range(1, 16) as $sequence) {
+            ExpiredBoxReport::create([
+                'box_id' => $box->id,
+                'box_number' => $box->box_number,
+                'part_number' => $box->part_number,
+                'pallet_id' => $pallet->id,
+                'pallet_number' => $pallet->pallet_number,
+                'warehouse_location' => $location->code,
+                'stored_at' => now()->subMonthsNoOverflow(13),
+                'age_months' => 13,
+                'status' => 'handled',
+                'handled_by' => $supervisor->id,
+                'handled_at' => now()->subMinutes($sequence),
+                'reactivated_until' => now()->addMonthNoOverflow(),
+            ]);
+        }
+
+        $firstPage = $this->actingAs($supervisor)->get(route('expired-box.index'));
+        $firstPage->assertOk()->assertSee('class="page-item', false);
+        $firstPage->assertViewHas('handledHistory', fn ($history) => $history->perPage() === 15
+            && $history->total() === 16
+            && $history->count() === 15);
+
+        $secondPage = $this->actingAs($supervisor)->get(route('expired-box.index', ['page' => 2]));
+        $secondPage->assertOk();
+        $secondPage->assertViewHas('handledHistory', fn ($history) => $history->total() === 16
+            && $history->firstItem() === 16
+            && $history->count() === 1);
     }
 }

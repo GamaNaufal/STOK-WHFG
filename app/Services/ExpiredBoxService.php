@@ -156,6 +156,18 @@ class ExpiredBoxService
                     'reactivated_until' => $box->reactivated_until,
                 ]);
             }
+
+            AuditService::record('expired_box', 'handled', 'Box', $box->id, $userId,
+                ['status' => 'expired'], [
+                    'status' => 'active',
+                    'box_number' => $box->box_number,
+                    'part_number' => $box->part_number,
+                    'pallet_number' => $pallet->pallet_number,
+                    'warehouse_location' => $storage->warehouse_location,
+                    'age_months' => (int) $ageMonths,
+                    'handled_at' => $box->handled_at->toDateTimeString(),
+                    'reactivated_until' => $box->reactivated_until->toDateTimeString(),
+                ], "Box {$box->box_number} di-Handle dan aktif sampai {$box->reactivated_until->format('d M Y H:i')}.");
         });
     }
 

@@ -543,6 +543,9 @@ class DeliveryPickController extends Controller
                     $pendingSession->status = 'cancelled';
                     $pendingSession->approval_notes = 'Sesi pending duplikat dibatalkan otomatis saat picking dimulai.';
                     $pendingSession->save();
+                    AuditService::record('delivery_pick', 'cancelled', 'DeliveryPickSession', $pendingSession->id, null,
+                        ['status' => 'pending'], ['status' => 'cancelled', 'delivery_order_id' => $lockedOrder->id],
+                        "Sesi picking #{$pendingSession->id} dibatalkan otomatis karena duplikat.");
                 }
             }
 
@@ -573,6 +576,11 @@ class DeliveryPickController extends Controller
             if (! $session->items()->exists()) {
                 throw new \RuntimeException('Stok tidak cukup atau tidak ada rekomendasi FIFO yang tersedia.');
             }
+
+            AuditService::record('delivery_pick', 'started', 'DeliveryPickSession', $session->id, $userId,
+                [], ['status' => 'scanning', 'delivery_order_id' => $lockedOrder->id,
+                    'verification' => $verification, 'box_count' => $session->items()->count()],
+                "Sesi picking #{$session->id} dimulai untuk DO #{$lockedOrder->id}.");
 
             return $session;
         });
@@ -785,11 +793,15 @@ class DeliveryPickController extends Controller
             $notes = trim((string) $session->approval_notes);
             $cancelNote = 'Sesi dibatalkan oleh '.($user->name ?? ('user #'.$user->id)).'.';
 
+            $previousStatus = $session->status;
             $session->status = 'cancelled';
             $session->verification_box_ids = null;
             $session->verification_last_activity_at = null;
             $session->approval_notes = $notes !== '' ? ($notes.' | '.$cancelNote) : $cancelNote;
             $session->save();
+            AuditService::record('delivery_pick', 'cancelled', 'DeliveryPickSession', $session->id, $user->id,
+                ['status' => $previousStatus], ['status' => 'cancelled', 'delivery_order_id' => $session->delivery_order_id],
+                "Sesi picking #{$session->id} dibatalkan oleh {$user->name}.");
 
             return ['success' => true, 'message' => 'Proses scan dibatalkan dan lock box telah dilepas.', 'status' => 200];
         });
@@ -857,7 +869,7 @@ class DeliveryPickController extends Controller
                 : null;
 
             if ($box && ($box->is_withdrawn || $box->isExpiryUnavailable())) {
-                DeliveryIssue::create([
+                $issue = DeliveryIssue::create([
                     'pick_session_id' => $session->id,
                     'box_id' => $box->id,
                     'scanned_code' => $scannedCode,
@@ -867,6 +879,11 @@ class DeliveryPickController extends Controller
 
                 $session->status = 'blocked';
                 $session->save();
+                AuditService::record('delivery_issue', 'created', 'DeliveryIssue', $issue->id, $user->id,
+                    [], ['status' => 'pending', 'delivery_order_id' => $session->delivery_order_id,
+                        'pick_session_id' => $session->id, 'box_number' => $box->box_number,
+                        'scanned_code' => $scannedCode, 'issue_type' => $issue->issue_type],
+                    "Issue scan {$issue->issue_type} memblokir sesi #{$session->id}.");
 
                 return [
                     'success' => false,
@@ -884,7 +901,7 @@ class DeliveryPickController extends Controller
                 : null;
 
             if (! $pickItem) {
-                DeliveryIssue::create([
+                $issue = DeliveryIssue::create([
                     'pick_session_id' => $session->id,
                     'box_id' => $box?->id,
                     'scanned_code' => $scannedCode,
@@ -894,6 +911,11 @@ class DeliveryPickController extends Controller
 
                 $session->status = 'blocked';
                 $session->save();
+                AuditService::record('delivery_issue', 'created', 'DeliveryIssue', $issue->id, $user->id,
+                    [], ['status' => 'pending', 'delivery_order_id' => $session->delivery_order_id,
+                        'pick_session_id' => $session->id, 'scanned_code' => $scannedCode,
+                        'issue_type' => $issue->issue_type],
+                    "Issue scan {$issue->issue_type} memblokir sesi #{$session->id}.");
 
                 return ['success' => false, 'message' => 'Box tidak sesuai. Menunggu approval admin.', 'status' => 422, 'session_status' => 'blocked'];
             }
@@ -909,6 +931,12 @@ class DeliveryPickController extends Controller
             if ($updated === 0) {
                 return ['success' => false, 'message' => 'Box sudah discan.', 'status' => 409];
             }
+
+            AuditService::record('delivery_pick', 'scanned', 'DeliveryPickItem', $pickItem->id, $user->id,
+                ['status' => 'pending'], ['status' => 'scanned', 'delivery_order_id' => $session->delivery_order_id,
+                    'box_number' => $box->box_number, 'part_number' => $box->part_number,
+                    'pcs_quantity' => (int) $box->pcs_quantity],
+                "Box {$box->box_number} discan pada sesi #{$session->id}.");
 
             $remaining = DeliveryPickItem::where('pick_session_id', $session->id)
                 ->where('status', 'pending')
@@ -1012,6 +1040,10 @@ class DeliveryPickController extends Controller
                 $verifiedBoxIds->push((int) $box->id);
                 $session->verification_box_ids = $verifiedBoxIds->unique()->values()->all();
                 $session->save();
+                AuditService::record('delivery_pick', 'verified', 'DeliveryPickSession', $session->id, $user->id,
+                    [], ['delivery_order_id' => $session->delivery_order_id, 'box_number' => $box->box_number,
+                        'part_number' => $box->part_number, 'verified_count' => $verifiedBoxIds->count()],
+                    "Box {$box->box_number} diverifikasi pada sesi #{$session->id}.");
             }
 
             $totalItems = DeliveryPickItem::where('pick_session_id', $session->id)->count();
@@ -1042,26 +1074,46 @@ class DeliveryPickController extends Controller
             return redirect()->back()->with('error', 'Unauthorized.');
         }
 
-        $issue = DeliveryIssue::with('session')->findOrFail($issueId);
-        if ($issue->status !== 'pending') {
+        $issueSessionId = DeliveryIssue::whereKey($issueId)->value('pick_session_id');
+        if ($issueSessionId === null) {
+            abort(404);
+        }
+
+        $approved = DB::transaction(function () use ($request, $issueId, $issueSessionId, $user) {
+            $session = DeliveryPickSession::whereKey($issueSessionId)->lockForUpdate()->firstOrFail();
+            $issue = DeliveryIssue::whereKey($issueId)->lockForUpdate()->firstOrFail();
+            if ($issue->status !== 'pending') {
+                return false;
+            }
+
+            $issue->status = 'approved';
+            $issue->resolved_by = $user->id;
+            $issue->resolved_at = now();
+            $issue->notes = $request->input('notes');
+            $issue->save();
+
+            $previousStatus = $session->status;
+            $session->status = 'scanning';
+            $session->approved_by = $user->id;
+            if ($session->verification_last_activity_at) {
+                $session->verification_last_activity_at = now();
+            }
+            $session->approved_at = now();
+            $session->approval_notes = $issue->notes;
+            $session->save();
+
+            AuditService::record('delivery_issue', 'approved', 'DeliveryIssue', $issue->id, $user->id,
+                ['status' => 'pending', 'session_status' => $previousStatus],
+                ['status' => 'approved', 'session_status' => 'scanning', 'delivery_order_id' => $session->delivery_order_id,
+                    'pick_session_id' => $session->id, 'scanned_code' => $issue->scanned_code,
+                    'issue_type' => $issue->issue_type, 'notes' => $issue->notes],
+                "Issue scan #{$issue->id} disetujui; sesi #{$session->id} dibuka kembali.");
+
+            return true;
+        });
+        if (! $approved) {
             return redirect()->back()->with('error', 'Issue sudah diproses sebelumnya.');
         }
-
-        $issue->status = 'approved';
-        $issue->resolved_by = $user->id;
-        $issue->resolved_at = now();
-        $issue->notes = $request->input('notes');
-        $issue->save();
-
-        $session = $issue->session;
-        $session->status = 'scanning';
-        $session->approved_by = $user->id;
-        if ($session->verification_last_activity_at) {
-            $session->verification_last_activity_at = now();
-        }
-        $session->approved_at = now();
-        $session->approval_notes = $issue->notes;
-        $session->save();
 
         return redirect()->back()->with('success', 'Issue di-approve.');
     }
@@ -1279,6 +1331,10 @@ class DeliveryPickController extends Controller
                 $session->completion_status = 'completed';
                 $session->redo_until = now()->addDays(5);
                 $session->save();
+                AuditService::record('delivery_pick', 'completed', 'DeliveryPickSession', $session->id, $user->id,
+                    ['status' => 'scanning'], ['status' => 'completed', 'delivery_order_id' => $order->id,
+                        'box_count' => $session->items->count()],
+                    "Sesi picking #{$session->id} selesai untuk DO #{$order->id}.");
 
                 return [
                     'success' => true,
@@ -2302,11 +2358,15 @@ class DeliveryPickController extends Controller
                 $reason = trim((string) ($validated['reason'] ?? ''));
                 $terminateNote = 'Force terminate oleh '.($user->name ?? ('user #'.$user->id)).': '.$reason;
 
+                $previousStatus = $session->status;
                 $session->status = 'cancelled';
                 $session->verification_box_ids = null;
                 $session->verification_last_activity_at = null;
                 $session->approval_notes = $notes !== '' ? ($notes.' | '.$terminateNote) : $terminateNote;
                 $session->save();
+                AuditService::record('delivery_pick', 'terminated', 'DeliveryPickSession', $session->id, $user->id,
+                    ['status' => $previousStatus], ['status' => 'cancelled', 'delivery_order_id' => $session->delivery_order_id,
+                        'reason' => $reason], "Lock sesi picking #{$session->id} dihentikan oleh {$user->name}.");
 
                 return [
                     'success' => true,

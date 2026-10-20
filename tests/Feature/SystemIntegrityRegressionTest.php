@@ -101,6 +101,8 @@ class SystemIntegrityRegressionTest extends TestCase
         ]);
 
         $response->assertOk()->assertJsonPath('actual_withdrawn_qty', 60);
+        $this->assertDatabaseHas('audit_logs', ['type' => 'stock_withdrawal', 'action' => 'completed',
+            'model' => 'StockWithdrawal', 'user_id' => $operator->id]);
         $this->assertDatabaseHas('stock_withdrawals', [
             'box_id' => $box->id,
             'pcs_quantity' => 60,

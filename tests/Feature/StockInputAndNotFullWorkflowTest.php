@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Box;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
@@ -62,10 +63,14 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         $requestCreate->assertSessionHas('success');
 
         $requestId = (int) NotFullBoxRequest::query()->value('id');
+        $this->assertDatabaseHas('audit_logs', ['type' => 'not_full_box', 'action' => 'created',
+            'model_id' => $requestId, 'user_id' => $adminWarehouse->id]);
 
         $approve = $this->actingAs($supervisi)->post(route('box-not-full.approve', $requestId));
         $approve->assertRedirect();
         $approve->assertSessionHas('success');
+        $this->assertDatabaseHas('audit_logs', ['type' => 'not_full_box', 'action' => 'approved',
+            'model_id' => $requestId, 'user_id' => $supervisi->id]);
 
         $approvedRequest = NotFullBoxRequest::findOrFail($requestId);
 
@@ -144,6 +149,8 @@ class StockInputAndNotFullWorkflowTest extends TestCase
         $reject = $this->actingAs($supervisi)->post(route('box-not-full.reject', $requestId));
         $reject->assertRedirect();
         $reject->assertSessionHas('success');
+        $this->assertDatabaseHas('audit_logs', ['type' => 'not_full_box', 'action' => 'rejected',
+            'model_id' => $requestId, 'user_id' => $supervisi->id]);
 
         $this->assertDatabaseHas('not_full_box_requests', [
             'id' => $requestId,
@@ -215,6 +222,7 @@ class StockInputAndNotFullWorkflowTest extends TestCase
             'id' => $requestId,
             'status' => 'approved',
         ]);
+        $this->assertSame(2, AuditLog::where('type', 'not_full_box')->where('model_id', $requestId)->count());
     }
 
     public function test_supplement_request_rejects_part_not_present_in_delivery_order(): void

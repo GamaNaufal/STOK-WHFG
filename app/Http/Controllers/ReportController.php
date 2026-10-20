@@ -153,7 +153,7 @@ class ReportController extends Controller
             $query->where('user_id', $request->input('user_id'));
         }
 
-        $withdrawals = $query->orderBy('withdrawn_at', 'desc')->paginate(50);
+        $withdrawals = $query->orderBy('withdrawn_at', 'desc')->paginate(15);
 
         // Get statistics
         $totalWithdrawals = StockWithdrawal::where('status', 'completed')->count();

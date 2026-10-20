@@ -178,6 +178,8 @@ class DeliveryFlowConsistencyTest extends TestCase
         ]);
 
         $sessionId = (int) $response->json('session_id');
+        $this->assertDatabaseHas('audit_logs', ['type' => 'delivery_pick', 'action' => 'started',
+            'model_id' => $sessionId, 'user_id' => $operator->id]);
 
         $this->assertDatabaseHas('delivery_pick_items', [
             'pick_session_id' => $sessionId,
@@ -610,6 +612,8 @@ class DeliveryFlowConsistencyTest extends TestCase
             ->postJson(route('delivery.pick.complete', $session->id));
 
         $complete->assertOk()->assertJson(['success' => true]);
+        $this->assertDatabaseHas('audit_logs', ['type' => 'delivery_pick', 'action' => 'completed',
+            'model_id' => $session->id, 'user_id' => $operator->id]);
 
         $this->assertDatabaseHas('stock_withdrawals', [
             'box_id' => $box->id,
