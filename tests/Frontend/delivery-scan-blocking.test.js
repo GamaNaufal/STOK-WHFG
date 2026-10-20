@@ -39,7 +39,9 @@ function setup(view) {
             requests.push(JSON.parse(options.body));
             return {
                 status: 422,
-                json: async () => ({ success: false, message: 'Sesi diblokir.', session_status: 'blocked' }),
+                json: async () => view === 'scan'
+                    ? { success: false, message: 'Sesi diblokir.', session_status: 'blocked' }
+                    : { success: false, message: 'Box tidak sesuai.', session_status: null },
             };
         },
         setTimeout() {},
@@ -48,35 +50,41 @@ function setup(view) {
     return { element, requests };
 }
 
-for (const view of ['scan', 'verify-scan']) {
-    for (const wrongCode of ['87654321', '1', 'abc', '']) {
-        test(`${view}: submitted ${wrongCode || 'empty'} scan blocks UI and discards queued scans`, async () => {
-            const app = setup(view);
-            const input = app.element('scanInput');
-            input.value = wrongCode;
-            input.keydown({ key: 'Enter', preventDefault() {} });
-            input.value = '12345678';
-            input.keydown({ key: 'Enter', preventDefault() {} });
-            await flush();
-            await flush();
+for (const wrongCode of ['87654321', '1', 'abc', '']) {
+    test(`scan: submitted ${wrongCode || 'empty'} scan blocks UI and discards queued scans`, async () => {
+        const app = setup('scan');
+        const input = app.element('scanInput');
+        input.value = wrongCode;
+        input.keydown({ key: 'Enter', preventDefault() {} });
+        input.value = '12345678';
+        input.keydown({ key: 'Enter', preventDefault() {} });
+        await flush();
+        await flush();
 
-            assert.deepEqual(app.requests, [{ box_number: wrongCode }]);
-            assert.equal(input.disabled, true);
-            assert.equal(app.element('btnScan').disabled, true);
-            if (view === 'scan') {
-                assert.equal(app.element('sessionStatus').textContent, 'BLOCKED');
-                assert.equal(app.element('btnComplete').disabled, true);
-                assert.equal(app.element('scanBlockedNotice').hidden, false);
-                assert.equal(app.element('btnCancelScan').disabled, true);
-            } else {
-                assert.equal(app.element('btnToFinal').classList.contains('disabled'), true);
-                assert.equal(app.element('btnToFinal')['aria-disabled'], 'true');
-                let prevented = false;
-                app.element('btnToFinal').click({ preventDefault() { prevented = true; } });
-                assert.equal(prevented, true);
-                assert.equal(app.element('verificationBlockedNotice').hidden, false);
-                assert.equal(app.element('btnCancelVerification').disabled, true);
-            }
-        });
-    }
+        assert.deepEqual(app.requests, [{ box_number: wrongCode }]);
+        assert.equal(input.disabled, true);
+        assert.equal(app.element('btnScan').disabled, true);
+        assert.equal(app.element('sessionStatus').textContent, 'BLOCKED');
+        assert.equal(app.element('btnComplete').disabled, true);
+        assert.equal(app.element('scanBlockedNotice').hidden, false);
+        assert.equal(app.element('btnCancelScan').disabled, true);
+    });
+
+    test(`verify-scan: submitted ${wrongCode || 'empty'} scan keeps UI active and processes queued scans`, async () => {
+        const app = setup('verify-scan');
+        const input = app.element('scanInput');
+        input.value = wrongCode;
+        input.keydown({ key: 'Enter', preventDefault() {} });
+        input.value = '12345678';
+        input.keydown({ key: 'Enter', preventDefault() {} });
+        await flush();
+        await flush();
+        await flush();
+
+        assert.deepEqual(app.requests, [{ box_number: wrongCode }, { box_number: '12345678' }]);
+        assert.equal(input.disabled, false);
+        assert.equal(app.element('btnScan').disabled, false);
+        assert.equal(app.element('verificationBlockedNotice').hidden, true);
+        assert.equal(app.element('btnCancelVerification').disabled, false);
+    });
 }

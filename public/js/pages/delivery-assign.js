@@ -84,6 +84,10 @@
         enabled: false,
         lastDeliveryOrderId: deliveryOrderSelect?.value || "",
     };
+    const draftKey = `delivery-assign-draft:v1:${Number(config.userId) || "unknown"}`;
+    let draftReady = false;
+    let previewInFlight = false;
+    let assignmentInFlight = false;
 
     function escapeHtml(input) {
         return String(input ?? "")
@@ -92,6 +96,97 @@
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;")
             .replace(/'/g, "&#039;");
+    }
+
+    function persistDraft() {
+        if (!draftReady) {
+            return;
+        }
+
+        try {
+            const orderId = String(deliveryOrderSelect?.value || "");
+            if (!orderId) {
+                window.sessionStorage.removeItem(draftKey);
+                return;
+            }
+
+            window.sessionStorage.setItem(
+                draftKey,
+                JSON.stringify({
+                    orderId,
+                    selectedPallets: Array.from(selectedPallets.values()),
+                    selectedBoxes: Array.from(selectedBoxes.values()),
+                    scannedBoxes: Array.from(scannedBoxes.values()),
+                    selectionOrder,
+                    palletMode: getNewBoxPalletMode(),
+                    existingPalletId: selectedExistingPalletId?.value || "",
+                    existingPalletText: selectedExistingPalletText?.value || "",
+                    locationId: selectedLocationId?.value || "",
+                    locationCode: selectedLocationCode?.value || "",
+                }),
+            );
+        } catch (_) {
+            // Assignment remains usable when browser storage is unavailable.
+        }
+    }
+
+    function readDraft() {
+        try {
+            const draft = JSON.parse(window.sessionStorage.getItem(draftKey) || "null");
+            if (!draft || !Array.from(deliveryOrderSelect?.options || []).some((option) => option.value === String(draft.orderId))) {
+                window.sessionStorage.removeItem(draftKey);
+                return null;
+            }
+            return draft;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function restoreDraft(draft) {
+        if (!draft) {
+            return false;
+        }
+
+        deliveryOrderSelect.value = String(draft.orderId);
+        gateState.lastDeliveryOrderId = deliveryOrderSelect.value;
+
+        const mode = draft.palletMode === "existing" ? "existing" : "new";
+        if (palletModeNew) palletModeNew.checked = mode === "new";
+        if (palletModeExisting) palletModeExisting.checked = mode === "existing";
+        setNewBoxPalletModeUI(mode);
+
+        if (mode === "existing") {
+            if (selectedExistingPalletId) selectedExistingPalletId.value = String(draft.existingPalletId || "");
+            if (selectedExistingPalletText) selectedExistingPalletText.value = String(draft.existingPalletText || "");
+        } else {
+            if (selectedLocationId) selectedLocationId.value = String(draft.locationId || "");
+            if (selectedLocationCode) selectedLocationCode.value = String(draft.locationCode || "");
+            if (locationSearchInput) locationSearchInput.value = String(draft.locationCode || "");
+        }
+
+        (Array.isArray(draft.selectedPallets) ? draft.selectedPallets : []).forEach((pallet) => {
+            const id = Number(pallet?.id);
+            if (Number.isInteger(id) && id > 0) selectedPallets.set(id, pallet);
+        });
+        (Array.isArray(draft.selectedBoxes) ? draft.selectedBoxes : []).forEach((box) => {
+            const id = Number(box?.id);
+            if (Number.isInteger(id) && id > 0) selectedBoxes.set(id, box);
+        });
+        (Array.isArray(draft.scannedBoxes) ? draft.scannedBoxes : []).forEach((box) => {
+            const number = String(box?.box_number || "");
+            if (/^[0-9]{8}$/.test(number) && Number(box?.pcs_quantity) > 0) scannedBoxes.set(number, box);
+        });
+        (Array.isArray(draft.selectionOrder) ? draft.selectionOrder : []).forEach((entry) => {
+            if (entry?.type === "pallet" && selectedPallets.has(Number(entry.id))) {
+                addToOrder({ key: makeKey("pallet", Number(entry.id)), type: "pallet", id: Number(entry.id) });
+            } else if (entry?.type === "box" && selectedBoxes.has(Number(entry.id))) {
+                addToOrder({ key: makeKey("box", Number(entry.id)), type: "box", id: Number(entry.id) });
+            } else if (entry?.type === "new_box" && scannedBoxes.has(String(entry.box_number))) {
+                addToOrder({ key: makeKey("new_box", String(entry.box_number)), type: "new_box", box_number: String(entry.box_number) });
+            }
+        });
+        return true;
     }
 
     function makeKey(type, value) {
@@ -333,32 +428,44 @@
         );
     }
 
-    function confirmDeliveryOrderChange(onConfirm, onCancel) {
-        if (
-            window.WarehouseAlert &&
-            typeof window.WarehouseAlert.confirm === "function"
-        ) {
-            window.WarehouseAlert.confirm({
-                title: "Ganti Delivery Order",
-                message:
-                    "Mengganti delivery order akan mengosongkan pilihan box/pallet yang sudah dipilih.",
-                warningItems: [
-                    "Semua pilihan saat ini akan direset.",
-                    "Pastikan Anda memilih delivery order yang benar.",
-                ],
-                confirmText: "Ya, ganti",
-                cancelText: "Batal",
-                confirmColor: "#0C7779",
-                onConfirm,
+    function confirmChoice({ title, message, confirmText, danger = false }, onConfirm, onCancel = null) {
+        if (window.Swal && typeof window.Swal.fire === "function") {
+            window.Swal.fire({
+                titleText: title,
+                text: message,
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonText: confirmText,
+                cancelButtonText: "Batal",
+                confirmButtonColor: danger ? "#b53a40" : "#0b7072",
+                reverseButtons: true,
+                focusCancel: true,
+            }).then((result) => {
+                if (result.isConfirmed) onConfirm();
+                else if (onCancel) onCancel();
             });
             return;
         }
 
-        if (window.confirm("Ganti delivery order dan reset pilihan?")) {
-            onConfirm();
-        } else if (typeof onCancel === "function") {
-            onCancel();
-        }
+        if (window.confirm(`${title}\n\n${message}`)) onConfirm();
+        else if (onCancel) onCancel();
+    }
+
+    function confirmDeliveryOrderChange(onConfirm, onCancel) {
+        confirmChoice({
+            title: "Ganti Delivery Order?",
+            message: "Pilihan box dan pallet untuk order saat ini akan dikosongkan. Stok tidak akan dihapus.",
+            confirmText: "Ya, ganti order",
+        }, onConfirm, onCancel);
+    }
+
+    function confirmChoiceRemoval(label, onConfirm, onCancel = null) {
+        confirmChoice({
+            title: `Hapus ${label} dari pilihan?`,
+            message: `${label} hanya dikeluarkan dari draft Delivery Assign. Data box dan stok gudang tidak dihapus.`,
+            confirmText: "Hapus dari pilihan",
+            danger: true,
+        }, onConfirm, onCancel);
     }
 
     function updateSummary() {
@@ -374,6 +481,7 @@
         if (summary) {
             summary.textContent = text;
         }
+        persistDraft();
     }
 
     function showNewBoxError(message) {
@@ -470,14 +578,6 @@
             };
         }
 
-        const palletNumber = String(newPalletNumberInput?.value || "").trim();
-        if (!palletNumber) {
-            if (!silent) {
-                showNewBoxError("Nomor pallet wajib diisi untuk pallet baru.");
-            }
-            return null;
-        }
-
         const locationId = String(selectedLocationId?.value || "").trim();
         const locationCode = String(selectedLocationCode?.value || "").trim();
         if (!locationId || !locationCode) {
@@ -489,7 +589,6 @@
 
         return {
             mode,
-            pallet_number: palletNumber,
             location_id: Number(locationId),
             location_code: locationCode,
         };
@@ -548,6 +647,7 @@
                             selectedExistingPalletText.value = `${row.pallet_number} (Lokasi: ${row.warehouse_location || "-"})`;
                         }
                         existingPalletSearchResults.style.display = "none";
+                        persistDraft();
                     };
                     existingPalletSearchResults.appendChild(item);
                 });
@@ -601,6 +701,7 @@
                                 );
                             }
                             locationSearchResults.style.display = "none";
+                            persistDraft();
                         };
                         locationSearchResults.appendChild(item);
                     });
@@ -649,7 +750,7 @@
             return;
         }
 
-        selectionOrder.forEach((entry) => {
+        selectionOrder.forEach((entry, position) => {
             if (entry.type === "pallet") {
                 const pallet = selectedPallets.get(entry.id);
                 if (!pallet) {
@@ -657,23 +758,21 @@
                 }
 
                 const item = document.createElement("div");
-                item.className = "list-group-item";
+                item.className = "list-group-item delivery-assign-selected-item";
                 item.innerHTML = `
-                    <div class="d-flex align-items-start justify-content-between gap-3">
-                        <div>
-                            <div class="fw-semibold">Pallet ${escapeHtml(
-                                pallet.pallet_number || "-",
-                            )}</div>
-                            <div class="small text-muted">Lokasi: ${escapeHtml(
-                                pallet.location || "-",
-                            )}</div>
+                    <div class="delivery-assign-selected-row">
+                        <span class="delivery-assign-position" aria-label="Pilihan ${position + 1}">${position + 1}</span>
+                        <div class="delivery-assign-selected-main">
+                            <span class="delivery-assign-item-type">Pallet stok</span>
+                            <strong class="delivery-assign-item-id">${escapeHtml(pallet.pallet_number || "-")}</strong>
+                            <span class="delivery-assign-item-meta"><span><small>Lokasi</small> ${escapeHtml(pallet.location || "-")}</span></span>
                         </div>
-                        <div class="d-flex gap-2">
-                            <button type="button" class="btn btn-sm btn-outline-primary" data-action="toggle">Lihat box</button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove">Hapus</button>
+                        <div class="delivery-assign-selected-actions">
+                            <button type="button" class="btn btn-sm btn-outline-primary" data-action="toggle" aria-expanded="false" aria-controls="deliveryAssignPalletBoxes-${entry.id}">Lihat box</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove" aria-label="Hapus pallet ${escapeHtml(pallet.pallet_number || "-")} dari pilihan">Hapus</button>
                         </div>
                     </div>
-                    <div class="mt-2" data-role="pallet-boxes" style="display: none;"></div>
+                    <div class="delivery-assign-pallet-details" id="deliveryAssignPalletBoxes-${entry.id}" data-role="pallet-boxes" style="display: none;"></div>
                 `;
 
                 const removeBtn = item.querySelector('[data-action="remove"]');
@@ -683,11 +782,13 @@
                 );
 
                 removeBtn.addEventListener("click", () => {
-                    selectedPallets.delete(entry.id);
-                    removeFromOrder(entry.key);
-                    updateCheckboxState("pallet", entry.id, false);
-                    updateSummary();
-                    renderSelectedList();
+                    confirmChoiceRemoval(`pallet ${pallet.pallet_number || "-"}`, () => {
+                        selectedPallets.delete(entry.id);
+                        removeFromOrder(entry.key);
+                        updateCheckboxState("pallet", entry.id, false);
+                        updateSummary();
+                        renderSelectedList();
+                    });
                 });
 
                 toggleBtn.addEventListener("click", () => {
@@ -697,6 +798,8 @@
 
                     const isHidden = detailBox.style.display === "none";
                     detailBox.style.display = isHidden ? "block" : "none";
+                    toggleBtn.setAttribute("aria-expanded", String(isHidden));
+                    toggleBtn.textContent = isHidden ? "Sembunyikan box" : "Lihat box";
 
                     if (isHidden && detailBox.dataset.loaded !== "1") {
                         loadPalletBoxes(entry.id, detailBox, toggleBtn);
@@ -714,30 +817,30 @@
                 }
 
                 const item = document.createElement("div");
-                item.className = "list-group-item";
+                item.className = "list-group-item delivery-assign-selected-item";
                 item.innerHTML = `
-                    <div class="d-flex align-items-start justify-content-between gap-3">
-                        <div>
-                            <div class="fw-semibold">Box ${escapeHtml(
-                                box.box_number || "-",
-                            )} - ${escapeHtml(box.part_number || "-")}</div>
-                            <div class="small text-muted">Pallet: ${escapeHtml(
-                                box.pallet_number || "-",
-                            )} | Lokasi: ${escapeHtml(
-                                box.location || "-",
-                            )} | PCS: ${escapeHtml(box.pcs_quantity ?? "0")}</div>
+                    <div class="delivery-assign-selected-row">
+                        <span class="delivery-assign-position" aria-label="Pilihan ${position + 1}">${position + 1}</span>
+                        <div class="delivery-assign-selected-main">
+                            <span class="delivery-assign-item-type">Box stok</span>
+                            <strong class="delivery-assign-item-id">${escapeHtml(box.box_number || "-")}</strong>
+                            <div class="delivery-assign-item-meta"><span><small>Part</small> ${escapeHtml(box.part_number || "-")}</span><span><small>Pallet</small> ${escapeHtml(box.pallet_number || "-")}</span><span><small>Lokasi</small> ${escapeHtml(box.location || "-")}</span><span><small>PCS</small> ${escapeHtml(box.pcs_quantity ?? "0")}</span></div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove">Hapus</button>
+                        <div class="delivery-assign-selected-actions">
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove" aria-label="Hapus box ${escapeHtml(box.box_number || "-")} dari pilihan">Hapus</button>
+                        </div>
                     </div>
                 `;
 
                 const removeBtn = item.querySelector('[data-action="remove"]');
                 removeBtn.addEventListener("click", () => {
-                    selectedBoxes.delete(entry.id);
-                    removeFromOrder(entry.key);
-                    updateCheckboxState("box", entry.id, false);
-                    updateSummary();
-                    renderSelectedList();
+                    confirmChoiceRemoval(`box ${box.box_number || "-"}`, () => {
+                        selectedBoxes.delete(entry.id);
+                        removeFromOrder(entry.key);
+                        updateCheckboxState("box", entry.id, false);
+                        updateSummary();
+                        renderSelectedList();
+                    });
                 });
 
                 selectedList.appendChild(item);
@@ -751,27 +854,29 @@
                 }
 
                 const item = document.createElement("div");
-                item.className = "list-group-item";
+                item.className = "list-group-item delivery-assign-selected-item";
                 item.innerHTML = `
-                    <div class="d-flex align-items-start justify-content-between gap-3">
-                        <div>
-                            <div class="fw-semibold">Box Baru ${escapeHtml(
-                                box.box_number,
-                            )} - ${escapeHtml(box.part_number)}</div>
-                            <div class="small text-muted">Qty PCS: ${escapeHtml(
-                                box.pcs_quantity,
-                            )}</div>
+                    <div class="delivery-assign-selected-row">
+                        <span class="delivery-assign-position" aria-label="Pilihan ${position + 1}">${position + 1}</span>
+                        <div class="delivery-assign-selected-main">
+                            <span class="delivery-assign-item-type">Box baru</span>
+                            <strong class="delivery-assign-item-id">${escapeHtml(box.box_number)}</strong>
+                            <div class="delivery-assign-item-meta"><span><small>Part</small> ${escapeHtml(box.part_number)}</span><span><small>PCS</small> ${escapeHtml(box.pcs_quantity)}</span></div>
                         </div>
-                        <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove">Hapus</button>
+                        <div class="delivery-assign-selected-actions">
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-action="remove" aria-label="Hapus box baru ${escapeHtml(box.box_number)} dari pilihan">Hapus</button>
+                        </div>
                     </div>
                 `;
 
                 const removeBtn = item.querySelector('[data-action="remove"]');
                 removeBtn.addEventListener("click", () => {
-                    scannedBoxes.delete(entry.box_number);
-                    removeFromOrder(entry.key);
-                    updateSummary();
-                    renderSelectedList();
+                    confirmChoiceRemoval(`box baru ${box.box_number || "-"}`, () => {
+                        scannedBoxes.delete(entry.box_number);
+                        removeFromOrder(entry.key);
+                        updateSummary();
+                        renderSelectedList();
+                    });
                 });
 
                 selectedList.appendChild(item);
@@ -814,19 +919,15 @@
                 const boxes = Array.isArray(data.boxes) ? data.boxes : [];
                 const limit = Number(data.limit || boxes.length || 0);
 
-                let html = `<div class="small text-muted mb-2">Total box: ${total}. Ditampilkan: ${boxes.length}.</div>`;
+                let html = `<div class="delivery-assign-pallet-detail-count">${boxes.length} dari ${total} box eligible ditampilkan</div>`;
 
                 if (boxes.length === 0) {
                     html +=
                         '<div class="small text-muted">Tidak ada box eligible di pallet.</div>';
                 } else {
-                    html += '<ul class="mb-0">';
+                    html += '<ul class="delivery-assign-pallet-box-list">';
                     boxes.forEach((box) => {
-                        html += `<li>Box ${escapeHtml(
-                            box.box_number || "-",
-                        )} - ${escapeHtml(box.part_number || "-")} (PCS: ${escapeHtml(
-                            box.pcs_quantity ?? "0",
-                        )})</li>`;
+                        html += `<li><strong>${escapeHtml(box.box_number || "-")}</strong><span>${escapeHtml(box.part_number || "-")}</span><span>${escapeHtml(box.pcs_quantity ?? "0")} PCS</span></li>`;
                     });
                     html += "</ul>";
                 }
@@ -861,19 +962,14 @@
         pallets.forEach((pallet) => {
             const palletId = Number(pallet.id);
             const item = document.createElement("label");
-            item.className = "list-group-item d-flex gap-2 align-items-start";
+            item.className = "list-group-item delivery-assign-stock-option";
             item.innerHTML = `
-                <input class="form-check-input mt-1" type="checkbox" data-type="pallet" data-id="${palletId}">
-                <div>
-                    <div class="fw-semibold">${escapeHtml(
-                        pallet.pallet_number || "-",
-                    )}</div>
-                    <div class="small text-muted">Lokasi: ${escapeHtml(
-                        pallet.location || "-",
-                    )} | Eligible box: ${escapeHtml(
-                        pallet.eligible_boxes ?? "0",
-                    )}</div>
+                <input class="form-check-input" type="checkbox" data-type="pallet" data-id="${palletId}">
+                <div class="delivery-assign-stock-option-main">
+                    <strong class="delivery-assign-item-id">${escapeHtml(pallet.pallet_number || "-")}</strong>
+                    <div class="delivery-assign-item-meta"><span><small>Lokasi</small> ${escapeHtml(pallet.location || "-")}</span></div>
                 </div>
+                <span class="delivery-assign-stock-quantity">${escapeHtml(pallet.eligible_boxes ?? "0")} box eligible</span>
             `;
 
             const checkbox = item.querySelector("input");
@@ -891,8 +987,13 @@
                         id: palletId,
                     });
                 } else {
-                    selectedPallets.delete(palletId);
-                    removeFromOrder(makeKey("pallet", palletId));
+                    confirmChoiceRemoval(`pallet ${pallet.pallet_number || "-"}`, () => {
+                        selectedPallets.delete(palletId);
+                        removeFromOrder(makeKey("pallet", palletId));
+                        updateSummary();
+                        renderSelectedList();
+                    }, () => { checkbox.checked = true; });
+                    return;
                 }
                 updateSummary();
                 renderSelectedList();
@@ -921,19 +1022,14 @@
         boxes.forEach((box) => {
             const boxId = Number(box.id);
             const item = document.createElement("label");
-            item.className = "list-group-item d-flex gap-2 align-items-start";
+            item.className = "list-group-item delivery-assign-stock-option";
             item.innerHTML = `
-                <input class="form-check-input mt-1" type="checkbox" data-type="box" data-id="${boxId}">
-                <div>
-                    <div class="fw-semibold">${escapeHtml(
-                        box.box_number || "-",
-                    )} - ${escapeHtml(box.part_number || "-")}</div>
-                    <div class="small text-muted">Pallet: ${escapeHtml(
-                        box.pallet_number || "-",
-                    )} | Lokasi: ${escapeHtml(
-                        box.location || "-",
-                    )} | PCS: ${escapeHtml(box.pcs_quantity ?? "0")}</div>
+                <input class="form-check-input" type="checkbox" data-type="box" data-id="${boxId}">
+                <div class="delivery-assign-stock-option-main">
+                    <strong class="delivery-assign-item-id">${escapeHtml(box.box_number || "-")}</strong>
+                    <div class="delivery-assign-item-meta"><span><small>Part</small> ${escapeHtml(box.part_number || "-")}</span><span><small>Pallet</small> ${escapeHtml(box.pallet_number || "-")}</span><span><small>Lokasi</small> ${escapeHtml(box.location || "-")}</span></div>
                 </div>
+                <span class="delivery-assign-stock-quantity">${escapeHtml(box.pcs_quantity ?? "0")} PCS</span>
             `;
 
             const checkbox = item.querySelector("input");
@@ -954,8 +1050,13 @@
                         id: boxId,
                     });
                 } else {
-                    selectedBoxes.delete(boxId);
-                    removeFromOrder(makeKey("box", boxId));
+                    confirmChoiceRemoval(`box ${box.box_number || "-"}`, () => {
+                        selectedBoxes.delete(boxId);
+                        removeFromOrder(makeKey("box", boxId));
+                        updateSummary();
+                        renderSelectedList();
+                    }, () => { checkbox.checked = true; });
+                    return;
                 }
                 updateSummary();
                 renderSelectedList();
@@ -971,7 +1072,9 @@
 
     function performSearch(options = {}) {
         const strict = options.strict === true;
-        hideResult();
+        if (!options.preserveResult) {
+            hideResult();
+        }
 
         if (!deliveryOrderSelect?.value) {
             if (strict) {
@@ -1033,6 +1136,16 @@
         selectedBoxes.clear();
         scannedBoxes.clear();
         selectionOrder.length = 0;
+        if (palletModeNew) palletModeNew.checked = true;
+        if (palletModeExisting) palletModeExisting.checked = false;
+        setNewBoxPalletModeUI("new");
+        if (newPalletNumberInput) newPalletNumberInput.value = "";
+        if (locationSearchInput) locationSearchInput.value = "";
+        if (selectedLocationId) selectedLocationId.value = "";
+        if (selectedLocationCode) selectedLocationCode.value = "";
+        if (newBoxNumberInput) newBoxNumberInput.value = "";
+        if (newBoxPartSelect) newBoxPartSelect.value = "";
+        if (newBoxQtyInput) newBoxQtyInput.value = "";
         updateSummary();
         renderSelectedList();
         hideNewBoxError();
@@ -1164,6 +1277,7 @@
     }
 
     function executeAssignment(payload) {
+        assignmentInFlight = true;
         assignBtn.disabled = true;
         assignBtn.textContent = "Memproses...";
 
@@ -1173,16 +1287,40 @@
             const overages = Array.isArray(overageResponse?.part_overages)
                 ? overageResponse.part_overages
                 : [];
-
-            const warningItems = overages.map((entry) => {
-                const partNumber = String(entry.part_number || "-");
-                const selectedQty = Number(entry.selected_quantity || 0);
-                const remainingQty = Number(entry.remaining_quantity || 0);
-                const newRequestedQty = Number(
-                    entry.new_requested_quantity || 0,
-                );
-                return `Part ${partNumber}: assign ${selectedQty}, sisa ${remainingQty}, qty request baru ${newRequestedQty}.`;
-            });
+            const formatQty = (value) => {
+                const quantity = Number(value);
+                return Number.isFinite(quantity)
+                    ? quantity.toLocaleString("id-ID")
+                    : "-";
+            };
+            const overageRows = overages.map((entry) => `
+                <li class="delivery-assign-overage-item">
+                    <div class="delivery-assign-overage-item-head">
+                        <strong>Part ${escapeHtml(entry.part_number || "-")}</strong>
+                        <span>+${formatQty(entry.overage_quantity)} PCS</span>
+                    </div>
+                    <div class="delivery-assign-overage-math">
+                        <span>Sisa ${formatQty(entry.remaining_quantity)} PCS</span>
+                        <span aria-hidden="true">+</span>
+                        <span>Kelebihan ${formatQty(entry.overage_quantity)} PCS</span>
+                        <span aria-hidden="true">=</span>
+                        <strong>Dipilih ${formatQty(entry.selected_quantity)} PCS</strong>
+                    </div>
+                    <div class="delivery-assign-overage-request">
+                        Request order: <strong>${formatQty(entry.requested_quantity)}</strong>
+                        <span aria-hidden="true">→</span>
+                        <strong>${formatQty(entry.new_requested_quantity)} PCS</strong>
+                        <span class="delivery-assign-overage-assigned">(sudah di-assign ${formatQty(entry.assigned_quantity)} PCS)</span>
+                    </div>
+                </li>
+            `).join("");
+            const html = `
+                <div class="delivery-assign-overage-body">
+                    <p>Jumlah box yang dipilih melebihi sisa permintaan untuk ${overages.length || "satu atau lebih"} part. Kelebihan ini tidak akan dipotong otomatis.</p>
+                    ${overageRows ? `<ul class="delivery-assign-overage-list">${overageRows}</ul>` : ""}
+                    <p class="delivery-assign-overage-note">Jika dikonfirmasi, quantity request order akan naik sesuai kelebihan di atas. Server lalu memvalidasi ulang dan mencoba assign pilihan box. Stok belum ditarik pada tahap ini.</p>
+                    <p class="delivery-assign-overage-cancel">Pilih “Kembali periksa” untuk mempertahankan pilihan tanpa mengubah order.</p>
+                </div>`;
 
             const proceed = () =>
                 executeAssignment({
@@ -1190,33 +1328,29 @@
                     confirm_overage: true,
                 });
 
-            if (
-                window.WarehouseAlert &&
-                typeof window.WarehouseAlert.confirm === "function"
-            ) {
-                window.WarehouseAlert.confirm({
-                    title: "Qty Melebihi Request",
-                    message:
-                        overageResponse?.message ||
-                        "Qty assign melebihi sisa request delivery order.",
-                    warningItems:
-                        warningItems.length > 0
-                            ? warningItems
-                            : [
-                                  "Jika dilanjutkan, qty request delivery order akan ditambah.",
-                              ],
-                    confirmText: "Lanjutkan & Tambah Qty",
-                    cancelText: "Batal",
-                    confirmColor: "#d97706",
-                    onConfirm: proceed,
+            if (window.Swal && typeof window.Swal.fire === "function") {
+                window.Swal.fire({
+                    title: "Pilihan melebihi sisa order",
+                    html,
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonText: "Tambah request & assign",
+                    cancelButtonText: "Kembali periksa",
+                    confirmButtonColor: "#9a6700",
+                    reverseButtons: true,
+                    focusCancel: true,
+                    width: "min(42rem, calc(100vw - 2rem))",
+                    customClass: { popup: "delivery-assign-overage" },
+                }).then((result) => {
+                    if (result.isConfirmed) proceed();
                 });
                 return;
             }
 
-            const fallbackMessage =
-                (overageResponse?.message ||
-                    "Qty melebihi request delivery order.") +
-                " Lanjutkan dan tambah qty request?";
+            const fallbackDetails = overages.map((entry) =>
+                `Part ${entry.part_number || "-"}: dipilih ${formatQty(entry.selected_quantity)} PCS, sisa ${formatQty(entry.remaining_quantity)} PCS, kelebihan ${formatQty(entry.overage_quantity)} PCS; request order ${formatQty(entry.requested_quantity)} → ${formatQty(entry.new_requested_quantity)} PCS.`,
+            ).join("\n");
+            const fallbackMessage = `Pilihan melebihi sisa order.\n${fallbackDetails}\n\nJika dilanjutkan, quantity request order bertambah dan server mencoba assign pilihan box setelah validasi ulang. Stok belum ditarik.\n\nTambah request dan assign?`;
 
             if (window.confirm(fallbackMessage)) {
                 proceed();
@@ -1294,7 +1428,8 @@
 
                 showResultHtml("success", html);
                 showToastMessage(toastMessage, "success");
-                clearSelection();
+                clearSelection({ skipSearch: true });
+                performSearch({ preserveResult: true });
             })
             .catch((error) => {
                 if (error?.type === "overage_confirmation") {
@@ -1306,12 +1441,98 @@
                 showToastMessage(error.message, "danger");
             })
             .finally(() => {
+                assignmentInFlight = false;
                 assignBtn.disabled = false;
                 assignBtn.textContent = "Assign Delivery";
             });
     }
 
-    function submitAssignment() {
+    async function previewAssignment(payload, palletInfo) {
+        const response = await fetch(config.previewUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRF-TOKEN": config.csrfToken,
+            },
+            body: JSON.stringify({
+                delivery_order_id: payload.delivery_order_id,
+                box_ids: payload.box_ids,
+                pallet_ids: payload.pallet_ids,
+            }),
+        });
+        const data = await response.json().catch(() => ({
+            message: "Pratinjau tidak tersedia atau sesi login berubah. Muat ulang halaman.",
+        }));
+        if (!response.ok) {
+            throw new Error(data.message || "Gagal menyiapkan pratinjau assignment.");
+        }
+
+        const missingIds = Array.isArray(data.missing_box_ids) ? data.missing_box_ids : [];
+        if (missingIds.length > 0) {
+            const labels = missingIds.map((id) => selectedBoxes.get(Number(id))?.box_number || `ID ${id}`);
+            throw new Error(`Box ${labels.join(", ")} tidak lagi tersedia. Hapus dari pilihan lalu cari ulang.`);
+        }
+        const emptyPalletIds = Array.isArray(data.empty_pallet_ids) ? data.empty_pallet_ids : [];
+        if (emptyPalletIds.length > 0) {
+            const labels = emptyPalletIds.map((id) => selectedPallets.get(Number(id))?.pallet_number || `ID ${id}`);
+            throw new Error(`Pallet ${labels.join(", ")} tidak lagi memiliki box yang tersedia. Hapus dari pilihan lalu cari ulang.`);
+        }
+
+        const existingBoxes = Array.isArray(data.boxes) ? data.boxes : [];
+        if (existingBoxes.length === 0 && payload.new_boxes.length === 0) {
+            throw new Error("Tidak ada box tersedia dalam pilihan saat ini. Cari ulang stok sebelum assign.");
+        }
+
+        const orderLabel = deliveryOrderSelect?.selectedOptions?.[0]?.textContent?.trim() || `#${payload.delivery_order_id}`;
+        const newBoxDestination = payload.new_boxes.length === 0
+            ? ""
+            : palletInfo.mode === "new"
+                ? `Box baru akan dicatat sebagai stok masuk pada pallet bernomor otomatis di lokasi ${palletInfo.location_code}.`
+                : `Box baru akan dicatat sebagai stok masuk pada ${selectedExistingPalletText?.value || "pallet existing terpilih"}.`;
+        const boxRows = [
+            ...existingBoxes.map((box) => ({ ...box, source: "Stok" })),
+            ...payload.new_boxes.map((box) => ({ ...box, source: "Baru" })),
+        ];
+        const listHtml = boxRows.map((box) => `
+            <li><span class="delivery-assign-confirm-source">${escapeHtml(box.source)}</span>
+                <strong>${escapeHtml(box.box_number || "-")}</strong>
+                <span>${escapeHtml(box.part_number || "-")}</span>
+                <span>${escapeHtml(box.pcs_quantity ?? 0)} PCS</span></li>
+        `).join("");
+        const palletNames = Array.from(selectedPallets.values()).map((pallet) => escapeHtml(pallet.pallet_number || "-")).join(", ");
+        const html = `
+            <div class="delivery-assign-confirm-body">
+                <p class="delivery-assign-confirm-order">${escapeHtml(orderLabel)}</p>
+                <p>${existingBoxes.length} box stok dan ${payload.new_boxes.length} box baru akan diajukan untuk assign${palletNames ? `, termasuk dari pallet ${palletNames}` : ""}.</p>
+                <p>Box stok yang lolos validasi akan dihubungkan ke order dan sesi picking pending. ${escapeHtml(newBoxDestination)} Stok belum ditarik; server akan memvalidasi ulang ketersediaan dan kebutuhan part saat diproses.</p>
+                <div class="delivery-assign-confirm-list-label">Box yang terlibat (${boxRows.length})</div>
+                <ul class="delivery-assign-confirm-list">${listHtml}</ul>
+                <p class="delivery-assign-confirm-note">Jika jumlah melebihi sisa request, akan muncul konfirmasi tambahan sebelum quantity order dinaikkan.</p>
+            </div>`;
+
+        if (window.Swal && typeof window.Swal.fire === "function") {
+            const result = await window.Swal.fire({
+                title: "Periksa Assign Delivery",
+                html,
+                icon: "question",
+                showCancelButton: true,
+                confirmButtonText: "Assign box tersebut",
+                cancelButtonText: "Kembali periksa",
+                confirmButtonColor: "#0b7072",
+                reverseButtons: true,
+                focusCancel: true,
+                width: "min(44rem, calc(100vw - 2rem))",
+                customClass: { popup: "delivery-assign-confirm" },
+            });
+            return result.isConfirmed;
+        }
+
+        const fallbackList = boxRows.map((box) => `${box.source} ${box.box_number} · ${box.part_number} · ${box.pcs_quantity} PCS`).join("\n");
+        return window.confirm(`Assign Delivery ${orderLabel}\n\n${newBoxDestination}\n\nBox yang terlibat:\n${fallbackList}\n\nLanjutkan?`);
+    }
+
+    async function submitAssignment() {
+        if (previewInFlight || assignmentInFlight) return;
         hideResult();
 
         const deliveryOrderId = deliveryOrderSelect?.value;
@@ -1360,40 +1581,25 @@
             if (palletInfo.mode === "existing") {
                 payload.new_boxes_pallet_id = palletInfo.pallet_id;
             } else {
-                payload.new_boxes_pallet_number = palletInfo.pallet_number;
                 payload.new_boxes_location_id = palletInfo.location_id;
             }
         }
 
-        const infoText =
-            `Pallet: ${selectedPallets.size}, ` +
-            `Box stok: ${selectedBoxes.size}, ` +
-            `Box baru: ${scannedBoxes.size}.`;
-
-        const proceed = () => executeAssignment(payload);
-
-        if (
-            window.WarehouseAlert &&
-            typeof window.WarehouseAlert.confirm === "function"
-        ) {
-            window.WarehouseAlert.confirm({
-                title: "Konfirmasi Assign",
-                message:
-                    "Assign ini tidak bisa di-rewind. Pastikan daftar box/pallet sudah benar.",
-                warningItems: [
-                    "Assign tidak dapat dibatalkan setelah diproses.",
-                    "Periksa kembali daftar box/pallet sebelum lanjut.",
-                ],
-                infoText,
-                confirmText: "Ya, Assign",
-                cancelText: "Batal",
-                confirmColor: "#0C7779",
-                onConfirm: proceed,
-            });
-        } else if (
-            window.confirm("Assign ini tidak bisa di-rewind. Lanjutkan?")
-        ) {
-            proceed();
+        previewInFlight = true;
+        assignBtn.disabled = true;
+        assignBtn.textContent = "Menyiapkan ringkasan...";
+        try {
+            if (await previewAssignment(payload, palletInfo)) {
+                executeAssignment(payload);
+            }
+        } catch (error) {
+            showResult("danger", error.message);
+        } finally {
+            previewInFlight = false;
+            if (!assignmentInFlight) {
+                assignBtn.disabled = false;
+                assignBtn.textContent = "Assign Delivery";
+            }
         }
     }
 
@@ -1406,7 +1612,18 @@
     });
 
     if (clearBtn) {
-        clearBtn.addEventListener("click", clearSelection);
+        clearBtn.addEventListener("click", () => {
+            if (!hasSelections()) {
+                showResult("info", "Belum ada box atau pallet dalam daftar pilihan.");
+                return;
+            }
+            confirmChoice({
+                title: "Reset semua pilihan?",
+                message: `${selectionOrder.length} pilihan akan dikeluarkan dari draft di tab ini. Data stok dan delivery order tidak berubah.`,
+                confirmText: "Reset pilihan",
+                danger: true,
+            }, () => clearSelection());
+        });
     }
 
     assignBtn.addEventListener("click", submitAssignment);
@@ -1419,6 +1636,7 @@
         palletModeNew.addEventListener("change", function () {
             if (this.checked) {
                 setNewBoxPalletModeUI("new");
+                persistDraft();
             }
         });
     }
@@ -1427,6 +1645,7 @@
         palletModeExisting.addEventListener("change", function () {
             if (this.checked) {
                 setNewBoxPalletModeUI("existing");
+                persistDraft();
             }
         });
     }
@@ -1444,6 +1663,7 @@
             if (selectedExistingPalletText) {
                 selectedExistingPalletText.value = "";
             }
+            persistDraft();
 
             existingPalletSearchTimeout = window.setTimeout(() => {
                 searchExistingPallets(query);
@@ -1478,6 +1698,7 @@
             if (selectedLocationCode) {
                 selectedLocationCode.value = "";
             }
+            persistDraft();
 
             locationSearchTimeout = window.setTimeout(() => {
                 performLocationSearch(query);
@@ -1574,13 +1795,21 @@
         });
     }
 
-    setNewBoxPalletModeUI(getNewBoxPalletMode());
-
+    const restoredDraft = restoreDraft(readDraft());
+    if (!restoredDraft) {
+        setNewBoxPalletModeUI(getNewBoxPalletMode());
+    }
+    draftReady = true;
     setGateState(Boolean(deliveryOrderSelect?.value));
     if (deliveryOrderSelect?.value) {
-        loadDeliveryOrderParts(deliveryOrderSelect.value).catch((error) => {
-            showResult("danger", error.message);
-        });
+        loadDeliveryOrderParts(deliveryOrderSelect.value)
+            .then(() => restoredDraft && performSearch())
+            .then(() => {
+                if (restoredDraft && hasSelections()) {
+                    showResult("info", "Draft pilihan dipulihkan dari tab ini. Ketersediaan stok akan divalidasi ulang saat assign.");
+                }
+            })
+            .catch((error) => showResult("danger", error.message));
     } else {
         renderDeliveryOrderParts([]);
     }

@@ -1,7 +1,7 @@
 # UI Redesign Progress
 
 Repository checked: 20 October 2026 (Asia/Jakarta).
-Baseline: branch `REDESIGN`, HEAD `c495070`. This records local implementation;
+Baseline: branch `REDESIGN`, HEAD `681fa80`. This records local implementation;
 the exact revision deployed to production has not been verified.
 
 ## 1. Frontend architecture
@@ -47,15 +47,11 @@ the exact revision deployed to production has not been verified.
 
 ## 4. Unfinished work and verification gaps
 
-- Dashboard processing, throughput and mismatch tables are implemented in
-  `resources/views/shared/partials/dashboard-{processing,throughput,issues}-table.blade.php`.
-  Audit filters/results live in `resources/views/shared/partials/dashboard-audit-{filters,results}.blade.php`;
-  they retain scoped counts, keyboard-scrollable tables and 44px controls.
+- Dashboard processing/throughput/issues tables: `resources/views/shared/partials/dashboard-{processing,throughput,issues}-table.blade.php`.
+  Audit filters/results: `dashboard-audit-{filters,results}.blade.php`; scoped counts, keyboard-scrollable tables, 44px controls.
 - Delivery Schedule header/toolbar: `resources/views/operator/delivery/partials/schedule-{header,filters}.blade.php`,
   `public/css/pages/delivery-schedule-toolbar.css`, `public/js/pages/delivery-schedule-filters.js`.
-  Existing page had no list filter/API parameters. New client-only search (order/customer/part)
-  and timing filter use already-rendered active rows; preserve priority order and all actions.
-  Completed/history sections unaffected; no-JS retains all rows and hides filter controls.
+  Client-only search/timing filter uses rendered active rows; priority order/actions remain. No-JS shows all rows.
 - Active delivery results implemented in the same index and `public/css/pages/delivery-schedule-results.css`:
   sticky date/order and header, keyboard scroll, grouped FIFO-ready/required PCS, text sufficiency,
   wrapped part/customer data, 44px actions and responsive empty state. Post-split action buttons
@@ -86,28 +82,33 @@ the exact revision deployed to production has not been verified.
   and `public/css/pages/{picking-verification-list,delivery-verification}.css`: the list has
   scoped counts, contextual status, 44px actions and sticky Order; scan has clear progress/timer
   and sticky picklist ID. Start/resume, Enter/focus, timeout, cancel and permissions are unchanged.
-- Wrong scans in verification/final create a pending issue and block for unmatched short,
-  nonnumeric, empty or absent codes and withdrawn/expired boxes. Both screens submit any
-  input, stop queued scans on `session_status=blocked`, and require approval/reload.
-  Issue codes cap at 255 characters; empty codes are recorded as `(kosong)`.
+- Picking Verification rejects wrong/empty/unlisted or withdrawn/expired box scans
+  without counting them, creating an issue or blocking the session; the next scan can
+  proceed. Final Delivery still creates a pending issue and blocks on wrong scans,
+  including short, nonnumeric, empty and long codes, until admin approval.
 - Scan Issues management uses `resources/views/operator/delivery/scan-issues.blade.php`
   and `public/css/pages/delivery-scan-issues.css`: pending/history hierarchy, visible
   reason/code, linked notes, 44px approval and sticky Order. Confirmation clarifies that
   approval unlocks the session without counting the bad scan; routes/statuses are unchanged.
+- Delivery lock management uses `resources/views/operator/delivery/lock-management.blade.php`
+  and `public/css/pages/delivery-lock-management.css`: Admin-only summary, clear status/counts,
+  sticky session/order header and cells, labeled reason, terminate confirmation and empty state.
+- Delivery Assign page hierarchy is updated in `resources/views/operator/delivery-assign/index.blade.php`
+  and `public/css/pages/delivery-assign.css`: numbered stages, readable stock/selection rows,
+  responsive controls. `public/js/pages/delivery-assign.js` confirms removal/reset, restores
+  per-tab drafts, previews all candidate box IDs, and shows per-part sisa/kelebihan plus request
+  before/after for overage; only confirmation retries assign with quantity increase. New UI pallets
+  use `PalletNumberService`; legacy manual payload remains. Location claims stay atomic; server revalidates.
 - Split backend/schema: MySQL `db_stock` lacked enum value `partial`, causing Split to fail when
   updating its parent. `database/migrations/2026_10_20_000001_add_partial_to_existing_delivery_order_status.php`
   adds the missing value to existing MySQL enums; applied locally on 20 October. No Split rule changed.
-- Delivery, merge/move pallet, expired boxes, reports/audit, master/admin screens
-  have shared styling but are not documented as completing the same detailed
-  segment-by-segment interaction review as Stock View/Input/Not Full.
-- Physical scanner/printer/touch devices, screen readers, large datasets and
-  all network/session combinations remain unverified. Stock Input lookup races
-  and successful print dialog output also need validation.
+- Other Delivery, merge/move pallet, expired boxes, reports/audit and master/admin screens still need detailed review.
+- Physical devices, screen readers, large datasets, network/session combinations, Stock Input races and print output remain unverified.
 
 ## 5. Recommended next segment
 
-Continue with **Delivery lock management** in `resources/views/operator/delivery/lock-management.blade.php`.
-Preserve Admin-only access and the existing stop/unlock behavior.
+Continue with **Move Pallet** in `resources/views/operator/move-pallet/index.blade.php`.
+Keep the location workflow, inventory constraints and role permissions unchanged.
 
 ## 6. Production safety
 
@@ -120,18 +121,17 @@ Preserve Admin-only access and the existing stop/unlock behavior.
 - Use isolated fixtures and a verified testing database; `phpunit.xml` specifies
   SQLite `:memory:`. Never reset/seed the operational database or exercise real
   stock mutations for UI previews. No deployment is implied by this handoff.
-- Run Laravel preview/tests sequentially on Windows: concurrent runs have
-  previously collided on compiled Blade cache.
+- Run Laravel preview/tests sequentially on Windows to avoid compiled Blade cache collisions.
 
 ## 7. Relevant validation
 
-- Final delivery scan: 45 Laravel tests/443 assertions; 1440/768/390px layout fixture passed.
-- Wrong-scan repair: 55 focused Laravel tests/455 assertions and 8 Node tests passed;
-  short/nonnumeric/empty/absent/long codes block in both scan stages, with approval recovery
-  and queued-scan cancellation. No live scans or physical scanner test.
-- Picking Verification layout: 34 Laravel tests/290 assertions and 12 Node tests passed;
-  these cover blocked scan, cancellation, timer and Enter queue. Responsive layout was
-  reviewed in CSS only; physical scanner, screen reader and device testing remain open.
+- Scan-stage distinction: 34 focused Laravel tests/264 assertions and 13 Node tests passed;
+  verification rejects wrong input without blocking, while final scan still blocks and
+  requires approval. Status links no longer preload scan audio; no live scanner test.
+- Delivery lock management: 15 Laravel tests/287 assertions passed for populated/empty
+  rendering and Admin-only access. 390px browser fixture kept header/body aligned at 843px scroll.
+- Delivery Assign: prior 18 Laravel tests/134 assertions; current focused 15/70 and 4 Node
+  tests passed. Syntax/diff checks passed; no live stock mutation or device check.
 - Picking Verification list: 14 Laravel tests/229 assertions passed (module render and
   verification flow); responsive styling reviewed in CSS, without live operational requests.
 - Scan Issues: 24 Laravel tests/181 assertions passed with pending/history rendering,
@@ -139,12 +139,11 @@ Preserve Admin-only access and the existing stop/unlock behavior.
 
 ## 8. Changes to preserve
 
-- Current uncommitted work: this document, `resources/views/operator/delivery/index.blade.php`,
-  `resources/views/operator/delivery/{picking-verification,scan,scan-issues,verify-scan}.blade.php`, `public/css/pages/{delivery-scan,delivery-scan-issues,picking-verification-list}.css`,
-  `app/Http/Controllers/{DeliveryOrder,DeliveryPick}Controller.php`,
-  `tests/Feature/{DeliverySalesPpcWorkflowTest,DeliveryFlowConsistencyTest,PickingVerificationActivityTest,ExpiredBoxReactivationTest}.php`,
-  `tests/Frontend/delivery-scan-blocking.test.js`,
-  `public/css/pages/delivery-{schedule-results,fifo-modal,picklist-modal}.css`,
-  new `public/css/pages/delivery-{completed,history,redo-dialog,split-modal,verification}.css`,
-  `docs/AGENT_SYSTEM_MEMO.md` and the 20 October status migration. Preserve these files;
-  the migration ran only on local `db_stock`, with no production deployment.
+- Delivery redesign and scan issue changes are in `681fa80`. Preserve uncommitted
+  verification changes in `DeliveryPickController.php`, `verify-scan.blade.php`,
+  `PickingVerificationActivityTest.php`, `delivery-scan-blocking.test.js`,
+  `public/js/scan-feedback.js`, new `tests/Frontend/scan-feedback.test.js`, this document,
+  `lock-management.blade.php`, new `delivery-lock-management.css`, `UiReviewPreviewTest.php`,
+  `docs/AGENT_SYSTEM_MEMO.md`, Delivery Assign controller/route/Blade/JS/CSS and focused tests.
+  The status migration ran only on local `db_stock`;
+  production deployment remains unverified.

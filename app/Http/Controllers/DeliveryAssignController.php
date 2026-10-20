@@ -15,6 +15,7 @@ use App\Models\StockLocation;
 use App\Models\StockInput;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletNumberService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -25,15 +26,9 @@ class DeliveryAssignController extends Controller
     private const ACTIVE_LOCK_STATUSES = ['scanning', 'blocked'];
 
     public function __construct(
-        private readonly LocationAssignmentService $locationAssignmentService
+        private readonly LocationAssignmentService $locationAssignmentService,
+        private readonly PalletNumberService $palletNumberService
     ) {
-    }
-
-    private function resolveAndClaimMasterLocation(int $masterLocationId, Pallet $pallet): string
-    {
-        return (string) $this->locationAssignmentService
-            ->claim($masterLocationId, (int) $pallet->id)
-            ->code;
     }
 
     private function syncPalletItemsWithActiveBoxes(Pallet $pallet): void
@@ -986,6 +981,46 @@ class DeliveryAssignController extends Controller
         ]);
     }
 
+    public function preview(Request $request)
+    {
+        $validated = $request->validate([
+            'delivery_order_id' => ['required', 'integer'],
+            'box_ids' => ['array'],
+            'box_ids.*' => ['integer', 'min:1'],
+            'pallet_ids' => ['array'],
+            'pallet_ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $deliveryOrderId = (int) $validated['delivery_order_id'];
+        if (!$this->isApprovedDeliveryOrder($deliveryOrderId)) {
+            return response()->json(['message' => 'Delivery order tidak lagi berstatus approved.'], 422);
+        }
+
+        $directBoxIds = collect($validated['box_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $palletIds = collect($validated['pallet_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $palletBoxIds = $this->resolveBoxIdsFromPallets($palletIds);
+        $allBoxIds = array_values(array_unique(array_merge($directBoxIds, $palletBoxIds)));
+
+        $palletIdsWithBoxes = DB::table('pallet_boxes')
+            ->whereIn('pallet_id', $palletIds)
+            ->whereIn('box_id', $palletBoxIds)
+            ->pluck('pallet_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        $boxes = Box::query()
+            ->whereIn('id', $allBoxIds)
+            ->orderBy('box_number')
+            ->get(['id', 'box_number', 'part_number', 'pcs_quantity']);
+
+        return response()->json([
+            'boxes' => $boxes,
+            'missing_box_ids' => array_values(array_diff($directBoxIds, $boxes->pluck('id')->map(fn ($id) => (int) $id)->all())),
+            'empty_pallet_ids' => array_values(array_diff($palletIds, $palletIdsWithBoxes)),
+            'pallet_box_count' => count($palletBoxIds),
+        ]);
+    }
+
     public function assign(Request $request)
     {
         $validated = $request->validate([
@@ -1061,19 +1096,14 @@ class DeliveryAssignController extends Controller
                     ], 422);
                 }
             } else {
-                if ($newBoxesPalletNumber === '') {
-                    return response()->json([
-                        'message' => 'Nomor pallet wajib diisi untuk pallet baru.',
-                    ], 422);
-                }
-
                 if ($newBoxesLocationId <= 0) {
                     return response()->json([
                         'message' => 'Pilih lokasi untuk pallet baru.',
                     ], 422);
                 }
 
-                $alreadyExists = Pallet::withTrashed()->where('pallet_number', $newBoxesPalletNumber)->exists();
+                $alreadyExists = $newBoxesPalletNumber !== ''
+                    && Pallet::withTrashed()->where('pallet_number', $newBoxesPalletNumber)->exists();
                 if ($alreadyExists) {
                     return response()->json([
                         'message' => 'Nomor pallet sudah ada. Pilih mode pallet existing.',
@@ -1338,16 +1368,15 @@ class DeliveryAssignController extends Controller
                         throw new \RuntimeException('Pallet existing belum memiliki lokasi tersimpan.');
                     }
                 } else {
-                    $palletForNewBoxes = Pallet::create([
-                        'pallet_number' => $newBoxesPalletNumber,
-                    ]);
+                    $palletForNewBoxes = $newBoxesPalletNumber === ''
+                        ? $this->palletNumberService->create()
+                        : Pallet::create(['pallet_number' => $newBoxesPalletNumber]);
 
-                    $locationCodeForNewBoxes = $this->resolveAndClaimMasterLocation($newBoxesLocationId, $palletForNewBoxes);
-
-                    $this->locationAssignmentService->assign(
+                    $stockLocationForNewBoxes = $this->locationAssignmentService->assign(
                         $newBoxesLocationId,
                         $palletForNewBoxes
                     );
+                    $locationCodeForNewBoxes = (string) $stockLocationForNewBoxes->warehouse_location;
                 }
 
                 $now = now();

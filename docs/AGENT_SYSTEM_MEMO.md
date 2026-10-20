@@ -2,13 +2,18 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
-Verifikasi tambahan 20 Oktober 2026 (scan salah saat picking): setiap scan yang
-tidak cocok dengan picklist, termasuk satu digit, nonangka, kosong, atau tanpa
-kode, membuat issue `pending` dan memblokir sesi pada Picking Verification maupun
-Scan Final Delivery. Box withdrawn/expired juga memblokir. Respons memuat
-`session_status=blocked`; layar menghentikan scan sampai approval Admin
-Warehouse/Admin, lalu operator memuat ulang sesi. Kode kosong dicatat `(kosong)`;
-kode panjang disimpan maksimal 255 karakter sesuai kolom `delivery_issues`.
+Verifikasi tambahan 20 Oktober 2026 (Delivery Assign): UI menyimpan draft pilihan
+per tab untuk refresh dan menampilkan pratinjau box sebelum assign. Pallet baru
+dari UI mendapat nomor melalui `PalletNumberService`; payload nomor manual lama
+tetap didukung. Lokasi harus berasal dari Master Location dan diklaim atomik
+melalui `LocationAssignmentService` saat transaksi assign.
+
+Verifikasi tambahan 20 Oktober 2026 (perbedaan tahap scan): pada Picking Verification,
+kode salah, kosong, tidak ada di picklist, atau box withdrawn/expired ditolak tanpa
+menambah progres, issue, atau memblokir sesi; operator dapat langsung scan ulang.
+Pada Scan Final Delivery, setiap scan salah tetap membuat issue `pending` dan
+memblokir sesi sampai approval Admin Warehouse/Admin. Kode kosong dicatat
+`(kosong)`; kode issue panjang disimpan maksimal 255 karakter.
 
 Verifikasi tambahan 20 Oktober 2026 (Split Delivery): MySQL lokal `delivery_orders.status`
 sebelumnya tidak memuat `partial` meski migrasi dasar dan alur Split memakainya.
@@ -452,8 +457,10 @@ File utama:
 
 ### 11. Scan issue
 
-Issue dibuat pada Picking Verification maupun Scan Final Delivery ketika kode
-yang dikirim:
+Picking Verification menolak kode salah tanpa issue atau blokir sesi, termasuk
+box withdrawn/expired; box tersebut tidak dihitung sebagai terverifikasi.
+
+Scan Final Delivery membuat issue ketika kode yang dikirim:
 
 - kosong, tidak ditemukan, atau tidak ada dalam picklist (`scan_mismatch`),
   tanpa syarat panjang atau format ID;
@@ -679,7 +686,7 @@ File utama:
 - Audio berasal dari `public/audio/OK.mp3` untuk input/scan berhasil dan `public/audio/NG.mp3` untuk input/scan gagal. File disertakan dalam repository dan diakses melalui URL `asset()`, sehingga deployment tidak bergantung pada folder Downloads komputer development.
 - Stock Input memutar OK setelah server menerima ID box atau nomor part; seluruh pemanggilan suara error sebelumnya memakai NG. Pesan sedang memproses tidak memutar OK.
 - Picking Verification dan Scan Final Delivery memutar NG untuk validasi input gagal, penolakan server, dan kegagalan koneksi. Scan ulang box yang sudah diverifikasi tetap memakai OK sesuai perilaku sukses yang sudah ada.
-- Beep sintetis dan text-to-speech sebelumnya dihapus. Pemutar menyiapkan audio pada interaksi keyboard/pointer, menghentikan suara sebelumnya saat hasil baru datang, dan tidak menggagalkan proses scan jika audio tidak tersedia.
+- Beep sintetis dan text-to-speech sebelumnya dihapus. Pemutar menyiapkan audio hanya saat interaksi keyboard/pointer pada kontrol scan (diverifikasi 20 Oktober 2026), bukan saat navigasi/status; suara sebelumnya dihentikan saat hasil baru datang, dan scan tetap berjalan jika audio tidak tersedia.
 - Audio OK dan NG memakai penguatan 2x (sekitar +6 dB sebelum kompresi) melalui GainNode bersama, lalu kompresor untuk menekan puncak suara dan mengurangi risiko clipping. Volume akhir tetap mengikuti perangkat pengguna.
 - Perubahan audio ini dibuat di project development; production memerlukan deployment file terkait.
 

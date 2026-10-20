@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
+use App\Models\DeliveryIssue;
+use App\Models\DeliveryPickSession;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -11,6 +13,41 @@ use Tests\TestCase;
 class UiReviewPreviewTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_delivery_lock_management_shows_active_session_and_preserves_admin_only_terminate_form(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $operator = User::factory()->create(['role' => 'warehouse_operator', 'name' => 'Operator Lock']);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $admin->id,
+            'customer_name' => 'Customer Lock',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'processing',
+        ]);
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'blocked',
+            'started_at' => now(),
+        ]);
+        DeliveryIssue::create([
+            'pick_session_id' => $session->id,
+            'scanned_code' => 'wrong-box',
+            'issue_type' => 'scan_mismatch',
+            'status' => 'pending',
+        ]);
+
+        $this->actingAs($admin)->get(route('delivery.pick.locks'))
+            ->assertOk()
+            ->assertSee('Sesi #'.$session->id)
+            ->assertSee('Customer Lock')
+            ->assertSee('Operator Lock')
+            ->assertSee('1</strong> issue pending', false)
+            ->assertSee('name="reason"', false)
+            ->assertSee(route('delivery.pick.lock.terminate', $session->id));
+
+        $this->actingAs($operator)->get(route('delivery.pick.locks'))->assertForbidden();
+    }
 
     public function test_dashboard_renders_for_every_role_and_preserves_supervisor_detail_links(): void
     {

@@ -964,7 +964,6 @@ class DeliveryPickController extends Controller
 
             $submittedCode = $request->input('box_number');
             $boxNumber = is_scalar($submittedCode) ? trim((string) $submittedCode) : '';
-            $scannedCode = $boxNumber === '' ? '(kosong)' : mb_substr($boxNumber, 0, 255);
             $box = $boxNumber !== '' && mb_strlen($boxNumber) <= 255
                 ? Box::where('box_number', $boxNumber)->lockForUpdate()->first()
                 : null;
@@ -974,22 +973,12 @@ class DeliveryPickController extends Controller
                 ->exists();
 
             if (! $pickItemExists) {
-                DeliveryIssue::create([
-                    'pick_session_id' => $session->id,
-                    'box_id' => $box?->id,
-                    'scanned_code' => $scannedCode,
-                    'issue_type' => $isUnavailable ? ($box->is_withdrawn ? 'box_withdrawn' : 'box_expired') : 'scan_mismatch',
-                    'status' => 'pending',
-                ]);
-
-                $session->status = 'blocked';
-                $session->save();
-
                 return [
                     'success' => false,
-                    'message' => 'Box tidak sesuai daftar picking. Sesi diblokir; menunggu approval admin.',
+                    'message' => $isUnavailable
+                        ? 'Box sudah withdrawn atau expired. Scan box lain pada picklist.'
+                        : 'Box tidak sesuai daftar picking. Periksa ID box dan coba lagi.',
                     'status' => 422,
-                    'session_status' => 'blocked',
                 ];
             }
 

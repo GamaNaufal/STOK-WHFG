@@ -1,0 +1,64 @@
+#deliveryLockManagementPage { max-width: 88rem; margin: 0 auto; padding: .5rem 0 2rem; }
+#deliveryLockManagementPage .delivery-lock-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 1rem 2rem; margin-bottom: 1.25rem; }
+#deliveryLockManagementPage .delivery-lock-eyebrow { display: block; color: var(--ui-accent, #0b7072); font-size: .75rem; font-weight: 700; letter-spacing: .045em; text-transform: uppercase; }
+#deliveryLockManagementPage h1 { display: flex; align-items: center; gap: .625rem; margin: .375rem 0 .5rem; color: var(--ui-ink, #202124); font-size: clamp(1.5rem, 2.5vw, 2rem); letter-spacing: -.02em; }
+#deliveryLockManagementPage h1 i { color: var(--ui-accent, #0b7072); font-size: .9em; }
+#deliveryLockManagementPage .delivery-lock-header p { max-width: 48rem; margin: 0; color: var(--ui-muted, #595d65); font-size: .875rem; line-height: 1.5; }
+#deliveryLockManagementPage .delivery-lock-back { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; padding: .625rem .875rem; border: 1px solid var(--ui-border, #dfe1e5); background: #fff; color: var(--ui-ink, #202124); font-size: .8125rem; font-weight: 600; text-decoration: none; }
+#deliveryLockManagementPage .delivery-lock-back:hover { border-color: #a9c9c6; background: #f5faf9; color: #075e60; }
+#deliveryLockManagementPage .delivery-lock-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1.25rem; }
+#deliveryLockManagementPage .delivery-lock-summary-item { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-width: 0; padding: .875rem 1rem; border: 1px solid var(--ui-border, #dfe1e5); border-radius: .625rem; background: #fff; }
+#deliveryLockManagementPage .delivery-lock-summary-item span { color: var(--ui-muted, #595d65); font-size: .8125rem; font-weight: 600; }
+#deliveryLockManagementPage .delivery-lock-summary-item strong { color: var(--ui-ink, #202124); font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+#deliveryLockManagementPage .delivery-lock-summary-item.is-scanning strong { color: #8a5b08; }
+#deliveryLockManagementPage .delivery-lock-summary-item.is-blocked strong { color: #a52f35; }
+#deliveryLockManagementPage .delivery-lock-panel { min-width: 0; border: 1px solid var(--ui-border, #dfe1e5); background: #fff; box-shadow: var(--ui-shadow, 0 1px 3px rgb(20 25 32 / 5%)); }
+#deliveryLockManagementPage .delivery-lock-panel-header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: .875rem 1.5rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+#deliveryLockManagementPage .delivery-lock-panel-header h2 { margin: .375rem 0 .25rem; color: var(--ui-ink, #202124); font-size: 1.125rem; font-weight: 650; letter-spacing: -.015em; }
+#deliveryLockManagementPage .delivery-lock-panel-header p { max-width: 52rem; margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; line-height: 1.5; }
+#deliveryLockManagementPage .delivery-lock-count { display: inline-flex; align-items: center; min-height: 2rem; padding: .25rem .625rem; border: 1px solid #cddfdd; border-radius: .5rem; background: #eff7f5; color: #165b59; font-size: .8125rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+#deliveryLockManagementPage .delivery-lock-scroll { max-width: 100%; max-height: min(70vh, 45rem); overflow: auto; overscroll-behavior: contain; }
+#deliveryLockManagementPage .delivery-lock-scroll:focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: -3px; }
+#deliveryLockManagementPage .delivery-lock-table { min-width: 76rem; table-layout: fixed; border-collapse: separate; border-spacing: 0; }
+#deliveryLockManagementPage .delivery-lock-table > :is(thead, tbody) > tr > :is(th, td) { padding: .875rem .75rem; vertical-align: middle; border-bottom: 1px solid var(--ui-border, #dfe1e5); font-size: .8125rem; line-height: 1.45; white-space: normal; overflow-wrap: anywhere; }
+#deliveryLockManagementPage .delivery-lock-table > thead > tr > th { position: sticky; top: 0; z-index: 2; background: #f6f7f8; color: #4b515a; font-weight: 650; }
+#deliveryLockManagementPage .delivery-lock-table > tbody > tr > td:first-child:not([colspan]) { position: sticky; left: 0; z-index: 1; width: 17rem; min-width: 17rem; border-right: 1px solid var(--ui-border, #dfe1e5); background: #fff; }
+#deliveryLockManagementPage .delivery-lock-table > thead > tr > th:first-child { position: sticky; top: 0; left: 0; z-index: 4; width: 17rem; min-width: 17rem; border-right: 1px solid var(--ui-border, #dfe1e5); background: #f6f7f8; }
+#deliveryLockManagementPage .delivery-lock-table > :is(thead, tbody) > tr > :nth-child(2) { width: 11rem; }
+#deliveryLockManagementPage .delivery-lock-table > :is(thead, tbody) > tr > :nth-child(3) { width: 9rem; }
+#deliveryLockManagementPage .delivery-lock-table > :is(thead, tbody) > tr > :nth-child(4) { width: 9rem; }
+#deliveryLockManagementPage .delivery-lock-table > :is(thead, tbody) > tr > :nth-child(5) { width: 9rem; }
+#deliveryLockManagementPage .delivery-lock-table > :is(thead, tbody) > tr > :last-child:not([colspan]) { width: 21rem; }
+#deliveryLockManagementPage .delivery-lock-identity strong { display: block; color: var(--ui-ink, #202124); font-size: .875rem; font-variant-numeric: tabular-nums; }
+#deliveryLockManagementPage .delivery-lock-identity :is(span, small) { display: block; margin-top: .2rem; color: var(--ui-muted, #595d65); font-size: .75rem; }
+#deliveryLockManagementPage .delivery-lock-owner { color: var(--ui-ink, #202124); font-weight: 600; }
+#deliveryLockManagementPage .delivery-lock-status { display: inline-flex; align-items: center; gap: .375rem; min-height: 1.75rem; padding: .25rem .5rem; border: 1px solid; border-radius: .375rem; font-size: .75rem; font-weight: 650; white-space: nowrap; }
+#deliveryLockManagementPage .delivery-lock-status.is-scanning { border-color: #e9d7a5; background: #fff8e9; color: #785400; }
+#deliveryLockManagementPage .delivery-lock-status.is-blocked { border-color: #eec1c4; background: #fff0f0; color: #922b31; }
+#deliveryLockManagementPage .delivery-lock-counts span { display: block; color: var(--ui-muted, #595d65); font-size: .75rem; }
+#deliveryLockManagementPage .delivery-lock-counts span + span { margin-top: .25rem; }
+#deliveryLockManagementPage .delivery-lock-counts strong { color: var(--ui-ink, #202124); font-variant-numeric: tabular-nums; }
+#deliveryLockManagementPage .delivery-lock-counts .has-issue,
+#deliveryLockManagementPage .delivery-lock-counts .has-issue strong { color: #a52f35; }
+#deliveryLockManagementPage .delivery-lock-date time { display: block; color: var(--ui-ink, #202124); font-variant-numeric: tabular-nums; }
+#deliveryLockManagementPage .delivery-lock-date small { display: block; margin-top: .2rem; color: var(--ui-muted, #595d65); font-size: .75rem; }
+#deliveryLockManagementPage .delivery-lock-action label { display: block; margin-bottom: .375rem; color: var(--ui-muted, #595d65); font-size: .75rem; font-weight: 650; }
+#deliveryLockManagementPage .delivery-lock-action-controls { display: flex; gap: .5rem; }
+#deliveryLockManagementPage .delivery-lock-action .form-control { min-width: 0; min-height: 44px; font-size: .8125rem; }
+#deliveryLockManagementPage .delivery-lock-action .form-control:focus { border-color: var(--ui-accent, #0b7072); box-shadow: 0 0 0 3px rgb(11 112 114 / 16%); }
+#deliveryLockManagementPage .delivery-lock-terminate { display: inline-flex; align-items: center; justify-content: center; gap: .375rem; min-height: 44px; flex: 0 0 auto; padding: .5rem .75rem; border: 1px solid #b53a40; background: #b53a40; color: #fff; font-size: .8125rem; font-weight: 650; }
+#deliveryLockManagementPage .delivery-lock-terminate:hover { border-color: #922b31; background: #922b31; color: #fff; }
+#deliveryLockManagementPage .delivery-lock-terminate:disabled { opacity: .6; }
+#deliveryLockManagementPage .delivery-lock-empty { padding: 2rem 1rem !important; color: var(--ui-muted, #595d65); text-align: center; }
+#deliveryLockManagementPage .delivery-lock-empty :is(i, strong, span) { display: block; }
+#deliveryLockManagementPage .delivery-lock-empty i { margin-bottom: .5rem; color: var(--ui-accent, #0b7072); font-size: 1.5rem; }
+#deliveryLockManagementPage .delivery-lock-empty strong { color: var(--ui-ink, #202124); font-size: .875rem; }
+#deliveryLockManagementPage .delivery-lock-empty span { margin-top: .25rem; font-size: .8125rem; }
+#deliveryLockManagementPage .delivery-lock-table-hint { margin: 0; padding: .75rem 1.5rem; border-top: 1px solid var(--ui-border, #dfe1e5); color: var(--ui-muted, #595d65); font-size: .75rem; }
+#deliveryLockManagementPage :is(.delivery-lock-back, .delivery-lock-terminate):focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 2px; }
+@media (max-width: 575.98px) {
+    #deliveryLockManagementPage .delivery-lock-back { width: 100%; }
+    #deliveryLockManagementPage .delivery-lock-summary { grid-template-columns: 1fr; }
+    #deliveryLockManagementPage .delivery-lock-panel-header { padding: 1rem; }
+    #deliveryLockManagementPage .delivery-lock-table-hint { padding: .75rem 1rem; }
+}

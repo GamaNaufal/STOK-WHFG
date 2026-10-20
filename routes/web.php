@@ -147,6 +147,7 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::get('/delivery-assign/search', [DeliveryAssignController::class, 'search'])->name('delivery-assign.search');
         Route::get('/delivery-assign/pallets/search', [DeliveryAssignController::class, 'searchPalletsForNewBoxInput'])->name('delivery-assign.search-new-box-pallets');
         Route::get('/delivery-assign/pallets/{palletId}/boxes', [DeliveryAssignController::class, 'palletBoxes'])->name('delivery-assign.pallet-boxes');
+        Route::post('/delivery-assign/preview', [DeliveryAssignController::class, 'preview'])->name('delivery-assign.preview');
         Route::post('/delivery-assign/assign', [DeliveryAssignController::class, 'assign'])->name('delivery-assign.assign');
     });
 

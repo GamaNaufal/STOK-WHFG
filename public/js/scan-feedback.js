@@ -45,8 +45,9 @@
         return buffers.get(type);
     }
 
-    // Keyboard scanners and pointer input both unlock audio before AJAX finishes.
-    function prepare() {
+    // Prepare audio only for scan controls, not navigation or status links.
+    function prepare(event) {
+        if (!event.target?.closest?.('#scanForm, #scanInput, #btnScan')) return;
         try {
             const audioContext = getContext();
             if (!audioContext) return;
