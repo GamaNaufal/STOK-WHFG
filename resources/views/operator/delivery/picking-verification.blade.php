@@ -73,9 +73,10 @@
                                 </span>
                             </td>
                             <td class="verification-list-action">
-                                <button type="button" class="btn btn-verify js-start-verification" data-order-id="{{ $order->id }}" @disabled(! $isReady)>
+                                <button type="button" class="btn btn-verify js-start-verification" data-order-id="{{ $order->id }}" aria-label="{{ $isOwnSession ? 'Lanjutkan' : 'Mulai' }} verifikasi order #{{ $order->id }}" @disabled(! $isReady)>
                                     <i class="bi {{ $isOwnSession ? 'bi-arrow-repeat' : 'bi-play-circle' }}" aria-hidden="true"></i>
-                                    {{ $isOwnSession ? 'Lanjutkan Verifikasi' : 'Mulai Verifikasi' }}
+                                    <span class="verification-action-full">{{ $isOwnSession ? 'Lanjutkan Verifikasi' : 'Mulai Verifikasi' }}</span>
+                                    <span class="verification-action-compact" aria-hidden="true">{{ $isOwnSession ? 'Lanjut' : 'Mulai' }}</span>
                                 </button>
                             </td>
                         </tr>
@@ -87,7 +88,7 @@
                 </tbody>
             </table>
         </div>
-        <p class="verification-list-footnote">Geser tabel untuk melihat semua kolom. Nomor order tetap terlihat saat digeser.</p>
+        <p class="verification-list-footnote">Geser tabel untuk melihat semua kolom. Nomor order tetap terlihat; pada ponsel, tombol aksi juga tetap terlihat.</p>
     </section>
 </div>
 @endsection

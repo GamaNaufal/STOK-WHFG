@@ -13,6 +13,67 @@ class DeliverySalesPpcWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_ppc_queue_keeps_stock_context_and_all_decision_actions(): void
+    {
+        $ppc = User::factory()->create(['role' => 'ppc']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'PT Keputusan',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'pending',
+            'notes' => 'Periksa prioritas.',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-PPC-01',
+            'quantity' => 125,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $this->actingAs($ppc)->get(route('delivery.approvals'))
+            ->assertOk()
+            ->assertSee('Order #'.$order->id)
+            ->assertSee('PT Keputusan')
+            ->assertSee('Periksa prioritas.')
+            ->assertSee('P-PPC-01')
+            ->assertSee('0 / 125')
+            ->assertSee('Belum cukup')
+            ->assertSee('data-order-id="'.$order->id.'" data-status="approved"', false)
+            ->assertSee('data-order-id="'.$order->id.'" data-status="correction"', false)
+            ->assertSee('data-order-id="'.$order->id.'" data-status="rejected"', false);
+    }
+
+    public function test_ppc_history_keeps_full_notes_and_items_in_order_details(): void
+    {
+        $ppc = User::factory()->create(['role' => 'ppc']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $note = str_repeat('Periksa perubahan kebutuhan part sebelum pengiriman. ', 3);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'PT Riwayat PPC',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'rejected',
+            'notes' => $note,
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-HISTORY',
+            'quantity' => 125,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $this->actingAs($ppc)->get(route('delivery.approvals'))
+            ->assertOk()
+            ->assertSee('Order #'.$order->id)
+            ->assertSee('PT Riwayat PPC')
+            ->assertSee('Ditolak')
+            ->assertSee('data-bs-target="#history-detail-'.$order->id.'"', false)
+            ->assertSee($note)
+            ->assertSee('P-HISTORY')
+            ->assertSee('125 PCS');
+    }
+
     public function test_ppc_approve_requires_notes(): void
     {
         $ppc = User::factory()->create(['role' => 'ppc']);

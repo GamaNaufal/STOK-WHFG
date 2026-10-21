@@ -40,6 +40,7 @@
 #pickingVerificationListPage .btn-verify { display: inline-flex; align-items: center; justify-content: center; gap: .4rem; min-height: 44px; padding: .55rem .75rem; border: 1px solid var(--ui-accent, #0b7072); background: var(--ui-accent, #0b7072); color: #fff; font-size: .75rem; font-weight: 650; line-height: 1.3; }
 #pickingVerificationListPage .btn-verify:not(:disabled):hover { border-color: #075b5d; background: #075b5d; color: #fff; }
 #pickingVerificationListPage .btn-verify:disabled { border-color: #d7dce0; background: #eef0f2; color: #59616a; opacity: 1; cursor: not-allowed; }
+#pickingVerificationListPage .verification-action-compact { display: none; }
 #pickingVerificationListPage .verification-list-empty { padding: 2rem 1rem !important; color: var(--ui-muted, #595d65); text-align: center; }
 #pickingVerificationListPage .verification-list-footnote { margin: 0; padding: .75rem 1.5rem; border-top: 1px solid var(--ui-border, #dfe1e5); color: var(--ui-muted, #595d65); font-size: .75rem; }
 #pickingVerificationListPage :is(.verification-list-back, .btn-verify):focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 2px; }
@@ -47,4 +48,13 @@
     #pickingVerificationListPage .verification-list-back { width: 100%; }
     #pickingVerificationListPage .verification-list-toolbar { padding: 1rem; }
     #pickingVerificationListPage .verification-list-footnote { padding: .75rem 1rem; }
+    #pickingVerificationListPage .verification-list-table > :is(thead, tbody) > tr > :first-child { z-index: 2; width: 5.5rem; min-width: 5.5rem; }
+    #pickingVerificationListPage .verification-list-table > thead > tr > :first-child { z-index: 4; }
+    #pickingVerificationListPage .verification-list-table > :is(thead, tbody) > tr > :last-child { position: sticky; right: 0; z-index: 2; width: 7rem; min-width: 7rem; background: #fff; box-shadow: inset 1px 0 var(--ui-border, #dfe1e5); }
+    #pickingVerificationListPage .verification-list-table > thead > tr > :last-child { z-index: 3; background: #f6f7f8; }
+    #pickingVerificationListPage .verification-list-table > tbody > tr.verification-list-own-session > :last-child { background: #eaf6f4; }
+    #pickingVerificationListPage .verification-list-table > tbody > tr > .verification-list-empty { position: static; width: auto; min-width: 0; border-right: 0; box-shadow: none; }
+    #pickingVerificationListPage .verification-list-action .btn-verify { width: 100%; padding-right: .35rem; padding-left: .35rem; }
+    #pickingVerificationListPage .verification-action-full { display: none; }
+    #pickingVerificationListPage .verification-action-compact { display: inline; }
 }

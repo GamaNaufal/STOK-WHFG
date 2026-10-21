@@ -5,22 +5,16 @@ Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 ## 1. Frontend architecture
 
 - Laravel 12 server-rendered Blade; Bootstrap 5.3, Bootstrap Icons, vanilla JS, and page-specific jQuery/Select2. Charts use Chart.js and Highcharts.
-- Main shell: `resources/views/shared/layouts/app.blade.php`; navigation/styles/scripts: `resources/views/shared/layouts/partials/`. CSS order: Bootstrap → shell styles → page `@section('styles')` →
-  `public/css/application-ui.css` → `public/css/apple-design.css`.
-  Global overrides load after page styles; no `@stack('styles')`. Scripts support sections/stacks.
-- Main shell loads public assets directly, including `public/js/alert-helper.js`. Vite/Tailwind 4 are configured in `vite.config.js`, `resources/css/app.css`,
-  and `resources/js/app.js`, but this shell does not load them with `@vite`.
+- Main shell: `resources/views/shared/layouts/app.blade.php`; navigation/styles/scripts: `resources/views/shared/layouts/partials/`. CSS order: Bootstrap → shell → page styles → `public/css/application-ui.css` → `public/css/apple-design.css`; global overrides load last. Scripts support sections/stacks, styles do not have `@stack`.
+- Main shell loads public assets directly, including `public/js/alert-helper.js`; Vite/Tailwind 4 are configured but this shell does not load them with `@vite`.
 - Reusable UI: `resources/views/components/`; standalone login: `resources/views/shared/auth/login.blade.php`, `public/css/login-ui.css`.
-- Dashboard: `resources/views/shared/dashboard.blade.php` for Operator, Sales,
-  PPC, Admin Warehouse; `resources/views/operator/reports/operational.blade.php`
-  for Admin Utama/Supervisi. Dashboard partials are in
-  `resources/views/shared/partials/`; styles in `public/css/dashboard*.css`.
+- Dashboard: `resources/views/shared/dashboard.blade.php` for Operator, Sales, PPC, Admin Warehouse; `resources/views/operator/reports/operational.blade.php` for Admin Utama/Supervisi. Partials: `resources/views/shared/partials/`; styles: `public/css/dashboard*.css`.
 
 ## 2. Implemented segments
 
 | Segment | Current status and entry points |
 | --- | --- |
-| Shared foundation | Implemented: shell/sidebar/search, focus, responsive controls, restrained surfaces, login/profile feedback. Global coverage is a baseline, not a completed interaction audit of every page. See `docs/UI_UX_AUDIT.md`. |
+| Shared foundation | Implemented: shell/sidebar/search, focus, responsive controls, restrained surfaces and login. `/profile` now has grouped identity/security fields, inline validation, optional-password guidance and responsive actions in `resources/views/profile/edit.blade.php` and `public/css/pages/profile.css`. Global coverage is a baseline, not a completed interaction audit of every page. See `docs/UI_UX_AUDIT.md`. |
 | Dashboard | Implemented: role summaries, quick access, operational filters, stock activity charts, planned/actual delivery, mismatch summary, popovers, Current Handling/Active Pallet tables. On 19 October: Matching/Schedule Fulfillment tables use `resources/views/shared/partials/dashboard-order-table.blade.php` and `public/css/dashboard-stock-tables.css`. See `docs/DASHBOARD_SEGMENT_REVIEW.md` for earlier segments. Report-route presentation remains separate. |
 | Lihat Stok | Implemented: four-mode toolbar/results, part/pallet details, edit/history/delete dialogs, single-modal focus restoration, retry/error/loading states, save/delete guards and reload feedback. Entry: `resources/views/shared/stock-view/index.blade.php`, its `partials/`, `public/css/stock-view-toolbar.css`, `public/css/stock-view-results.css`. See `docs/STOCK_VIEW_SEGMENT_REVIEW.md`. |
 | Input Stok | Implemented: scoped responsive layout, stable scan fields, inline validation, duplicate-submit guards, lookup/reset/save error recovery. Entry: `resources/views/operator/stock-input/index.blade.php`, its `partials/`, `public/css/pages/operator-stock-input.css`, `public/js/pages/operator-stock-input.js`. See `docs/STOCK_INPUT_SEGMENT_REVIEW.md`. |
@@ -81,7 +75,7 @@ Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 - Picking Verification list/scan use `resources/views/operator/delivery/{picking-verification,verify-scan}.blade.php`
   and `public/css/pages/{picking-verification-list,delivery-verification}.css`: the list has
   scoped counts, contextual status, 44px actions and sticky Order; scan has clear progress/timer
-  and sticky picklist ID. Start/resume, Enter/focus, timeout, cancel and permissions are unchanged.
+  and sticky picklist ID. On 21 Oct, the list also keeps its compact action column visible beside Order on phones during horizontal scroll, with full accessible button names. Start/resume, Enter/focus, timeout, cancel and permissions are unchanged.
 - Picking Verification rejects wrong/empty/unlisted or withdrawn/expired box scans
   without counting them, creating an issue or blocking the session; the next scan can
   proceed. Final Delivery still creates a pending issue and blocks on wrong scans,
@@ -109,20 +103,21 @@ Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 - Master Location complete: `resources/views/admin/locations/{index,edit}.blade.php` and `public/css/pages/master-locations.css` cover page headers, create/edit forms, validation feedback, occupancy context, labeled table actions, empty state and bounded pagination. Occupied edit is read-only; occupied deletion is disabled in UI while server guards remain. Other Delivery, remaining reports/master screens, devices, screen readers and large datasets remain unverified.
 - Master Part & Qty complete: `resources/views/operator/part-settings/{index,create,edit}.blade.php`, `public/css/pages/master-parts.css`, `public/js/pages/master-parts.js` cover header, capped global search with loading/error/reset, consistent PCS/box units, bounded pagination, create/edit guidance and deletion context. Existing 10-row pages, 50-result search API, validation, referenced-part guards, routes and roles remain.
 - User Management complete: `resources/views/admin/users/{index,create,edit}.blade.php`, `public/css/pages/user-management.css`, `public/js/pages/user-management-forms.js`, and `UserController::index` cover account totals, server-side name/email search, role/status filters, 15-row pagination, responsive table, labeled create/edit fields, role/status guidance, matching password feedback and contextual confirmations. Own-account deactivation is unavailable in the list; routes, server validation, role options, activation and audit behavior remain.
+- Hak Akses complete: `resources/views/admin/access/index.blade.php`, `public/css/pages/access-management.css`, and `public/js/pages/feature-access.js` show grouped permissions, selected/group counts, locked Admin-only features, dependency notes, unsaved state and confirmation before role-wide save (including empty selection). Existing role switch, dependency sync, payload, server validation and audit semantics remain.
+- Sales Delivery Order complete: `resources/views/operator/delivery/{create,edit}.blade.php` share `partials/sales-order-fields.blade.php`, `public/css/pages/sales-delivery-order.css`, and `public/js/pages/sales-delivery-order.js`. Forms group customer/date and part/PCS, show PPC correction notes, preserve input after errors, flag duplicate parts, summarize PCS and confirm submission. The Sales history table now groups order/date, customer/status and actions; shows up to 50 own orders with visible correction/rejection notes, sticky Order when scrolling, and item details for all statuses. Payload, ownership, correction-only edits and PPC flow remain.
+- PPC approval page complete: `resources/views/operator/delivery/approvals.blade.php`, `public/css/pages/ppc-approval-queue.css`, and `public/js/pages/ppc-approval-decision.js` cover pending count, per-part ready/required and total stock, three decisions, note guidance and approval-impact feedback (checking/safe/affected/failure with retry and stale-response guard). The history table shows up to 15 updated orders with sticky Order, textual status, full notes and item details in a stable collapse row. Decision payload, endpoint, stock calculations, history query, server rules and PPC access remain.
 - Pallet business guard (20 Oct): assigned/not-full boxes and `pending` pick sessions allow Move/Merge.
   Any attached box in `scanning`, `blocked`, or `approved` blocks Move/Merge and additions
   through Stock Input/Box Not Full, plus sibling assignment, Stock View mutation and expired Handle. Merge retargets pending Box Not Full requests; assignment and PCS stay intact.
 
 ## 5. Recommended next segment
 
-Continue with **Hak Akses / Access Management** in `resources/views/admin/access/index.blade.php`; preserve role-feature rules and Admin-only permissions.
+Next, check the active Picking Verification scan screen at phone width and by keyboard, then fix one concrete usability gap. The registered `/delivery-stock/{id}/fulfill` view has no link from the active flow; FIFO/picklist uses the Schedule modal. `resources/views/operator/stock-withdrawal/index.blade.php` has no GET route or active navigation link; the Withdrawal report is `/reports/withdrawal`.
 
 ## 6. Production safety
 
-- Presentation changes must preserve form names, IDs used by scripts, payloads,
-  endpoints, scanner focus/Enter behavior, audio feedback and server validation.
-- Do not alter inventory/FIFO, picking locks, approval rules, transaction boundaries
-  or quantity calculations as a side effect of redesign. Preserve permission-gated actions.
+- Presentation changes must preserve form names, script IDs, payloads, endpoints, scanner focus/Enter behavior, audio feedback and server validation.
+- Do not alter inventory/FIFO, picking locks, approval rules, transaction boundaries or quantity calculations as a side effect of redesign. Preserve permission-gated actions.
 - Keep print/PDF/email templates separate from screen styling. Preserve CDN and
   asset loading order; check deployed asset caching when shipping CSS/JS changes.
 - Use isolated fixtures and a verified testing database; `phpunit.xml` specifies
@@ -132,7 +127,7 @@ Continue with **Hak Akses / Access Management** in `resources/views/admin/access
 
 ## 7. Relevant validation
 
-- Scan stages: 34 Laravel tests/264 assertions and 13 Node tests passed; verification rejects wrong input without blocking, while final scan blocks pending approval.
+- Scan stages: prior 34 Laravel tests/264 assertions and 13 Node tests passed; current Picking Verification list 390px fixture kept Order/Aksi visible at maximum horizontal scroll and keyboard Tab reached the visible action. Render 1/26 and activity 13/157 Laravel tests passed; wrong verification input still does not block, while final scan blocks pending approval. Device check remains open.
 - Delivery lock management: 15 Laravel tests/287 assertions passed; 390px browser fixture
   kept header/body aligned at 843px scroll.
 - Delivery Assign: prior 18 Laravel tests/134 assertions; current focused 15/70 and 4 Node
@@ -145,7 +140,10 @@ Continue with **Hak Akses / Access Management** in `resources/views/admin/access
 - Dashboard processing/throughput/issues/audit filters: prior `UiReviewPreviewTest` 8/109 and report/export sanity 3/24 passed. Standalone Audit Trail: 10 audit/detail/auth tests/89 assertions passed; full Laravel suite on 21 Oct passed 233 tests/1,723 assertions after broader audit coverage. Master Location and Master Part & Qty: 42 focused Laravel tests/447 assertions plus 2 Node search/delete tests passed; browser/device visual check remains open.
 - Stock Input/Withdrawal reports: 16 focused Laravel tests/157 assertions passed; after Withdrawal wording revision, 8 filter/auth/export tests/48 assertions passed. Coverage includes 15+1 pagination, filter retention and full notes; browser/device visual check remains open.
 - User Management list/forms: 28 focused Laravel tests/409 assertions passed (rendering, filters, pagination, access and audit); JS syntax and diff checks passed. Browser/device visual check remains open.
+- Hak Akses: 22 Laravel tests/364 assertions and 2 Node interaction tests passed (dependency, empty-save warning, dirty navigation). Browser/device visual check remains open.
+- Sales Delivery Order forms/history: 26 focused Laravel tests/302 assertions after history update; prior 2 Node interaction tests passed (item controls), JS syntax passed. Coverage includes correction item details, ownership, PPC notes, Sales/PPC flow and permissions. Browser/device visual check remains open.
+- PPC approval page: 34 focused Laravel tests/438 assertions and 3 Node modal tests passed (stock context, decisions, notes/items in history, impact gating/retry, stale responses); JS syntax and Blade compilation passed. Profile: render test 1/26 and update/audit test 1/10 passed; browser/device visual check remains open.
 
 ## 8. Changes to preserve
 
-- Earlier Audit Trail/Stock Input edits are in HEAD `ae67525`; preserve all uncommitted audit/controller/service/test work, Withdrawal and Expired Box UI assets, Master Location, Master Part and User Management Blade/CSS/tests, and this handoff. The status migration ran only on local `db_stock`; production remains unverified.
+- Earlier Audit Trail/Stock Input edits are in HEAD `ae67525`; preserve uncommitted Hak Akses, Sales Delivery Order, PPC queue, Profile, Picking Verification list Blade/CSS, related tests and this handoff. The status migration ran only on local `db_stock`; production remains unverified.
