@@ -146,11 +146,11 @@
                         @if(in_array($viewMode, ['part', 'pallet'], true))
                             <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                                 <span style="font-size: 12px; opacity: 0.85; font-weight: 500;">Urut ditambahkan</span>
-                                <a href="{{ $sortUrl('created_oldest') }}" class="stock-sort-pill {{ $sortMode === 'created_oldest' ? 'is-active' : '' }}">
+                                <a href="{{ $sortUrl('created_oldest') }}" class="stock-sort-pill {{ $sortMode === 'created_oldest' ? 'is-active' : '' }}" @if($sortMode === 'created_oldest') aria-current="true" @endif>
                                     <i class="bi bi-hourglass-split"></i>
                                     <span>Terlama</span>
                                 </a>
-                                <a href="{{ $sortUrl('created_newest') }}" class="stock-sort-pill {{ $sortMode === 'created_newest' ? 'is-active' : '' }}">
+                                <a href="{{ $sortUrl('created_newest') }}" class="stock-sort-pill {{ $sortMode === 'created_newest' ? 'is-active' : '' }}" @if($sortMode === 'created_newest') aria-current="true" @endif>
                                     <i class="bi bi-hourglass-bottom"></i>
                                     <span>Terbaru</span>
                                 </a>
@@ -326,6 +326,7 @@
                                         </td>
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <button type="button" class="btn btn-sm js-detail-part"
+                                                    aria-label="Detail stok part {{ $partData['part_number'] }}"
                                                     data-part-number="{{ $partData['part_number'] }}"
                                                     data-total-box="{{ $partData['total_box'] }}"
                                                     data-total-pcs="{{ $partData['total_pcs'] }}"
@@ -376,12 +377,14 @@
                                             <div class="d-inline-flex gap-1 flex-wrap justify-content-center">
                                                 @if(!empty($boxData['box_id']))
                                                     <button type="button" class="btn btn-sm btn-outline-primary js-box-history"
+                                                            aria-label="Riwayat box {{ $boxData['box_number'] ?? 'Legacy' }}"
                                                             data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                             style="font-size: 12px;">
-                                                        <i class="bi bi-clock-history"></i> History
+                                                        <i class="bi bi-clock-history"></i> Riwayat
                                                     </button>
                                                     @if($canEditBox && empty($boxData['is_expired']))
                                                         <button type="button" class="btn btn-sm btn-outline-success js-edit-box"
+                                                                aria-label="Edit box {{ $boxData['box_number'] ?? 'Legacy' }}"
                                                                 data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                                 data-box-number="{{ $boxData['box_number'] ?? '' }}"
                                                                 data-part-number="{{ $boxData['part_number'] ?? '' }}"
@@ -393,6 +396,7 @@
                                                     @endif
                                                     @if($canDeleteStock)
                                                         <button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                                                aria-label="Hapus box {{ $boxData['box_number'] ?? 'Legacy' }} dari stok aktif"
                                                                 data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                                 data-box-number="{{ $boxData['box_number'] ?? '' }}"
                                                                 data-part-number="{{ $boxData['part_number'] ?? '' }}"
@@ -438,6 +442,7 @@
                                         </td>
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <button type="button" class="btn btn-sm js-detail-pallet"
+                                               aria-label="Lihat isi pallet {{ $palletData['pallet_number'] }}"
                                                data-pallet-id="{{ $palletData['pallet_id'] }}"
                                                style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                                                       color: white; 
@@ -480,6 +485,7 @@
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <div class="d-inline-flex gap-1 flex-wrap justify-content-center">
                                                 <button type="button" class="btn btn-sm js-detail-pallet"
+                                                   aria-label="Lihat isi pallet {{ $box['pallet_number'] }}"
                                                    data-pallet-id="{{ $box['pallet_id'] }}"
                                                    style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                                                           color: white; 
@@ -498,6 +504,7 @@
                         </tbody>
                     </table>
                 </div>
+                <p class="stock-scroll-hint">Geser tabel untuk melihat seluruh kolom. Identitas stok tetap terlihat pada layar kecil.</p>
             </div>
         @else
             <div class="card border-0 shadow-sm" style="border-radius: 12px;">

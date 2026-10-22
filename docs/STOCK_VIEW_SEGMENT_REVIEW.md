@@ -115,3 +115,22 @@ inventory, serta isi template cetak tetap dipertahankan.
 - Belum memverifikasi printer/scanner/perangkat sentuh fisik, dataset besar,
   atau seluruh kombinasi gangguan jaringan. Preview bersifat sementara;
   screenshot tidak disertakan dalam laporan kepada pengguna.
+
+## Pemeriksaan ulang seluruh interaksi — 22 Oktober 2026
+
+- Ditinjau ulang: empat mode dan sort, pencarian/saran/keyboard, hasil kosong,
+  detail part/pallet, riwayat, edit/hapus dan konfirmasinya, retry/error/loading,
+  ekspor/cetak, fokus modal, serta hak akses. Aturan transaksi dan endpoint tetap.
+- Diperbaiki: info box tanpa pallet tidak lagi tampil sebagai error; teks perubahan
+  riwayat yang rusak menjadi terbaca; aksi baris menyebut identitas stok untuk
+  pembaca layar; status saran, sort, dan pil urutan tersampaikan secara semantik.
+- Pada layar kecil, kolom identitas hasil tetap terlihat saat tabel digeser;
+  petunjuk geser ditampilkan pada viewport sempit. Reduced motion dihormati
+  saat baris hasil pencarian disorot.
+- Setelah perubahan, 41 tes Laravel/526 assertions lulus, meliputi kontrak API,
+  mode/filter/ekspor, role, audit edit dan penjagaan edit/hapus. Sintaks JS
+  dan `git diff --check` lulus.
+- Fixture UI terisolasi pada 390 × 844 memverifikasi overflow horizontal, kolom
+  identitas tetap di tempat setelah scroll keyboard, saran/Escape, `aria-sort`,
+  nama aksi dan warna/status pesan info. Ini bukan pengujian data produksi.
+  Cetak fisik, perangkat sentuh/screen reader, dan dataset besar masih terbuka.

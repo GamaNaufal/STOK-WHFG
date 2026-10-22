@@ -1,6 +1,6 @@
 # UI Redesign Progress
 
-Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`, HEAD `ae67525`; local implementation only, production revision unverified.
+Repository checked: 22 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`, HEAD `18fea86`; local implementation only, production revision unverified.
 
 ## 1. Frontend architecture
 
@@ -16,7 +16,7 @@ Repository checked: 21 October 2026 (Asia/Jakarta). Baseline: branch `REDESIGN`,
 | --- | --- |
 | Shared foundation | Implemented: shell/sidebar/search, focus, responsive controls, restrained surfaces and login. `/profile` now has grouped identity/security fields, inline validation, optional-password guidance and responsive actions in `resources/views/profile/edit.blade.php` and `public/css/pages/profile.css`. Global coverage is a baseline, not a completed interaction audit of every page. See `docs/UI_UX_AUDIT.md`. |
 | Dashboard | Implemented: role summaries, quick access, operational filters, stock activity charts, planned/actual delivery, mismatch summary, popovers, Current Handling/Active Pallet tables. On 19 October: Matching/Schedule Fulfillment tables use `resources/views/shared/partials/dashboard-order-table.blade.php` and `public/css/dashboard-stock-tables.css`. See `docs/DASHBOARD_SEGMENT_REVIEW.md` for earlier segments. Report-route presentation remains separate. |
-| Lihat Stok | Implemented: four-mode toolbar/results, part/pallet details, edit/history/delete dialogs, single-modal focus restoration, retry/error/loading states, save/delete guards and reload feedback. Entry: `resources/views/shared/stock-view/index.blade.php`, its `partials/`, `public/css/stock-view-toolbar.css`, `public/css/stock-view-results.css`. See `docs/STOCK_VIEW_SEGMENT_REVIEW.md`. |
+| Lihat Stok | Implemented: four-mode toolbar/results, part/pallet details, edit/history/delete dialogs, single-modal focus restoration, retry/error/loading states, save/delete guards and reload feedback. 22 Oct interaction recheck added contextual action names, semantic search/sort state, readable history diff/info, and sticky identity on small screens. Entry: `resources/views/shared/stock-view/index.blade.php`, its `partials/`, `public/css/stock-view-toolbar.css`, `public/css/stock-view-results.css`. See `docs/STOCK_VIEW_SEGMENT_REVIEW.md`. |
 | Input Stok | Implemented: scoped responsive layout, stable scan fields, inline validation, duplicate-submit guards, lookup/reset/save error recovery. Entry: `resources/views/operator/stock-input/index.blade.php`, its `partials/`, `public/css/pages/operator-stock-input.css`, `public/js/pages/operator-stock-input.js`. See `docs/STOCK_INPUT_SEGMENT_REVIEW.md`. |
 | Request/Approval Box Not Full | Implemented: grouped fields, capacity hints, inline validation, contextual confirmations, persistent feedback, submit guards, readable mobile approvals. Entry: `resources/views/operator/box-not-full/create.blade.php`, `resources/views/supervisor/approvals.blade.php`, `resources/views/shared/not-full-feedback.blade.php`, `public/css/not-full.css`, `public/js/pages/not-full.js`. See `docs/NOT_FULL_SEGMENT_REVIEW.md`. |
 
@@ -143,7 +143,8 @@ Next, check the active Picking Verification scan screen at phone width and by ke
 - Hak Akses: 22 Laravel tests/364 assertions and 2 Node interaction tests passed (dependency, empty-save warning, dirty navigation). Browser/device visual check remains open.
 - Sales Delivery Order forms/history: 26 focused Laravel tests/302 assertions after history update; prior 2 Node interaction tests passed (item controls), JS syntax passed. Coverage includes correction item details, ownership, PPC notes, Sales/PPC flow and permissions. Browser/device visual check remains open.
 - PPC approval page: 34 focused Laravel tests/438 assertions and 3 Node modal tests passed (stock context, decisions, notes/items in history, impact gating/retry, stale responses); JS syntax and Blade compilation passed. Profile: render test 1/26 and update/audit test 1/10 passed; browser/device visual check remains open.
+- Stock View interaction recheck: 41 focused Laravel tests/526 assertions, JS syntax and diff checks passed. Isolated 390px browser fixture verified search/Escape, status/sort semantics, info feedback and sticky identity after horizontal scroll; physical touch/print, screen readers and large datasets remain open.
 
 ## 8. Changes to preserve
 
-- Earlier Audit Trail/Stock Input edits are in HEAD `ae67525`; preserve uncommitted Hak Akses, Sales Delivery Order, PPC queue, Profile, Picking Verification list Blade/CSS, related tests and this handoff. The status migration ran only on local `db_stock`; production remains unverified.
+- Earlier redesign edits are in HEAD `18fea86`; preserve current uncommitted Stock View Blade/CSS and this review/handoff. The status migration ran only on local `db_stock`; production remains unverified.

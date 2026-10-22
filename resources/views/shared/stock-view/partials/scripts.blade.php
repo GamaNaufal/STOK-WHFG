@@ -160,7 +160,11 @@
 
     function showAutoPopup(message, type = 'success', duration = 1800) {
         const popup = document.createElement('div');
-        const isSuccess = type === 'success';
+        const appearance = {
+            success: { color: '#065f46', background: '#d1fae5', border: '#86efac', role: 'status' },
+            info: { color: '#075b5d', background: '#e8f3f1', border: '#b5d9d7', role: 'status' },
+            danger: { color: '#7f1d1d', background: '#fee2e2', border: '#fca5a5', role: 'alert' },
+        }[type] || { color: '#075b5d', background: '#e8f3f1', border: '#b5d9d7', role: 'status' };
 
         popup.style.position = 'fixed';
         popup.style.top = '24px';
@@ -170,16 +174,16 @@
         popup.style.padding = '12px 16px';
         popup.style.borderRadius = '10px';
         popup.style.boxShadow = '0 8px 24px rgba(0,0,0,0.18)';
-        popup.style.color = isSuccess ? '#065f46' : '#7f1d1d';
-        popup.style.background = isSuccess ? '#d1fae5' : '#fee2e2';
-        popup.style.border = isSuccess ? '1px solid #86efac' : '1px solid #fca5a5';
+        popup.style.color = appearance.color;
+        popup.style.background = appearance.background;
+        popup.style.border = `1px solid ${appearance.border}`;
         popup.style.fontWeight = '600';
         popup.style.fontSize = '14px';
         popup.style.opacity = '0';
         popup.style.transform = 'translateY(-8px)';
         popup.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-        popup.textContent = message || (isSuccess ? 'Berhasil.' : 'Terjadi kesalahan.');
-        popup.setAttribute('role', isSuccess ? 'status' : 'alert');
+        popup.textContent = message || (type === 'success' ? 'Berhasil.' : (type === 'danger' ? 'Terjadi kesalahan.' : 'Informasi stok tersedia.'));
+        popup.setAttribute('role', appearance.role);
         popup.style.maxWidth = 'min(380px, calc(100vw - 48px))';
         if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
             popup.style.transition = 'none';
@@ -590,6 +594,7 @@
             suggestion.addEventListener('click', () => {
                 searchInput.value = item;
                 searchDropdown.style.display = 'none';
+                searchInput.setAttribute('aria-expanded', 'false');
                 searchForm.submit();
             });
             searchDropdown.appendChild(suggestion);
@@ -598,23 +603,28 @@
 
     if (hasSearchUi) {
         const searchRegion = searchInput.closest('.stock-toolbar__search');
+        const hideSuggestions = () => {
+            searchDropdown.style.display = 'none';
+            searchInput.setAttribute('aria-expanded', 'false');
+        };
         const showSuggestions = () => {
             loadSearchSuggestions(searchInput.value);
             searchDropdown.style.display = 'block';
+            searchInput.setAttribute('aria-expanded', 'true');
         };
         searchInput.addEventListener('focus', showSuggestions);
         searchInput.addEventListener('input', showSuggestions);
         searchRegion.addEventListener('focusout', event => {
-            if (!searchRegion.contains(event.relatedTarget)) searchDropdown.style.display = 'none';
+            if (!searchRegion.contains(event.relatedTarget)) hideSuggestions();
         });
         document.addEventListener('pointerdown', event => {
-            if (!searchRegion.contains(event.target)) searchDropdown.style.display = 'none';
+            if (!searchRegion.contains(event.target)) hideSuggestions();
         });
         searchRegion.addEventListener('keydown', event => {
             if (event.key === 'Escape') {
                 event.preventDefault();
                 searchInput.focus();
-                searchDropdown.style.display = 'none';
+                hideSuggestions();
             }
         });
     }
@@ -696,10 +706,12 @@
                             <td style="padding: 12px 8px; white-space: nowrap;">
                                 ${pallet.pallet_id ? `
                                     <button type="button" class="btn btn-sm btn-outline-primary js-detail-pallet"
+                                        aria-label="Detail pallet ${escapeHtml(pallet.pallet_number)}"
                                         data-pallet-id="${pallet.pallet_id}">
                                         Detail Pallet
                                     </button>
                                     ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-danger js-delete-pallet ms-1"
+                                        aria-label="Hapus pallet ${escapeHtml(pallet.pallet_number)} dari stok aktif"
                                         data-pallet-id="${pallet.pallet_id}"
                                         data-pallet-number="${escapeHtml(pallet.pallet_number || '')}">
                                         Hapus Pallet
@@ -764,6 +776,7 @@
                             <td style="padding: 12px 8px; white-space: nowrap;">
                                 ${item.box_id ? `
                                     ${canEditBox && !item.is_expired ? `<button type="button" class="btn btn-sm btn-outline-primary js-edit-box"
+                                        aria-label="Edit box ${escapeHtml(item.box_number || '-')}"
                                         data-box-id="${item.box_id}"
                                         data-box-number="${escapeHtml(item.box_number || '')}"
                                         data-part-number="${escapeHtml(item.part_number || '')}"
@@ -772,8 +785,11 @@
                                         data-pallet-id="${palletId || ''}"
                                         data-pallet-number="${escapeHtml(data.pallet_number || '')}"
                                         data-location="${escapeHtml(data.location || '')}">Edit</button>` : ''}
-                                    <button type="button" class="btn btn-sm btn-outline-secondary js-box-history" data-box-id="${item.box_id}">History</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary js-box-history"
+                                        aria-label="Riwayat box ${escapeHtml(item.box_number || '-')}"
+                                        data-box-id="${item.box_id}">Riwayat</button>
                                     ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                        aria-label="Hapus box ${escapeHtml(item.box_number || '-')} dari stok aktif"
                                         data-box-id="${item.box_id}"
                                         data-box-number="${escapeHtml(item.box_number || '')}"
                                         data-part-number="${escapeHtml(item.part_number || '')}"
@@ -829,7 +845,10 @@
                         targetRow.style.backgroundColor = '#ecfeff';
                         targetRow.style.outline = '2px solid #14b8a6';
                         targetRow.style.outlineOffset = '-2px';
-                        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetRow.scrollIntoView({
+                            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                            block: 'center'
+                        });
 
                         setTimeout(() => {
                             targetRow.style.backgroundColor = '';
@@ -935,9 +954,9 @@
                         badgeClass = 'bg-warning text-dark';
                         actionLabel = 'Edit Box';
                         const diffLines = [
-                            `Part: ${escapeHtml(oldVal.part_number ?? '-')} â†’ ${escapeHtml(newVal.part_number ?? '-')}`,
-                            `PCS: ${escapeHtml(String(oldVal.pcs_quantity ?? '-'))} â†’ ${escapeHtml(String(newVal.pcs_quantity ?? '-'))}`,
-                            `Tanggal: ${escapeHtml(oldVal.stored_at ?? '-')} â†’ ${escapeHtml(newVal.stored_at ?? '-')}`,
+                            `Part: ${escapeHtml(oldVal.part_number ?? '-')} menjadi ${escapeHtml(newVal.part_number ?? '-')}`,
+                            `PCS: ${escapeHtml(String(oldVal.pcs_quantity ?? '-'))} menjadi ${escapeHtml(String(newVal.pcs_quantity ?? '-'))}`,
+                            `Tanggal: ${escapeHtml(oldVal.stored_at ?? '-')} menjadi ${escapeHtml(newVal.stored_at ?? '-')}`,
                         ];
                         if (newVal.reason) {
                             diffLines.push(`Alasan: ${escapeHtml(newVal.reason)}`);
@@ -1142,6 +1161,10 @@
     }, true);
 
     window.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.stock-results .stock-sort-link.is-active').forEach(link => {
+            const heading = link.closest('th');
+            if (heading) heading.setAttribute('aria-sort', link.querySelector('.bi-sort-up') ? 'ascending' : 'descending');
+        });
         try {
             const message = sessionStorage.getItem('stockViewSuccess');
             sessionStorage.removeItem('stockViewSuccess');

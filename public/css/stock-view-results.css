@@ -23,6 +23,7 @@
     text-transform: none !important; font-weight: 600 !important;
 }
 .warehouse-app .stock-results .table { min-width: 40rem; }
+.warehouse-app .stock-results .stock-scroll-hint { display: none; margin: 0; padding: .75rem 1rem; border-top: 1px solid var(--ui-border); color: var(--ui-muted); font-size: .75rem; line-height: 1.5; }
 .warehouse-app .stock-detail .table { min-width: 42rem; }
 .warehouse-app :is(.stock-results, .stock-detail) .table tr { transition: none !important; }
 .warehouse-app .stock-results td > span:not(.badge) {
@@ -57,10 +58,21 @@
 .warehouse-app :is(.stock-results, .stock-detail) :is(button, a, [tabindex]):focus-visible {
     outline: 3px solid var(--ui-accent); outline-offset: -3px;
 }
+@media (max-width: 991.98px) {
+    .warehouse-app .stock-results .stock-scroll-hint { display: block; }
+}
 @media (max-width: 575.98px) {
     .warehouse-app .stock-detail .modal-dialog { width: 100%; max-width: none; height: 100%; margin: 0; }
     .warehouse-app .stock-detail .modal-content { border-radius: 0 !important; }
     .warehouse-app .stock-detail .modal-body { padding: 1rem !important; }
+    .warehouse-app .stock-results .table > thead > tr > th:first-child,
+    .warehouse-app .stock-results .table > tbody > tr > td:first-child {
+        position: sticky; left: 0; width: 9rem; min-width: 9rem; max-width: 9rem;
+        background: var(--ui-surface); box-shadow: inset -1px 0 var(--ui-border);
+    }
+    .warehouse-app .stock-results .table > thead > tr > th:first-child { z-index: 2; background: var(--ui-canvas); }
+    .warehouse-app .stock-results .table > tbody > tr > td:first-child { z-index: 1; }
+    .warehouse-app .stock-results .table > tbody > tr:hover > td:first-child { background: #f3f6f5; }
 }
 @media (prefers-reduced-motion: reduce) {
     .stock-detail.fade, .stock-detail.fade .modal-dialog { transition: none !important; }

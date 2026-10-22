@@ -11,8 +11,8 @@
             <label for="searchInput">Cari stok</label>
             <input type="search" name="search" id="searchInput" class="form-control"
                    placeholder="Part, pallet, box, atau lokasi" value="{{ $search ?? '' }}"
-                   autocomplete="off" aria-describedby="stockSearchHint">
-            <div id="searchDropdown" class="stock-toolbar__suggestions" style="display: none;" aria-label="Saran pencarian"></div>
+                   autocomplete="off" aria-describedby="stockSearchHint" aria-controls="searchDropdown" aria-expanded="false">
+            <div id="searchDropdown" class="stock-toolbar__suggestions" style="display: none;" role="group" aria-label="Saran pencarian"></div>
         </div>
         <div class="stock-toolbar__sort">
             <label for="stockSort">Urutkan</label>
