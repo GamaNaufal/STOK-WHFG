@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ExpiredBoxHandling;
 use App\Models\ExpiredBoxReport;
+use App\Models\ExpiredBoxTransaction;
 use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Services\ExpiredBoxBulkService;
@@ -42,18 +43,21 @@ class ExpiredBoxController extends Controller
                 ->paginate(15);
         }
 
-        $handlings = ExpiredBoxHandling::query()
+        $transactions = ExpiredBoxTransaction::with(['handlings' => fn ($q) => $q->select('id', 'transaction_id', 'status', 'pcs_quantity')])
             ->when($request->filled('search'), function ($query) use ($request) {
                 $search = (string) $request->input('search');
                 $query->where(function ($q) use ($search) {
-                    $q->where('source_box_number', 'like', '%'.$search.'%')
+                    if (preg_match('/^EXP-\d{8}-(\d+)$/i', $search, $matches)) {
+                        $q->where('id', (int) $matches[1]);
+                    }
+                    $q->orWhereHas('handlings', fn ($items) => $items->where('source_box_number', 'like', '%'.$search.'%')
                         ->orWhere('replacement_box_number', 'like', '%'.$search.'%')
-                        ->orWhere('part_number', 'like', '%'.$search.'%');
+                        ->orWhere('part_number', 'like', '%'.$search.'%'));
                 });
-            })->orderByRaw("CASE WHEN status IN ('completed', 'rejected') THEN 1 ELSE 0 END")
-            ->latest('id')->paginate(50, ['*'], 'handling_page')->withQueryString();
+            })->withExists(['handlings as is_open' => fn ($q) => $q->whereNotIn('status', ['completed', 'rejected'])])
+            ->orderByDesc('is_open')->latest('id')->paginate(15, ['*'], 'transaction_page')->withQueryString();
 
-        return view('warehouse.expired-box.index', compact('warningBoxes', 'expiredBoxes', 'handledHistory', 'handlings'));
+        return view('warehouse.expired-box.index', compact('warningBoxes', 'expiredBoxes', 'handledHistory', 'transactions'));
     }
 
     public function handle(Request $request, int $boxId, ExpiredBoxService $service): RedirectResponse
@@ -65,25 +69,27 @@ class ExpiredBoxController extends Controller
                 ->with('error', $e->getMessage());
         }
 
-        return redirect()->route('expired-box.show', $handling)
+        return redirect()->route('expired-box.transactions.show', $handling->transaction_id)
             ->with('success', 'Penyerahan ke QA tercatat. Box belum tersedia untuk delivery.');
     }
 
     public function show(ExpiredBoxHandling $handling)
     {
-        $availableLocations = MasterLocation::available()->orderBy('code')->get(['id', 'code']);
-        $pallets = Pallet::with('stockLocation')->whereHas('stockLocation')->orderBy('pallet_number')->get();
+        $handling->loadMissing('transaction');
         $users = \App\Models\User::whereIn('id', collect(['sent_qa_by', 'qa_decided_by', 'sent_packing_by', 'received_by'])
             ->map(fn ($field) => $handling->$field)->filter())->pluck('name', 'id');
         $originHandling = ExpiredBoxHandling::where('replacement_box_id', $handling->source_box_id)->first();
         $nextHandling = $handling->replacement_box_id
             ? ExpiredBoxHandling::where('source_box_id', $handling->replacement_box_id)->first() : null;
 
-        return view('warehouse.expired-box.show', compact('handling', 'availableLocations', 'pallets', 'users', 'originHandling', 'nextHandling'));
+        return view('warehouse.expired-box.show', compact('handling', 'users', 'originHandling', 'nextHandling'));
     }
 
     public function qa(Request $request, ExpiredBoxHandling $handling, ExpiredBoxHandlingService $service)
     {
+        if ($redirect = $this->groupRedirect($handling)) {
+            return $redirect;
+        }
         $data = $request->validate([
             'decision' => ['required', 'in:passed,rejected'],
             'notes' => ['nullable', 'string', 'max:2000', 'required_if:decision,rejected'],
@@ -95,6 +101,9 @@ class ExpiredBoxController extends Controller
 
     public function packing(Request $request, ExpiredBoxHandling $handling, ExpiredBoxHandlingService $service)
     {
+        if ($redirect = $this->groupRedirect($handling)) {
+            return $redirect;
+        }
         $request->validate(['confirmed' => ['accepted']]);
 
         return $this->perform($handling, fn () => $service->sendToPacking($handling->id, $request->user()->id));
@@ -102,6 +111,9 @@ class ExpiredBoxController extends Controller
 
     public function receive(Request $request, ExpiredBoxHandling $handling, ExpiredBoxHandlingService $service)
     {
+        if ($redirect = $this->groupRedirect($handling)) {
+            return $redirect;
+        }
         $data = $request->validate([
             'box_number' => ['required', 'string', 'regex:/^\d{8}$/'],
             'part_number' => ['required', 'string', 'max:255'],
@@ -117,6 +129,9 @@ class ExpiredBoxController extends Controller
 
     public function print(ExpiredBoxHandling $handling)
     {
+        if ($handling->transaction->handlings()->count() > 1) {
+            return redirect()->route('expired-box.transactions.print', $handling->transaction_id);
+        }
         abort_unless(in_array($handling->status, ['awaiting_packing', 'at_packing', 'completed']), 409, 'Pengantar hanya tersedia setelah lolos QA.');
 
         return view('warehouse.expired-box.print', compact('handling'));
@@ -156,7 +171,18 @@ class ExpiredBoxController extends Controller
             return redirect()->route('expired-box.index')->with('error', 'Pilihan memuat box yang tidak ditemukan atau statusnya tidak sesuai tindakan. Pilih ulang box pada tahap yang sama.');
         }
         if ($action === 'print' || $action === 'result') {
-            return view('warehouse.expired-box.bulk-'.$action, compact('records'));
+            if ($records->pluck('transaction_id')->unique()->count() !== 1) {
+                return redirect()->route('expired-box.index')->with('error', 'Buka satu transaksi untuk melanjutkan proses.');
+            }
+
+            return redirect()->route($action === 'print' ? 'expired-box.transactions.print' : 'expired-box.transactions.show', $records->first()->transaction_id);
+        }
+        if ($action !== 'start') {
+            if ($records->pluck('transaction_id')->unique()->count() !== 1) {
+                return redirect()->route('expired-box.index')->with('error', 'Buka satu transaksi untuk melanjutkan proses.');
+            }
+
+            return redirect()->route('expired-box.transactions.show', $records->first()->transaction_id);
         }
         $availableLocations = MasterLocation::available()->orderBy('code')->get(['id', 'code']);
         $pallets = Pallet::with('stockLocation')->whereHas('stockLocation')->orderBy('pallet_number')->get();
@@ -178,8 +204,18 @@ class ExpiredBoxController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('expired-box.bulk.review', ['action' => 'result', 'ids' => $ids])
-            ->with('success', count($ids).' box berhasil diproses.');
+        return redirect()->route('expired-box.transactions.show', ExpiredBoxHandling::findOrFail($ids[0])->transaction_id)
+            ->with('success', count($ids).' box tersimpan dalam satu transaksi.');
+    }
+
+    private function groupRedirect(ExpiredBoxHandling $handling): ?RedirectResponse
+    {
+        if ($handling->transaction->handlings()->count() > 1) {
+            return redirect()->route('expired-box.transactions.show', $handling->transaction_id)
+                ->with('error', 'Box ini bagian dari satu transaksi. Lanjutkan seluruh box melalui halaman transaksi.');
+        }
+
+        return null;
     }
 
     private function perform(ExpiredBoxHandling $handling, callable $action): RedirectResponse

@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class ExpiredBoxHandling extends Model
 {
+    public function transaction(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ExpiredBoxTransaction::class, 'transaction_id');
+    }
+
     protected $guarded = ['id'];
 
     protected $casts = [

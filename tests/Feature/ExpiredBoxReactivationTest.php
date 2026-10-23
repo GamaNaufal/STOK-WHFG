@@ -178,7 +178,7 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->assertNull($box->fresh()->reactivated_until);
         $this->assertCount(1, $handling->source_snapshot['pallet_boxes']);
         $this->assertDatabaseMissing('pallet_boxes', ['box_id' => $box->id]);
-        $this->post(route('expired-box.handle', $box->id))->assertRedirect(route('expired-box.show', $handling));
+        $this->post(route('expired-box.handle', $box->id))->assertRedirect(route('expired-box.transactions.show', $handling->transaction_id));
         $this->assertDatabaseCount('expired_box_handlings', 1);
         $this->assertSame(1, AuditLog::where('action', 'sent_qa')->count());
         app(ExpiredBoxService::class)->syncStatuses();

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\AuditLog;
 use App\Models\Box;
 use App\Models\ExpiredBoxHandling;
+use App\Models\ExpiredBoxTransaction;
 use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Models\PalletItem;
@@ -79,7 +80,9 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $this->assertSame(3, Box::where('expired_status', 'handled')->count());
         $this->assertSame(1, AuditLog::where('action', 'bulk_start')->count());
         $this->assertDatabaseCount('pallet_boxes', 0);
-        $this->get(route('expired-box.bulk.review', ['action' => 'result', 'ids' => ExpiredBoxHandling::pluck('id')->all()]))->assertOk()->assertSee('Catat hasil QA');
+        $transaction = ExpiredBoxTransaction::sole();
+        $this->get(route('expired-box.bulk.review', ['action' => 'result', 'ids' => ExpiredBoxHandling::pluck('id')->all()]))->assertRedirect(route('expired-box.transactions.show', $transaction));
+        $this->get(route('expired-box.transactions.show', $transaction))->assertOk()->assertSee('Catat hasil QA');
     }
 
     public function test_invalid_second_box_rolls_back_all_qa_handoffs(): void
@@ -88,6 +91,7 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $boxes[1]->update(['created_at' => now()]);
         $this->post(route('expired-box.bulk.store'), ['action' => 'start', 'rows' => $boxes->map(fn ($b) => ['id' => $b->id])->all(), 'confirmed' => 1])->assertSessionHasErrors('rows.1.id');
         $this->assertDatabaseCount('expired_box_handlings', 0);
+        $this->assertDatabaseCount('expired_box_transactions', 0);
         $this->assertDatabaseCount('pallet_boxes', 2);
         $this->assertSame('expired', $boxes[0]->fresh()->expired_status);
         $this->assertDatabaseMissing('audit_logs', ['action' => 'sent_qa']);
@@ -97,7 +101,7 @@ class ExpiredBoxBulkHandlingTest extends TestCase
     {
         [$user, $boxes] = $this->inventory(3);
         $handlings = $this->start($boxes, $user);
-        $this->get(route('expired-box.bulk.review', ['action' => 'qa', 'ids' => $handlings->pluck('id')->all()]))->assertOk()->assertSee('Hasil QA dapat berbeda');
+        $this->get(route('expired-box.transactions.show', $handlings[0]->transaction_id))->assertOk()->assertSee('Hasil QA dapat berbeda');
         $payload = ['action' => 'qa', 'confirmed' => 1, 'rows' => [
             ['id' => $handlings[0]->id, 'decision' => 'passed'],
             ['id' => $handlings[1]->id, 'decision' => 'rejected', 'notes' => 'QA gagal'],
@@ -110,7 +114,8 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $this->post(route('expired-box.bulk.store'), $payload)->assertSessionHas('success');
         $this->assertSame(1, AuditLog::where('action', 'bulk_qa')->count());
         $passed = [$handlings[0]->id, $handlings[2]->id];
-        $this->get(route('expired-box.bulk.review', ['action' => 'print', 'ids' => $passed]))->assertOk()->assertSee($boxes[0]->box_number)->assertSee($boxes[2]->box_number)->assertDontSee($boxes[1]->box_number);
+        $this->get(route('expired-box.bulk.review', ['action' => 'print', 'ids' => $passed]))->assertRedirect(route('expired-box.transactions.print', $handlings[0]->transaction_id));
+        $this->get(route('expired-box.transactions.print', $handlings[0]->transaction_id))->assertOk()->assertSee($boxes[0]->box_number)->assertSee($boxes[2]->box_number)->assertDontSee($boxes[1]->box_number);
         $this->get(route('expired-box.bulk.review', ['action' => 'print', 'ids' => $handlings->pluck('id')->all()]))->assertSessionHas('error');
     }
 
@@ -142,7 +147,7 @@ class ExpiredBoxBulkHandlingTest extends TestCase
     {
         [$user, $boxes, $location] = $this->inventory(3);
         $handlings = $this->atPacking($boxes, $user);
-        $this->get(route('expired-box.bulk.review', ['action' => 'receive', 'ids' => $handlings->pluck('id')->all()]))->assertOk()->assertSee('Tujuan penerimaan bersama');
+        $this->get(route('expired-box.transactions.show', $handlings[0]->transaction_id))->assertOk()->assertSee('Tujuan penerimaan bersama');
         $payload = $this->receipt($handlings, $location);
         $this->post(route('expired-box.bulk.store'), $payload)->assertSessionHas('success');
         $this->assertDatabaseCount('pallets', 2);
@@ -242,5 +247,134 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $this->actingAs($operator)->post($route, ['action' => 'start', 'confirmed' => 1, 'rows' => [['id' => $boxes[0]->id]]])->assertForbidden();
         $this->get(route('expired-box.bulk.review', ['action' => 'start', 'ids' => [$boxes[0]->id]]))->assertForbidden();
         $this->assertDatabaseCount('expired_box_handlings', 0);
+    }
+
+    public function test_three_boxes_are_one_persistent_transaction_and_search_keeps_all_members(): void
+    {
+        [$user, $boxes] = $this->inventory(3);
+        $this->get(route('expired-box.transactions.create'))->assertOk()->assertSee('Pilih box untuk satu transaksi');
+        $handlings = $this->start($boxes, $user);
+        $transaction = ExpiredBoxTransaction::sole();
+        $this->assertSame([$transaction->id], $handlings->pluck('transaction_id')->unique()->all());
+        $this->get(route('expired-box.index'))->assertOk()
+            ->assertViewHas('transactions', fn ($list) => $list->count() === 1 && $list[0]->handlings->count() === 3)
+            ->assertSee('3 box')->assertDontSee('data-bulk-selection="handling"', false);
+        foreach ([$boxes[0]->box_number, $boxes[1]->part_number, $transaction->reference] as $search) {
+            $this->get(route('expired-box.index', ['search' => $search]))->assertOk()
+                ->assertViewHas('transactions', fn ($list) => $list->count() === 1 && $list[0]->handlings->count() === 3);
+        }
+        $this->get(route('expired-box.transactions.show', $transaction))->assertOk()
+            ->assertSee($transaction->reference)->assertSee('Tidak perlu memilih box lagi.');
+    }
+
+    public function test_transaction_lifecycle_keeps_rejected_box_and_receives_all_passed_boxes_together(): void
+    {
+        [$user, $boxes, $location] = $this->inventory(3);
+        $handlings = $this->start($boxes, $user);
+        $transaction = ExpiredBoxTransaction::sole();
+        $url = route('expired-box.transactions.update', $transaction);
+        $qa = ['action' => 'qa', 'confirmed' => 1, 'rows' => $handlings->map(fn ($h, $i) => [
+            'id' => $h->id, 'decision' => $i === 1 ? 'rejected' : 'passed', 'notes' => $i === 1 ? 'Tidak lolos pemeriksaan' : null,
+        ])->all()];
+        $this->post($url, $qa)->assertSessionHas('success')->assertRedirect(route('expired-box.transactions.show', $transaction));
+        $this->post($url, $qa)->assertSessionHas('success');
+        $this->assertSame('awaiting_packing', $transaction->fresh()->stage);
+        $this->assertNull(Box::withTrashed()->find($boxes[1]->id));
+        $this->assertNotNull($handlings[1]->fresh()->history_snapshot);
+        $this->get(route('expired-box.transactions.show', $transaction))->assertOk()->assertSee('1 dari 3 box ditolak QA.')->assertSee($boxes[1]->box_number);
+        $passed = $handlings->filter(fn ($h, $i) => $i !== 1)->values();
+        $this->get(route('expired-box.transactions.print', $transaction))->assertOk()->assertSee($transaction->reference)->assertDontSee($boxes[1]->box_number);
+        $packing = ['action' => 'packing', 'confirmed' => 1, 'rows' => $passed->map(fn ($h) => ['id' => $h->id])->all()];
+        $this->post($url, $packing)->assertSessionHas('success');
+        $this->assertSame('at_packing', $transaction->fresh()->stage);
+        $payload = $this->receipt($passed, $location);
+        $this->post($url, $payload)->assertSessionHas('success');
+        $this->post($url, $payload)->assertSessionHas('success');
+        $this->assertSame('completed', $transaction->fresh()->stage);
+        $this->assertDatabaseCount('expired_box_transactions', 1);
+        $this->assertSame(3, $transaction->handlings()->count());
+        $this->assertSame(2, $transaction->handlings()->where('status', 'completed')->count());
+        $this->assertDatabaseCount('pallets', 2);
+        $this->get(route('expired-box.transactions.show', $transaction))->assertOk()->assertSee('Transaksi selesai')->assertSee('2 box diterima dengan ID baru dan 1 box ditolak QA.');
+    }
+
+    public function test_partial_or_cross_transaction_requests_cannot_change_group_members(): void
+    {
+        [$user, $boxes] = $this->inventory(4);
+        $first = $this->start($boxes->take(2), $user);
+        $second = $this->start($boxes->skip(2)->values(), $user);
+        $url = route('expired-box.transactions.update', $first[0]->transaction_id);
+        $row = fn ($h) => ['id' => $h->id, 'decision' => 'passed'];
+        foreach ([[$row($first[0])], [$row($first[0]), $row($second[0])], $second->map($row)->all()] as $rows) {
+            $this->post($url, ['action' => 'qa', 'confirmed' => 1, 'rows' => $rows, 'transaction_id' => $second[0]->transaction_id])->assertSessionHasErrors('rows');
+        }
+        $this->post(route('expired-box.bulk.store'), ['action' => 'qa', 'confirmed' => 1, 'rows' => [$row($first[0])]])->assertSessionHasErrors('rows');
+        $this->post(route('expired-box.qa', $first[0]), ['decision' => 'passed', 'confirmed' => 1])->assertSessionHas('error')->assertRedirect(route('expired-box.transactions.show', $first[0]->transaction_id));
+        $this->assertSame(4, ExpiredBoxHandling::where('status', 'at_qa')->count());
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'qa_passed']);
+        $this->get(route('expired-box.print', $first[0]))->assertRedirect(route('expired-box.transactions.print', $first[0]->transaction_id));
+        $this->get(route('expired-box.transactions.print', $first[0]->transaction_id))->assertStatus(409);
+    }
+
+    public function test_overlapping_start_does_not_merge_transactions_or_leave_empty_headers(): void
+    {
+        [$user, $boxes] = $this->inventory(3);
+        $first = $this->start($boxes->take(2), $user);
+        $payload = ['action' => 'start', 'confirmed' => 1, 'rows' => $boxes->map(fn ($b) => ['id' => $b->id])->all()];
+        $this->post(route('expired-box.bulk.store'), $payload)->assertSessionHasErrors('rows');
+        $this->assertDatabaseCount('expired_box_transactions', 1);
+        $this->assertDatabaseCount('expired_box_handlings', 2);
+        $this->assertSame('expired', $boxes[2]->fresh()->expired_status);
+        $this->assertSame(2, ExpiredBoxHandling::where('transaction_id', $first[0]->transaction_id)->count());
+        $payload['rows'] = [$payload['rows'][0]];
+        $this->post(route('expired-box.bulk.store'), $payload)->assertSessionHasErrors('rows');
+        $this->post(route('expired-box.handle', $boxes[2]->id))->assertSessionHas('success');
+        $this->assertDatabaseCount('expired_box_transactions', 2);
+        $this->assertSame(1, ExpiredBoxTransaction::latest('id')->first()->handlings()->count());
+    }
+
+    public function test_all_rejected_transaction_closes_without_packing_and_remains_searchable(): void
+    {
+        [$user, $boxes] = $this->inventory();
+        $handlings = $this->start($boxes, $user);
+        $transaction = ExpiredBoxTransaction::sole();
+        $this->post(route('expired-box.transactions.update', $transaction), ['action' => 'qa', 'confirmed' => 1,
+            'rows' => $handlings->map(fn ($h) => ['id' => $h->id, 'decision' => 'rejected', 'notes' => 'Tidak lolos'])->all(),
+        ])->assertSessionHas('success');
+        $this->assertSame('completed', $transaction->fresh()->stage);
+        $this->assertDatabaseCount('boxes', 0);
+        $this->get(route('expired-box.transactions.show', $transaction))->assertOk()->assertSee('Tidak ada box yang dilanjutkan ke packing.')->assertDontSee('name="action"', false);
+        $this->get(route('expired-box.transactions.print', $transaction))->assertStatus(409);
+        $this->get(route('expired-box.index', ['search' => $boxes[0]->box_number]))->assertOk()->assertSee($transaction->reference);
+    }
+
+    public function test_transaction_routes_preserve_feature_permissions(): void
+    {
+        [$user, $boxes] = $this->inventory();
+        $this->start($boxes, $user);
+        $transaction = ExpiredBoxTransaction::sole();
+        $this->actingAs(User::factory()->create(['role' => 'warehouse_operator']));
+        $this->get(route('expired-box.transactions.create'))->assertForbidden();
+        $this->get(route('expired-box.transactions.show', $transaction))->assertForbidden();
+        $this->get(route('expired-box.transactions.print', $transaction))->assertForbidden();
+        $this->post(route('expired-box.transactions.update', $transaction), [])->assertForbidden();
+    }
+
+    public function test_transaction_migration_backfills_without_guessing_groups_and_can_resume(): void
+    {
+        [$user, $boxes] = $this->inventory();
+        $handlings = $this->start($boxes, $user);
+        // Simulate historical rows predating persistent grouping.
+        \Illuminate\Support\Facades\DB::table('expired_box_handlings')->update(['transaction_id' => null]);
+        ExpiredBoxTransaction::query()->delete();
+        $migration = require database_path('migrations/2026_10_23_000002_create_expired_box_transactions.php');
+        $migration->up();
+        $migration->up();
+        $this->assertDatabaseCount('expired_box_transactions', 2);
+        $this->assertSame(2, ExpiredBoxHandling::pluck('transaction_id')->unique()->count());
+        $this->assertSame(2, ExpiredBoxHandling::where('status', 'at_qa')->count());
+        $this->assertSame($handlings[0]->created_at->toDateTimeString(), $handlings[0]->fresh()->transaction->created_at->toDateTimeString());
+        $this->expectException(\RuntimeException::class);
+        $migration->down();
     }
 }

@@ -4,6 +4,7 @@
 </head><body>
 <button class="no-print" onclick="window.print()">Cetak pengantar bersama</button>
 <h1>Surat Pengantar Packing · {{ $records->count() }} box</h1>
+@isset($transaction)<p><strong>Transaksi {{ $transaction->reference }}</strong> · Dibuat {{ $transaction->created_at->format('d M Y H:i') }}</p>@endisset
 <p>Setiap baris mewakili satu box lama dan satu box pengganti. Hasil QA seluruh box pada daftar ini: <strong>Lolos</strong>.</p>
 <p>Pengantar menyertai barang sampai kembali ke warehouse. Petugas warehouse mengisi ID baru sesuai label packing dan mencocokkan setiap pasangan. Jangan menggabungkan identitas atau PCS antarbaris.</p>
 <table><thead><tr><th>No.</th><th>Referensi / ID lama</th><th>Part / PCS</th><th>Masuk asli</th><th>Penyerahan packing</th><th>ID baru</th><th>Waktu ID diterbitkan</th><th>Penerima / waktu diterima</th></tr></thead><tbody>

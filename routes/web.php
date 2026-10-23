@@ -167,6 +167,10 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::get('/reports/operational/export', [ReportController::class, 'exportOperationalExcel'])->name('reports.operational.export');
 
         Route::get('/expired-box', [\App\Http\Controllers\ExpiredBoxController::class, 'index'])->name('expired-box.index');
+        Route::get('/expired-box/new', [\App\Http\Controllers\ExpiredBoxTransactionController::class, 'create'])->name('expired-box.transactions.create');
+        Route::get('/expired-box/transactions/{transaction}', [\App\Http\Controllers\ExpiredBoxTransactionController::class, 'show'])->name('expired-box.transactions.show');
+        Route::post('/expired-box/transactions/{transaction}', [\App\Http\Controllers\ExpiredBoxTransactionController::class, 'update'])->name('expired-box.transactions.update');
+        Route::get('/expired-box/transactions/{transaction}/print', [\App\Http\Controllers\ExpiredBoxTransactionController::class, 'print'])->name('expired-box.transactions.print');
         Route::get('/expired-box/bulk/review', [\App\Http\Controllers\ExpiredBoxController::class, 'bulkReview'])->name('expired-box.bulk.review');
         Route::post('/expired-box/bulk', [\App\Http\Controllers\ExpiredBoxController::class, 'bulkStore'])->name('expired-box.bulk.store');
         Route::post('/expired-box/{box}/handle', [\App\Http\Controllers\ExpiredBoxController::class, 'handle'])->name('expired-box.handle');

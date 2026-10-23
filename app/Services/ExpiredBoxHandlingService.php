@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Box;
 use App\Models\ExpiredBoxHandling;
+use App\Models\ExpiredBoxTransaction;
 use App\Models\Pallet;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -11,13 +12,13 @@ use Illuminate\Validation\ValidationException;
 
 class ExpiredBoxHandlingService
 {
-    public function start(int $boxId, int $userId, bool $syncStatuses = true): ExpiredBoxHandling
+    public function start(int $boxId, int $userId, bool $syncStatuses = true, ?int $transactionId = null): ExpiredBoxHandling
     {
         if ($syncStatuses) {
             app(ExpiredBoxService::class)->syncStatuses();
         }
 
-        return DB::transaction(function () use ($boxId, $userId) {
+        return DB::transaction(function () use ($boxId, $userId, $transactionId) {
             $box = Box::whereKey($boxId)->lockForUpdate()->first();
             $existing = ExpiredBoxHandling::where('source_box_id', $boxId)->first();
             if ($existing) {
@@ -36,6 +37,7 @@ class ExpiredBoxHandlingService
             $snapshot['pallet_boxes'] = DB::table('pallet_boxes')->where('box_id', $boxId)->get()->toArray();
             $snapshot['last_expired_report'] = DB::table('expired_box_reports')->where('box_id', $boxId)->latest('id')->first();
             $handling = ExpiredBoxHandling::create([
+                'transaction_id' => $transactionId ?? ExpiredBoxTransaction::create(['created_by' => $userId])->id,
                 'source_box_id' => $boxId, 'source_box_number' => $box->box_number,
                 'part_number' => $box->part_number, 'pcs_quantity' => $box->pcs_quantity,
                 'original_stored_at' => $row->stored_at, 'source_snapshot' => $snapshot,

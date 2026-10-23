@@ -1,6 +1,6 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 23 Oktober 2026 (perubahan QA/packing pada branch codex/expired-qa-packing; database kerja belum dimigrasikan).
+Terakhir diverifikasi dari source code: 23 Oktober 2026 (QA/packing dan pengelompokan per transaksi pada branch codex/expired-qa-packing; database kerja belum dimigrasikan dalam pengerjaan ini).
 
 Verifikasi tambahan 21 Oktober 2026 (Audit Trail): Handle box expired kini membuat
 `audit_logs` bertipe `expired_box` dalam transaksi yang sama dengan aktivasi dan
@@ -655,6 +655,21 @@ Alur:
 
 Seluruh transisi berjalan dalam transaksi dengan row lock. State tidak boleh dilewati; pengulangan keputusan/penyerahan/penerimaan yang sama tidak menggandakan transaksi atau memperpanjang deadline. Box assigned/pick-locked atau pallet dengan sesi scanning/blocked/approved menolak mutasi. Hapus/koreksi sumber melalui Stock View diblokir jika sudah memiliki penanganan.
 
+Penanganan per transaksi (revisi UX 23 Oktober 2026):
+
+- `expired_box_transactions` adalah header permanen bernomor `EXP-YYYYMMDD-000001`; `expired_box_handlings.transaction_id` menghubungkan setiap detail box ke satu header. Memilih 3 box pada penyerahan awal membuat tepat satu transaksi berisi 3 detail; satu box juga menjadi satu transaksi.
+- Daftar utama menampilkan satu baris per transaksi (tanggal, jumlah box/PCS, tahap, hasil, dan tindakan berikutnya). Proses belum selesai didahulukan. Pencarian nomor transaksi, ID lama/baru, atau part tetap mengembalikan transaksi beserta seluruh anggotanya.
+- Revisi tampilan 23 Oktober 2026: daftar box expired tampil langsung di halaman utama sebelum daftar transaksi, tanpa membuka Buat transaksi. Section warning juga selalu terbuka. Keduanya menampilkan umur kalender dalam bulan/hari, total hari sejak masuk asli, tanggal masuk, part/PCS, dan pallet/lokasi. Umur juga tampil saat memilih box untuk transaksi baru. Box expired dengan `reactivated_until` menampilkan waktu batas aktif berakhir secara terpisah; tidak mengubah dasar umur/FIFO atau aturan expiry. Tabel lebar dapat digulir pada ponsel.
+- Poles UI 23 Oktober 2026: box warning ditempatkan tepat setelah daftar expired, dengan tautan lompat ke expired/warning/transaksi. Pada pemilihan awal, pencarian langsung menyaring daftar tanpa memuat ulang halaman atau menghilangkan box yang sudah dicentang; "Pilih semua yang tampil" hanya menambah hasil yang terlihat sampai batas 50. Form QA memberikan umpan balik penerapan hasil bersama dan menandai baris ditolak; tahap packing memakai ringkasan box, sementara lokasi pallet baru hanya ditampilkan saat membuat pallet baru. Ini perubahan presentasi; status, izin, payload, dan aturan transaksi tetap sama.
+- Tombol Buat transaksi membuka pemilihan box expired, maksimal 50 box, lalu tinjauan dan konfirmasi penyerahan QA. Pemilihan hanya terjadi di awal. Keanggotaan tidak bisa digabung dengan transaksi lain atau dikurangi lewat payload tahap berikutnya; start yang tumpang tindih ditolak tanpa meninggalkan header kosong.
+- Halaman transaksi menampilkan progres dan form tahap saat ini: hasil QA → penyerahan packing → penerimaan → selesai. Operator tidak memilih ulang box pada setiap tahap. Detail box tersendiri menjadi halaman jejak; endpoint per-box lama menolak mutasi sebagian untuk transaksi dengan beberapa anggota.
+- Keputusan QA dapat berbeda per box; tersedia pengisian hasil/catatan bersama dan alasan wajib untuk penolakan. Box ditolak dihapus permanen dari inventory, tetapi detailnya tetap anggota transaksi. Hanya anggota lolos yang diteruskan bersama ke packing/penerimaan. Jika seluruh box ditolak, transaksi selesai tanpa tahap packing.
+- Semua perubahan satu tahap disimpan dalam satu database transaction. Kegagalan satu baris atau audit membatalkan seluruh mutasi tahap, termasuk penghapusan permanen, registrasi ID baru, pallet, dan okupansi lokasi. Sinkronisasi expiry sebelum penyerahan QA tetap housekeeping tersendiri.
+- Semua box lolos dalam transaksi diterima bersama pada satu pallet existing atau satu pallet baru di lokasi kosong. Setiap ID lama tetap dipasangkan dengan satu ID baru dan part/PCS yang sama. Waktu penerbitan dapat diisi bersama atau berbeda; Enter scanner memindahkan fokus ke ID berikutnya tanpa mengirim form. Ringkasan pallet dihitung setelah semua baris terbentuk agar baris expired tidak melepas lokasi sebelum baris aktif diterima.
+- Pengulangan permintaan yang sama tidak membuat ulang header, box, pallet, atau audit. Server mengunci header dan detail serta memeriksa ulang seluruh anggota; ID dari transaksi lain atau penerimaan sebagian ditolak.
+- Surat pengantar mencantumkan nomor transaksi dan satu baris per anggota lolos. QA/packing tetap tidak memerlukan akun; jejak petugas, waktu, snapshot, dan pasangan ID tersedia per detail.
+- Migration tambahan `2026_10_23_000002_create_expired_box_transactions` menambah header dan FK tanpa mengubah stok/deadline. Untuk riwayat sebelum pengelompokan permanen, setiap detail lama dibackfill menjadi satu transaksi tersendiri dengan tanggal/petugas asal; kedekatan timestamp atau pilihan massal pada tahap lain tidak dipakai untuk menebak kelompok. Backfill dapat dilanjutkan untuk detail yang masih null. Rollback ditolak bila sudah ada header agar pengelompokan tidak hilang. Database kerja belum dimigrasikan.
+
 `box_identities` menyimpan semua nomor yang pernah dipakai, termasuk soft-delete dan penolakan QA permanen. Pembuatan melalui model Box mendaftarkan identitas atomik bersama box; unique constraint mencegah pemakaian bersamaan. Stock Input, direct Delivery Assign, dan pengajuan Not Full memeriksa identitas yang telah dipakai. Jangan membuat box melalui raw insert yang melewati model.
 
 Transisi data lama: migration `2026_10_23_000001_create_expired_box_handlings` menyimpan deadline lama pada `legacy_reactivated_until` lalu mengakhiri deadline reaktivasi box non-withdrawn/non-deleted pada saat cutover. Box tersebut langsung tidak eligible delivery; sinkronisasi expiry memasukkannya ke daftar QA. Riwayat `expired_box_reports` lama tetap dipisahkan dari proses QA baru. Tidak ada transaksi QA fiktif yang dibuat. Data handled legacy yang tidak memiliki deadline tetap nonaktif.
@@ -665,11 +680,17 @@ File utama:
 
 - `app/Services/ExpiredBoxService.php`
 - `app/Services/ExpiredBoxHandlingService.php`
+- `app/Services/ExpiredBoxBulkService.php`
 - `app/Models/ExpiredBoxHandling.php`
+- `app/Models/ExpiredBoxTransaction.php`
 - `app/Models/Box.php`
 - `app/Http/Controllers/ExpiredBoxController.php`
+- `app/Http/Controllers/ExpiredBoxTransactionController.php`
 - `resources/views/warehouse/expired-box/{index,show,print}.blade.php`
+- `resources/views/warehouse/expired-box/{create,transaction,transaction-form,bulk-review,bulk-print}.blade.php`
+- `public/js/expired-box-bulk.js`
 - `tests/Feature/ExpiredBoxReactivationTest.php`
+- `tests/Feature/ExpiredBoxBulkHandlingTest.php`
 
 ### 18. Laporan dan audit
 
@@ -800,7 +821,10 @@ Status yang digunakan:
 - Seluruh migration sampai `2026_06_19_000005_make_audit_log_type_extensible` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.
-- Full regression suite branch QA/packing diverifikasi 23 Oktober 2026 menggunakan SQLite in-memory: 254 test lulus (1.875 assertions), termasuk 22 test expiry/QA/packing. Halaman penerimaan diverifikasi di browser desktop dan simulasi viewport 390px; pengantar cetak diperiksa di browser. Database kerja MySQL belum dimigrasikan.
+- Full regression suite branch QA/packing diverifikasi 23 Oktober 2026 menggunakan SQLite in-memory: 272 test lulus (2.076 assertions), termasuk 22 test expiry/QA/packing dan 18 test proses beberapa box/pengelompokan transaksi. Cakupan tambahan: 3 box menjadi 1 header, siklus lengkap dengan hasil QA campuran, seluruh anggota ditolak, penolakan payload sebagian/lintas transaksi, start tumpang tindih, permission, dan backfill yang dijalankan ulang. Daftar satu baris per transaksi, navigasi langsung ke tahap QA, pilihan awal, hasil QA berbeda, tahap packing/selesai, dan simulasi viewport 390px diperiksa di browser dengan HTML hasil render Laravel dari database test. Ini bukan pengujian perangkat scanner fisik atau rehearsal MySQL production. Database kerja MySQL belum dimigrasikan dalam pengerjaan ini.
+- Migration QA/packing belum dinyatakan siap production: cutover deadline masih perlu preflight box assigned/picking, pemisahan perubahan schema dan cutover, serta prosedur pemulihan jika DDL terhenti sebagian. `down()` menolak rollback jika penanganan sudah ada dan bukan pemulihan deadline lama. Perlu rehearsal pada salinan MySQL production, backup/restore teruji, serta penghentian sementara write/worker/scheduler ketika backfill dan cutover. Penambahan proses massal tidak menyelesaikan risiko migration tersebut.
+- Verifikasi UI umur setelah revisi di atas: 40 tes expiry/transaksi lulus (384 assertions). Render dengan data contoh memastikan umur 13 bulan 5 hari / 10 bulan 3 hari, batas aktif terpisah, serta hasil pencarian kosong; daftar expired/warning diperiksa pada desktop dan simulasi lebar 390px. Revisi tampilan ini tidak menambah migration.
+- Verifikasi poles UI 23 Oktober 2026: 40 tes expiry/transaksi lulus (384 assertions), sintaks controller dan JavaScript valid, serta pratinjau browser desktop memeriksa filter yang mempertahankan pilihan lintas pencarian, pemilihan massal hasil tampil, feedback QA, urutan daftar utama, dan ringkasan packing. Preview memakai HTML dari SQLite test; belum diuji dengan perangkat scanner fisik atau browser ponsel nyata. Tidak ada migration tambahan.
 - Kolom `audit_logs.type` menggunakan string terindeks, bukan enum tertutup, sehingga audit fitur baru seperti `delivery_assignment` dapat disimpan tanpa melanggar constraint.
 
 ## Catatan yang Belum Diputuskan

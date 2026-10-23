@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Box;
 use App\Models\ExpiredBoxHandling;
+use App\Models\ExpiredBoxTransaction;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -22,6 +23,7 @@ class ExpiredBoxBulkService
             'rows' => ['required', 'array', 'min:1', 'max:'.self::LIMIT],
             'rows.*.id' => ['required', 'integer', 'min:1', 'distinct'],
             'confirmed' => ['accepted'],
+            'transaction_id' => ['nullable', 'integer', 'min:1'],
         ];
         if (($input['action'] ?? '') === 'qa') {
             $rules += [
@@ -48,11 +50,39 @@ class ExpiredBoxBulkService
         return DB::transaction(function () use ($data, $userId) {
             $rows = collect($data['rows'])->sortBy('id');
             $ids = $rows->pluck('id')->all();
+            if ($data['action'] === 'start') {
+                // Serialize overlapping selections before checking existing membership.
+                Box::withTrashed()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+            }
             $before = $data['action'] === 'start'
                 ? ExpiredBoxHandling::whereIn('source_box_id', $ids)->get()->keyBy('source_box_id')
-                : ExpiredBoxHandling::whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+                : ExpiredBoxHandling::whereIn('id', $ids)->orderBy('id')->get()->keyBy('id');
             if ($data['action'] !== 'start' && $before->count() !== count($ids)) {
                 throw ValidationException::withMessages(['rows' => 'Ada penanganan yang tidak ditemukan. Pilih ulang dari daftar.']);
+            }
+            if ($data['action'] === 'start') {
+                if ($before->isNotEmpty()) {
+                    $groups = $before->pluck('transaction_id')->unique();
+                    if ($before->count() === count($ids) && $groups->count() === 1
+                        && ExpiredBoxHandling::where('transaction_id', $groups->first())->count() === count($ids)) {
+                        return $before->pluck('id')->all();
+                    }
+                    throw ValidationException::withMessages(['rows' => 'Sebagian box sudah menjadi anggota transaksi lain. Buka transaksi tersebut atau pilih box yang belum ditangani.']);
+                }
+                $transaction = ExpiredBoxTransaction::create(['created_by' => $userId]);
+            } else {
+                $groups = $before->pluck('transaction_id')->unique();
+                if ($groups->count() !== 1 || ! $groups->first()
+                    || (! empty($data['transaction_id']) && (int) $data['transaction_id'] !== (int) $groups->first())) {
+                    throw ValidationException::withMessages(['rows' => 'Box harus berasal dari satu transaksi yang sama.']);
+                }
+                $transaction = ExpiredBoxTransaction::whereKey($groups->first())->lockForUpdate()->firstOrFail();
+                $members = $transaction->handlings()->lockForUpdate()->get();
+                $expected = $data['action'] === 'qa' ? $members : $members->where('status', '!=', 'rejected');
+                if ($expected->pluck('id')->sort()->values()->all() !== $rows->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all()) {
+                    throw ValidationException::withMessages(['rows' => 'Proses seluruh box pada tahap transaksi ini. Buka kembali transaksi untuk melihat daftar lengkap.']);
+                }
+                $before = $members->whereIn('id', $ids)->keyBy('id');
             }
             $target = [];
             if ($data['action'] === 'receive') {
@@ -88,7 +118,7 @@ class ExpiredBoxBulkService
                     : $before[$row['id']]->source_box_number;
                 try {
                     if ($data['action'] === 'start') {
-                        $handling = $this->workflow->start((int) $row['id'], $userId, false);
+                        $handling = $this->workflow->start((int) $row['id'], $userId, false, $transaction->id);
                     } else {
                         match ($data['action']) {
                             'qa' => $this->workflow->decideQa((int) $row['id'], $row['decision'], $row['notes'] ?? null, $userId),
@@ -120,7 +150,7 @@ class ExpiredBoxBulkService
             }
             if ($changed) {
                 AuditService::record('expired_box', 'bulk_'.$data['action'], 'ExpiredBoxHandling', $result[0], $userId, [],
-                    ['handling_ids' => $result, 'count' => count($result)],
+                    ['transaction_id' => $transaction->id, 'handling_ids' => $result, 'count' => count($result)],
                     'Penanganan massal '.$data['action'].': '.count($result).' box, seluruhnya tersimpan bersama.');
             }
 
