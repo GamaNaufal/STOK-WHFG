@@ -477,7 +477,8 @@ class DeliveryAssignController extends Controller
             ->pluck('box_number')
             ->map(fn ($value) => (string) $value)
             ->all();
-        $existingLookup = array_fill_keys($existingBoxNumbers, true);
+        $reservedNumbers = DB::table('box_identities')->whereIn('box_number', $boxNumbers)->pluck('box_number')->all();
+        $existingLookup = array_fill_keys(array_merge($existingBoxNumbers, $reservedNumbers), true);
 
         $partSettings = PartSetting::query()
             ->whereIn('part_number', $partNumbers)

@@ -25,6 +25,19 @@ class Box extends Model
 {
     use SoftDeletes;
 
+    protected function performInsert(\Illuminate\Database\Eloquent\Builder $query)
+    {
+        return $this->getConnection()->transaction(function () use ($query) {
+            // Reserve the identity atomically with creation, including all inbound paths.
+            if (\Illuminate\Support\Facades\DB::table('box_identities')->where('box_number', $this->box_number)->exists()) {
+                throw new \RuntimeException('ID Box sudah pernah digunakan, termasuk box yang dihapus setelah ditolak QA.');
+            }
+            \Illuminate\Support\Facades\DB::table('box_identities')->insert(['box_number' => $this->box_number]);
+
+            return parent::performInsert($query);
+        });
+    }
+
     protected $fillable = [
         'box_number',
         'part_number',

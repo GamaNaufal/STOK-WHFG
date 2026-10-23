@@ -48,8 +48,8 @@ class DeliveryPickController extends Controller
 
         if ($box->reactivated_until && $box->reactivated_until->lte(now())) {
             return $finalScan
-                ? 'Masa aktif Handle box ini sudah habis. Box tidak dapat dikirim; sesi diblokir. Hubungi Admin Warehouse/Admin untuk menangani issue dan penggantian box.'
-                : 'Masa aktif Handle box ini sudah habis. Box tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist; sesi tetap aktif. Laporkan box ini ke Supervisi/Admin.';
+                ? 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dikirim; sesi diblokir. Hubungi Admin Warehouse/Admin untuk menangani issue dan penggantian box.'
+                : 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist; sesi tetap aktif. Laporkan box ini ke Supervisi/Admin.';
         }
 
         return $finalScan

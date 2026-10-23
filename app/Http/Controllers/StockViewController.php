@@ -138,6 +138,9 @@ class StockViewController extends Controller
 
     private function getBoxMutationBlockReason(Box $box): ?string
     {
+        if (\App\Models\ExpiredBoxHandling::where('source_box_id', $box->id)->exists()) {
+            return 'Box memiliki riwayat QA/packing. Gunakan halaman penanganan expired.';
+        }
         if ($box->assigned_delivery_order_id !== null) {
             return 'Box sudah di-assign ke delivery dan tidak dapat diubah atau dihapus.';
         }

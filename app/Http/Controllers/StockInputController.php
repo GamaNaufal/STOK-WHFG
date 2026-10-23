@@ -182,6 +182,9 @@ class StockInputController extends Controller
 
         // Jika box sudah ada di DB dan sudah tersimpan, tolak
         $existingBox = Box::withTrashed()->where('box_number', $barcode)->first();
+        if (! $existingBox && DB::table('box_identities')->where('box_number', $barcode)->exists()) {
+            return response()->json(['success' => false, 'message' => 'ID Box sudah pernah digunakan dan dihapus permanen. Gunakan ID Box baru.'], 400);
+        }
         if ($existingBox) {
             if ($existingBox->trashed()) {
                 return response()->json([

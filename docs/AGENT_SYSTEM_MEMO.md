@@ -1,6 +1,6 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 7 Oktober 2026.
+Terakhir diverifikasi dari source code: 23 Oktober 2026 (perubahan QA/packing pada branch codex/expired-qa-packing; database kerja belum dimigrasikan).
 
 Verifikasi tambahan 21 Oktober 2026 (Audit Trail): Handle box expired kini membuat
 `audit_logs` bertipe `expired_box` dalam transaksi yang sama dengan aktivasi dan
@@ -638,41 +638,38 @@ File utama:
 - `app/Http/Controllers/MovePalletController.php`
 - `resources/views/operator/move-pallet/index.blade.php`
 
-### 17. Expired box dan aktivasi ulang (13 Oktober 2026)
+### 17. Expired box, QA, dan penggantian ID melalui packing (23 Oktober 2026)
 
-Umur box menggunakan `boxes.created_at` sebagai tanggal penyimpanan per box. Mapping `stock_input_boxes -> stock_inputs.stored_at` tetap menjadi fallback untuk data legacy yang tidak memiliki tanggal box.
+Implementasi branch `codex/expired-qa-packing`; migration belum diterapkan pada database kerja saat pengembangan. QA dan packing tetap di luar sistem. Hak akses seluruh endpoint mengikuti fitur `expired_box` (default Supervisi/Admin, dapat diatur Admin Utama).
 
-Status:
+Umur dan FIFO menggunakan `boxes.created_at` sebagai tanggal masuk asli. Box pengganti mewarisi tanggal tersebut; penerimaan hasil packing dan penerbitan ID dicatat terpisah. Umur normal: active <9 bulan, warning 9–<12 bulan, expired >=12 bulan. Warning tetap eligible FIFO dan tidak dapat di-Handle.
 
-- di bawah 9 bulan: `active`;
-- 9 sampai kurang dari 12 bulan: `warning`;
-- 12 bulan atau lebih: `expired`;
-- Handle pada warning/expired: `active` sampai `reactivated_until`, satu bulan kalender sejak Handle (`addMonthNoOverflow`, tanggal akhir menyesuaikan panjang bulan);
-- setelah masa aktivasi ulang habis: `expired`, wajib Handle lagi agar dapat masuk FIFO;
-- `handled` pada data box lama tetap nonaktif; migration tidak mengaktifkan data lama secara massal.
+Alur:
 
-Box warning tetap boleh masuk FIFO tanpa Handle. Box expired/handled atau box dengan masa aktivasi ulang habis tidak termasuk stok aktif dan tidak boleh dipakai untuk delivery. Batas `reactivated_until` diperiksa langsung pada query stok/FIFO/assignment dan validasi scan/withdrawal/completion, sehingga box langsung ditolak meskipun scheduler belum memperbarui label status menjadi expired.
+1. Handle pada expired berarti barang sudah diserahkan ke QA. Dibuat `expired_box_handlings` dengan referensi HND, snapshot identitas/tanggal/asal, petugas, dan status `at_qa`. Box lama menjadi `expired_status=handled` dan tetap nonaktif; tidak mendapat tambahan masa aktif. Setelah ringkasan disinkronkan, relasi pallet dilepas karena fisik sudah ke QA; identitas pallet dan mapping asal disimpan dalam snapshot agar operasi pallet berikutnya tidak mengubah box dalam penanganan.
+2. Petugas mencatat `passed` atau `rejected`. Lolos sekaligus mengonfirmasi barang kembali ke warehouse (`awaiting_packing`). Penolakan wajib alasan dan konfirmasi; box di-force-delete. Snapshot histori, mapping input/picking, withdrawal, issue, request not-full, expiry report, pallet, serta audit disimpan dalam penanganan sebelum cascade/null FK. Header stock input/withdrawal/order tidak dihapus. Snapshot lengkap dapat diunduh oleh pengguna berizin.
+3. Setelah lolos QA, tersedia surat pengantar cetak yang memuat nomor penanganan, ID lama, part, PCS, dan kolom ID baru/waktu penerbitan. Dokumen mengikuti box secara fisik. Warehouse mencatat penyerahan packing (`at_packing`). Packing tidak memerlukan akun atau akses aplikasi.
+4. Penerimaan wajib scan ID baru delapan digit, konfirmasi fisik, part dan PCS sama persis, serta waktu penerbitan ID sejak penyerahan packing sampai sekarang. Satu box lama selalu menjadi satu box baru. Tidak ada penerimaan bertahap atau perubahan PCS. Jika pasangan ID belum pasti, jangan mencatat penerimaan.
+5. Penerimaan membuat box baru, mewarisi part/PCS/atribut not-full dan tanggal asli. Batas `reactivated_until` = waktu penerbitan ID + satu bulan kalender (`addMonthNoOverflow`), bukan waktu penerimaan. Status active jika deadline belum lewat; bila terlambat diterima, status expired dan tidak eligible delivery. Lokasi tujuan wajib tersedia; pallet existing mempertahankan lokasi dan tunduk lock delivery. ID lama tetap handled, transaksi menjadi completed, dan hubungan ID lama-baru dapat ditelusuri antar siklus.
+6. Penerimaan packing dicatat di ledger penanganan dan audit, tidak membuat stock input produksi atau withdrawal customer. Karena itu throughput inbound tidak menghitung barang yang sama lagi. Penerimaan expired mengikuti aturan lokasi expired yang sudah ada: ringkasan aktif kosong dapat melepas lokasi, tetapi lokasi penerimaan tetap tersimpan di penanganan dan expired report.
 
-Saat status berubah menjadi expired, sistem menghitung ulang `pallet_items`, menghapus stock location pallet yang sudah kosong, dan mengosongkan master location terkait. Snapshot lokasi disimpan sebelum pelepasan lokasi.
+Seluruh transisi berjalan dalam transaksi dengan row lock. State tidak boleh dilewati; pengulangan keputusan/penyerahan/penerimaan yang sama tidak menggandakan transaksi atau memperpanjang deadline. Box assigned/pick-locked atau pallet dengan sesi scanning/blocked/approved menolak mutasi. Hapus/koreksi sumber melalui Stock View diblokir jika sudah memiliki penanganan.
 
-Supervisi/Admin hanya dapat menekan Handle pada box expired untuk mengaktifkan box satu bulan. Warning tetap terlihat pada halaman Expired Box tanpa tombol Handle/lokasi; backend menolak request Handle untuk warning dan stok aktif yang belum expired. Box withdrawn, soft-deleted, assigned ke delivery, atau terkunci dalam sesi picking tidak dapat diaktifkan ulang. Request berulang saat masa aktif belum habis tidak memperpanjang deadline maupun menggandakan riwayat. Tanggal `boxes.created_at` tidak berubah, sehingga posisi FIFO tetap mengikuti penyimpanan asli.
+`box_identities` menyimpan semua nomor yang pernah dipakai, termasuk soft-delete dan penolakan QA permanen. Pembuatan melalui model Box mendaftarkan identitas atomik bersama box; unique constraint mencegah pemakaian bersamaan. Stock Input, direct Delivery Assign, dan pengajuan Not Full memeriksa identitas yang telah dipakai. Jangan membuat box melalui raw insert yang melewati model.
 
-Handle mempertahankan pallet dan lokasi yang masih valid. Jika lokasi sudah dilepas, UI meminta lokasi kosong; backend juga mendukung lokasi historis bila request tidak menentukan lokasi. `LocationAssignmentService` mengunci dan memvalidasi lokasi, menolak lokasi yang sudah ditempati pallet lain, lalu memulihkan ringkasan box/PCS. Kegagalan assignment lokasi membatalkan aktivasi ulang secara atomik.
+Transisi data lama: migration `2026_10_23_000001_create_expired_box_handlings` menyimpan deadline lama pada `legacy_reactivated_until` lalu mengakhiri deadline reaktivasi box non-withdrawn/non-deleted pada saat cutover. Box tersebut langsung tidak eligible delivery; sinkronisasi expiry memasukkannya ke daftar QA. Riwayat `expired_box_reports` lama tetap dipisahkan dari proses QA baru. Tidak ada transaksi QA fiktif yang dibuat. Data handled legacy yang tidak memiliki deadline tetap nonaktif.
 
-Setiap aktivasi ulang disimpan sebagai baris baru `expired_box_reports` berstatus `handled`, termasuk petugas, waktu aktivasi, lokasi, dan `reactivated_until`. Riwayat sebelumnya tetap tersimpan. Halaman menampilkan kolom Aktif Sampai. Constraint unik `(box_id,status)` dihapus untuk mendukung riwayat berulang; index biasa dipertahankan. Jenis delivery issue `box_expired` kini didukung schema.
-
-Command `expired-box:sync-statuses` dijadwalkan setiap menit untuk mengubah status yang waktunya habis dan menyinkronkan stok/lokasi. Scheduler harus aktif di deployment. Migration `2026_10_13_000002_add_box_reactivation_period` menambahkan deadline pada box dan history, serta memperbarui constraint riwayat dan jenis issue.
-
-Setiap hari pukul 07.00 sistem:
-
-- menyinkronkan status umur box;
-- mengirim email ringkasan warning dan expired ke user role Supervisi jika terdapat data.
+Scheduler `expired-box:sync-statuses` tetap berjalan setiap menit dan ringkasan email setiap 07.00. Query expiry mencakup box orphan; status handled tidak diaktifkan ulang oleh scheduler. Cek deadline pada query stok/FIFO/scan tetap berlaku sebelum scheduler berjalan. Setelah masa satu bulan habis, ID pengganti masuk siklus QA baru.
 
 File utama:
 
 - `app/Services/ExpiredBoxService.php`
+- `app/Services/ExpiredBoxHandlingService.php`
+- `app/Models/ExpiredBoxHandling.php`
+- `app/Models/Box.php`
 - `app/Http/Controllers/ExpiredBoxController.php`
-- `routes/console.php`
+- `resources/views/warehouse/expired-box/{index,show,print}.blade.php`
+- `tests/Feature/ExpiredBoxReactivationTest.php`
 
 ### 18. Laporan dan audit
 
@@ -794,7 +791,7 @@ Status yang digunakan:
 - Status delivery `partial` tetap dipakai khusus untuk parent order yang memiliki child hasil split.
 - Semua box not full wajib melalui request dan approval Supervisi; Stock Input dan Delivery Assignment tidak boleh membuat box not full secara langsung.
 - PCS direct input wajib sama dengan fixed qty Master Part.
-- Warning tetap dapat masuk FIFO dan tidak dapat di-Handle. Handle hanya pada expired, mengaktifkan box selama satu bulan kalender; saat masa aktif habis, box menjadi expired dan wajib Handle lagi. Aktivasi ulang tidak boleh dilakukan pada box assigned atau pick-locked.
+- Warning tetap dapat masuk FIFO dan tidak dapat di-Handle. Handle expired berarti penyerahan QA. QA ditolak menghapus box permanen dengan snapshot histori; QA lolos dikembalikan ke warehouse lalu packing menerbitkan ID baru. Stok pengganti aktif satu bulan sejak penerbitan ID, dengan umur/FIFO mengikuti tanggal asli. Assignment dan picking lock tetap dilindungi.
 
 ## Status Schema dan Validasi Terakhir
 
@@ -803,12 +800,12 @@ Status yang digunakan:
 - Seluruh migration sampai `2026_06_19_000005_make_audit_log_type_extensible` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.
-- Full regression suite terakhir: diverifikasi 15 Oktober 2026, 199 unit & feature test lulus (1.227 assertions), termasuk 12 test pengaturan hak akses. Form juga diverifikasi di browser untuk pilihan massal, dependensi, dan pembatasan fitur Admin Utama.
+- Full regression suite branch QA/packing diverifikasi 23 Oktober 2026 menggunakan SQLite in-memory: 254 test lulus (1.875 assertions), termasuk 22 test expiry/QA/packing. Halaman penerimaan diverifikasi di browser desktop dan simulasi viewport 390px; pengantar cetak diperiksa di browser. Database kerja MySQL belum dimigrasikan.
 - Kolom `audit_logs.type` menggunakan string terindeks, bukan enum tertutup, sehingga audit fitur baru seperti `delivery_assignment` dapat disimpan tanpa melanggar constraint.
 
 ## Catatan yang Belum Diputuskan
 
-Tidak ada catatan terbuka terkait approval box not full atau handling status warning. Keputusan final tercatat pada bagian Keputusan Bisnis.
+Alur QA/packing memakai pencatatan internal dan pengantar fisik; metode informasi hasil QA serta keterjagaan pengantar perlu diverifikasi operasional. Jalankan migration hanya saat cutover karena masa aktif Handle lama dihentikan. Rincian keputusan ada pada bagian 17.
 
 ## Panduan Agent Saat Menerima Tugas
 
