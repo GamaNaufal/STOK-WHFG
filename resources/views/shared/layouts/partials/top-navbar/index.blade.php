@@ -4,7 +4,7 @@
 
         @include('shared.layouts.partials.top-navbar.global-search-form')
 
-        <div class="topbar-future-slot" title="Space reserved for future features"></div>
+
 
         @if(auth()->check())
             @include('shared.layouts.partials.top-navbar.profile-dropdown')

@@ -76,6 +76,50 @@ class ReportFilterMatrixTest extends TestCase
         });
     }
 
+    public function test_withdrawal_report_paginates_without_losing_filters_or_long_notes(): void
+    {
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $longNote = 'Catatan audit pengambilan yang lebih panjang dari tiga puluh karakter tetap terlihat lengkap.';
+
+        foreach (range(1, 16) as $sequence) {
+            StockWithdrawal::create([
+                'user_id' => $operator->id,
+                'part_number' => 'P-RPT-PAGE',
+                'pcs_quantity' => 10,
+                'box_quantity' => 1,
+                'warehouse_location' => 'LOC-PAGE',
+                'status' => 'completed',
+                'notes' => $sequence === 1 ? $longNote : null,
+                'withdrawn_at' => Carbon::parse('2026-02-10 08:00:00')->addMinutes($sequence),
+            ]);
+        }
+
+        $filters = [
+            'start_date' => '2026-02-09',
+            'end_date' => '2026-02-11',
+            'status' => 'completed',
+            'part_number' => 'P-RPT-PAGE',
+            'user_id' => $operator->id,
+        ];
+        $firstPage = $this->actingAs($supervisi)->get(route('reports.withdrawal', $filters));
+        $firstPage->assertOk();
+        $firstPage->assertViewHas('withdrawals', fn ($rows) => $rows->perPage() === 15
+            && $rows->total() === 16
+            && $rows->count() === 15);
+        $firstPage->assertSee('class="page-item', false);
+        $firstPage->assertSee('part_number=P-RPT-PAGE', false);
+        $firstPage->assertSee('user_id=' . $operator->id, false);
+        $firstPage->assertSee('page=2', false);
+
+        $secondPage = $this->actingAs($supervisi)->get(route('reports.withdrawal', [...$filters, 'page' => 2]));
+        $secondPage->assertOk();
+        $secondPage->assertViewHas('withdrawals', fn ($rows) => $rows->total() === 16
+            && $rows->firstItem() === 16
+            && $rows->count() === 1);
+        $secondPage->assertSee($longNote);
+    }
+
     public function test_stock_input_report_filter_matrix_applies_date_part_and_location(): void
     {
         $supervisi = User::factory()->create(['role' => 'supervisi']);
@@ -195,6 +239,42 @@ class ReportFilterMatrixTest extends TestCase
                 && $filters['part_number'] === 'P-SI-RPT-01'
                 && $filters['warehouse_location'] === 'LOC-R1';
         });
+    }
+
+    public function test_stock_input_report_uses_compact_pagination_and_keeps_filters_on_next_page(): void
+    {
+        $supervisi = User::factory()->create(['role' => 'supervisi']);
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-RPT-PAGE']);
+
+        foreach (range(1, 16) as $sequence) {
+            StockInput::create([
+                'pallet_id' => $pallet->id,
+                'user_id' => $operator->id,
+                'warehouse_location' => 'LOC-PAGE',
+                'pcs_quantity' => 10,
+                'box_quantity' => 1,
+                'stored_at' => Carbon::parse('2026-02-10 08:00:00')->addMinutes($sequence),
+            ]);
+        }
+
+        $firstPage = $this->actingAs($supervisi)->get(route('reports.stock-input', ['warehouse_location' => 'LOC-PAGE']));
+        $firstPage->assertOk();
+        $firstPage->assertViewHas('stockInputs', fn ($inputs) => $inputs->perPage() === 15
+            && $inputs->total() === 16
+            && $inputs->count() === 15);
+        $firstPage->assertSee('class="page-item', false);
+        $firstPage->assertSee('warehouse_location=LOC-PAGE', false);
+        $firstPage->assertSee('page=2', false);
+
+        $secondPage = $this->actingAs($supervisi)->get(route('reports.stock-input', [
+            'warehouse_location' => 'LOC-PAGE',
+            'page' => 2,
+        ]));
+        $secondPage->assertOk();
+        $secondPage->assertViewHas('stockInputs', fn ($inputs) => $inputs->total() === 16
+            && $inputs->firstItem() === 16
+            && $inputs->count() === 1);
     }
 
     public function test_stock_input_report_keeps_box_ids_when_some_boxes_are_soft_deleted(): void

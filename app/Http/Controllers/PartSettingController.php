@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PartSetting;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -52,7 +53,11 @@ class PartSettingController extends Controller
             'qty_box' => 'required|integer|min:1|max:4294967295',
         ]);
 
-        PartSetting::create($validated);
+        DB::transaction(function () use ($validated, $request) {
+            $part = PartSetting::create($validated);
+            AuditService::record('master_part', 'created', 'PartSetting', $part->id, $request->user()->id,
+                [], ['part_number' => $part->part_number, 'qty_box' => (int) $part->qty_box], "Master part {$part->part_number} dibuat.");
+        });
 
         return redirect()->route('part-settings.index')->with('success', 'No Part berhasil ditambahkan.');
     }
@@ -78,7 +83,13 @@ class PartSettingController extends Controller
                 ->with('error', 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat diganti. Qty per box tetap dapat diperbarui.');
         }
 
-        $partSetting->update($validated);
+        DB::transaction(function () use ($partSetting, $validated, $request) {
+            $before = ['part_number' => $partSetting->part_number, 'qty_box' => (int) $partSetting->qty_box];
+            $partSetting->update($validated);
+            AuditService::record('master_part', 'updated', 'PartSetting', $partSetting->id, $request->user()->id,
+                $before, ['part_number' => $partSetting->part_number, 'qty_box' => (int) $partSetting->qty_box],
+                "Master part {$partSetting->part_number} diperbarui.");
+        });
 
         return redirect()->route('part-settings.index')->with('success', 'No Part berhasil diperbarui.');
     }
@@ -89,7 +100,12 @@ class PartSettingController extends Controller
             return redirect()->back()->with('error', 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat dihapus.');
         }
 
-        $partSetting->delete();
+        DB::transaction(function () use ($partSetting) {
+            $partSetting->delete();
+            AuditService::record('master_part', 'deleted', 'PartSetting', $partSetting->id, request()->user()->id,
+                ['part_number' => $partSetting->part_number, 'qty_box' => (int) $partSetting->qty_box], [],
+                "Master part {$partSetting->part_number} dihapus.");
+        });
 
         return redirect()->route('part-settings.index')->with('success', 'No Part berhasil dihapus.');
     }

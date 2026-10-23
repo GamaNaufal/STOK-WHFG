@@ -11,15 +11,15 @@
             <div class="hero-content">
                 <div>
                     <h1 class="h2 hero-title">
-                        <i class="bi bi-{{ $icon }}"></i> {{ $title }}
+                        <i class="bi {{ str_starts_with($icon, 'bi-') ? $icon : 'bi-'.$icon }}"></i> {{ $title }}
                     </h1>
                     <p class="hero-subtitle">
                         {{ $subtitle }}
                     </p>
                 </div>
-                @if($action)
+                @if($action || $slot->isNotEmpty())
                     <div>
-                        {{ $action }}
+                        {{ $action ?? $slot }}
                     </div>
                 @endif
             </div>

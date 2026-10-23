@@ -28,7 +28,7 @@ class ExpiredBoxController extends Controller
             $handledHistory = ExpiredBoxReport::with('handler')
                 ->where('status', 'handled')
                 ->orderByDesc('handled_at')
-                ->paginate(50);
+                ->paginate(15);
         }
 
         $availableLocations = MasterLocation::available()->orderBy('code')->get(['id', 'code']);

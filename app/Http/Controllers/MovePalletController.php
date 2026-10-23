@@ -7,13 +7,15 @@ use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Models\StockLocation;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletDeliveryLockService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class MovePalletController extends Controller
 {
     public function __construct(
-        private readonly LocationAssignmentService $locationAssignmentService
+        private readonly LocationAssignmentService $locationAssignmentService,
+        private readonly PalletDeliveryLockService $palletDeliveryLockService
     ) {
     }
 
@@ -26,7 +28,7 @@ class MovePalletController extends Controller
             });
     }
 
-    private function validatePalletCanMove(Pallet $pallet): array
+    private function validatePalletCanMove(Pallet $pallet, bool $lockRows = false): array
     {
         $stockLocation = $pallet->stockLocation;
         $masterLocation = $stockLocation?->masterLocation;
@@ -39,30 +41,16 @@ class MovePalletController extends Controller
             throw new \RuntimeException('Lokasi pallet tidak lagi berstatus terisi. Muat ulang data pallet.');
         }
 
-        $activeBoxes = $this->activeBoxes($pallet)->lockForUpdate()->get();
+        $activeBoxQuery = $this->activeBoxes($pallet);
+        $activeBoxes = ($lockRows ? $activeBoxQuery->lockForUpdate() : $activeBoxQuery)->get();
         if ($activeBoxes->isEmpty()) {
             throw new \RuntimeException('Pallet tidak memiliki box aktif dan tidak dapat dipindahkan.');
         }
 
-        $assignedBox = $activeBoxes->first(fn ($box) => $box->assigned_delivery_order_id !== null);
-        if ($assignedBox) {
+        $lockedBox = $this->palletDeliveryLockService->blockingBoxForPallets([(int) $pallet->id], $lockRows);
+        if ($lockedBox) {
             throw new \RuntimeException(
-                "Box {$assignedBox->box_number} sudah di-assign ke delivery dan pallet tidak dapat dipindahkan."
-            );
-        }
-
-        $pickLockedBoxId = DB::table('delivery_pick_items')
-            ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
-            ->whereIn('delivery_pick_items.box_id', $activeBoxes->pluck('id')->all())
-            ->whereIn('delivery_pick_sessions.status', ['pending', 'scanning', 'blocked', 'approved'])
-            ->lockForUpdate()
-            ->value('delivery_pick_items.box_id');
-
-        if ($pickLockedBoxId) {
-            $lockedBox = $activeBoxes->firstWhere('id', (int) $pickLockedBoxId);
-            $lockedBoxNumber = $lockedBox?->box_number ?? (string) $pickLockedBoxId;
-            throw new \RuntimeException(
-                "Box {$lockedBoxNumber} sedang digunakan dalam sesi picking dan pallet tidak dapat dipindahkan."
+                "Box {$lockedBox->box_number} sedang digunakan dalam proses delivery aktif dan pallet tidak dapat dipindahkan."
             );
         }
 
@@ -78,18 +66,13 @@ class MovePalletController extends Controller
                 });
         };
 
-        $lockedStatuses = ['pending', 'scanning', 'blocked', 'approved'];
+        $lockedStatuses = PalletDeliveryLockService::BLOCKING_SESSION_STATUSES;
         $pallets = Pallet::query()
             ->whereHas('stockLocation.masterLocation', function ($query) {
                 $query->where('is_occupied', true);
             })
             ->whereHas('boxes', $activeBoxFilter)
-            ->whereDoesntHave('boxes', function ($query) use ($activeBoxFilter) {
-                $activeBoxFilter($query);
-                $query->whereNotNull('assigned_delivery_order_id');
-            })
-            ->whereDoesntHave('boxes', function ($query) use ($activeBoxFilter, $lockedStatuses) {
-                $activeBoxFilter($query);
+            ->whereDoesntHave('boxes', function ($query) use ($lockedStatuses) {
                 $query->whereHas('deliveryPickItems', function ($query) use ($lockedStatuses) {
                     $query->whereHas('session', function ($query) use ($lockedStatuses) {
                         $query->whereIn('status', $lockedStatuses);
@@ -169,7 +152,7 @@ class MovePalletController extends Controller
                     throw new \RuntimeException('Pallet tidak ditemukan atau sudah tidak aktif.');
                 }
 
-                [$stockLocation, $sourceLocation, $activeBoxes] = $this->validatePalletCanMove($pallet);
+                [$stockLocation, $sourceLocation, $activeBoxes] = $this->validatePalletCanMove($pallet, true);
                 $targetLocation = MasterLocation::whereKey($data['location_id'])->first();
 
                 if (! $targetLocation) {

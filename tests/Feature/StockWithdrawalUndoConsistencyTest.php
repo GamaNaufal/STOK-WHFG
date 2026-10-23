@@ -77,6 +77,8 @@ class StockWithdrawalUndoConsistencyTest extends TestCase
 
         $this->assertSame(200, $response->status());
         $this->assertSame(true, (bool) $response->getData(true)['success']);
+        $this->assertDatabaseHas('audit_logs', ['type' => 'stock_withdrawal', 'action' => 'reversed',
+            'model_id' => $withdrawal->id, 'user_id' => $operator->id]);
 
         $this->assertDatabaseHas('stock_withdrawals', [
             'id' => $withdrawal->id,

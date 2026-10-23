@@ -13,6 +13,67 @@ class DeliverySalesPpcWorkflowTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_ppc_queue_keeps_stock_context_and_all_decision_actions(): void
+    {
+        $ppc = User::factory()->create(['role' => 'ppc']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'PT Keputusan',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'pending',
+            'notes' => 'Periksa prioritas.',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-PPC-01',
+            'quantity' => 125,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $this->actingAs($ppc)->get(route('delivery.approvals'))
+            ->assertOk()
+            ->assertSee('Order #'.$order->id)
+            ->assertSee('PT Keputusan')
+            ->assertSee('Periksa prioritas.')
+            ->assertSee('P-PPC-01')
+            ->assertSee('0 / 125')
+            ->assertSee('Belum cukup')
+            ->assertSee('data-order-id="'.$order->id.'" data-status="approved"', false)
+            ->assertSee('data-order-id="'.$order->id.'" data-status="correction"', false)
+            ->assertSee('data-order-id="'.$order->id.'" data-status="rejected"', false);
+    }
+
+    public function test_ppc_history_keeps_full_notes_and_items_in_order_details(): void
+    {
+        $ppc = User::factory()->create(['role' => 'ppc']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $note = str_repeat('Periksa perubahan kebutuhan part sebelum pengiriman. ', 3);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'PT Riwayat PPC',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'rejected',
+            'notes' => $note,
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-HISTORY',
+            'quantity' => 125,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $this->actingAs($ppc)->get(route('delivery.approvals'))
+            ->assertOk()
+            ->assertSee('Order #'.$order->id)
+            ->assertSee('PT Riwayat PPC')
+            ->assertSee('Ditolak')
+            ->assertSee('data-bs-target="#history-detail-'.$order->id.'"', false)
+            ->assertSee($note)
+            ->assertSee('P-HISTORY')
+            ->assertSee('125 PCS');
+    }
+
     public function test_ppc_approve_requires_notes(): void
     {
         $ppc = User::factory()->create(['role' => 'ppc']);
@@ -368,5 +429,53 @@ class DeliverySalesPpcWorkflowTest extends TestCase
             'parent_delivery_order_id' => $parentOrder->id,
             'status' => 'approved',
         ]);
+    }
+
+    public function test_split_orders_cannot_be_deleted_except_through_restore(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $sales = User::factory()->create(['role' => 'sales']);
+
+        $parent = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Split Delete Guard',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $parent->id,
+            'part_number' => 'P-SPLIT-DELETE',
+            'quantity' => 100,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        $this->actingAs($admin)->post(route('delivery.split', $parent->id), [
+            'items' => [['part_number' => 'P-SPLIT-DELETE', 'quantity' => 40]],
+        ])->assertSessionHas('success');
+
+        $child = DeliveryOrder::where('parent_delivery_order_id', $parent->id)->firstOrFail();
+
+        $this->actingAs($admin)->delete(route('delivery.destroy', $child->id))
+            ->assertSessionHas('error', 'Delivery hasil split tidak dapat dihapus. Gunakan Restore Split untuk mengembalikan quantity ke delivery utama.');
+        $this->actingAs($admin)->delete(route('delivery.destroy', $parent->id))
+            ->assertSessionHas('error', 'Delivery utama dengan hasil split aktif tidak dapat dihapus. Restore hasil split terlebih dahulu.');
+
+        $this->assertDatabaseHas('delivery_orders', ['id' => $parent->id, 'status' => 'partial', 'deleted_at' => null]);
+        $this->assertDatabaseHas('delivery_orders', ['id' => $child->id, 'status' => 'approved', 'deleted_at' => null]);
+        $this->assertDatabaseHas('delivery_order_items', ['delivery_order_id' => $parent->id, 'part_number' => 'P-SPLIT-DELETE', 'quantity' => 60]);
+        $this->assertDatabaseHas('delivery_order_items', ['delivery_order_id' => $child->id, 'part_number' => 'P-SPLIT-DELETE', 'quantity' => 40]);
+
+        $schedule = $this->actingAs($admin)->get(route('delivery.index'));
+        $schedule->assertDontSee('data-delete-url="'.route('delivery.destroy', $parent->id).'"', false);
+        $schedule->assertDontSee('data-delete-url="'.route('delivery.destroy', $child->id).'"', false);
+
+        $this->actingAs($admin)->post(route('delivery.restore-split', $child->id))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('delivery_order_items', ['delivery_order_id' => $parent->id, 'part_number' => 'P-SPLIT-DELETE', 'quantity' => 100]);
+        $this->assertSoftDeleted('delivery_orders', ['id' => $child->id]);
+
+        $this->actingAs($admin)->delete(route('delivery.destroy', $parent->id))
+            ->assertSessionHas('success');
     }
 }

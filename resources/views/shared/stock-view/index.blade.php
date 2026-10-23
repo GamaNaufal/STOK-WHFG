@@ -5,6 +5,8 @@
 @section('styles')
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 @include('shared.stock-view.partials.styles')
+<link href="{{ asset('css/stock-view-toolbar.css') }}" rel="stylesheet">
+<link href="{{ asset('css/stock-view-results.css') }}" rel="stylesheet">
 @endsection
 
 @section('content')
@@ -43,35 +45,7 @@
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="position-relative">
-            <form method="GET" action="{{ route('stock-view.index') }}" id="searchForm" class="input-group input-group-lg">
-                <input type="hidden" name="view_mode" value="{{ $viewMode }}">
-                <input type="hidden" name="sort" value="{{ $sortMode }}">
-                <span class="input-group-text border-0" style="background: #0C7779; color: white; border-radius: 10px 0 0 10px; font-size: 1.2rem;">
-                    <i class="bi bi-search"></i>
-                </span>
-                <input type="text" name="search" id="searchInput" class="form-control form-control-lg border-0" 
-                      placeholder="Cari part number, no pallet, atau ID box..." 
-                       value="{{ $search ?? '' }}"
-                       autocomplete="off"
-                       style="font-size: 1rem; padding: 14px 16px;">
-                <button class="btn btn-outline-secondary border-0" type="submit" style="border-radius: 0 10px 10px 0; background: white; color: #0C7779; font-weight: 600;">
-                    <i class="bi bi-search"></i> Cari
-                </button>
-                @if($search)
-                    <a href="{{ route('stock-view.index', ['view_mode' => $viewMode, 'sort' => $sortMode]) }}" class="btn btn-outline-danger border-0" style="border-radius: 0 10px 10px 0; background: white;">
-                        <i class="bi bi-x-circle"></i> Atur Ulang
-                    </a>
-                @endif
-            </form>
-            <div id="searchDropdown" class="search-dropdown dropdown-list border-0 bg-white rounded-3 mt-2" 
-                 style="display: none; max-height: 300px; overflow-y: auto; position: absolute; width: 100%; z-index: 1000; box-shadow: 0 8px 16px rgba(0,0,0,0.12); border: 1px solid #e5e7eb;">
-            </div>
-        </div>
-    </div>
-</div>
+@include('shared.stock-view.partials.toolbar')
 
 <div class="row mb-4 g-3">
     <div class="col-6 col-md-3">
@@ -80,7 +54,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Part Numbers</p>
-                        <h2 class="fw-bold" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $summaryTotalParts }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #0C7779; margin: 0; font-size: 2.5rem;">{{ $summaryTotalParts }}</h2>
                     </div>
                     <i class="bi bi-tag d-none d-sm-block" style="font-size: 2.5rem; color: #0C7779; opacity: 0.2;"></i>
                 </div>
@@ -93,7 +67,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Pallet</p>
-                        <h2 class="fw-bold" style="color: #005461; margin: 0; font-size: 2.5rem;">{{ $totalPallets }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #005461; margin: 0; font-size: 2.5rem;">{{ $totalPallets }}</h2>
                     </div>
                     <i class="bi bi-layers d-none d-sm-block" style="font-size: 2.5rem; color: #005461; opacity: 0.2;"></i>
                 </div>
@@ -106,7 +80,7 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total Box</p>
-                        <h2 class="fw-bold" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ (int) $summaryTotalBox }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #249E94; margin: 0; font-size: 2.5rem;">{{ (int) $summaryTotalBox }}</h2>
                     </div>
                     <i class="bi bi-box2 d-none d-sm-block" style="font-size: 2.5rem; color: #249E94; opacity: 0.2;"></i>
                 </div>
@@ -119,38 +93,11 @@
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <p class="text-muted mb-2" style="font-size: 13px; font-weight: 600;">Total PCS</p>
-                        <h2 class="fw-bold" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $summaryTotalPcs }}</h2>
+                        <h2 class="fw-bold app-summary-value" style="color: #3BC1A8; margin: 0; font-size: 2.5rem;">{{ $summaryTotalPcs }}</h2>
                     </div>
                     <i class="bi bi-stack d-none d-sm-block" style="font-size: 2.5rem; color: #3BC1A8; opacity: 0.2;"></i>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
-
-<div class="row mb-3">
-    <div class="col-12 d-flex justify-content-end">
-        <div class="btn-group shadow-sm" style="border-radius: 8px;">
-            <a href="{{ route('stock-view.index', ['view_mode' => 'part', 'search' => $search, 'sort' => $sortMode]) }}" 
-               class="btn {{ $viewMode === 'part' ? 'btn-primary' : 'btn-light' }}"
-               @if($viewMode === 'part') style="background: #0C7779; border-color: #0C7779;" @endif>
-                <i class="bi bi-tag"></i> By Part Number
-            </a>
-            <a href="{{ route('stock-view.index', ['view_mode' => 'box_id', 'search' => $search, 'sort' => $sortMode]) }}" 
-               class="btn {{ $viewMode === 'box_id' ? 'btn-primary' : 'btn-light' }}"
-               @if($viewMode === 'box_id') style="background: #0C7779; border-color: #0C7779;" @endif>
-                <i class="bi bi-upc-scan"></i> By Box ID
-            </a>
-            <a href="{{ route('stock-view.index', ['view_mode' => 'pallet', 'search' => $search, 'sort' => $sortMode]) }}" 
-               class="btn {{ $viewMode === 'pallet' ? 'btn-primary' : 'btn-light' }}"
-               @if($viewMode === 'pallet') style="background: #0C7779; border-color: #0C7779;" @endif>
-                <i class="bi bi-layers"></i> By Pallet
-            </a>
-            <a href="{{ route('stock-view.index', ['view_mode' => 'not_full', 'search' => $search, 'sort' => $sortMode]) }}" 
-               class="btn {{ $viewMode === 'not_full' ? 'btn-primary' : 'btn-light' }}"
-               @if($viewMode === 'not_full') style="background: #0C7779; border-color: #0C7779;" @endif>
-                <i class="bi bi-exclamation-circle"></i> By Not Full
-            </a>
         </div>
     </div>
 </div>
@@ -186,8 +133,8 @@
 <div class="row">
     <div class="col-12">
         @if(($viewMode === 'part' && $groupedByPart->count() > 0) || ($viewMode === 'box_id' && $groupedByBoxId->count() > 0) || ($viewMode === 'pallet' && $groupedByPallet->count() > 0) || ($viewMode === 'not_full' && $notFullBoxes->count() > 0))
-            <div class="card border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
-                <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
+            <div class="card border-0 shadow-sm stock-results" data-stock-view="{{ $viewMode }}" style="border-radius: 12px; overflow: hidden;">
+                <div class="app-section-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                             color: white; 
                             padding: 20px 24px; 
                             font-weight: 600;
@@ -199,11 +146,11 @@
                         @if(in_array($viewMode, ['part', 'pallet'], true))
                             <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
                                 <span style="font-size: 12px; opacity: 0.85; font-weight: 500;">Urut ditambahkan</span>
-                                <a href="{{ $sortUrl('created_oldest') }}" class="stock-sort-pill {{ $sortMode === 'created_oldest' ? 'is-active' : '' }}">
+                                <a href="{{ $sortUrl('created_oldest') }}" class="stock-sort-pill {{ $sortMode === 'created_oldest' ? 'is-active' : '' }}" @if($sortMode === 'created_oldest') aria-current="true" @endif>
                                     <i class="bi bi-hourglass-split"></i>
                                     <span>Terlama</span>
                                 </a>
-                                <a href="{{ $sortUrl('created_newest') }}" class="stock-sort-pill {{ $sortMode === 'created_newest' ? 'is-active' : '' }}">
+                                <a href="{{ $sortUrl('created_newest') }}" class="stock-sort-pill {{ $sortMode === 'created_newest' ? 'is-active' : '' }}" @if($sortMode === 'created_newest') aria-current="true" @endif>
                                     <i class="bi bi-hourglass-bottom"></i>
                                     <span>Terbaru</span>
                                 </a>
@@ -212,161 +159,162 @@
                     </div>
                 </div>
 
-                <div class="table-responsive" style="overflow: hidden;">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel stok, geser untuk melihat kolom lainnya">
                     <table class="table table-hover mb-0" style="margin-bottom: 0;">
+                        <caption class="visually-hidden">Hasil stok berdasarkan {{ ['part' => 'part number', 'box_id' => 'ID box', 'pallet' => 'pallet', 'not_full' => 'box not full'][$viewMode] ?? $viewMode }}</caption>
                         <thead style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
                             <tr>
                                 @if($viewMode === 'part')
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('part_asc', 'part_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['part_asc', 'part_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-tag"></i>
                                             <span>No Part</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'part_asc', 'part_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
                                         <a href="{{ $sortUrl($sortToggle('total_box_asc', 'total_box_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['total_box_asc', 'total_box_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-box2"></i>
                                             <span>Total Box</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'total_box_asc', 'total_box_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
                                         <a href="{{ $sortUrl($sortToggle('total_pcs_asc', 'total_pcs_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['total_pcs_asc', 'total_pcs_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-stack"></i>
                                             <span>Total PCS</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'total_pcs_asc', 'total_pcs_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
                                 @elseif($viewMode === 'box_id')
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('box_number_asc', 'box_number_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['box_number_asc', 'box_number_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-upc-scan"></i>
                                             <span>ID Box</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'box_number_asc', 'box_number_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('part_asc', 'part_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['part_asc', 'part_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-tag"></i>
                                             <span>No Part</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'part_asc', 'part_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('pallet_asc', 'pallet_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['pallet_asc', 'pallet_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-layers"></i>
                                             <span>No Pallet</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'pallet_asc', 'pallet_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
                                         <a href="{{ $sortUrl($sortToggle('pcs_asc', 'pcs_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['pcs_asc', 'pcs_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-stack"></i>
                                             <span>PCS</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'pcs_asc', 'pcs_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('location_asc', 'location_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['location_asc', 'location_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-geo-alt"></i>
                                             <span>Lokasi</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'location_asc', 'location_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('created_oldest', 'created_newest')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['created_oldest', 'created_newest'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-calendar"></i>
                                             <span>Tanggal</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'created_oldest', 'created_newest') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
                                 @elseif($viewMode === 'pallet')
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('pallet_asc', 'pallet_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['pallet_asc', 'pallet_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-layers"></i>
                                             <span>No Pallet</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'pallet_asc', 'pallet_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('location_asc', 'location_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['location_asc', 'location_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-geo-alt"></i>
                                             <span>Lokasi</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'location_asc', 'location_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
                                         <a href="{{ $sortUrl($sortToggle('total_box_asc', 'total_box_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['total_box_asc', 'total_box_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-box2"></i>
                                             <span>Total Box</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'total_box_asc', 'total_box_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
                                         <a href="{{ $sortUrl($sortToggle('total_pcs_asc', 'total_pcs_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['total_pcs_asc', 'total_pcs_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-stack"></i>
                                             <span>Total PCS</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'total_pcs_asc', 'total_pcs_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
                                 @else
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('box_number_asc', 'box_number_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['box_number_asc', 'box_number_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-upc-scan"></i>
                                             <span>ID Box</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'box_number_asc', 'box_number_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('part_asc', 'part_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['part_asc', 'part_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-tag"></i>
                                             <span>No Part</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'part_asc', 'part_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('pallet_asc', 'pallet_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['pallet_asc', 'pallet_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-layers"></i>
                                             <span>No Pallet</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'pallet_asc', 'pallet_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">
                                         <a href="{{ $sortUrl($sortToggle('pcs_asc', 'pcs_desc')) }}" class="stock-sort-link is-center {{ in_array($sortMode, ['pcs_asc', 'pcs_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-stack"></i>
                                             <span>PCS</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'pcs_asc', 'pcs_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('location_asc', 'location_desc')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['location_asc', 'location_desc'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-geo-alt"></i>
                                             <span>Lokasi</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'location_asc', 'location_desc') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase;">
                                         <a href="{{ $sortUrl($sortToggle('created_oldest', 'created_newest')) }}" class="stock-sort-link is-left {{ in_array($sortMode, ['created_oldest', 'created_newest'], true) ? 'is-active' : '' }}">
                                             <i class="bi bi-calendar"></i>
                                             <span>Tanggal</span>
                                             <i class="bi {{ $sortIcon($sortMode, 'created_oldest', 'created_newest') }} stock-sort-icon"></i>
                                         </a>
                                     </th>
-                                    <th style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
+                                    <th scope="col" style="color: #0C7779; font-weight: 700; padding: 16px 20px; font-size: 13px; text-transform: uppercase; text-align: center;">Aksi</th>
                                 @endif
                             </tr>
                         </thead>
                         <tbody>
                             @if($viewMode === 'part')
                                 @foreach($groupedByPart as $partData)
-                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;" onmouseenter="this.style.backgroundColor='#f9fafb';" onmouseleave="this.style.backgroundColor='transparent';">
+                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
                                             <span style="background: linear-gradient(135deg, #f0f4f8 0%, #e0f2fe 100%); color: #0C7779; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; display: inline-block; box-shadow: 0 2px 4px rgba(12, 119, 121, 0.1);">
-                                                {{ $partData['part_number'] }}
+                                                <span class="stock-identity">{{ $partData['part_number'] }}</span>
                                                 @if(($partData['expired_box'] ?? 0) > 0)<span class="badge bg-danger ms-1">{{ $partData['expired_box'] }} box Expired / {{ $partData['expired_pcs'] }} PCS</span>@endif
                                             </span>
                                         </td>
@@ -378,6 +326,7 @@
                                         </td>
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <button type="button" class="btn btn-sm js-detail-part"
+                                                    aria-label="Detail stok part {{ $partData['part_number'] }}"
                                                     data-part-number="{{ $partData['part_number'] }}"
                                                     data-total-box="{{ $partData['total_box'] }}"
                                                     data-total-pcs="{{ $partData['total_pcs'] }}"
@@ -402,10 +351,10 @@
                                     $canDeleteStock = auth()->user()->canAccess('stock_delete');
                                 @endphp
                                 @foreach($groupedByBoxId as $boxData)
-                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;" onmouseenter="this.style.backgroundColor='#f9fafb';" onmouseleave="this.style.backgroundColor='transparent';">
+                                    <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 700;">
                                             <span style="background: linear-gradient(135deg, #f0f4f8 0%, #e0f2fe 100%); color: #0C7779; padding: 8px 14px; border-radius: 10px; font-size: 13px; font-weight: 700; display: inline-block; box-shadow: 0 2px 4px rgba(12, 119, 121, 0.1);">
-                                                {{ $boxData['box_number'] ?? 'Legacy' }}
+                                                <span class="stock-identity">{{ $boxData['box_number'] ?? 'Legacy' }}</span>
                                                 @if(!empty($boxData['is_expired']))<span class="badge bg-danger ms-1" title="Tidak dapat masuk FIFO sebelum Handle">Expired</span>@endif
                                             </span>
                                         </td>
@@ -428,12 +377,14 @@
                                             <div class="d-inline-flex gap-1 flex-wrap justify-content-center">
                                                 @if(!empty($boxData['box_id']))
                                                     <button type="button" class="btn btn-sm btn-outline-primary js-box-history"
+                                                            aria-label="Riwayat box {{ $boxData['box_number'] ?? 'Legacy' }}"
                                                             data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                             style="font-size: 12px;">
-                                                        <i class="bi bi-clock-history"></i> History
+                                                        <i class="bi bi-clock-history"></i> Riwayat
                                                     </button>
                                                     @if($canEditBox && empty($boxData['is_expired']))
                                                         <button type="button" class="btn btn-sm btn-outline-success js-edit-box"
+                                                                aria-label="Edit box {{ $boxData['box_number'] ?? 'Legacy' }}"
                                                                 data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                                 data-box-number="{{ $boxData['box_number'] ?? '' }}"
                                                                 data-part-number="{{ $boxData['part_number'] ?? '' }}"
@@ -445,6 +396,7 @@
                                                     @endif
                                                     @if($canDeleteStock)
                                                         <button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                                                aria-label="Hapus box {{ $boxData['box_number'] ?? 'Legacy' }} dari stok aktif"
                                                                 data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                                 data-box-number="{{ $boxData['box_number'] ?? '' }}"
                                                                 data-part-number="{{ $boxData['part_number'] ?? '' }}"
@@ -469,7 +421,7 @@
                                         <td style="padding: 16px 20px; color: #1f2937; font-weight: 600;">
                                             <div style="display: flex; align-items: center; gap: 8px;">
                                                 <span style="background: #fff8e1; color: #b45309; padding: 6px 12px; border-radius: 8px; font-size: 13px;">
-                                                    {{ $palletData['pallet_number'] }}
+                                                    <span class="stock-identity">{{ $palletData['pallet_number'] }}</span>
                                                 @if(($palletData['expired_box'] ?? 0) > 0)<span class="badge bg-danger ms-1">{{ $palletData['expired_box'] }} box Expired / {{ $palletData['expired_pcs'] }} PCS</span>@endif
                                                 </span>
                                                 @if($palletData['is_merged'])
@@ -490,6 +442,7 @@
                                         </td>
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <button type="button" class="btn btn-sm js-detail-pallet"
+                                               aria-label="Lihat isi pallet {{ $palletData['pallet_number'] }}"
                                                data-pallet-id="{{ $palletData['pallet_id'] }}"
                                                style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                                                       color: white; 
@@ -510,7 +463,7 @@
                                     <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.3s ease;">
                                         <td style="padding: 16px 20px; color: #9a3412; font-weight: 700;">
                                             <span style="background: #fff7ed; padding: 6px 12px; border-radius: 8px; display: inline-block;">
-                                                {{ $box['box_number'] }}
+                                                <span class="stock-identity">{{ $box['box_number'] }}</span>
                                                 @if(!empty($box['is_expired']))<span class="badge bg-danger ms-1" title="Tidak dapat masuk FIFO sebelum Handle">Expired</span>@endif
                                             </span>
                                         </td>
@@ -532,6 +485,7 @@
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <div class="d-inline-flex gap-1 flex-wrap justify-content-center">
                                                 <button type="button" class="btn btn-sm js-detail-pallet"
+                                                   aria-label="Lihat isi pallet {{ $box['pallet_number'] }}"
                                                    data-pallet-id="{{ $box['pallet_id'] }}"
                                                    style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%); 
                                                           color: white; 
@@ -550,6 +504,7 @@
                         </tbody>
                     </table>
                 </div>
+                <p class="stock-scroll-hint">Geser tabel untuk melihat seluruh kolom. Identitas stok tetap terlihat pada layar kecil.</p>
             </div>
         @else
             <div class="card border-0 shadow-sm" style="border-radius: 12px;">
@@ -557,12 +512,12 @@
                     <i class="bi bi-inbox" style="font-size: 3rem; color: #e5e7eb;"></i>
                     <h5 class="mt-4 text-muted" style="font-weight: 600;">
                         @if($search)
-                            Tidak ada stok dengan No Part "<strong>{{ $search }}</strong>"
+                            Tidak ada stok yang cocok dengan "<strong>{{ $search }}</strong>"
                         @else
                             Belum ada stok tersimpan
                         @endif
                     </h5>
-                    <p class="text-muted">Mulai dengan melakukan input stok untuk melihat data di sini</p>
+                    <p class="text-muted">{{ $search ? 'Coba kata kunci lain atau hapus pencarian untuk melihat stok yang tersedia.' : 'Belum ada stok pada tampilan ini.' }}</p>
                 </div>
             </div>
         @endif

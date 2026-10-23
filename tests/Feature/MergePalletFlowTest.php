@@ -8,6 +8,7 @@ use App\Models\DeliveryOrderItem;
 use App\Models\DeliveryPickItem;
 use App\Models\DeliveryPickSession;
 use App\Models\MasterLocation;
+use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
 use App\Models\PalletItem;
 use App\Models\StockInput;
@@ -315,7 +316,7 @@ class MergePalletFlowTest extends TestCase
         );
     }
 
-    public function test_merge_rejects_pallet_containing_assigned_box(): void
+    public function test_merge_allows_assigned_pending_and_not_full_boxes_without_changing_them(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $sales = User::factory()->create(['role' => 'sales']);
@@ -354,25 +355,76 @@ class MergePalletFlowTest extends TestCase
             'box_number' => '92000002',
             'part_number' => 'P-MERGE-GUARD',
             'pcs_quantity' => 20,
-            'qty_box' => 20,
+            'qty_box' => 50,
             'qr_code' => '92000002|P-MERGE-GUARD|20',
             'user_id' => $operator->id,
+            'is_not_full' => true,
         ]);
         $pallet1->boxes()->attach($assignedBox->id);
         $pallet2->boxes()->attach($freeBox->id);
+        $session = DeliveryPickSession::create([
+            'delivery_order_id' => $order->id,
+            'created_by' => $operator->id,
+            'status' => 'pending',
+        ]);
+        DeliveryPickItem::create([
+            'pick_session_id' => $session->id,
+            'box_id' => $assignedBox->id,
+            'part_number' => $assignedBox->part_number,
+            'pcs_quantity' => 20,
+            'status' => 'pending',
+        ]);
+        $notFullRequest = NotFullBoxRequest::create([
+            'box_number' => '92000007',
+            'part_number' => 'P-MERGE-GUARD',
+            'pcs_quantity' => 20,
+            'fixed_qty' => 50,
+            'reason' => 'Butuh box tambahan',
+            'request_type' => 'additional',
+            'delivery_order_id' => $order->id,
+            'requested_by' => $operator->id,
+            'target_pallet_id' => $pallet1->id,
+            'status' => 'pending',
+        ]);
 
-        $response = $this->actingAs($operator)->postJson(route('merge-pallet.store'), [
+        $this->actingAs($operator)->get(route('merge-pallet.index'))
+            ->assertOk()->assertSee($pallet1->pallet_number);
+        $this->getJson(route('merge-pallet.search', ['code' => $pallet1->pallet_number]))
+            ->assertOk()->assertJsonPath('pallet.id', $pallet1->id);
+
+        $response = $this->postJson(route('merge-pallet.store'), [
             'pallet_ids' => [$pallet1->id, $pallet2->id],
             'location_id' => $target->id,
             'warehouse_location' => $target->code,
         ]);
 
-        $response->assertStatus(422)->assertJson(['success' => false]);
-        $this->assertDatabaseHas('pallets', ['id' => $pallet1->id, 'deleted_at' => null]);
-        $this->assertDatabaseHas('pallet_boxes', ['pallet_id' => $pallet1->id, 'box_id' => $assignedBox->id]);
+        $response->assertOk()->assertJson(['success' => true]);
+        $newPallet = Pallet::where('pallet_number', $response->json('new_pallet_number'))->firstOrFail();
+        $this->assertDatabaseHas('boxes', [
+            'id' => $assignedBox->id,
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $this->assertDatabaseHas('boxes', [
+            'id' => $freeBox->id,
+            'is_not_full' => true,
+            'pcs_quantity' => 20,
+            'qty_box' => 50,
+        ]);
+        $this->assertDatabaseHas('delivery_pick_items', [
+            'pick_session_id' => $session->id,
+            'box_id' => $assignedBox->id,
+            'status' => 'pending',
+        ]);
+        $this->assertDatabaseHas('pallet_boxes', ['pallet_id' => $newPallet->id, 'box_id' => $assignedBox->id]);
+        $this->assertDatabaseHas('pallet_boxes', ['pallet_id' => $newPallet->id, 'box_id' => $freeBox->id]);
+        $this->assertDatabaseHas('not_full_box_requests', [
+            'id' => $notFullRequest->id,
+            'target_pallet_id' => $newPallet->id,
+            'status' => 'pending',
+        ]);
     }
 
-    public function test_merge_rejects_pallet_containing_pick_locked_box(): void
+    public function test_merge_rejects_pallet_with_box_in_final_delivery_even_if_box_is_expired(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $sales = User::factory()->create(['role' => 'sales']);
@@ -403,6 +455,16 @@ class MergePalletFlowTest extends TestCase
             'qty_box' => 20,
             'qr_code' => '92000003|P-MERGE-PICK|20',
             'user_id' => $operator->id,
+            'expired_status' => 'expired',
+            'assigned_delivery_order_id' => $order->id,
+        ]);
+        $activeBox = Box::create([
+            'box_number' => '92000008',
+            'part_number' => 'P-MERGE-PICK',
+            'pcs_quantity' => 20,
+            'qty_box' => 20,
+            'qr_code' => '92000008|P-MERGE-PICK|20',
+            'user_id' => $operator->id,
         ]);
         $freeBox = Box::create([
             'box_number' => '92000004',
@@ -412,12 +474,12 @@ class MergePalletFlowTest extends TestCase
             'qr_code' => '92000004|P-MERGE-PICK|20',
             'user_id' => $operator->id,
         ]);
-        $pallet1->boxes()->attach($lockedBox->id);
+        $pallet1->boxes()->attach([$lockedBox->id, $activeBox->id]);
         $pallet2->boxes()->attach($freeBox->id);
         $session = DeliveryPickSession::create([
             'delivery_order_id' => $order->id,
             'created_by' => $operator->id,
-            'status' => 'scanning',
+            'status' => 'approved',
         ]);
         DeliveryPickItem::create([
             'pick_session_id' => $session->id,
@@ -427,7 +489,12 @@ class MergePalletFlowTest extends TestCase
             'status' => 'pending',
         ]);
 
-        $response = $this->actingAs($operator)->postJson(route('merge-pallet.store'), [
+        $this->actingAs($operator)->get(route('merge-pallet.index'))
+            ->assertOk()->assertDontSee($pallet1->pallet_number);
+        $this->getJson(route('merge-pallet.search', ['code' => $pallet1->pallet_number]))
+            ->assertStatus(422)->assertJson(['success' => false]);
+
+        $response = $this->postJson(route('merge-pallet.store'), [
             'pallet_ids' => [$pallet1->id, $pallet2->id],
             'location_id' => $target->id,
             'warehouse_location' => $target->code,
@@ -435,6 +502,7 @@ class MergePalletFlowTest extends TestCase
 
         $response->assertStatus(422)->assertJson(['success' => false]);
         $this->assertDatabaseHas('pallet_boxes', ['pallet_id' => $pallet1->id, 'box_id' => $lockedBox->id]);
+        $this->assertDatabaseHas('pallet_boxes', ['pallet_id' => $pallet1->id, 'box_id' => $activeBox->id]);
     }
 
     public function test_merge_rejects_free_text_target_location_without_master_id(): void

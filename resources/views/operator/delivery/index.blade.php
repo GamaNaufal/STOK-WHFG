@@ -277,7 +277,7 @@
 
         .btn-insufficient {
             background: #f3f4f6;
-            color: #9ca3af;
+            color: #52636e;
             border: 1px solid #e5e7eb;
             padding: 0.4rem 0.8rem;
             border-radius: 5px;
@@ -398,7 +398,7 @@
         .empty-state {
             padding: 3rem 2rem;
             text-align: center;
-            color: #9ca3af;
+            color: #52636e;
         }
 
         .empty-state i {
@@ -414,52 +414,62 @@
             margin-bottom: 0.5rem;
         }
     </style>
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-schedule-toolbar.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-schedule-results.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-completed.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-history.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-redo-dialog.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-split-modal.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-fifo-modal.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/delivery-picklist-modal.css') }}">
 @endsection
 
 @section('content')
-<div class="page-header">
-    <h1>
-        <i class="bi bi-truck" style="color: #0C7779;"></i> Delivery Schedule
-    </h1>
-    <p class="mb-0">Kelola jadwal pengiriman dan status pesanan delivery</p>
-</div>
+@include('operator.delivery.partials.schedule-header')
 
 <div class="container-fluid">
     @if(isset($completedOrders) && $completedOrders->count() > 0)
-    <div class="section-card">
+    <div class="section-card delivery-completed">
         <div class="section-header">
-            <i class="bi bi-clock-history"></i>
-            <h5>Pesanan Selesai (Redo 5 Hari)</h5>
+            <i class="bi bi-clock-history" aria-hidden="true"></i>
+            <h5 id="delivery-completed-title">Pesanan selesai</h5>
+            <span class="delivery-completed-count">{{ $completedOrders->count() }} ditampilkan</span>
         </div>
-        <div class="table-responsive">
-            <table class="table modern-table">
+        <p class="delivery-completed-help" id="delivery-completed-help">Maksimal 20 pesanan terbaru dalam jendela Redo 5 hari saat halaman dimuat. Redo tersedia sesuai hak akses hingga tenggat di bawah.</p>
+        <div class="table-responsive delivery-completed-scroll" tabindex="0" role="region" aria-labelledby="delivery-completed-title" aria-describedby="delivery-completed-help">
+            <table class="table modern-table" id="delivery-completed-results">
+                <caption class="visually-hidden">Pesanan selesai, diurutkan dari waktu selesai terbaru. Geser untuk melihat tenggat dan aksi Redo.</caption>
                 <thead>
                     <tr>
-                        <th>Order</th>
-                        <th>Customer</th>
-                        <th>Selesai Pada</th>
-                        <th>Redo Hingga</th>
-                        <th class="text-end">Action</th>
+                        <th scope="col">Order</th>
+                        <th scope="col">Customer</th>
+                        <th scope="col">Selesai pada</th>
+                        <th scope="col">Tenggat Redo</th>
+                        <th scope="col">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($completedOrders as $completion)
+                        @php
+                            $completedAt = is_object($completion->completed_at) ? $completion->completed_at : \Carbon\Carbon::parse($completion->completed_at);
+                            $redoUntil = is_object($completion->redo_until) ? $completion->redo_until : \Carbon\Carbon::parse($completion->redo_until);
+                        @endphp
                         <tr>
-                            <td><strong>#{{ $completion->order->id }}</strong></td>
+                            <th scope="row"><strong>#{{ $completion->order->id }}</strong></th>
                             <td>{{ $completion->order->customer_name }}</td>
-                            <td>{{ is_object($completion->completed_at) ? $completion->completed_at->format('d M Y H:i') : \Carbon\Carbon::parse($completion->completed_at)->format('d M Y H:i') }}</td>
-                            <td>{{ is_object($completion->redo_until) ? $completion->redo_until->format('d M Y H:i') : \Carbon\Carbon::parse($completion->redo_until)->format('d M Y H:i') }}</td>
-                            <td class="text-end">
+                            <td><time datetime="{{ $completedAt->format('c') }}">{{ $completedAt->format('d M Y') }}<span class="delivery-completed-time">{{ $completedAt->format('H:i') }}</span></time></td>
+                            <td class="delivery-completed-deadline"><time datetime="{{ $redoUntil->format('c') }}">{{ $redoUntil->format('d M Y') }}<span class="delivery-completed-time">{{ $redoUntil->format('H:i') }}</span></time></td>
+                            <td>
                                 @if(Auth::user()->canAccess('delivery_redo'))
                                     <form method="POST" action="{{ route('delivery.pick.redo', $completion->id) }}" class="d-inline js-redo-form" data-redo-options-url="{{ route('delivery.pick.redo-options', $completion->id) }}">
                                         @csrf
                                         <input type="hidden" name="relocation_location" value="">
-                                        <button type="button" class="btn-redo js-redo-btn" {{ $completion->completion_status !== 'completed' || now()->greaterThan($completion->redo_until) ? 'disabled' : '' }}>
-                                            <i class="bi bi-arrow-counterclockwise"></i> Redo
+                                        <button type="button" class="btn-redo js-redo-btn" aria-label="Redo order #{{ $completion->order->id }}" {{ $completion->completion_status !== 'completed' || now()->greaterThan($completion->redo_until) ? 'disabled' : '' }}>
+                                            <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Redo
                                         </button>
                                     </form>
                                 @else
-                                    <span class="text-muted small">-</span>
+                                    <span class="delivery-completed-no-access">Tanpa akses Redo</span>
                                 @endif
                             </td>
                         </tr>
@@ -476,25 +486,29 @@
             <i class="bi bi-calendar-check"></i>
             <h5>Jadwal Delivery Terdaftar</h5>
         </div>
-        <div class="table-responsive">
-            <table class="table modern-table">
+        @include('operator.delivery.partials.schedule-filters')
+        <p class="delivery-results-help" id="delivery-results-help">PCS siap / kebutuhan mengikuti perhitungan FIFO saat halaman dimuat. Geser tabel untuk melihat status dan aksi; tanggal serta nomor order tetap terlihat.</p>
+        <div class="table-responsive delivery-results-scroll" tabindex="0" role="region" aria-label="Jadwal delivery aktif" aria-describedby="delivery-results-help">
+            <table class="table modern-table" id="delivery-schedule-results" data-empty="{{ $approvedOrders->isEmpty() ? 'true' : 'false' }}">
+                <caption class="visually-hidden">Jadwal delivery aktif, diurutkan berdasarkan tanggal pengiriman</caption>
                 <thead>
                     <tr>
-                        <th style="width: 12%">Tanggal</th>
-                        <th style="width: 18%">Customer</th>
-                        <th>Detail Pesanan (Part No. & Qty)</th>
-                        <th style="width: 10%">Status</th>
+                        <th scope="col" style="width: 12%">Tanggal / Order</th>
+                        <th scope="col" style="width: 18%">Customer</th>
+                        <th scope="col">Part &amp; PCS <span class="delivery-column-hint">Siap / kebutuhan</span></th>
+                        <th scope="col" style="width: 10%">Status</th>
                         @if((Auth::user()->canAccess('delivery_pick') || Auth::user()->canAccess('delivery_split') || Auth::user()->canAccess('delivery_delete')))
-                        <th style="width: 18%" class="text-end">Action</th>
+                        <th scope="col" style="width: 18%">Aksi</th>
                         @endif
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($approvedOrders as $order)
-                    <tr>
-                        <td>
+                    <tr data-schedule-search="{{ $order->id }} {{ $order->customer_name }} {{ $order->items->pluck('part_number')->implode(' ') }}" data-schedule-timing="{{ $order->days_remaining < 0 ? 'overdue' : ($order->days_remaining === 0 ? 'today' : 'upcoming') }}">
+                        <th scope="row">
                             <strong>{{ $order->delivery_date->format('d M Y') }}</strong>
-                        </td>
+                            <span class="delivery-order-number">Order #{{ $order->id }}</span>
+                        </th>
                         <td>
                             {{ $order->customer_name }}
                             @if(!empty($order->notes))
@@ -508,7 +522,8 @@
                                 <div class="part-item">
                                     <span class="part-name">{{ $item->part_number }}</span>
                                     <span class="part-qty {{ ($item->is_fulfillable ?? false) ? 'ok' : 'warning' }}">
-                                        {{ $item->display_fulfilled ?? 0 }} / {{ $item->quantity }}
+                                        {{ number_format($item->display_fulfilled ?? 0) }} / {{ number_format($item->quantity) }}
+                                        <span class="delivery-qty-status">{{ ($item->is_fulfillable ?? false) ? 'Cukup' : 'Belum cukup' }}</span>
                                     </span>
                                     @if(!empty($item->needs_not_full))
                                         <span class="ms-2 badge bg-warning text-dark">Butuh Box Not Full</span>
@@ -552,7 +567,7 @@
                             @endif
                         </td>
                         @if((Auth::user()->canAccess('delivery_pick') || Auth::user()->canAccess('delivery_split') || Auth::user()->canAccess('delivery_delete')))
-                        <td class="text-end">
+                        <td class="delivery-order-actions">
                             <div class="action-buttons">
                                 @if(Auth::user()->canAccess('delivery_pick'))
                                 @if($order->status === 'completed')
@@ -612,9 +627,10 @@
                                         </button>
                                     @endif
                                 @endif
-                                @if(Auth::user()->canAccess('delivery_delete'))
+                                @if(Auth::user()->canAccess('delivery_delete') && empty($order->is_split_child) && empty($order->has_split_children))
                                     <button type="button"
                                         class="btn-delete js-delete-delivery"
+                                        aria-label="Hapus delivery #{{ $order->id }}"
                                         data-delete-url="{{ route('delivery.destroy', $order->id) }}"
                                         data-order-id="{{ $order->id }}">
                                         <i class="bi bi-trash"></i>
@@ -641,29 +657,33 @@
     </div>
 
 @if(isset($historyRows) && $historyRows->count() > 0)
-    <div class="section-card">
+    <div class="section-card delivery-history">
         <div class="section-header">
-            <i class="bi bi-archive"></i>
-            <h5>Riwayat Pesanan</h5>
+            <i class="bi bi-archive" aria-hidden="true"></i>
+            <h5 id="delivery-history-title">Riwayat pesanan</h5>
+            <span class="delivery-history-count">{{ $historyRows->count() }} ditampilkan</span>
         </div>
-        <div class="table-responsive">
-            <table class="table modern-table">
+        <p class="delivery-history-help" id="delivery-history-help">Terbaru lebih dulu. Memuat hingga 50 riwayat Redo/kedaluwarsa dan 50 pesanan dihapus. Waktu menunjukkan penyelesaian atau penghapusan sesuai status.</p>
+        <div class="table-responsive delivery-history-scroll" tabindex="0" role="region" aria-labelledby="delivery-history-title" aria-describedby="delivery-history-help">
+            <table class="table modern-table" id="delivery-history-results">
+                <caption class="visually-hidden">Riwayat pesanan berdasarkan waktu selesai atau dihapus, terbaru lebih dulu</caption>
                 <thead>
                     <tr>
-                        <th>Order</th>
-                        <th>Customer</th>
-                        <th>Detail Pesanan (Part No. & Qty)</th>
-                        <th>Selesai Pada</th>
-                        <th>Status</th>
+                        <th scope="col">Order</th>
+                        <th scope="col">Customer</th>
+                        <th scope="col">Part &amp; PCS</th>
+                        <th scope="col">Selesai / dihapus pada</th>
+                        <th scope="col">Status</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach($historyRows as $history)
                         @php
                             $order = $history->order;
+                            $eventAt = is_object($history->completed_at) ? $history->completed_at : \Carbon\Carbon::parse($history->completed_at);
                         @endphp
                         <tr>
-                            <td>{{ $order ? '#' . $order->id : '-' }}</td>
+                            <th scope="row">{{ $order ? '#' . $order->id : '-' }}</th>
                             <td>
                                 {{ $order?->customer_name ?? '-' }}
                             </td>
@@ -672,26 +692,26 @@
                                     @foreach($order->items as $item)
                                         <div class="part-item">
                                             <span class="part-name">{{ $item->part_number }}</span>
-                                            <span>{{ $item->quantity }}</span>
+                                            <span class="delivery-history-quantity">{{ number_format($item->quantity) }} PCS</span>
                                         </div>
                                     @endforeach
                                 @else
                                     -
                                 @endif
                             </td>
-                            <td>{{ is_object($history->completed_at) ? $history->completed_at->format('d M Y H:i') : \Carbon\Carbon::parse($history->completed_at)->format('d M Y H:i') }}</td>
+                            <td><time datetime="{{ $eventAt->format('c') }}">{{ $eventAt->format('d M Y') }}<span class="delivery-history-time">{{ $eventAt->format('H:i') }}</span></time></td>
                             <td>
                                 @if($history->status_label === 'Deleted')
-                                    <span class="badge" style="background: #fee2e2; color: #991b1b;">
-                                        <i class="bi bi-x-circle"></i> Dihapus
+                                    <span class="badge delivery-history-status is-deleted">
+                                        <i class="bi bi-x-circle" aria-hidden="true"></i> Dihapus
                                     </span>
                                 @elseif($history->status_label === 'Redone')
-                                    <span class="badge" style="background: #fef3c7; color: #92400e;">
-                                        <i class="bi bi-arrow-counterclockwise"></i> Diulang
+                                    <span class="badge delivery-history-status is-redone">
+                                        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Diulang
                                     </span>
                                 @else
-                                    <span class="badge" style="background: #e5e7eb; color: #6b7280;">
-                                        <i class="bi bi-clock"></i> Kadaluarsa
+                                    <span class="badge delivery-history-status is-expired">
+                                        <i class="bi bi-clock" aria-hidden="true"></i> Kadaluarsa
                                     </span>
                                 @endif
                             </td>
@@ -705,22 +725,45 @@
 </div>
 
 <!-- Picklist Modal -->
-<div class="modal fade" id="picklistModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <div class="modal-header" style="background: linear-gradient(135deg, #0C7779 0%, #005461 100%); color: white; border: none; padding: 1.5rem;">
-                <h5 class="modal-title"><i class="bi bi-file-earmark-pdf"></i> Dokumen Pengambilan</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+<div class="modal fade" id="picklistModal" tabindex="-1" aria-labelledby="picklistModalTitle" aria-describedby="picklistModalDescription">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="delivery-picklist-eyebrow">Sesi picking aktif</span>
+                    <h5 class="modal-title" id="picklistModalTitle"><i class="bi bi-file-earmark-text" aria-hidden="true"></i> Dokumen pengambilan</h5>
+                    <p class="delivery-picklist-description" id="picklistModalDescription">Siapkan dokumen, lalu lanjutkan verifikasi barang.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup dialog"></button>
             </div>
-            <div class="modal-body" style="padding: 1.5rem;">
-                <p>Silakan klik tombol print untuk mencetak atau pilih <strong>Save as PDF</strong> dari dialog browser sebelum scan.</p>
+            <div class="modal-body">
+                <div class="delivery-picklist-session" role="status">
+                    <i class="bi bi-check-circle" aria-hidden="true"></i>
+                    <span id="picklistSessionInfo">Sesi picking aktif</span>
+                </div>
+                <ol class="delivery-picklist-steps">
+                    <li>
+                        <span class="delivery-picklist-step-number" aria-hidden="true">1</span>
+                        <div>
+                            <strong>Buka dokumen pengambilan</strong>
+                            <p>Cetak dari browser atau pilih <strong>Save as PDF</strong> pada dialog cetak.</p>
+                        </div>
+                    </li>
+                    <li>
+                        <span class="delivery-picklist-step-number" aria-hidden="true">2</span>
+                        <div>
+                            <strong>Lanjutkan scan</strong>
+                            <p>Verifikasi barang setelah dokumen siap.</p>
+                        </div>
+                    </li>
+                </ol>
             </div>
-            <div class="modal-footer" style="border-top: 1px solid #e9ecef; padding: 1.5rem;">
-                <a href="#" class="btn" id="btnPrintOrPdf" target="_blank" style="background: #f0f8f7; color: #0C7779; border: 1px solid #b3e5db; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; text-decoration: none;">
-                    <i class="bi bi-printer"></i> Print / Download PDF
+            <div class="modal-footer">
+                <a href="#" class="btn delivery-picklist-print" id="btnPrintOrPdf" target="_blank" rel="noopener">
+                    <i class="bi bi-printer" aria-hidden="true"></i> Cetak / Simpan PDF
                 </a>
-                <a href="#" class="btn" id="btnStartScan" style="background: linear-gradient(135deg, #0C7779 0%, #005461 100%); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-weight: 600; text-decoration: none;">
-                    <i class="bi bi-upc-scan"></i> Mulai Scan
+                <a href="#" class="btn delivery-picklist-scan" id="btnStartScan">
+                    <i class="bi bi-upc-scan" aria-hidden="true"></i> Mulai scan
                 </a>
             </div>
         </div>
@@ -728,26 +771,34 @@
 </div>
 
 <!-- Split Modal -->
-<div class="modal fade" id="splitDeliveryModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 1.5rem;">
-                <h5 class="modal-title"><i class="bi bi-scissors"></i> Split Delivery</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+<div class="modal fade" id="splitDeliveryModal" tabindex="-1" aria-labelledby="splitDeliveryTitle" aria-describedby="splitDeliveryDescription">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="delivery-split-eyebrow">Pengaturan pesanan</span>
+                    <h5 class="modal-title" id="splitDeliveryTitle"><i class="bi bi-scissors" aria-hidden="true"></i> Split Delivery</h5>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup dialog"></button>
             </div>
             <form id="splitDeliveryForm" method="POST" action="">
                 @csrf
-                <div class="modal-body" style="padding: 1.5rem;">
-                    <div id="splitDeliveryInfo" class="mb-3 small text-muted"></div>
-                    <div id="splitItemsContainer">
+                <div class="modal-body">
+                    <p id="splitDeliveryInfo" class="delivery-split-context"></p>
+                    <p id="splitDeliveryDescription" class="delivery-split-description">PCS yang dipilih menjadi pesanan baru. Sisa PCS tetap pada pesanan sumber.</p>
+                    <div class="delivery-split-list-heading">
+                        <h6 id="splitItemsTitle">Part yang akan dipisahkan</h6>
+                        <span id="splitSelectionSummary" role="status" aria-live="polite">0 part dipilih</span>
+                    </div>
+                    <div id="splitItemsContainer" class="table-responsive delivery-split-scroll" tabindex="0" role="region" aria-labelledby="splitItemsTitle" aria-describedby="splitItemsHelp">
                         <!-- rows injected by JS: checkbox, part_number, available qty, qty input -->
                     </div>
-                    <div class="form-text mt-2">Pilih satu atau lebih part lalu isi nominal split untuk setiap part (harus lebih kecil dari qty sumber).</div>
+                    <p class="delivery-split-help" id="splitItemsHelp">Pilih satu atau lebih part. PCS split harus minimal 1 dan lebih kecil dari PCS sumber.</p>
                 </div>
-                <div class="modal-footer" style="border-top: 1px solid #e9ecef; padding: 1.5rem;">
+                <div class="modal-footer">
                     <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; font-weight: 600;">
-                        <i class="bi bi-scissors"></i> Simpan Split
+                    <button type="submit" class="btn btn-warning delivery-split-submit">
+                        <i class="bi bi-scissors" aria-hidden="true"></i> Simpan Split
                     </button>
                 </div>
             </form>
@@ -763,20 +814,29 @@
 @endsection
 
 <!-- Fulfill Modal -->
-<div class="modal fade" id="fulfillModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content" style="border-radius: 12px; border: none; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);">
-            <div class="modal-header" style="background: linear-gradient(135deg, #0C7779 0%, #005461 100%); color: white; border: none; padding: 1.5rem;">
-                <h5 class="modal-title"><i class="bi bi-box-seam"></i> Rekomendasi Pengambilan (FIFO)</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+<div class="modal fade" id="fulfillModal" tabindex="-1" aria-labelledby="fulfillModalTitle" aria-describedby="fulfillModalDescription">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div>
+                    <span class="delivery-fifo-eyebrow">Rencana pengambilan</span>
+                    <h5 class="modal-title" id="fulfillModalTitle"><i class="bi bi-box-seam" aria-hidden="true"></i> Rekomendasi FIFO</h5>
+                    <p id="fulfillModalDescription" class="delivery-fifo-description">Periksa kebutuhan part dan urutan box sebelum memulai picking.</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup dialog"></button>
             </div>
-            <div class="modal-body" style="padding: 1.5rem;">
-                <div id="fulfillInfo" class="mb-3"></div>
+            <div class="modal-body">
+                <div id="fulfillInfo" class="delivery-fifo-context" role="status" aria-live="polite"></div>
+                <div class="delivery-fifo-section-heading">
+                    <h6>Rincian part</h6>
+                    <span>Rekomendasi box ditentukan oleh sistem</span>
+                </div>
                 <div id="fulfillItems"></div>
             </div>
-            <div class="modal-footer" style="border-top: 1px solid #e9ecef; padding: 1.5rem;">
-                <button type="button" class="btn" id="btnProcessAll" style="background: linear-gradient(135deg, #0C7779 0%, #005461 100%); color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 6px; font-weight: 600; cursor: pointer;">
-                    <i class="bi bi-box-seam"></i> Proses Pengambilan
+            <div class="modal-footer">
+                <span class="delivery-fifo-footer-note">Rencana ini belum mengubah stok.</span>
+                <button type="button" class="btn delivery-fifo-process" id="btnProcessAll">
+                    <i class="bi bi-box-seam" aria-hidden="true"></i> Proses Pengambilan
                 </button>
             </div>
         </div>
@@ -784,6 +844,7 @@
 </div>
 
 @section('scripts')
+<script src="{{ asset('js/pages/delivery-schedule-filters.js') }}?v={{ filemtime(public_path('js/pages/delivery-schedule-filters.js')) }}"></script>
 <script>
     const fulfillModal = new bootstrap.Modal(document.getElementById('fulfillModal'));
     const picklistModal = new bootstrap.Modal(document.getElementById('picklistModal'));
@@ -791,26 +852,39 @@
     const splitForm = document.getElementById('splitDeliveryForm');
     const splitDeliveryInfo = document.getElementById('splitDeliveryInfo');
     const splitItemsContainer = document.getElementById('splitItemsContainer');
+    const splitSelectionSummary = document.getElementById('splitSelectionSummary');
+    const splitSaveButton = splitForm?.querySelector('.delivery-split-submit');
     let currentSplitItems = [];
+
+    function updateSplitSelectionSummary() {
+        if (!splitSelectionSummary) return;
+        const count = splitItemsContainer.querySelectorAll('.js-split-check:checked').length;
+        splitSelectionSummary.textContent = `${count} part dipilih`;
+    }
 
     function renderSplitItems(items) {
         currentSplitItems = Array.isArray(items) ? items : [];
         splitItemsContainer.innerHTML = '';
+        if (splitSaveButton) {
+            splitSaveButton.disabled = !currentSplitItems.some((item) => parseInt(item.quantity || 0, 10) > 1);
+        }
 
         if (currentSplitItems.length === 0) {
-            splitItemsContainer.innerHTML = '<div class="small text-muted">Tidak ada item pada order ini.</div>';
+            splitItemsContainer.innerHTML = '<p class="delivery-split-empty">Tidak ada item pada order ini.</p>';
+            updateSplitSelectionSummary();
             return;
         }
 
         const table = document.createElement('table');
-        table.className = 'table table-sm';
+        table.className = 'table table-sm delivery-split-table';
         table.innerHTML = `
+            <caption class="visually-hidden">Part pesanan sumber dan jumlah PCS yang dapat dipisahkan</caption>
             <thead>
                 <tr>
-                    <th style="width:40px"></th>
-                    <th>Part Number</th>
-                    <th style="width:140px">Available</th>
-                    <th style="width:160px">Split Qty</th>
+                    <th scope="col"><span class="visually-hidden">Pilih</span></th>
+                    <th scope="col">Part Number</th>
+                    <th scope="col">PCS sumber</th>
+                    <th scope="col">PCS split</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -821,21 +895,28 @@
         currentSplitItems.forEach((item, idx) => {
             const tr = document.createElement('tr');
             const available = parseInt(item.quantity || 0, 10);
-            const max = Math.max(1, available - 1);
+            const max = Math.max(0, available - 1);
+            const canSplit = available > 1;
 
             tr.innerHTML = `
-                <td class="align-middle text-center"><input type="checkbox" class="form-check-input js-split-check" data-idx="${idx}"></td>
-                <td class="align-middle">${item.part_number}</td>
-                <td class="align-middle">${available} PCS</td>
-                <td class="align-middle">
-                    <input type="number" class="form-control form-control-sm js-split-qty" data-idx="${idx}" min="1" max="${max}" value="1" style="max-width:120px;" disabled>
+                <td class="delivery-split-select"><input type="checkbox" class="form-check-input js-split-check" data-idx="${idx}" ${canSplit ? '' : 'disabled'}></td>
+                <th scope="row" class="delivery-split-part"><span class="js-split-part-number"></span></th>
+                <td class="delivery-split-available">${available.toLocaleString('en-US')} PCS</td>
+                <td class="delivery-split-quantity">
+                    <input type="number" class="form-control form-control-sm js-split-qty" data-idx="${idx}" min="1" max="${max}" value="1" aria-describedby="split-qty-limit-${idx}" disabled>
+                    <span class="delivery-split-limit" id="split-qty-limit-${idx}">${canSplit ? `Maks. ${max.toLocaleString('en-US')} PCS` : 'Tidak dapat di-split'}</span>
                 </td>
             `;
+
+            tr.querySelector('.js-split-part-number').textContent = item.part_number;
+            tr.querySelector('.js-split-check').setAttribute('aria-label', canSplit ? `Pilih part ${item.part_number} untuk split` : `Part ${item.part_number} tidak dapat di-split`);
+            tr.querySelector('.js-split-qty').setAttribute('aria-label', `Jumlah split untuk part ${item.part_number}`);
 
             tbody.appendChild(tr);
         });
 
         splitItemsContainer.appendChild(table);
+        updateSplitSelectionSummary();
 
         // toggle qty input when checkbox changed
         splitItemsContainer.querySelectorAll('.js-split-check').forEach((ch) => {
@@ -845,6 +926,8 @@
                 if (!qtyInput) return;
                 qtyInput.disabled = !e.target.checked;
                 if (!e.target.checked) qtyInput.value = '1';
+                e.target.closest('tr')?.classList.toggle('is-selected', e.target.checked);
+                updateSplitSelectionSummary();
             });
         });
     }
@@ -874,6 +957,10 @@
         }
 
         splitModal.show();
+    });
+
+    document.getElementById('splitDeliveryModal')?.addEventListener('shown.bs.modal', () => {
+        splitItemsContainer.querySelector('.js-split-check')?.focus();
     });
 
     // On submit, gather checked items and inject hidden inputs then submit
@@ -948,11 +1035,34 @@
         });
     });
 
+    function renderFulfillContext(data, blockedReason = null) {
+        const info = document.getElementById('fulfillInfo');
+        info.innerHTML = `
+            <div class="delivery-fifo-context-grid">
+                <div><span>Order</span><strong class="js-fifo-order"></strong></div>
+                <div><span>Customer</span><strong class="js-fifo-customer"></strong></div>
+                <div><span>Tanggal delivery</span><strong class="js-fifo-date"></strong></div>
+            </div>
+        `;
+        info.querySelector('.js-fifo-order').textContent = `#${data.order_id}`;
+        info.querySelector('.js-fifo-customer').textContent = data.customer_name;
+        info.querySelector('.js-fifo-date').textContent = data.delivery_date;
+
+        if (blockedReason) {
+            const warning = document.createElement('div');
+            warning.className = 'delivery-fifo-blocked';
+            warning.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i><span></span>';
+            warning.querySelector('span').textContent = blockedReason;
+            info.appendChild(warning);
+        }
+    }
+
     function openFulfillModal(orderId) {
         currentOrderId = orderId;
         fulfillGateBlockedReason = null;
+        pendingProcessItems = [];
         document.getElementById('fulfillItems').innerHTML = '';
-        document.getElementById('fulfillInfo').innerHTML = 'Loading...';
+        document.getElementById('fulfillInfo').textContent = 'Memuat detail order...';
         fulfillModal.show();
 
         fetch(`/delivery-stock/${orderId}/fulfill-data`)
@@ -960,23 +1070,18 @@
             .then(data => {
                 if (data.is_blocked) {
                     fulfillGateBlockedReason = data.blocked_reason || 'Delivery masih menunggu approval supervisi.';
-                    document.getElementById('fulfillInfo').innerHTML = `
-                        <div class="small text-muted mb-2">Order #${data.order_id} | ${data.customer_name} | ${data.delivery_date}</div>
-                        <div class="alert alert-warning mb-0"><i class="bi bi-hourglass-split"></i> ${fulfillGateBlockedReason}</div>
-                    `;
+                    renderFulfillContext(data, fulfillGateBlockedReason);
                     document.getElementById('fulfillItems').innerHTML = '';
                     pendingProcessItems = [];
                     updateProcessButton();
                     return;
                 }
 
-                document.getElementById('fulfillInfo').innerHTML = `
-                    <div class="small text-muted">Order #${data.order_id} | ${data.customer_name} | ${data.delivery_date}</div>
-                `;
+                renderFulfillContext(data);
                 renderFulfillItems(data.items);
             })
             .catch(() => {
-                document.getElementById('fulfillInfo').innerHTML = '<div class="text-danger">Gagal memuat data.</div>';
+                document.getElementById('fulfillInfo').textContent = 'Gagal memuat data.';
             });
     }
 
@@ -1009,41 +1114,45 @@
             pendingProcessItems.push(item);
 
             const section = document.createElement('div');
-            section.className = 'card mb-3';
+            section.className = 'delivery-fifo-part';
+            const partHeadingId = `fifo-part-${item.id}`;
             section.innerHTML = `
-                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <div class="delivery-fifo-part-header">
                     <div>
-                        <strong>Part: ${item.part_number}</strong>
-                        <span class="ms-2 text-muted">Remaining: ${item.remaining}</span>
+                        <span class="delivery-fifo-part-label">Part number</span>
+                        <h6 id="${partHeadingId}" class="delivery-fifo-part-number"></h6>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="small text-muted">Qty Ambil:</span>
-                        <span class="fw-bold">${item.plannedQty || item.remaining}</span>
+                    <div class="delivery-fifo-part-metrics">
+                        <div><span>Sisa permintaan</span><strong>${item.remaining} PCS</strong></div>
+                        <div><span>Rencana ambil</span><strong class="js-fifo-planned-qty">${item.plannedQty || item.remaining} PCS</strong></div>
                     </div>
                 </div>
-                <div class="card-body">
-                    <div class="fifo-loading text-muted">Menghitung FIFO...</div>
+                <div class="delivery-fifo-part-body">
+                    <div class="fifo-loading" role="status">Menghitung rekomendasi FIFO...</div>
                     <div class="fifo-table" style="display:none;">
-                        <table class="table table-sm table-bordered align-middle">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>ID Box</th>
-                                    <th>Pallet</th>
-                                    <th>Location</th>
-                                    <th>Date In</th>
-                                    <th>Available</th>
-                                    <th>Take</th>
-                                </tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                        <div class="alert alert-info small mb-0">
-                            <i class="bi bi-info-circle"></i> Rekomendasi FIFO mengikuti sistem (tidak dapat diubah).
+                        <div class="delivery-fifo-table-scroll" tabindex="0" role="region" aria-labelledby="${partHeadingId}">
+                            <table class="table table-sm align-middle">
+                                <caption class="visually-hidden">Urutan box FIFO dan PCS yang akan diambil</caption>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">ID Box</th>
+                                        <th scope="col">Palet</th>
+                                        <th scope="col">Lokasi</th>
+                                        <th scope="col">Tanggal masuk</th>
+                                        <th scope="col">Tersedia</th>
+                                        <th scope="col">Diambil</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
+                        <p class="delivery-fifo-note"><i class="bi bi-info-circle" aria-hidden="true"></i> Rekomendasi FIFO mengikuti sistem dan tidak dapat diubah.</p>
                     </div>
                     <div class="fifo-error alert alert-danger mt-2" style="display:none;"></div>
                 </div>
             `;
+
+            section.querySelector('.delivery-fifo-part-number').textContent = item.part_number;
 
             container.appendChild(section);
 
@@ -1100,6 +1209,7 @@
 
                         item.hasFifoError = !!data.needs_not_full;
                         item.plannedQty = data.planned_qty || qty;
+                        section.querySelector('.js-fifo-planned-qty').textContent = `${item.plannedQty} PCS`;
                         
                         if (data.locations && data.locations.length > 0) {
                             data.locations.forEach(loc => {
@@ -1173,6 +1283,7 @@
         .then(res => res.json())
         .then(data => {
             if (data.session_id) {
+                document.getElementById('picklistSessionInfo').textContent = `Sesi picking #${data.session_id} aktif`;
                 const printBtn = document.getElementById('btnPrintOrPdf');
                 const printPreviewUrl = data.print_preview_url || data.pdf_url;
                 printBtn.href = printPreviewUrl;
@@ -1226,7 +1337,7 @@
             });
         });
     });
-        async function fetchRedoOptions(optionsUrl, query = '') {
+    async function fetchRedoOptions(optionsUrl, query = '') {
         const url = new URL(optionsUrl, window.location.origin);
         if (query) {
             url.searchParams.set('q', query);
@@ -1269,6 +1380,12 @@
         return options;
     }
 
+    function escapeRedoHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[char]);
+    }
+
     function renderLocationDropdown(container, options, selectedCode, query = '') {
         if (!container) return;
 
@@ -1276,17 +1393,19 @@
         const filtered = options.filter((opt) => !q || opt.code.includes(q));
 
         if (filtered.length === 0) {
-            container.innerHTML = '<div class="small text-muted">Tidak ada lokasi yang cocok.</div>';
+            container.innerHTML = '<p class="delivery-redo-empty">Tidak ada lokasi yang cocok.</p>';
             return;
         }
 
         container.innerHTML = filtered.map((opt) => {
-            const activeClass = opt.code === selectedCode ? 'style="background:#e6f7f4;border-color:#0C7779;color:#0C7779;"' : '';
-            return `<button type="button" class="btn btn-sm btn-outline-secondary me-2 mb-2 js-redo-location-option" data-code="${opt.code}" ${activeClass}>${opt.label}</button>`;
+            const selected = opt.code === selectedCode;
+            return `<button type="button" class="delivery-redo-option js-redo-location-option${selected ? ' is-selected' : ''}" data-code="${escapeRedoHtml(opt.code)}" aria-pressed="${selected}">${escapeRedoHtml(opt.label)}</button>`;
         }).join('');
     }
 
     async function openRedoDialog(form) {
+        const trigger = form.querySelector('.js-redo-btn');
+        if (trigger?.getAttribute('aria-busy') === 'true') return;
         const optionsUrl = form.getAttribute('data-redo-options-url');
         if (!optionsUrl) {
             WarehouseAlert.error({
@@ -1297,6 +1416,12 @@
         }
 
         let optionsPayload;
+        const triggerMarkup = trigger?.innerHTML;
+        if (trigger) {
+            trigger.disabled = true;
+            trigger.setAttribute('aria-busy', 'true');
+            trigger.textContent = 'Memuat lokasi…';
+        }
         try {
             optionsPayload = await fetchRedoOptions(optionsUrl);
         } catch (error) {
@@ -1305,25 +1430,33 @@
                 message: error.message || 'Gagal memuat data redo.'
             });
             return;
+        } finally {
+            if (trigger) {
+                trigger.disabled = false;
+                trigger.removeAttribute('aria-busy');
+                trigger.innerHTML = triggerMarkup;
+            }
         }
 
         const targets = Array.isArray(optionsPayload.targets) ? optionsPayload.targets : [];
         if (targets.length > 1) {
-            const sourcePallets = targets.map((target) => target.pallet_number).filter(Boolean).join(', ');
+            const sourcePallets = escapeRedoHtml(targets.map((target) => target.pallet_number).filter(Boolean).join(', ') || '-');
             const availableCodes = (optionsPayload.available_locations || [])
                 .map((location) => String(location.code || '').trim().toUpperCase())
                 .filter(Boolean);
-            const options = availableCodes.map((code) => `<option value="${code}">${code}</option>`).join('');
+            const options = availableCodes.map((code) => `<option value="${escapeRedoHtml(code)}">${escapeRedoHtml(code)}</option>`).join('');
             const result = await Swal.fire({
-                title: 'Redo Withdrawal: Konsolidasi Pallet',
+                title: 'Pilih lokasi tujuan Redo',
                 html: `
-                    <div class="text-start small text-muted mb-3">
-                        Box dari pallet ${sourcePallets || 'asal'} akan dikembalikan menjadi <strong>satu pallet baru</strong>.
-                        Pilih satu lokasi kosong untuk pallet hasil konsolidasi.
+                    <div class="delivery-redo-intro">
+                        <span class="delivery-redo-eyebrow">Konsolidasi pallet</span>
+                        <p>Box dari pallet <strong>${sourcePallets}</strong> akan dikembalikan ke <strong>satu pallet baru</strong>.</p>
                     </div>
-                    <select id="redo-consolidated-location" class="form-select">
+                    <label for="redo-consolidated-location" class="delivery-redo-label">Lokasi kosong tujuan</label>
+                    <select id="redo-consolidated-location" class="form-select" aria-describedby="redo-consolidated-help" required>
                         <option value="">Pilih lokasi kosong...</option>${options}
                     </select>
+                    <p id="redo-consolidated-help" class="delivery-redo-hint">Pilih satu lokasi untuk seluruh box. Lokasi diperiksa ulang saat Redo dijalankan.</p>
                 `,
                 showCancelButton: true,
                 confirmButtonText: 'Lanjutkan Redo',
@@ -1332,6 +1465,9 @@
                 cancelButtonColor: '#6B7280',
                 reverseButtons: true,
                 width: '640px',
+                customClass: { popup: 'delivery-redo-dialog' },
+                focusConfirm: false,
+                didOpen: () => document.getElementById('redo-consolidated-location')?.focus(),
                 preConfirm: () => {
                     const code = (document.getElementById('redo-consolidated-location')?.value || '').trim().toUpperCase();
                     if (!code) {
@@ -1346,11 +1482,8 @@
                 return;
             }
 
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = 'relocation_location';
-            input.value = result.value;
-            form.appendChild(input);
+            const hiddenInput = form.querySelector('input[name="relocation_location"]');
+            if (hiddenInput) hiddenInput.value = result.value;
             form.submit();
             return;
         }
@@ -1372,30 +1505,33 @@
 
         const conflictHtml = conflictRows.length > 0
             ? `
-                <div style="background-color: #FEF3C7; border-left: 4px solid #F59E0B; border-radius: 8px; padding: 12px; margin-bottom: 12px; text-align: left;">
-                    <strong style="color: #92400E;">Lokasi bentrok terdeteksi</strong>
-                    <ul style="margin: 8px 0 0 18px; color: #78350F;">
-                        ${conflictRows.map((row) => `<li>${row.pallet_number} bentrok di ${row.conflict.location_code} dengan pallet ${row.conflict.occupying_pallet_number}</li>`).join('')}
+                <div class="delivery-redo-notice is-conflict" role="status">
+                    <strong>Lokasi bentrok terdeteksi</strong>
+                    <ul>
+                        ${conflictRows.map((row) => `<li>${escapeRedoHtml(row.pallet_number)} bentrok di ${escapeRedoHtml(row.conflict.location_code)} dengan pallet ${escapeRedoHtml(row.conflict.occupying_pallet_number)}</li>`).join('')}
                     </ul>
                 </div>
             `
-            : '<div class="small text-muted text-start mb-2">Tidak ada bentrok lokasi. Anda bisa lanjutkan redo tanpa isi relokasi.</div>';
+            : '<p class="delivery-redo-notice is-clear">Tidak ada bentrok lokasi. Lokasi tujuan boleh dikosongkan.</p>';
 
         let selectedLocation = '';
         let locationOptions = mergeLocationOptions('', optionsPayload.available_locations || []);
+        let searchTimeout = null;
+        let searchRequestId = 0;
 
         await Swal.fire({
-            title: '<strong style="font-size: 1.4rem; color: #374151;">Redo Withdrawal: Konsolidasi Pallet</strong>',
+            title: 'Pilih lokasi tujuan Redo',
             html: `
-                <div style="text-align: left; padding: 8px 6px;">
-                    ${conflictHtml}
-                    <div class="mb-2">
-                        <label for="redo-location-search" class="form-label" style="font-weight: 600; color: #374151;">Pilih Lokasi Tujuan</label>
-                        <input id="redo-location-search" class="form-control" type="text" placeholder="Cari kode lokasi..." value="${selectedLocation || ''}" autocomplete="off">
-                        <div class="form-text">Box akan dikembalikan ke satu pallet baru di lokasi kosong ini.</div>
+                <div class="delivery-redo-body">
+                    <div class="delivery-redo-intro">
+                        <span class="delivery-redo-eyebrow">Konsolidasi pallet</span>
+                        <p>Box dari pallet <strong>${escapeRedoHtml(targets.map((target) => target.pallet_number).filter(Boolean).join(', ') || '-')}</strong> akan dikembalikan ke <strong>satu pallet baru</strong>.</p>
                     </div>
-                    <div id="redo-location-suggestions" style="max-height: 180px; overflow: auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; background: #f9fafb;"></div>
-                    <div class="small text-muted mt-2">Pallet asal: ${targets.map((target) => target.pallet_number).filter(Boolean).join(', ') || '-'}</div>
+                    ${conflictHtml}
+                    <label for="redo-location-search" class="delivery-redo-label">Lokasi kosong tujuan${conflictRows.length > 0 ? ' (wajib)' : ' (opsional)'}</label>
+                    <input id="redo-location-search" class="form-control" type="text" placeholder="Cari kode lokasi..." autocomplete="off" aria-describedby="redo-location-help" aria-controls="redo-location-suggestions">
+                    <p id="redo-location-help" class="delivery-redo-hint">Cari kode lokasi, lalu pilih opsi yang tersedia. Lokasi diperiksa ulang saat Redo dijalankan.</p>
+                    <div id="redo-location-suggestions" class="delivery-redo-suggestions" role="group" aria-label="Lokasi kosong tersedia"></div>
                 </div>
             `,
             showCancelButton: true,
@@ -1405,11 +1541,14 @@
             cancelButtonColor: '#6B7280',
             reverseButtons: true,
             width: '640px',
+            customClass: { popup: 'delivery-redo-dialog' },
+            focusConfirm: false,
             didOpen: async () => {
                 const searchInput = document.getElementById('redo-location-search');
                 const suggestions = document.getElementById('redo-location-suggestions');
 
                 renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput?.value || '');
+                searchInput?.focus();
 
                 suggestions?.addEventListener('click', (event) => {
                     const btn = event.target.closest('.js-redo-location-option');
@@ -1420,10 +1559,11 @@
                         searchInput.value = code;
                     }
                     renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput?.value || '');
+                    searchInput?.focus();
                 });
 
-                let searchTimeout = null;
                 searchInput?.addEventListener('input', () => {
+                    searchRequestId += 1;
                     selectedLocation = (searchInput.value || '').trim().toUpperCase();
                     renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput.value || '');
 
@@ -1432,15 +1572,22 @@
                     }
 
                     searchTimeout = setTimeout(async () => {
+                        const requestId = searchRequestId;
                         try {
                             const payload = await fetchRedoOptions(optionsUrl, (searchInput.value || '').trim());
+                            if (requestId !== searchRequestId) return;
                             locationOptions = mergeLocationOptions('', payload.available_locations || []);
                             renderLocationDropdown(suggestions, locationOptions, selectedLocation, searchInput.value || '');
                         } catch (error) {
-                            renderLocationDropdown(suggestions, mergeLocationOptions('', []), selectedLocation, searchInput.value || '');
+                            if (requestId !== searchRequestId) return;
+                            if (suggestions) suggestions.innerHTML = '<p class="delivery-redo-empty" role="status">Gagal memuat lokasi. Coba ketik lagi.</p>';
                         }
                     }, 250);
                 });
+            },
+            willClose: () => {
+                searchRequestId += 1;
+                if (searchTimeout) clearTimeout(searchTimeout);
             },
             preConfirm: () => {
                 const searchInput = document.getElementById('redo-location-search');

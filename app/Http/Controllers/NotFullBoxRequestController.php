@@ -15,6 +15,7 @@ use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletDeliveryLockService;
 use App\Services\PalletNumberService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -27,7 +28,8 @@ class NotFullBoxRequestController extends Controller
 
     public function __construct(
         private readonly LocationAssignmentService $locationAssignmentService,
-        private readonly PalletNumberService $palletNumberService
+        private readonly PalletNumberService $palletNumberService,
+        private readonly PalletDeliveryLockService $palletDeliveryLockService
     ) {
     }
 
@@ -231,18 +233,26 @@ class NotFullBoxRequestController extends Controller
         }
 
         try {
-            NotFullBoxRequest::create([
-                'box_number' => $request->box_number,
-                'part_number' => $partNumber,
-                'pcs_quantity' => (int) $request->pcs_quantity,
-                'fixed_qty' => $fixedQty,
-                'reason' => $request->reason,
-                'request_type' => $request->request_type,
-                'delivery_order_id' => $deliveryOrder->id,
-                'requested_by' => Auth::id(),
-                'target_pallet_id' => $request->target_type === 'pallet' ? $request->target_pallet_id : null,
-                'target_location_id' => $request->target_type === 'location' ? $request->target_location_id : null,
-            ]);
+            DB::transaction(function () use ($request, $partNumber, $fixedQty, $deliveryOrder) {
+                $notFullRequest = NotFullBoxRequest::create([
+                    'box_number' => $request->box_number,
+                    'part_number' => $partNumber,
+                    'pcs_quantity' => (int) $request->pcs_quantity,
+                    'fixed_qty' => $fixedQty,
+                    'reason' => $request->reason,
+                    'request_type' => $request->request_type,
+                    'delivery_order_id' => $deliveryOrder->id,
+                    'requested_by' => Auth::id(),
+                    'target_pallet_id' => $request->target_type === 'pallet' ? $request->target_pallet_id : null,
+                    'target_location_id' => $request->target_type === 'location' ? $request->target_location_id : null,
+                ]);
+                AuditService::record('not_full_box', 'created', 'NotFullBoxRequest', $notFullRequest->id, Auth::id(), [], [
+                    'status' => 'pending', 'box_number' => $notFullRequest->box_number,
+                    'part_number' => $partNumber, 'pcs_quantity' => (int) $notFullRequest->pcs_quantity,
+                    'delivery_order_id' => $deliveryOrder->id, 'request_type' => $notFullRequest->request_type,
+                    'reason' => $notFullRequest->reason,
+                ], "Permintaan Box Not Full {$notFullRequest->box_number} dibuat.");
+            });
         } catch (QueryException $e) {
             if ($this->isDuplicateKeyException($e)) {
                 return redirect()->back()->with('error', 'ID Box sudah pernah diajukan.')->withInput();
@@ -339,6 +349,10 @@ class NotFullBoxRequestController extends Controller
                     $locationCode = $location->warehouse_location;
                 } else {
                     $pallet = Pallet::whereKey($pallet->id)->lockForUpdate()->firstOrFail();
+                    $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets([(int) $pallet->id], true);
+                    if ($blockingBox) {
+                        throw new \RuntimeException('Pallet tujuan tidak dapat diubah karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+                    }
                     $locationCode = $pallet->stockLocation?->warehouse_location;
                     if (! $locationCode || $locationCode === 'Unknown') {
                         throw new \RuntimeException('Pallet tujuan belum memiliki lokasi tersimpan yang valid.');
@@ -416,6 +430,12 @@ class NotFullBoxRequestController extends Controller
                 $request->box_id = $box->id;
                 $request->target_location_code = $locationCode;
                 $request->save();
+                AuditService::record('not_full_box', 'approved', 'NotFullBoxRequest', $request->id, Auth::id(),
+                    ['status' => 'pending'], [
+                        'status' => 'approved', 'box_number' => $request->box_number,
+                        'part_number' => $request->part_number, 'pcs_quantity' => (int) $request->pcs_quantity,
+                        'delivery_order_id' => $request->delivery_order_id, 'warehouse_location' => $locationCode,
+                    ], "Permintaan Box Not Full {$request->box_number} disetujui.");
             });
 
             return redirect()->back()->with('success', 'Permintaan berhasil di-approve.');
@@ -446,6 +466,12 @@ class NotFullBoxRequestController extends Controller
                 $request->approved_by = Auth::id();
                 $request->approved_at = now();
                 $request->save();
+                AuditService::record('not_full_box', 'rejected', 'NotFullBoxRequest', $request->id, Auth::id(),
+                    ['status' => 'pending'], [
+                        'status' => 'rejected', 'box_number' => $request->box_number,
+                        'part_number' => $request->part_number, 'pcs_quantity' => (int) $request->pcs_quantity,
+                        'delivery_order_id' => $request->delivery_order_id,
+                    ], "Permintaan Box Not Full {$request->box_number} ditolak.");
             });
 
             return redirect()->back()->with('success', 'Permintaan ditolak.');

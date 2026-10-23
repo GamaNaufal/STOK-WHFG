@@ -3,6 +3,7 @@
 namespace App\Exports;
 
 use App\Models\StockInput;
+use App\Support\AuditLogPresenter;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
@@ -55,7 +56,7 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
                         'Tanggal' => $log->created_at->format('d/m/Y'),
                         'Waktu' => $index === 0 ? $log->created_at->format('H:i:s') : '',
                         'Tipe Aksi' => $index === 0 ? $this->getTypeLabel($log->type) : '',
-                        'Status' => $index === 0 ? ucfirst($log->action) : '',
+                        'Status' => $index === 0 ? AuditLogPresenter::actionLabel($log->action) : '',
                         'Operator' => $index === 0 ? ($log->user?->name ?? 'System') : '',
                         'Qty (PCS)' => (int)($box['pcs_quantity'] ?? 0),
                         'Qty (Box)' => 1,
@@ -95,7 +96,7 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
                         'Tanggal' => $log->created_at->format('d/m/Y'),
                         'Waktu' => $index === 0 ? $log->created_at->format('H:i:s') : '',
                         'Tipe Aksi' => $index === 0 ? $this->getTypeLabel($log->type) : '',
-                        'Status' => $index === 0 ? ucfirst($log->action) : '',
+                        'Status' => $index === 0 ? AuditLogPresenter::actionLabel($log->action) : '',
                         'Operator' => $index === 0 ? ($log->user?->name ?? 'System') : '',
                         'Qty (PCS)' => (int)$currentPcs,
                         'Qty (Box)' => (int)$currentBox,
@@ -115,7 +116,7 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
                     'Tanggal' => $log->created_at->format('d/m/Y'),
                     'Waktu' => $log->created_at->format('H:i:s'),
                     'Tipe Aksi' => $this->getTypeLabel($log->type),
-                    'Status' => ucfirst($log->action),
+                    'Status' => AuditLogPresenter::actionLabel($log->action),
                     'Operator' => $log->user?->name ?? 'System',
                     'Qty (PCS)' => (int)($detail['quantity'] ?? 0),
                     'Qty (Box)' => (int)($detail['box_qty'] ?? 0),
@@ -269,10 +270,10 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
             default:
                 $detail = [
                     'box_location' => '-',
-                    'quantity' => 0,
-                    'box_qty' => 0,
-                    'part_number' => '-',
-                    'location' => '-',
+                    'quantity' => (int) ($newValues['pcs_quantity'] ?? 0),
+                    'box_qty' => (int) ($newValues['box_quantity'] ?? 0),
+                    'part_number' => $newValues['part_number'] ?? '-',
+                    'location' => $newValues['warehouse_location'] ?? $newValues['location'] ?? '-',
                 ];
         }
 
@@ -286,6 +287,15 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
             'stock_withdrawal' => 'Ambil Stok',
             'delivery_pickup' => 'Pengiriman',
             'delivery_redo' => 'Redo Delivery',
+            'expired_box' => 'Penanganan Box Expired',
+            'not_full_box' => 'Box Not Full',
+            'delivery_pick' => 'Picking Delivery',
+            'delivery_issue' => 'Issue Scan Delivery',
+            'master_location' => 'Master Lokasi',
+            'master_part' => 'Master Part',
+            'user_management' => 'Kelola User',
+            'profile' => 'Profil Pengguna',
+            'role_feature_access' => 'Hak Akses Role',
             default => ucfirst(str_replace('_', ' ', $type)),
         };
     }

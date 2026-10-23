@@ -93,7 +93,7 @@
         }
 
         .info-label {
-            color: #9ca3af;
+            color: #52636e;
             font-size: 0.85rem;
             font-weight: 500;
             text-transform: uppercase;
@@ -284,7 +284,7 @@
         }
 
         .empty-state p {
-            color: #9ca3af;
+            color: #52636e;
         }
 
         /* History Section */
@@ -343,7 +343,7 @@
         .empty-history {
             padding: 2rem;
             text-align: center;
-            color: #9ca3af;
+            color: #52636e;
         }
 
         /* Modal Styling */
@@ -372,191 +372,209 @@
             padding: 1.5rem;
         }
     </style>
+    <link rel="stylesheet" href="{{ asset('css/pages/ppc-approval-queue.css') }}">
 @endsection
 
 @section('content')
-<div class="page-header">
-    <h1>
-        <i class="bi bi-clipboard-check" style="color: #0C7779;"></i> Pending Approvals
-    </h1>
-    <p class="mb-0">Review dan setujui pesanan delivery yang menunggu persetujuan</p>
+<div class="page-header ppc-approval-page-header">
+    <div>
+        <span class="ppc-eyebrow">PPC / Keputusan delivery</span>
+        <h1>Antrean persetujuan</h1>
+        <p>Periksa kebutuhan part dan ketersediaan sesuai urutan delivery sebelum memutuskan.</p>
+    </div>
+    <span class="ppc-queue-count"><strong>{{ $pendingOrders->count() }}</strong> menunggu keputusan</span>
 </div>
 
-<div class="container-fluid">
+<div class="container-fluid ppc-approvals-page">
     @if($pendingOrders->isEmpty())
-        <div class="empty-state">
-            <i class="bi bi-check-circle"></i>
-            <h3>Tidak Ada Pesanan Menunggu</h3>
-            <p>Semua pesanan telah diproses. Kerja bagus!</p>
+        <div class="empty-state ppc-queue-empty" role="status">
+            <i class="bi bi-check-circle" aria-hidden="true"></i>
+            <h2>Tidak ada pesanan menunggu</h2>
+            <p>Pesanan baru dari Sales akan muncul di antrean ini.</p>
         </div>
     @else
-        <div class="row g-4">
+        <div class="ppc-queue-intro">
+            <span>Urutan kerja</span>
+            <p>Tanggal delivery terdekat lebih dulu. Angka siap saat giliran memperhitungkan kebutuhan order sebelumnya.</p>
+        </div>
+        <div class="row g-3 ppc-queue-grid">
             @foreach($pendingOrders as $order)
-            <div class="col-md-6 col-xl-4">
-                <div class="approval-card">
+            <div class="col-12 col-xl-6">
+                <article class="approval-card ppc-approval-card" aria-labelledby="ppc-order-{{ $order->id }}">
                     <div class="card-header">
-                        <span class="customer-name">{{ $order->customer_name }}</span>
-                        <span class="badge">
-                            <i class="bi bi-hourglass-split"></i> Pending
-                        </span>
+                        <div class="ppc-order-heading">
+                            <span>Order #{{ $order->id }}</span>
+                            <h2 id="ppc-order-{{ $order->id }}">{{ $order->customer_name }}</h2>
+                        </div>
+                        <span class="ppc-pending-badge"><i class="bi bi-clock" aria-hidden="true"></i> Menunggu PPC</span>
                     </div>
                     <div class="card-body">
-                        <!-- Order Info -->
-                        <div class="order-info">
-                            <div class="info-item">
-                                <span class="info-label">Sales</span>
-                                <span class="info-value">{{ $order->salesUser->name ?? 'Unknown' }}</span>
+                        <dl class="ppc-order-meta">
+                            <div>
+                                <dt>Sales</dt>
+                                <dd>{{ $order->salesUser->name ?? 'Tidak diketahui' }}</dd>
                             </div>
-                            <div class="info-item">
-                                <span class="info-label">Delivery Date</span>
-                                <span class="info-value">{{ $order->delivery_date->format('d M Y') }}</span>
+                            <div>
+                                <dt>Tanggal delivery</dt>
+                                <dd><time datetime="{{ $order->delivery_date->format('Y-m-d') }}">{{ $order->delivery_date->format('d M Y') }}</time></dd>
                             </div>
-                        </div>
+                        </dl>
 
-                        <!-- Notes -->
                         @if($order->notes)
-                        <div class="notes-box">
-                            <i class="bi bi-chat-quote"></i>
-                            <small>{{ $order->notes }}</small>
+                        <div class="ppc-order-note">
+                            <strong><i class="bi bi-chat-left-text" aria-hidden="true"></i> Catatan pada order</strong>
+                            <p>{{ $order->notes }}</p>
                         </div>
                         @endif
 
-                        <!-- Items & Stock Table -->
-                        @if($order->items->count() > 0)
-                        <div class="items-section">
-                            <h6>
-                                <i class="bi bi-box-seam"></i> Items & Stock
-                            </h6>
-                            <div style="overflow-x: auto;">
-                                <table class="items-table" style="width: 100%;">
-                                    <thead>
-                                        <tr>
-                                            <th style="text-align: left;">Part</th>
-                                            <th>Required</th>
-                                            <th>Aktual</th>
-                                            <th>Total Stock</th>
-                                            <th>Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach($order->items as $item)
-                                        <tr>
-                                            <td style="text-align: left;">{{ $item->part_number }}</td>
-                                            <td>{{ $item->quantity }}</td>
-                                            <td class="@if($item->stock_warning) status-warning @else status-ok @endif">
-                                                {{ $item->remaining_before ?? 0 }}
-                                            </td>
-                                            <td>{{ $item->available_total ?? 0 }}</td>
-                                            <td>
-                                                @if($item->stock_warning)
-                                                    <span class="badge-warning">⚠ Low</span>
-                                                @else
-                                                    <span class="badge-ok">✓ OK</span>
-                                                @endif
-                                            </td>
-                                        </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
+                        <section class="ppc-stock-section" aria-labelledby="ppc-stock-title-{{ $order->id }}">
+                            <div class="ppc-stock-section-heading">
+                                <h3 id="ppc-stock-title-{{ $order->id }}">Kebutuhan &amp; stok</h3>
+                                <span>{{ $order->items->count() }} part</span>
                             </div>
-                        </div>
-                        @endif
+                            @if($order->items->isNotEmpty())
+                                <ul class="ppc-stock-list">
+                                    @foreach($order->items as $item)
+                                        <li class="ppc-stock-item">
+                                            <div class="ppc-stock-item-heading">
+                                                <strong>{{ $item->part_number }}</strong>
+                                                <span class="ppc-stock-status {{ $item->stock_warning ? 'is-short' : 'is-ready' }}">
+                                                    <i class="bi {{ $item->stock_warning ? 'bi-exclamation-circle' : 'bi-check-circle' }}" aria-hidden="true"></i>
+                                                    {{ $item->stock_warning ? 'Belum cukup' : 'Cukup' }}
+                                                </span>
+                                            </div>
+                                            <div class="ppc-stock-values">
+                                                <div>
+                                                    <span>Siap / kebutuhan</span>
+                                                    <strong class="{{ $item->stock_warning ? 'is-short' : '' }}">{{ number_format($item->remaining_before ?? 0, 0, ',', '.') }} / {{ number_format($item->quantity, 0, ',', '.') }} <small>PCS</small></strong>
+                                                </div>
+                                                <div>
+                                                    <span>Total stok</span>
+                                                    <strong>{{ number_format($item->available_total ?? 0, 0, ',', '.') }} <small>PCS</small></strong>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <p class="ppc-stock-empty">Tidak ada item pada pesanan ini.</p>
+                            @endif
+                        </section>
 
-                        <!-- Action Buttons -->
-                        <div class="action-buttons">
+                        <div class="action-buttons ppc-queue-actions" role="group" aria-label="Keputusan untuk Order #{{ $order->id }}">
+                            <span>Pilih keputusan</span>
                             <button class="btn-approve js-open-status-modal" data-order-id="{{ $order->id }}" data-status="approved" type="button">
-                                <i class="bi bi-check-circle"></i> Setujui
+                                <i class="bi bi-check-circle" aria-hidden="true"></i> Setujui
                             </button>
                             <div class="btn-group-horizontal">
                                 <button class="btn-correction js-open-status-modal" data-order-id="{{ $order->id }}" data-status="correction" type="button">
-                                    <i class="bi bi-pencil"></i> Koreksi
+                                    <i class="bi bi-pencil" aria-hidden="true"></i> Minta koreksi
                                 </button>
                                 <button class="btn-reject js-open-status-modal" data-order-id="{{ $order->id }}" data-status="rejected" type="button">
-                                    <i class="bi bi-x-circle"></i> Tolak
+                                    <i class="bi bi-x-circle" aria-hidden="true"></i> Tolak
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
+                </article>
             </div>
             @endforeach
         </div>
     @endif
 
-    <!-- History Section -->
-    <div class="history-section">
-        <h4 class="history-header">
-            <i class="bi bi-clock-history"></i> Riwayat Persetujuan
-        </h4>
-        <div class="history-card">
+    <section class="history-section ppc-history-section" aria-labelledby="ppc-history-title">
+        <div class="ppc-history-heading">
+            <div>
+                <span class="ppc-eyebrow">Aktivitas PPC</span>
+                <h2 id="ppc-history-title">Riwayat persetujuan</h2>
+                <p>Hingga 15 order terbaru yang telah diputuskan atau diproses.</p>
+            </div>
+            <span class="ppc-history-count">{{ $historyOrders->count() }} ditampilkan</span>
+        </div>
+        <div class="history-card ppc-history-card">
             @if($historyOrders->isEmpty())
-                <div class="empty-history">
-                    <i class="bi bi-inbox" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;"></i>
-                    Belum ada riwayat persetujuan
+                <div class="empty-history ppc-history-empty">
+                    <i class="bi bi-inbox" aria-hidden="true"></i>
+                    <strong>Belum ada riwayat persetujuan</strong>
+                    <span>Keputusan PPC dan pembaruan order akan muncul di sini.</span>
                 </div>
             @else
-                <div class="table-responsive">
-                    <table class="table history-table">
+                <div class="table-responsive ppc-history-scroll" tabindex="0" role="region" aria-label="Riwayat persetujuan PPC, geser untuk melihat semua kolom">
+                    <table class="table history-table ppc-history-table">
+                        <caption class="visually-hidden">Pembaruan terakhir, pelanggan, status, catatan, dan rincian dari hingga 15 order terbaru.</caption>
                         <thead>
                             <tr>
-                                <th style="width: 15%;">Tanggal</th>
-                                <th style="width: 20%;">Pelanggan</th>
-                                <th style="width: 15%;">Sales</th>
-                                <th style="width: 15%;">Status</th>
-                                <th style="width: 35%;">Catatan</th>
+                                <th scope="col">Order / pembaruan terakhir</th>
+                                <th scope="col">Pelanggan / Sales</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Catatan &amp; rincian</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach($historyOrders as $order)
-                                <tr>
-                                    <td>{{ $order->updated_at->format('d M Y H:i') }}</td>
-                                    <td>
+                                @php
+                                    $historyStatus = match ($order->status) {
+                                        'approved' => ['Disetujui', 'approved', 'bi-check-circle'],
+                                        'rejected' => ['Ditolak', 'rejected', 'bi-x-circle'],
+                                        'correction' => ['Perlu koreksi', 'correction', 'bi-pencil-square'],
+                                        'completed' => ['Selesai', 'completed', 'bi-check2-all'],
+                                        'processing' => ['Dalam proses', 'processing', 'bi-arrow-repeat'],
+                                        default => [ucfirst(str_replace('_', ' ', $order->status)), 'neutral', 'bi-circle'],
+                                    };
+                                @endphp
+                                <tr class="ppc-history-main-row">
+                                    <th scope="row" class="ppc-history-order-cell">
+                                        <strong>Order #{{ $order->id }}</strong>
+                                        <time datetime="{{ $order->updated_at->toIso8601String() }}">
+                                            <span>{{ $order->updated_at->format('d M Y') }}</span>
+                                            <span>{{ $order->updated_at->format('H:i') }}</span>
+                                        </time>
+                                    </th>
+                                    <td class="ppc-history-customer-cell">
                                         <strong>{{ $order->customer_name }}</strong>
-                                    </td>
-                                    <td>{{ $order->salesUser->name ?? 'Unknown' }}</td>
-                                    <td>
-                                        @if($order->status == 'approved')
-                                            <span class="badge" style="background: #dcfce7; color: #166534;">
-                                                <i class="bi bi-check2-circle"></i> Disetujui
-                                            </span>
-                                        @elseif($order->status == 'rejected')
-                                            <span class="badge" style="background: #fee2e2; color: #991b1b;">
-                                                <i class="bi bi-x-circle"></i> Ditolak
-                                            </span>
-                                        @elseif($order->status == 'correction')
-                                            <span class="badge" style="background: #fef3c7; color: #92400e;">
-                                                <i class="bi bi-pencil-square"></i> Koreksi
-                                            </span>
-                                        @elseif($order->status == 'completed')
-                                            <span class="badge" style="background: #e0f2fe; color: #0369a1;">
-                                                <i class="bi bi-check-all"></i> Selesai
-                                            </span>
-                                        @elseif($order->status == 'processing')
-                                            <span class="badge" style="background: #dbeafe; color: #1e40af;">
-                                                <i class="bi bi-arrow-repeat"></i> Proses
-                                            </span>
-                                        @else
-                                            <span class="badge" style="background: #f3f4f6; color: #6b7280;">{{ ucfirst($order->status) }}</span>
-                                        @endif
+                                        <span>Sales: {{ $order->salesUser->name ?? 'Tidak diketahui' }}</span>
                                     </td>
                                     <td>
-                                        <div class="d-flex align-items-center gap-2">
-                                            <small class="text-muted">{{ $order->notes ? Str::limit($order->notes, 50) : '-' }}</small>
-                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#history-detail-{{ $order->id }}">
-                                                <i class="bi bi-eye"></i> Detail
+                                        <span class="ppc-history-status is-{{ $historyStatus[1] }}">
+                                            <i class="bi {{ $historyStatus[2] }}" aria-hidden="true"></i>{{ $historyStatus[0] }}
+                                        </span>
+                                    </td>
+                                    <td class="ppc-history-note-cell">
+                                        <p>{{ $order->notes ? Str::limit($order->notes, 88) : 'Tidak ada catatan' }}</p>
+                                        <div class="ppc-history-actions">
+                                            <span>{{ $order->items->count() }} item</span>
+                                            <button class="btn btn-outline-secondary ppc-history-detail-toggle" type="button"
+                                                data-bs-toggle="collapse" data-bs-target="#history-detail-{{ $order->id }}"
+                                                aria-controls="history-detail-{{ $order->id }}" aria-expanded="false">
+                                                <i class="bi bi-list-ul" aria-hidden="true"></i>
+                                                <span class="ppc-history-toggle-open">Lihat rincian</span>
+                                                <span class="ppc-history-toggle-close">Tutup rincian</span>
+                                                <span class="visually-hidden"> Order #{{ $order->id }}</span>
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
-                                <tr class="collapse" id="history-detail-{{ $order->id }}">
-                                    <td colspan="5" class="bg-light">
-                                        <div class="p-3">
-                                            <div class="fw-bold mb-2">Detail Item</div>
-                                            <ul class="mb-0">
+                                <tr class="ppc-history-detail-row">
+                                    <td colspan="4">
+                                        <div class="collapse ppc-history-detail" id="history-detail-{{ $order->id }}">
+                                            <div class="ppc-history-detail-heading">
+                                                <strong>Rincian Order #{{ $order->id }}</strong>
+                                                <span>{{ $order->items->count() }} nomor part</span>
+                                            </div>
+                                            <div class="ppc-history-full-note">
+                                                <strong>Catatan order</strong>
+                                                <p>{{ $order->notes ?: 'Tidak ada catatan pada order ini.' }}</p>
+                                            </div>
+                                            <strong class="ppc-history-items-label">Item pesanan</strong>
+                                            @if($order->items->isNotEmpty())
+                                            <ul class="ppc-history-item-list">
                                                 @foreach($order->items as $item)
-                                                    <li>{{ $item->part_number }} - {{ $item->quantity }} PCS</li>
+                                                    <li><span>{{ $item->part_number }}</span><strong>{{ number_format($item->quantity, 0, ',', '.') }} PCS</strong></li>
                                                 @endforeach
                                             </ul>
+                                            @else
+                                                <p class="ppc-history-no-items">Tidak ada item pada order ini.</p>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -566,114 +584,58 @@
                 </div>
             @endif
         </div>
-    </div>
+    </section>
 </div>
 
-<!-- Status Update Modal -->
-<div class="modal fade" id="statusModal" tabindex="-1">
-    <div class="modal-dialog">
-        <form id="statusForm" method="POST">
+<div class="modal fade ppc-decision-modal" id="statusModal" tabindex="-1" aria-labelledby="statusModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <form id="statusForm" method="POST" class="modal-content">
             @csrf
             <input type="hidden" name="status" id="modalStatusInput">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="statusModalLabel">Update Status</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header">
+                <div>
+                    <span class="ppc-decision-eyebrow">Keputusan PPC</span>
+                    <h2 class="modal-title" id="statusModalLabel">Tinjau pesanan</h2>
                 </div>
-                <div class="modal-body">
-                    <p id="statusConfirmationText"></p>
-                    <div id="impactWarning" class="alert alert-warning d-none"></div>
-                    
-                    <div class="mb-3" id="noteSection">
-                        <label class="form-label">Catatan / Alasan</label>
-                        <textarea name="notes" class="form-control" rows="3" placeholder="Masukkan alasan atau catatan..."></textarea>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup dialog"></button>
+            </div>
+            <div class="modal-body">
+                <div class="ppc-decision-order-context">
+                    <span id="statusOrderNumber"></span>
+                    <strong id="statusOrderCustomer"></strong>
+                    <time id="statusOrderDate"></time>
+                </div>
+                <p id="statusConfirmationText" class="ppc-decision-description"></p>
+                <section id="impactPanel" class="ppc-impact-panel" aria-live="polite" aria-labelledby="impactTitle" hidden>
+                    <div class="ppc-impact-heading">
+                        <i id="impactIcon" class="bi" aria-hidden="true"></i>
+                        <div>
+                            <h3 id="impactTitle"></h3>
+                            <p id="impactDescription"></p>
+                        </div>
                     </div>
+                    <ul id="impactList" class="ppc-impact-list" hidden></ul>
+                    <button type="button" id="impactRetry" class="btn btn-outline-secondary ppc-impact-retry" hidden>
+                        <i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Periksa lagi
+                    </button>
+                </section>
+                <div class="ppc-decision-note">
+                    <label class="form-label" for="statusNotes" id="statusNotesLabel">Catatan PPC</label>
+                    <p id="statusNoteHelp">Catatan wajib diisi sebelum keputusan dikirim.</p>
+                    <textarea id="statusNotes" name="notes" class="form-control" rows="3"
+                        aria-describedby="statusNoteHelp statusNoteError" required></textarea>
+                    <p id="statusNoteError" class="ppc-note-error" role="alert" hidden></p>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary">Konfirmasi</button>
-                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-primary" id="statusSubmitButton">Konfirmasi</button>
             </div>
         </form>
     </div>
 </div>
+@endsection
 
-<script>
-    document.addEventListener('DOMContentLoaded', function () {
-        document.querySelectorAll('.js-open-status-modal').forEach(function (button) {
-            button.addEventListener('click', function () {
-                openStatusModal(this.dataset.orderId, this.dataset.status);
-            });
-        });
-    });
-
-    function openStatusModal(orderId, status) {
-        const modal = new bootstrap.Modal(document.getElementById('statusModal'));
-        const form = document.getElementById('statusForm');
-        const statusInput = document.getElementById('modalStatusInput');
-        const noteSection = document.getElementById('noteSection');
-        const confirmationText = document.getElementById('statusConfirmationText');
-        const impactWarning = document.getElementById('impactWarning');
-        const title = document.getElementById('statusModalLabel');
-
-        form.action = `/delivery-stock/${orderId}/status`;
-        statusInput.value = status;
-
-        if (status === 'approved') {
-            title.innerText = 'Setujui Pesanan Delivery';
-            title.className = 'modal-title text-success';
-            confirmationText.innerText = 'Mengecek dampak jadwal... Wajib isi keterangan approval dari PPC.';
-            noteSection.style.display = 'block';
-            noteSection.querySelector('textarea').required = true;
-            impactWarning.classList.add('d-none');
-            impactWarning.innerHTML = '';
-
-            fetch(`/delivery-stock/${orderId}/approval-impact`)
-                .then((response) => response.json())
-                .then((data) => {
-                    const impacted = data.impacted || [];
-                    if (impacted.length === 0) {
-                        confirmationText.innerText = 'Yakin ingin menyetujui pesanan delivery ini?';
-                        impactWarning.classList.add('d-none');
-                        impactWarning.innerHTML = '';
-                        return;
-                    }
-
-                    const itemsHtml = impacted.map((item) => {
-                        const parts = (item.short_parts || []).map((part) => {
-                            return `${part.part_number} (${part.can_fulfill}/${part.required})`;
-                        }).join(', ');
-                        return `<li>#${item.id} - ${item.customer_name} (${item.delivery_date ?? '-'})<br><small>Parts: ${parts}</small></li>`;
-                    }).join('');
-
-                    confirmationText.innerText = 'Persetujuan ini akan menggeser jadwal dan membuat pesanan berikut tidak terpenuhi:';
-                    impactWarning.innerHTML = `<ul class="mb-0">${itemsHtml}</ul>`;
-                    impactWarning.classList.remove('d-none');
-                })
-                .catch(() => {
-                    confirmationText.innerText = 'Yakin ingin menyetujui pesanan delivery ini?';
-                    impactWarning.classList.add('d-none');
-                    impactWarning.innerHTML = '';
-                });
-        } else if (status === 'correction') {
-            title.innerText = 'Minta Koreksi';
-            title.className = 'modal-title text-warning';
-            confirmationText.innerText = 'Sebutkan apa yang perlu dikoreksi:';
-            noteSection.style.display = 'block';
-            noteSection.querySelector('textarea').required = true;
-            impactWarning.classList.add('d-none');
-            impactWarning.innerHTML = '';
-        } else if (status === 'rejected') {
-            title.innerText = 'Tolak Pesanan';
-            title.className = 'modal-title text-danger';
-            confirmationText.innerText = 'Yakin ingin menolak pesanan ini? Berikan alasan penolakan.';
-            noteSection.style.display = 'block';
-            noteSection.querySelector('textarea').required = true;
-            impactWarning.classList.add('d-none');
-            impactWarning.innerHTML = '';
-        }
-
-        modal.show();
-    }
-</script>
+@section('scripts')
+    <script src="{{ asset('js/pages/ppc-approval-decision.js') }}"></script>
 @endsection

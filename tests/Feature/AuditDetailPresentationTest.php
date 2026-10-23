@@ -87,11 +87,19 @@ class AuditDetailPresentationTest extends TestCase
             'ip_address' => '192.0.2.123',
         ]);
         $redo = AuditLog::create(['type' => 'delivery_redo', 'action' => 'redo', 'description' => 'Ulang pengiriman']);
+        $assignment = AuditLog::create([
+            'type' => 'delivery_assignment', 'action' => 'created', 'description' => 'Box dialokasikan',
+            'new_values' => json_encode(['boxes' => [['box_number' => '00000012', 'part_number' => 'P-1', 'pcs_quantity' => 100, 'warehouse_location' => 'A-01']]]),
+        ]);
         $this->actingAs($user)->get(route('audit.index'))
             ->assertOk()->assertSee('Lihat rincian')->assertSee('Alasan perubahan')
             ->assertSee('Data yang berubah')->assertSee('Jumlah PCS')
             ->assertSee('data-bs-target="#detailModal'.$edit->id.'"', false)
+            ->assertSee('aria-describedby="detailContext'.$edit->id.'"', false)
+            ->assertSee('1 perubahan')->assertSee('Sebelum: ')->assertSee('Sesudah: ')
             ->assertSee('id="detailModal'.$redo->id.'"', false)
+            ->assertSee('id="auditTableLabel'.$assignment->id.'-0"', false)
+            ->assertSee('Geser tabel untuk melihat semua kolom.')
             ->assertSee('Rincian barang atau perubahan tidak tercatat.')
             ->assertSee('Koreksi &lt;script&gt;alert(1)&lt;/script&gt;', false)
             ->assertDontSee('<script>alert(1)</script>', false)

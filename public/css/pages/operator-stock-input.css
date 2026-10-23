@@ -1,126 +1,32 @@
-:root {
-    --color-teal: #0c7779;
-    --color-turquoise: #249e94;
-    --color-green: #10b981;
-    --color-gray: #6b7280;
-    --color-gray-light: #e5e7eb;
-    --color-success: #e8f5e9;
-    --color-error: #fee2e2;
-    --color-info: #e0f2fe;
-}
-
-@media (min-width: 992px) {
-    .row.g-4 {
-        display: flex;
-        flex-wrap: wrap;
-    }
-
-    .col-lg-8 {
-        flex: 0 0 auto;
-        width: 66.666667%;
-    }
-
-    .col-lg-4 {
-        flex: 0 0 auto;
-        width: 33.333333%;
-    }
-}
-
-#barcodeInput:focus,
-#warehouse_location:focus,
-#locationSearchInput:focus {
-    outline: none;
-    border-color: var(--color-teal) !important;
-    box-shadow: 0 0 0 4px rgba(12, 119, 121, 0.1);
-    transform: translateY(-2px);
-}
-
-#clear-pallet-btn:hover {
-    background: #d97706 !important;
-    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.3) !important;
-    transform: translateY(-2px);
-}
-
-#cancel-btn:hover {
-    background: #4b5563 !important;
-    box-shadow: 0 4px 12px rgba(107, 114, 128, 0.2) !important;
-    transform: translateY(-2px);
-}
-
-#save-btn:hover {
-    box-shadow: 0 8px 24px rgba(12, 119, 121, 0.3) !important;
-    transform: translateY(-2px);
-}
-
-#print-pallet-btn:hover {
-    background: linear-gradient(135deg, #d97706 0%, #ea580c 100%) !important;
-    box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3) !important;
-    transform: translateY(-2px);
-}
-
-#print-pallet-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.22) !important;
-}
-
-#itemsList > div {
-    background: #f9fafb;
-    border: 1px solid var(--color-gray-light);
-    border-radius: 10px;
-    padding: 14px 16px;
-    transition: all 0.3s ease;
-}
-
-#itemsList > div:hover {
-    background: #f3f4f6;
-    border-color: var(--color-teal);
-    box-shadow: 0 2px 8px rgba(12, 119, 121, 0.1);
-}
-
-.btn,
-.form-control,
-.card {
-    transition:
-        background-color 0.3s ease,
-        box-shadow 0.3s ease,
-        transform 0.3s ease;
-}
-
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #f1f5f9;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: var(--color-teal);
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: var(--color-turquoise);
-}
-
-@media (max-width: 991px) {
-    .card-body {
-        padding: 20px !important;
-    }
-
-    .btn-lg {
-        width: 100%;
-    }
-
-    .col-lg-4 .card {
-        position: relative !important;
-        top: 0 !important;
-    }
-}
-
-@media (max-width: 576px) {
-    .card-body {
-        padding: 15px !important;
-    }
+/* Operational input: immediate feedback, solid surfaces, no focus movement. */
+.warehouse-app .stock-input-page { max-width: 70rem; margin-inline: 0; padding-inline: 0; }
+.warehouse-app .stock-input-page .card-body { padding: 1.5rem !important; }
+.warehouse-app .stock-input-page .stock-scan-heading { margin-bottom: 1.25rem !important; border-radius: .625rem !important; }
+.warehouse-app .stock-input-page .app-section-heading { padding: 1rem !important; }
+.warehouse-app .stock-input-page :is(.btn, .form-control, .input-group-text, .card) { transition: none !important; }
+.warehouse-app .stock-input-page :is(.btn, .form-control) { min-height: 44px; font-size: 1rem !important; }
+.warehouse-app .stock-input-page .form-control { min-width: 0; border: 1px solid var(--ui-border) !important; color: var(--ui-ink); }
+.warehouse-app .stock-input-page .form-control:disabled { background: var(--ui-canvas); color: var(--ui-muted); }
+.warehouse-app .stock-input-page .input-group-text { background: var(--ui-canvas) !important; color: var(--ui-muted) !important; border: 1px solid var(--ui-border) !important; }
+.warehouse-app .stock-input-page :is(input, button, a):focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 2px; transform: none; }
+.warehouse-app .stock-input-page :is(#barcodeSubmitBtn, #partSubmitBtn, #save-btn) { background: var(--ui-accent) !important; color: white !important; box-shadow: none !important; }
+.warehouse-app .stock-input-page :is(#clear-pallet-btn, #cancel-btn, #print-pallet-btn) { background: var(--ui-surface) !important; color: var(--ui-accent) !important; border: 1px solid var(--ui-border) !important; box-shadow: none !important; }
+.warehouse-app .stock-input-page .btn:disabled { opacity: .5; }
+.warehouse-app .stock-input-page .btn:active { filter: brightness(.94); }
+.warehouse-app .stock-input-page .alert { border-width: 1px !important; overflow-wrap: anywhere; }
+.warehouse-app .stock-input-page .form-text { line-height: 1.6; }
+.warehouse-app .stock-input-page #itemsList { gap: .75rem !important; }
+.warehouse-app .stock-input-page #itemsList > div { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1rem; margin: 0 !important; padding: 1rem !important; background: var(--ui-canvas) !important; border: 1px solid var(--ui-border); border-radius: .625rem; }
+.warehouse-app .stock-input-page #itemsList > div > div { width: auto; padding: 0; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.warehouse-app .stock-input-page #display_pallet_number { display: inline-block; background: #fff4d6; color: #854d0e !important; padding: .375rem .75rem; border-radius: .5rem; overflow-wrap: anywhere; }
+.warehouse-app .stock-input-page .stock-input-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .75rem; }
+.warehouse-app .stock-input-page .stock-input-actions .btn { padding: .75rem 1rem !important; }
+.warehouse-app .stock-input-page .form-check-label { min-height: 44px; display: inline-flex; align-items: center; }
+.warehouse-app .stock-input-page .form-check-input { margin-top: .85rem; }
+.warehouse-app .stock-input-page :is(#existingPalletSearchResults, #locationSearchResults) { background: var(--ui-surface); overflow-wrap: anywhere; }
+@media (max-width: 575.98px) {
+    .warehouse-app .stock-input-page .card-body { padding: 1rem !important; }
+    .warehouse-app .stock-input-page #itemsList > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .warehouse-app .stock-input-page .stock-input-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .warehouse-app .stock-input-page .input-group-text { padding-inline: .625rem !important; }
 }

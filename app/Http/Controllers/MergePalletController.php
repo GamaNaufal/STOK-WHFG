@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\AuditLog;
 use App\Models\MasterLocation;
+use App\Models\NotFullBoxRequest;
 use App\Models\Pallet;
 use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletDeliveryLockService;
 use App\Services\PalletNumberService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -17,7 +19,8 @@ class MergePalletController extends Controller
 {
     public function __construct(
         private readonly LocationAssignmentService $locationAssignmentService,
-        private readonly PalletNumberService $palletNumberService
+        private readonly PalletNumberService $palletNumberService,
+        private readonly PalletDeliveryLockService $palletDeliveryLockService
     ) {
     }
 
@@ -85,15 +88,6 @@ class MergePalletController extends Controller
                 ->lockForUpdate()
                 ->get();
 
-            $assignedBox = $activeBoxes->first(
-                fn ($box) => $box->assigned_delivery_order_id !== null
-            );
-            if ($assignedBox) {
-                throw new \RuntimeException(
-                    "Box {$assignedBox->box_number} sudah di-assign ke delivery dan pallet tidak dapat dimerge."
-                );
-            }
-
             $allBoxes = array_merge($allBoxes, $activeBoxes->values()->toArray());
 
             foreach ($activeBoxes as $box) {
@@ -101,22 +95,11 @@ class MergePalletController extends Controller
             }
         }
 
-        $allBoxIds = collect($allBoxes)->pluck('id')->map(fn ($id) => (int) $id)->unique()->values();
-        if ($allBoxIds->isNotEmpty()) {
-            $pickLockedBoxId = DB::table('delivery_pick_items')
-                ->join('delivery_pick_sessions', 'delivery_pick_sessions.id', '=', 'delivery_pick_items.pick_session_id')
-                ->whereIn('delivery_pick_items.box_id', $allBoxIds->all())
-                ->whereIn('delivery_pick_sessions.status', ['pending', 'scanning', 'blocked', 'approved'])
-                ->lockForUpdate()
-                ->value('delivery_pick_items.box_id');
-
-            if ($pickLockedBoxId) {
-                $lockedBox = collect($allBoxes)->firstWhere('id', (int) $pickLockedBoxId);
-                $boxNumber = $lockedBox['box_number'] ?? $pickLockedBoxId;
-                throw new \RuntimeException(
-                    "Box {$boxNumber} sedang digunakan dalam sesi picking dan pallet tidak dapat dimerge."
-                );
-            }
+        $lockedBox = $this->palletDeliveryLockService->blockingBoxForPallets($normalizedIds, true);
+        if ($lockedBox) {
+            throw new \RuntimeException(
+                "Box {$lockedBox->box_number} sedang digunakan dalam proses delivery aktif dan pallet tidak dapat dimerge."
+            );
         }
 
         return [$sourcePallets, $palletNumbers, $allBoxes, $boxOrigins];
@@ -249,6 +232,10 @@ class MergePalletController extends Controller
                 ->keyBy('code');
 
         foreach ($sourcePallets as $sourcePallet) {
+            NotFullBoxRequest::where('target_pallet_id', $sourcePallet->id)
+                ->where('status', 'pending')
+                ->update(['target_pallet_id' => $newPallet->id]);
+
             StockInput::where('pallet_id', $sourcePallet->id)
                 ->update(['pallet_id' => $newPallet->id]);
 
@@ -365,6 +352,13 @@ class MergePalletController extends Controller
                     \App\Models\Box::applyUsableExpiryFilter($q, '');
                 });
         })
+            ->whereDoesntHave('boxes', function ($query) {
+                $query->whereHas('deliveryPickItems', function ($query) {
+                    $query->whereHas('session', function ($query) {
+                        $query->whereIn('status', PalletDeliveryLockService::BLOCKING_SESSION_STATUSES);
+                    });
+                });
+            })
             ->with(['stockLocation.masterLocation', 'boxes' => function ($query) {
                 $query->where('is_withdrawn', false)
                     ->where(function ($q) {
@@ -440,6 +434,14 @@ class MergePalletController extends Controller
                 'success' => false,
                 'message' => 'Pallet tidak memiliki box aktif (semua box sudah withdrawn)',
             ], 404);
+        }
+
+        $lockedBox = $this->palletDeliveryLockService->blockingBoxForPallets([(int) $pallet->id]);
+        if ($lockedBox) {
+            return response()->json([
+                'success' => false,
+                'message' => "Box {$lockedBox->box_number} sedang digunakan dalam proses delivery aktif dan pallet tidak dapat dimerge.",
+            ], 422);
         }
 
         // Check if location is occupied (jika ada stockLocation)

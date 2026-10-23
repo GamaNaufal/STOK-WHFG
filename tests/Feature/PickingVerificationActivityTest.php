@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Box;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
@@ -53,6 +54,8 @@ class PickingVerificationActivityTest extends TestCase
             ->assertOk()->assertSee('Batalkan Verifikasi');
         $this->postJson(route('delivery.pick.cancel', $session->id))->assertOk()->assertJson(['success' => true]);
         $this->assertSame('cancelled', $session->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', ['type' => 'delivery_pick', 'action' => 'cancelled',
+            'model_id' => $session->id, 'user_id' => $user->id]);
         $this->assertNull($session->fresh()->verification_box_ids);
         $this->assertNull($session->fresh()->verification_last_activity_at);
         $this->assertDatabaseMissing('delivery_pick_items', ['pick_session_id' => $session->id]);
@@ -72,6 +75,8 @@ class PickingVerificationActivityTest extends TestCase
         $this->travel(1)->seconds();
         $this->artisan('delivery:expire-verifications')->assertSuccessful();
         $this->assertSame('cancelled', $session->fresh()->status);
+        $this->assertDatabaseHas('audit_logs', ['type' => 'delivery_pick', 'action' => 'timed_out',
+            'model_id' => $session->id, 'user_id' => null]);
         $this->assertStringContainsString('10 menit', $session->fresh()->approval_notes);
         $this->assertDatabaseMissing('delivery_pick_items', ['pick_session_id' => $session->id]);
         $this->assertFalse((bool) $box->fresh()->is_withdrawn);
@@ -120,6 +125,109 @@ class PickingVerificationActivityTest extends TestCase
         $this->travel(9)->minutes();
         $this->actingAs($user)->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $box->box_number])->assertOk();
         $this->assertTrue($session->fresh()->verification_last_activity_at->equalTo(now()));
+    }
+
+    public function test_final_scan_is_audited_once_when_box_progress_changes(): void
+    {
+        [$user, , $session, $box] = $this->picking();
+        $this->actingAs($user)->postJson(route('delivery.pick.scan.submit', $session->id),
+            ['box_number' => $box->box_number])->assertOk();
+        $this->assertDatabaseHas('audit_logs', ['type' => 'delivery_pick', 'action' => 'scanned',
+            'model' => 'DeliveryPickItem', 'user_id' => $user->id]);
+        $this->postJson(route('delivery.pick.scan.submit', $session->id),
+            ['box_number' => $box->box_number])->assertStatus(409);
+        $this->assertSame(1, AuditLog::where('type', 'delivery_pick')->where('action', 'scanned')->count());
+    }
+
+    public function test_wrong_verification_box_is_rejected_without_blocking_or_counting_it(): void
+    {
+        [$user, , $session, $expectedBox] = $this->picking();
+        $session->update(['verification_box_ids' => []]);
+        $wrongBox = Box::create([
+            'box_number' => '87654321', 'part_number' => 'PART-IDLE', 'part_name' => 'Other',
+            'pcs_quantity' => 10, 'qty_box' => 1, 'qr_code' => '87654321', 'user_id' => $user->id,
+        ]);
+
+        $this->actingAs($user)
+            ->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $wrongBox->box_number])
+            ->assertStatus(422)
+            ->assertJson(['success' => false, 'session_status' => null]);
+        $this->assertSame('scanning', $session->fresh()->status);
+        $this->assertSame([], $session->fresh()->verification_box_ids);
+        $this->assertDatabaseMissing('delivery_issues', ['pick_session_id' => $session->id]);
+        $this->assertSame(0, AuditLog::where('type', 'delivery_issue')->count());
+        $this->get(route('delivery.pick.verify', [$session->delivery_order_id, $session->id]))
+            ->assertOk()->assertSee('periksa box dan scan ulang');
+        $this->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $expectedBox->box_number])
+            ->assertOk()
+            ->assertJson(['success' => true, 'remaining' => 0]);
+        $this->assertDatabaseHas('audit_logs', ['type' => 'delivery_pick', 'action' => 'verified',
+            'model_id' => $session->id, 'user_id' => $user->id]);
+        $this->get(route('delivery.pick.scan', [$session->delivery_order_id, $session->id]))->assertOk();
+    }
+
+    public function test_wrong_verification_inputs_do_not_block_but_final_scan_still_blocks(): void
+    {
+        [$operator, , $session, $expectedBox] = $this->picking();
+        $admin = User::factory()->create(['role' => 'admin_warehouse']);
+        $attempts = [
+            [['box_number' => '1'], '1'],
+            [['box_number' => 'abc'], 'abc'],
+            [['box_number' => ''], '(kosong)'],
+            [[], '(kosong)'],
+            [['box_number' => str_repeat('9', 300)], str_repeat('9', 255)],
+        ];
+
+        foreach ($attempts as [$payload]) {
+            $this->actingAs($operator)
+                ->postJson(route('delivery.pick.verify.scan', $session->id), $payload)
+                ->assertStatus(422)
+                ->assertJson(['success' => false, 'session_status' => null]);
+            $this->assertSame('scanning', $session->fresh()->status);
+            $this->assertDatabaseMissing('delivery_issues', ['pick_session_id' => $session->id]);
+        }
+
+        foreach ($attempts as [$payload, $storedCode]) {
+            $this->actingAs($operator)
+                ->postJson(route('delivery.pick.scan.submit', $session->id), $payload)
+                ->assertStatus(422)
+                ->assertJson(['success' => false, 'session_status' => 'blocked']);
+            $this->assertSame('blocked', $session->fresh()->status);
+            $issue = DeliveryIssue::where('pick_session_id', $session->id)
+                ->where('status', 'pending')->sole();
+            $this->assertSame('scan_mismatch', $issue->issue_type);
+            $this->assertSame($storedCode, $issue->scanned_code);
+            $this->assertDatabaseHas('audit_logs', ['type' => 'delivery_issue', 'action' => 'created',
+                'model_id' => $issue->id, 'user_id' => $operator->id]);
+            $this->assertNull($issue->box_id);
+
+            $this->postJson(route('delivery.pick.scan.submit', $session->id), ['box_number' => $expectedBox->box_number])
+                ->assertStatus(423)->assertJson(['session_status' => 'blocked']);
+
+            $this->actingAs($admin)
+                ->post(route('delivery.pick.issue.approve', $issue->id), ['notes' => 'Lanjutkan scan'])
+                ->assertRedirect();
+            $this->assertSame('scanning', $session->fresh()->status);
+            $this->assertDatabaseHas('audit_logs', ['type' => 'delivery_issue', 'action' => 'approved',
+                'model_id' => $issue->id, 'user_id' => $admin->id]);
+        }
+    }
+
+    public function test_unavailable_verification_box_is_rejected_without_blocking(): void
+    {
+        [$user, , $session, $box] = $this->picking();
+        $session->update(['verification_box_ids' => []]);
+
+        foreach ([['is_withdrawn' => true], ['is_withdrawn' => false, 'expired_status' => 'expired']] as $attributes) {
+            $box->update($attributes);
+            $this->actingAs($user)
+                ->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $box->box_number])
+                ->assertStatus(422)
+                ->assertJson(['success' => false, 'session_status' => null]);
+            $this->assertSame('scanning', $session->fresh()->status);
+            $this->assertSame([], $session->fresh()->verification_box_ids);
+            $this->assertDatabaseMissing('delivery_issues', ['pick_session_id' => $session->id]);
+        }
     }
 
     public function test_final_scan_disables_timer_and_old_tab_cannot_reenable_it(): void

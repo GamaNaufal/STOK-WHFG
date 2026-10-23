@@ -10,6 +10,7 @@ use App\Models\StockInput;
 use App\Models\StockLocation;
 use App\Services\AuditService;
 use App\Services\LocationAssignmentService;
+use App\Services\PalletDeliveryLockService;
 use App\Services\PalletNumberService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\QueryException;
@@ -21,7 +22,8 @@ class StockInputController extends Controller
 {
     public function __construct(
         private readonly LocationAssignmentService $locationAssignmentService,
-        private readonly PalletNumberService $palletNumberService
+        private readonly PalletNumberService $palletNumberService,
+        private readonly PalletDeliveryLockService $palletDeliveryLockService
     ) {
     }
     private function isDuplicateKeyException(QueryException $e): bool
@@ -801,7 +803,14 @@ class StockInputController extends Controller
 
         try {
 
-            $pallet = Pallet::with(['items', 'stockLocation'])->findOrFail($validated['pallet_id']);
+            $pallet = Pallet::with(['items', 'stockLocation'])
+                ->lockForUpdate()
+                ->findOrFail($validated['pallet_id']);
+
+            $blockingBox = $this->palletDeliveryLockService->blockingBoxForPallets([(int) $pallet->id], true);
+            if ($blockingBox) {
+                throw new \RuntimeException('Pallet tidak dapat diubah karena box '.$blockingBox->box_number.' sedang dalam proses delivery aktif.');
+            }
 
             // Verify pallet has items (scanned QR) (INI KHUSUS UNTUK FLOW SCAN QR BARU - JIKA KITA PAKAI LOGIC DI BAWAH, LOGIC INI MUNGKIN PERLU DISESUAIKAN)
             // KARENA SAAT INI ITEM BELUM DI ATTACH KE PALLET (MASIH DI SESSION)

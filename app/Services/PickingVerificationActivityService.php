@@ -28,6 +28,9 @@ class PickingVerificationActivityService
         $session->verification_last_activity_at = null;
         $session->approval_notes = trim(($session->approval_notes ? $session->approval_notes.' | ' : '').self::EXPIRED_MESSAGE);
         $session->save();
+        AuditService::record('delivery_pick', 'timed_out', 'DeliveryPickSession', $session->id, null,
+            ['status' => 'scanning'], ['status' => 'cancelled', 'delivery_order_id' => $session->delivery_order_id],
+            "Sesi verifikasi #{$session->id} dibatalkan otomatis setelah 10 menit tanpa aktivitas.");
 
         return true;
     }

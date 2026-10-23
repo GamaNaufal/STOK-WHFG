@@ -729,4 +729,94 @@ class DeliveryAssignBoundaryTest extends TestCase
         $this->assertTrue($locations[0]['is_reserved'], 'Assigned box should be marked as reserved');
         $this->assertEquals('40001000', $locations[0]['box_number']);
     }
+
+    public function test_preview_expands_pallet_boxes_without_duplicate_direct_selection_and_respects_access(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Preview Assignment',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+        $pallet = Pallet::create(['pallet_number' => 'PLT-PREVIEW-ASSIGN']);
+        StockLocation::create(['pallet_id' => $pallet->id, 'warehouse_location' => 'A1', 'stored_at' => now()]);
+        $box = Box::create([
+            'box_number' => '50001000',
+            'part_number' => 'P-PREVIEW-ASSIGN',
+            'pcs_quantity' => 50,
+            'qty_box' => 50,
+            'qr_code' => '50001000|P-PREVIEW-ASSIGN|50',
+            'user_id' => $operator->id,
+        ]);
+        $pallet->boxes()->attach($box->id);
+
+        $payload = [
+            'delivery_order_id' => $order->id,
+            'box_ids' => [$box->id],
+            'pallet_ids' => [$pallet->id],
+        ];
+
+        $this->actingAs($operator)->postJson(route('delivery-assign.preview'), $payload)
+            ->assertOk()
+            ->assertJsonCount(1, 'boxes')
+            ->assertJsonPath('boxes.0.box_number', '50001000')
+            ->assertJsonPath('pallet_box_count', 1)
+            ->assertJsonPath('missing_box_ids', [])
+            ->assertJsonPath('empty_pallet_ids', []);
+
+        $this->actingAs($sales)->postJson(route('delivery-assign.preview'), $payload)->assertForbidden();
+        $this->assertNull($box->fresh()->assigned_delivery_order_id);
+
+        $box->delete();
+        $this->actingAs($operator)->postJson(route('delivery-assign.preview'), [
+            'delivery_order_id' => $order->id,
+            'pallet_ids' => [$pallet->id],
+        ])->assertOk()->assertJsonPath('empty_pallet_ids', [$pallet->id]);
+    }
+
+    public function test_assign_allocates_pallet_number_automatically_for_new_box(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        $order = DeliveryOrder::create([
+            'sales_user_id' => $sales->id,
+            'customer_name' => 'Automatic Pallet',
+            'delivery_date' => now()->addDay()->toDateString(),
+            'status' => 'approved',
+        ]);
+        DeliveryOrderItem::create([
+            'delivery_order_id' => $order->id,
+            'part_number' => 'P-AUTO-ASSIGN',
+            'quantity' => 40,
+            'fulfilled_quantity' => 0,
+        ]);
+        PartSetting::create(['part_number' => 'P-AUTO-ASSIGN', 'qty_box' => 40]);
+        $location = MasterLocation::create(['code' => 'AUTO-ASSIGN', 'is_occupied' => false]);
+
+        $this->actingAs($operator)->postJson(route('delivery-assign.assign'), [
+            'delivery_order_id' => $order->id,
+            'new_boxes' => [[
+                'box_number' => '50002000',
+                'part_number' => 'P-AUTO-ASSIGN',
+                'pcs_quantity' => 40,
+            ]],
+            'new_boxes_pallet_mode' => 'new',
+            'new_boxes_location_id' => $location->id,
+        ])->assertOk()->assertJsonPath('created_new_count', 1);
+
+        $box = Box::where('box_number', '50002000')->firstOrFail();
+        $pallet = $box->pallets()->firstOrFail();
+        $this->assertMatchesRegularExpression('/^PLT-\d{3,}$/', $pallet->pallet_number);
+        $this->assertDatabaseHas('stock_locations', [
+            'pallet_id' => $pallet->id,
+            'master_location_id' => $location->id,
+        ]);
+        $this->assertDatabaseHas('master_locations', [
+            'id' => $location->id,
+            'is_occupied' => true,
+            'current_pallet_id' => $pallet->id,
+        ]);
+    }
 }

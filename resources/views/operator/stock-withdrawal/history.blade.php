@@ -23,12 +23,12 @@
 <div class="row">
     <div class="col-12">
         <div class="card shadow-sm border-0" style="border-left: 4px solid #0C7779;">
-            <div class="card-header text-white" style="background-color: #0C7779;">
+            <div class="app-section-heading card-header text-white" style="background-color: #0C7779;">
                 <i class="bi bi-table"></i> Daftar Pengambilan
             </div>
             <div class="card-body p-0">
                 @if($withdrawals->count() > 0)
-                    <div class="table-responsive">
+                    <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                         <table class="table table-hover mb-0">
                             <thead style="background-color: #f5f7fa; color: #0C7779;">
                                 <tr>

@@ -3,13 +3,13 @@
 @section('title', 'Input Stok - Warehouse FG Yamato')
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid stock-input-page">
     @include('operator.stock-input.partials.header')
 
     <div class="row g-4 mt-0">
         <!-- Main Content -->
-        <div class="col-lg-8">
-            <div class="card shadow" style="border: none; border-radius: 12px; overflow: hidden;">
+        <div class="col-12">
+            <div class="card shadow stock-input-workspace" style="border: none; border-radius: 12px; overflow: hidden;">
                 <div class="card-body" style="padding: 30px;">
                     @include('operator.stock-input.partials.scanner')
                     @include('operator.stock-input.partials.pallet')

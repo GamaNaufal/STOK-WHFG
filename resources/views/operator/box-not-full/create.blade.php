@@ -4,32 +4,12 @@
 
 @section('styles')
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <style>
-        .select2-container .select2-selection--single {
-            height: 38px;
-            padding: 4px 8px;
-        }
-
-        .select2-container--default .select2-selection--single .select2-selection__rendered {
-            line-height: 28px;
-        }
-
-        @media (max-width: 992px) {
-            .card-body {
-                padding: 20px !important;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .row.g-4 > [class*="col-"] {
-                margin-bottom: 1rem;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="{{ asset('css/not-full.css') }}">
 @endsection
 
 @section('content')
-<div class="container-fluid">
+<div class="container-fluid not-full-page">
+    @include('shared.not-full-feedback')
     @if($errors->any())
         <div class="alert alert-dismissible fade show shadow-sm" role="alert" style="background: #FEF2F2; border: none; border-left: 4px solid #EF4444; color: #991B1B; border-radius: 8px;">
             <strong><i class="bi bi-exclamation-triangle"></i> Gagal mengirim request:</strong>
@@ -38,19 +18,19 @@
                     <li>{{ $error }}</li>
                 @endforeach
             </ul>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup pesan"></button>
         </div>
     @endif
 
     <div class="row mb-4">
         <div class="col-12">
-            <div style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
+            <div class="app-page-banner" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                         color: white;
                         padding: 30px 24px;
                         border-radius: 12px;
                         box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);">
                 <h1 class="h4" style="margin: 0 0 8px 0; font-weight: 700;">
-                    <i class="bi bi-exclamation-circle"></i> Input Box Not Full
+                    <i class="bi bi-exclamation-circle"></i> Request Box Not Full
                 </h1>
                 <p style="margin: 0; opacity: 0.95; font-size: 14px;">
                     Ajukan 1 box not full untuk approval Supervisi, lalu pilih delivery dan lokasi/pallet tujuan.
@@ -63,16 +43,20 @@
         <div class="col-xl-8">
             <div class="card shadow" style="border: none; border-radius: 12px; overflow: hidden;">
                 <div class="card-body" style="padding: 28px;">
-                    <form method="POST" action="{{ route('box-not-full.store') }}">
+                    <form id="notFullRequestForm" method="POST" action="{{ route('box-not-full.store') }}">
+                        <div id="notFullFormError" class="alert alert-danger d-none" role="alert" tabindex="-1"></div>
                         @csrf
 
+                        <h2 class="not-full-section-title">Detail box dan delivery</h2>
+                        <p class="text-muted">Stok dibuat setelah request disetujui. Semua field wajib diisi.</p>
                         <div class="row g-3">
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">ID Box (Scan)</label>
-                                <input type="text" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" value="{{ old('box_number') }}" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" required autofocus>
+                                <label for="boxNumber" class="form-label fw-bold">ID Box (Scan)</label>
+                                <input type="text" id="boxNumber" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" value="{{ old('box_number') }}" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" required autofocus aria-describedby="boxNumberHint">
+                            <small id="boxNumberHint" class="text-muted">Gunakan ID box 8 angka yang belum pernah dipakai.</small>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">No Part</label>
+                                <label id="partNumberLabel" for="partNumberSelect" class="form-label fw-bold">No Part</label>
                                 <select name="part_number" id="partNumberSelect" class="form-select" required>
                                     <option value="">Pilih No Part</option>
                                     @foreach($partNumbers as $part)
@@ -81,16 +65,19 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                @if($partNumbers->isEmpty())
+                                    <small class="text-muted">Master part belum tersedia. Hubungi pengelola master data sebelum mengajukan request.</small>
+                                @endif
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">PCS Aktual</label>
-                                <input type="number" id="pcsQuantityInput" name="pcs_quantity" class="form-control" min="1" value="{{ old('pcs_quantity') }}" required>
-                                <small class="text-muted">Wajib lebih kecil dari fixed qty.</small>
+                                <label for="pcsQuantityInput" class="form-label fw-bold">PCS Aktual</label>
+                                <input type="number" aria-describedby="pcsHint" id="pcsQuantityInput" name="pcs_quantity" class="form-control" min="1" value="{{ old('pcs_quantity') }}" required>
+                                <small id="pcsHint" class="text-muted" role="status">Pilih part untuk melihat kapasitas standar box.</small>
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Delivery Wajib</label>
-                                <select name="delivery_order_id" class="form-select" required>
+                                <label for="deliveryOrder" class="form-label fw-bold">Delivery Wajib</label>
+                                <select id="deliveryOrder" name="delivery_order_id" class="form-select" required>
                                     <option value="">Pilih jadwal delivery</option>
                                     @foreach($deliveryOrders as $order)
                                         <option value="{{ $order->id }}" {{ (string) old('delivery_order_id') === (string) $order->id ? 'selected' : '' }}>
@@ -98,42 +85,46 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                @if($deliveryOrders->isEmpty())
+                                    <small class="text-muted">Belum ada delivery aktif yang dapat dipilih.</small>
+                                @endif
                             </div>
 
                             <div class="col-md-6">
-                                <label class="form-label fw-bold">Tipe Permintaan</label>
-                                <select name="request_type" class="form-select" required>
+                                <label for="requestType" class="form-label fw-bold">Tipe Permintaan</label>
+                                <select id="requestType" name="request_type" class="form-select" required>
                                     <option value="supplement" {{ old('request_type', 'supplement') === 'supplement' ? 'selected' : '' }}>Pelengkap (tidak ubah qty order)</option>
                                     <option value="additional" {{ old('request_type') === 'additional' ? 'selected' : '' }}>Tambahan Order (tambah qty)</option>
                                 </select>
                             </div>
 
                             <div class="col-md-12">
-                                <label class="form-label fw-bold">Alasan Not Full</label>
-                                <textarea name="reason" class="form-control" rows="2" required>{{ old('reason') }}</textarea>
+                                <label for="notFullReason" class="form-label fw-bold">Alasan Not Full</label>
+                                <textarea id="notFullReason" name="reason" class="form-control" rows="3" minlength="3" required aria-describedby="notFullReasonHint">{{ old('reason') }}</textarea>
+                                <small id="notFullReasonHint" class="text-muted">Jelaskan alasan box tidak penuh, minimal 3 karakter.</small>
                             </div>
                         </div>
 
                         <hr class="my-4">
 
                         <div class="mb-3">
-                            <label class="form-label fw-bold">Masukkan ke</label>
-                            <div class="d-flex gap-3">
+                            <h2 class="not-full-section-title">Tujuan penyimpanan</h2>
+                            <div class="d-flex gap-3 flex-wrap" role="group" aria-label="Tujuan penyimpanan">
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="target_type" id="targetPallet" value="pallet" {{ old('target_type', 'pallet') === 'pallet' ? 'checked' : '' }}>
                                     <label class="form-check-label" for="targetPallet">Pallet Existing</label>
                                 </div>
                                 <div class="form-check">
                                     <input class="form-check-input" type="radio" name="target_type" id="targetLocation" value="location" {{ old('target_type') === 'location' ? 'checked' : '' }}>
-                                    <label class="form-check-label" for="targetLocation">Lokasi Baru</label>
+                                    <label class="form-check-label" for="targetLocation">Pallet Baru di Lokasi Kosong</label>
                                 </div>
                             </div>
                         </div>
 
                         <div class="row g-3" id="palletTargetSection">
                             <div class="col-md-12">
-                                <label class="form-label fw-bold">Pilih Pallet</label>
-                                <select name="target_pallet_id" class="form-select">
+                                <label for="targetPalletId" class="form-label fw-bold">Pilih Pallet</label>
+                                <select id="targetPalletId" name="target_pallet_id" class="form-select" required>
                                     <option value="">Pilih pallet</option>
                                     @foreach($pallets as $pallet)
                                         <option value="{{ $pallet->id }}" {{ (string) old('target_pallet_id') === (string) $pallet->id ? 'selected' : '' }}>
@@ -141,13 +132,16 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                @if($pallets->isEmpty())
+                                    <small class="text-muted">Belum ada pallet dengan lokasi aktif. Pilih pallet baru di lokasi kosong jika tersedia.</small>
+                                @endif
                             </div>
                         </div>
 
                         <div class="row g-3" id="locationTargetSection" style="display:none;">
                             <div class="col-md-12">
-                                <label class="form-label fw-bold">Pilih Lokasi</label>
-                                <select name="target_location_id" class="form-select">
+                                <label for="targetLocationId" class="form-label fw-bold">Pilih Lokasi</label>
+                                <select id="targetLocationId" name="target_location_id" class="form-select">
                                     <option value="">Pilih lokasi kosong</option>
                                     @foreach($locations as $location)
                                         <option value="{{ $location->id }}" {{ (string) old('target_location_id') === (string) $location->id ? 'selected' : '' }}>
@@ -155,11 +149,15 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                @if($locations->isEmpty())
+                                    <small class="text-muted">Tidak ada lokasi kosong. Pilih pallet existing atau hubungi pengelola gudang.</small>
+                                @endif
                             </div>
                         </div>
 
+                        <p class="not-full-note mt-4">Request pending menahan proses delivery terkait sampai disetujui atau ditolak.</p>
                         <div class="d-flex justify-content-end mt-4">
-                            <button type="submit" class="btn" style="background: #0C7779; color: white;">
+                            <button type="submit" class="btn btn-primary">
                                 <i class="bi bi-send"></i> Kirim ke Supervisi
                             </button>
                         </div>
@@ -170,16 +168,16 @@
         <div class="col-xl-4">
             <div class="card shadow-sm border-0">
                 <div class="card-header" style="background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
-                    <strong><i class="bi bi-clock-history"></i> Riwayat Box Not Full</strong>
+                    <h2 class="not-full-section-title mb-0">Riwayat Box Not Full</h2>
                 </div>
                 <div class="card-body" style="max-height: 520px; overflow-y: auto;">
                     @if($historyRequests->isEmpty())
-                        <div class="text-muted">Belum ada riwayat.</div>
+                        <div class="text-muted">Belum ada request yang disetujui atau ditolak.</div>
                     @else
                         <ul class="list-group list-group-flush">
                             @foreach($historyRequests as $history)
                                 <li class="list-group-item">
-                                    <div class="d-flex justify-content-between">
+                                    <div class="d-flex justify-content-between gap-2 flex-wrap">
                                         <strong>{{ $history->box_number }}</strong>
                                         <small class="text-muted">{{ $history->updated_at->format('d M Y H:i') }}</small>
                                     </div>
@@ -194,9 +192,9 @@
                                     <div class="small">
                                         Status:
                                         @if($history->status === 'approved')
-                                            <span class="badge bg-success">Approved</span>
+                                            <span class="badge bg-success">Disetujui</span>
                                         @else
-                                            <span class="badge bg-danger">Rejected</span>
+                                            <span class="badge bg-danger">Ditolak</span>
                                         @endif
                                     </div>
                                     <div class="small text-muted">Approver: {{ $history->approver?->name ?? '-' }}</div>
@@ -214,67 +212,5 @@
 @section('scripts')
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script>
-    const partSelect = document.getElementById('partNumberSelect');
-
-    window.jQuery(function() {
-        window.jQuery(partSelect).select2({
-            width: '100%',
-            placeholder: 'Pilih No Part',
-            allowClear: true,
-            minimumResultsForSearch: 0
-        });
-    });
-
-    const targetPallet = document.getElementById('targetPallet');
-    const targetLocation = document.getElementById('targetLocation');
-    const palletSection = document.getElementById('palletTargetSection');
-    const locationSection = document.getElementById('locationTargetSection');
-
-    const toggleTarget = () => {
-        if (targetLocation.checked) {
-            palletSection.style.display = 'none';
-            locationSection.style.display = 'block';
-        } else {
-            palletSection.style.display = 'block';
-            locationSection.style.display = 'none';
-        }
-    };
-
-    targetPallet.addEventListener('change', toggleTarget);
-    targetLocation.addEventListener('change', toggleTarget);
-    toggleTarget();
-
-    // Add SweetAlert2 confirmation before form submission
-    document.querySelector('form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        const form = this;
-        const partNumber = document.getElementById('partNumberSelect').value;
-        const pcsQty = document.getElementById('pcsQuantityInput')?.value || '';
-        const targetType = document.getElementById('targetLocation').checked ? 'Lokasi' : 'Pallet';
-        
-        if (!partNumber || !pcsQty) {
-            WarehouseAlert.error({
-                title: 'Data Tidak Lengkap',
-                message: 'Harap isi semua field yang diperlukan'
-            });
-            return;
-        }
-
-        WarehouseAlert.info({
-            title: 'Konfirmasi Kirim Request',
-            message: 'Request box not full akan dikirim ke <strong style="color: #0C7779;">Supervisor</strong> untuk approval.',
-            details: {
-                'Part Number': partNumber,
-                'PCS Aktual': `${pcsQty} PCS`,
-                'Tujuan': targetType
-            },
-            infoText: 'Pastikan data sudah benar sebelum mengirim.',
-            confirmText: 'Kirim Request',
-            onConfirm: () => {
-                form.submit();
-            }
-        });
-    });
-</script>
+<script src="{{ asset('js/pages/not-full.js') }}"></script>
 @endsection

@@ -2,6 +2,58 @@
 
 Terakhir diverifikasi dari source code: 7 Oktober 2026.
 
+Verifikasi tambahan 21 Oktober 2026 (Audit Trail): Handle box expired kini membuat
+`audit_logs` bertipe `expired_box` dalam transaksi yang sama dengan aktivasi dan
+`expired_box_reports`; request berulang saat box masih aktif tidak membuat entri baru.
+Pengajuan/keputusan Box Not Full, perubahan sesi picking (mulai, verifikasi sukses,
+scan final sukses, batal/timeout/selesai, terminate lock), pembuatan dan approval
+issue scan, withdrawal langsung, CRUD master lokasi/part dan user, serta pembaruan profil kini
+memiliki entri audit tersendiri. Jalur baru memakai `AuditService::record` yang
+mewajibkan audit tersimpan dalam transaksi mutasi; sandi tidak masuk snapshot.
+CRUD/status PPC/split/restore/hapus Delivery Order tetap dikecualikan atas permintaan
+pengguna. Jalur audit lama yang memakai `AuditService::log` masih best-effort dan
+menelan kegagalan tulis; riwayat lama tidak di-backfill.
+
+Verifikasi tambahan 20 Oktober 2026 (mutasi pallet saat delivery): box assigned delivery
+atau not-full tetap boleh ikut Move/Merge jika sesi pick baru `pending` atau tidak ada.
+Box mana pun yang masih terhubung ke pallet dan berada dalam sesi `scanning`, `blocked`,
+atau `approved` mengunci Move/Merge dan penambahan box melalui Stock Input, Delivery
+Assign (box existing maupun baru), approval Box Not Full, koreksi/hapus Stock View,
+atau Handle expired; termasuk box expired/withdrawn yang masih terhubung.
+Merge mengalihkan request Box Not Full `pending` ke pallet hasil. Assignment dan PCS box
+tidak berubah. Validasi mutasi diulang dalam transaksi; Move tetap mengklaim lokasi atomik.
+
+Verifikasi tambahan 20 Oktober 2026 (Delivery Assign): UI menyimpan draft pilihan
+per tab untuk refresh dan menampilkan pratinjau box sebelum assign. Pallet baru
+dari UI mendapat nomor melalui `PalletNumberService`; payload nomor manual lama
+tetap didukung. Lokasi harus berasal dari Master Location dan diklaim atomik
+melalui `LocationAssignmentService` saat transaksi assign.
+
+Verifikasi tambahan 20 Oktober 2026 (perbedaan tahap scan): pada Picking Verification,
+kode salah, kosong, tidak ada di picklist, atau box withdrawn/expired ditolak tanpa
+menambah progres, issue, atau memblokir sesi; operator dapat langsung scan ulang.
+Pada Scan Final Delivery, setiap scan salah tetap membuat issue `pending` dan
+memblokir sesi sampai approval Admin Warehouse/Admin. Kode kosong dicatat
+`(kosong)`; kode issue panjang disimpan maksimal 255 karakter.
+Masa Handle yang habis ditolak pada kedua tahap meskipun label expiry belum tersinkron;
+respons scan menyebut masa Handle habis dan langkah operator. Verifikasi tetap aktif,
+sedangkan scan final membuat issue `box_expired` dan memblokir sesi (tes diperbarui 20 Oktober 2026).
+
+Verifikasi tambahan 20 Oktober 2026 (Split Delivery): MySQL lokal `delivery_orders.status`
+sebelumnya tidak memuat `partial` meski migrasi dasar dan alur Split memakainya.
+Migration `2026_10_20_000001_add_partial_to_existing_delivery_order_status` telah
+diterapkan pada `db_stock` lokal; aturan Split/Restore dan data order tidak diubah.
+
+Verifikasi tambahan 20 Oktober 2026 (konsistensi penghapusan Split): hasil split
+tidak boleh dihapus melalui Hapus Jadwal; gunakan Restore Split. Parent dengan
+child split aktif juga tidak boleh dihapus sebelum semua child dipulihkan.
+
+Verifikasi tambahan 16 Oktober 2026 (presentasi dashboard): role `admin` (Admin Utama)
+dan `supervisi` menggunakan dashboard laporan operasional yang sama melalui
+`OperationalReportService` dan `operator.reports.operational`. Role lain tetap
+menggunakan `shared.dashboard`. Statistik stok serta sinkronisasi expiry Admin
+Utama tetap dijalankan; hak akses dan proses transaksi tidak berubah.
+
 Verifikasi tambahan 15 Oktober 2026: pengaturan hak akses fitur per role oleh Admin Utama, pembatasan server dan navigasi dinamis.
 
 Verifikasi tambahan 14 Oktober 2026: Stock View menampilkan stok expired dengan label, dan Handle dibatasi untuk box expired.
@@ -429,9 +481,13 @@ File utama:
 
 ### 11. Scan issue
 
-Issue dibuat ketika:
+Picking Verification menolak kode salah tanpa issue atau blokir sesi, termasuk
+box withdrawn/expired; box tersebut tidak dihitung sebagai terverifikasi.
 
-- box yang discan tidak ada dalam picklist (`scan_mismatch`);
+Scan Final Delivery membuat issue ketika kode yang dikirim:
+
+- kosong, tidak ditemukan, atau tidak ada dalam picklist (`scan_mismatch`),
+  tanpa syarat panjang atau format ID;
 - box sudah withdrawn (`box_withdrawn`);
 - box expired atau handled (`box_expired`).
 
@@ -500,6 +556,8 @@ Aturan:
 - child order dibuat dengan status `approved`;
 - quantity parent dikurangi;
 - parent menjadi `partial`.
+- Hapus Jadwal menolak child hasil split serta parent yang masih memiliki child aktif;
+  child hanya dapat dibatalkan melalui Restore Split agar quantity kembali ke parent.
 
 Restore split:
 
@@ -540,9 +598,11 @@ Alur:
 - hanya palet dengan box aktif yang dapat dipilih;
 - sistem membuat nomor palet baru;
 - seluruh box aktif dipindahkan ke palet baru;
-- merge ditolak jika terdapat box yang sudah assigned ke delivery atau dikunci sesi picking aktif;
+- box assigned delivery, not-full, dan sesi picking `pending` boleh ikut; merge ditolak jika
+  box yang terhubung ke pallet berada dalam sesi `scanning`, `blocked`, atau `approved`;
 - ringkasan `pallet_items` digabung;
 - referensi transaksi stock input diarahkan ke palet baru;
+- request Box Not Full `pending` yang menunjuk palet sumber diarahkan ke palet baru;
 - relasi box aktif yang dipindahkan dan lokasi palet sumber dibersihkan; relasi box inactive dipertahankan untuk histori;
 - lokasi lama dibuat available;
 - palet sumber dihapus;
@@ -563,7 +623,10 @@ mengubah nomor pallet, box, atau ringkasan pallet.
 Alur:
 
 - operator memilih pallet melalui scan atau pencarian nomor pallet;
-- pallet wajib memiliki box aktif, lokasi master yang valid, dan tidak sedang digunakan delivery/picking;
+- pallet wajib memiliki box aktif dan lokasi master yang valid; box assigned delivery
+  atau not-full tetap boleh ikut dipindahkan;
+- sesi picking `pending` boleh ada; box terhubung dalam sesi `scanning`, `blocked`, atau
+  `approved` menolak pemindahan, termasuk jika box sudah tidak terhitung sebagai stok aktif;
 - lokasi tujuan wajib berasal dari Master Location dan tersedia;
 - backend mengunci pallet serta lokasi sumber/tujuan dalam transaksi;
 - occupancy lokasi sumber dilepas, lokasi tujuan diklaim atomik, dan `stock_locations` diperbarui;
@@ -652,7 +715,7 @@ File utama:
 - Audio berasal dari `public/audio/OK.mp3` untuk input/scan berhasil dan `public/audio/NG.mp3` untuk input/scan gagal. File disertakan dalam repository dan diakses melalui URL `asset()`, sehingga deployment tidak bergantung pada folder Downloads komputer development.
 - Stock Input memutar OK setelah server menerima ID box atau nomor part; seluruh pemanggilan suara error sebelumnya memakai NG. Pesan sedang memproses tidak memutar OK.
 - Picking Verification dan Scan Final Delivery memutar NG untuk validasi input gagal, penolakan server, dan kegagalan koneksi. Scan ulang box yang sudah diverifikasi tetap memakai OK sesuai perilaku sukses yang sudah ada.
-- Beep sintetis dan text-to-speech sebelumnya dihapus. Pemutar menyiapkan audio pada interaksi keyboard/pointer, menghentikan suara sebelumnya saat hasil baru datang, dan tidak menggagalkan proses scan jika audio tidak tersedia.
+- Beep sintetis dan text-to-speech sebelumnya dihapus. Pemutar menyiapkan audio hanya saat interaksi keyboard/pointer pada kontrol scan (diverifikasi 20 Oktober 2026), bukan saat navigasi/status; suara sebelumnya dihentikan saat hasil baru datang, dan scan tetap berjalan jika audio tidak tersedia.
 - Audio OK dan NG memakai penguatan 2x (sekitar +6 dB sebelum kompresi) melalui GainNode bersama, lalu kompresor untuk menekan puncak suara dan mengurangi risiko clipping. Volume akhir tetap mengikuti perangkat pengguna.
 - Perubahan audio ini dibuat di project development; production memerlukan deployment file terkait.
 
@@ -697,7 +760,11 @@ Status yang digunakan:
 - Canonical pallet box shared adalah relasi lokasi valid paling baru.
 - Box dalam sesi picking aktif tidak boleh dialokasikan ke order lain.
 - Box dalam sesi picking aktif tidak boleh diedit atau dihapus.
-- Box assigned ke delivery tidak boleh diedit, dihapus, ditangani sebagai expired, atau dipindahkan melalui merge pallet.
+- Box assigned ke delivery tidak boleh diedit, dihapus, atau ditangani sebagai expired.
+  Move/Merge tetap boleh selama belum ada sesi delivery aktif; sesi `pending` tidak mengunci.
+- Pallet dengan box dalam sesi `scanning`, `blocked`, atau `approved` tidak boleh diubah
+  melalui Move/Merge, Stock Input, Delivery Assign, approval Box Not Full, Stock View,
+  atau Handle expired. Sinkronisasi expiry otomatis dan penyelesaian delivery tetap berjalan.
 - Semua lokasi baru dari Stock Input dan Merge Pallet wajib berasal dari Master Location.
 - Semua request box not full pending memblokir fulfillment; supplement hanya boleh menutup kebutuhan order yang benar-benar masih tersisa.
 - Completion delivery wajib exact dan membatalkan transaksi jika snapshot box, status, quantity, assignment, atau lokasi telah berubah.
@@ -731,6 +798,8 @@ Status yang digunakan:
 
 ## Status Schema dan Validasi Terakhir
 
+- MySQL lokal `db_stock`: enum `delivery_orders.status` sudah memuat `partial` (20 Oktober 2026).
+  Deployment lain dengan skema lama memerlukan migration perbaikan sebelum Split Delivery digunakan.
 - Seluruh migration sampai `2026_06_19_000005_make_audit_log_type_extensible` telah dijalankan pada MySQL lokal tanggal 19 Juni 2026.
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.

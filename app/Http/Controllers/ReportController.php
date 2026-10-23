@@ -153,7 +153,7 @@ class ReportController extends Controller
             $query->where('user_id', $request->input('user_id'));
         }
 
-        $withdrawals = $query->orderBy('withdrawn_at', 'desc')->paginate(50);
+        $withdrawals = $query->orderBy('withdrawn_at', 'desc')->paginate(15);
 
         // Get statistics
         $totalWithdrawals = StockWithdrawal::where('status', 'completed')->count();
@@ -219,7 +219,7 @@ class ReportController extends Controller
             $query->where('warehouse_location', 'like', '%' . request()->input('warehouse_location') . '%');
         }
 
-        $stockInputs = $query->orderBy('stored_at', 'desc')->paginate(50);
+        $stockInputs = $query->orderBy('stored_at', 'desc')->paginate(15);
 
         $stockInputs->getCollection()->transform(function (StockInput $input) {
             $boxAuditItems = $this->buildBoxAuditItems($input);

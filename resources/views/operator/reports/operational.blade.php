@@ -3,19 +3,37 @@
 @section('title', 'Operational Warehouse Reports')
 
 @section('styles')
+@if(request()->routeIs('dashboard'))
+    <link rel="stylesheet" href="{{ asset('css/dashboard-summary.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-filters.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-charts.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-performance.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/dashboard-stock-tables.css') }}">
+@endif
 <style>
     .popover.popover-wide {
-        max-width: 520px;
+        --bs-popover-bg: #fff;
+        --bs-popover-header-bg: #f5f6f7;
+        --bs-popover-max-width: min(520px, calc(100vw - 32px));
+        max-width: min(520px, calc(100vw - 32px));
+        z-index: 1105;
+        background: #fff;
+        box-shadow: 0 8px 24px rgb(20 25 32 / 12%);
     }
     .popover.popover-wide .popover-body {
-        max-width: 520px;
+        max-height: min(360px, 60vh);
+        overflow: auto;
+        overscroll-behavior: contain;
+        overflow-wrap: normal;
     }
-    
-    @media (max-width: 576px) {
-        .popover.popover-wide,
-        .popover.popover-wide .popover-body {
-            max-width: 320px;
-        }
+    .popover.popover-wide th { white-space: nowrap; }
+    .warehouse-app .popover.popover-wide .table > thead > tr > th,
+    .warehouse-app .popover.popover-wide .table > tbody > tr > td {
+        padding: .65rem .5rem;
+    }
+    .warehouse-app .popover.popover-wide .table > tbody > tr > td {
+        white-space: normal;
+        overflow-wrap: anywhere;
     }
 </style>
 @endsection
@@ -32,6 +50,9 @@
         </a>
     </div>
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-filters')
+    @else
     <div class="card shadow-sm border-0 mb-4" id="audit-report">
         <div class="card-body">
             <form method="GET" action="{{ url()->current() }}" class="row g-3 align-items-end">
@@ -77,6 +98,8 @@
         </div>
     </div>
 
+    @endif
+
     @php
         $activeBoxPreview = $currentHandling->sortByDesc('created_at')->take(5);
         $activePallets = $currentHandling->groupBy('pallet_number')->map(function ($rows) {
@@ -98,6 +121,9 @@
         $scanPreview = $issueList->take(5);
     @endphp
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.supervisor-summary')
+    @else
     <div class="row g-4 mb-4">
         <div class="col-md-3">
             @php
@@ -143,6 +169,8 @@
             </div>
         </div>
     </div>
+
+    @endif
 
     <div id="fulfillment-popover" class="d-none">
         <table class="table table-sm mb-0">
@@ -244,6 +272,9 @@
         </table>
     </div>
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-charts')
+    @else
     <div class="row g-4 mb-4">
         <div class="col-lg-8">
             <div class="card shadow-sm border-0 h-100">
@@ -263,17 +294,30 @@
         </div>
     </div>
 
-    <div class="row g-4 mb-4">
+    @endif
+
+    <div class="row g-4 mb-4 {{ request()->routeIs('dashboard') ? 'dashboard-performance' : '' }}">
         <div class="col-lg-6">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-3">Schedule Fulfillment Performance</h6>
+                    @if(request()->routeIs('dashboard'))
+                        <h2 id="dashboard-delivery-title">Rencana dan aktual delivery</h2>
+                        <p class="dashboard-performance-description">Perbandingan Rencana Sales dan Aktual Delivery dalam QTY, mengikuti pengelompokan periode yang dipilih.</p>
+                        @if(!collect($deliveryTrend)->contains(fn ($row) => $row['planned_qty'] != 0 || $row['actual_qty'] != 0))
+                            <p class="dashboard-performance-description">Belum ada rencana atau aktual delivery pada periode ini.</p>
+                        @endif
+                    @else
+                        <h6 class="fw-bold mb-3">Schedule Fulfillment Performance</h6>
+                    @endif
                     <div id="fulfillmentChart" style="height: 260px;"></div>
+                    @if(request()->routeIs('dashboard'))
+                        @include('shared.partials.dashboard-delivery-data')
+                    @endif
                     <div class="collapse mt-3" id="fulfillment-detail">
                         <div class="card card-body border-0 shadow-sm">
                             <div id="fulfillment-full" class="d-none">
                                 <div class="text-muted small mb-2">Order Full (Top 5)</div>
-                                <div class="table-responsive">
+                                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                                     <table class="table table-sm table-striped align-middle mb-0">
                                         <thead>
                                             <tr>
@@ -300,7 +344,7 @@
                             </div>
                             <div id="fulfillment-partial" class="d-none">
                                 <div class="text-muted small mb-2">Order Partial (Top 5)</div>
-                                <div class="table-responsive">
+                                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                                     <table class="table table-sm table-striped align-middle mb-0">
                                         <thead>
                                             <tr>
@@ -333,7 +377,11 @@
         <div class="col-lg-6">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-body">
-                    <h6 class="fw-bold mb-3">Scan Mismatch Summary</h6>
+                    @if(request()->routeIs('dashboard'))
+                        <h2>Ringkasan scan mismatch</h2>
+                    @else
+                        <h6 class="fw-bold mb-3">Scan Mismatch Summary</h6>
+                    @endif
                     @php
                         $scanTotal = $issueSummary->sum('total');
                         $scanTypes = $issueSummary->count();
@@ -345,6 +393,9 @@
                         $recentIssues = $issueList->take(5);
                     @endphp
                     <div class="text-muted small mb-2">Ringkasan mismatch dari periode terpilih.</div>
+                    @if(request()->routeIs('dashboard'))
+                        <div class="dashboard-mismatch-total"><strong>{{ number_format($scanTotal) }}</strong><span>total mismatch</span></div>
+                    @endif
                     <ul class="list-group list-group-flush">
                         @forelse($issueSummary as $row)
                             <li class="list-group-item d-flex justify-content-between">
@@ -356,10 +407,10 @@
                         @endforelse
                     </ul>
                     <div class="mt-3">
-                        <div class="text-muted small mb-2">5 mismatch terbaru</div>
+                        <div class="text-muted small mb-2 dashboard-recent-title">5 mismatch terbaru</div>
                         <ul class="list-unstyled small mb-0">
                             @forelse($recentIssues as $row)
-                                <li class="d-flex justify-content-between border-bottom py-1">
+                                <li class="d-flex justify-content-between border-bottom py-1 dashboard-recent-issue">
                                     <span>#{{ $row['order_id'] ?? '-' }} · {{ $row['scanned_code'] ?? '-' }}</span>
                                     <span class="text-muted">{{ $row['created_at'] ?? '-' }}</span>
                                 </li>
@@ -373,6 +424,9 @@
         </div>
     </div>
 
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-stock-tables')
+    @else
     <div class="card shadow-sm border-0 mb-4" id="current-handling">
         <div class="card-header bg-white">
             <strong>Current Handling Report (Barang Aktif)</strong>
@@ -439,6 +493,16 @@
         </div>
     </div>
 
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-order-table', [
+            'sectionId' => 'fulfillment-report',
+            'title' => 'Inbound vs Outbound Matching Report',
+            'description' => 'Kebutuhan dan pemenuhan order pada periode laporan. Required dan Fulfilled dalam PCS.',
+            'rows' => $matchingReport,
+        ])
+    @else
     <div class="card shadow-sm border-0 mb-4" id="fulfillment-report">
         <div class="card-header bg-white">
             <strong>Inbound vs Outbound Matching Report</strong>
@@ -475,7 +539,12 @@
         </div>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4" id="scan-issues">
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-processing-table')
+    @else
+    <div class="card shadow-sm border-0 mb-4" id="processing-time">
         <div class="card-header bg-white">
             <strong>Processing Time (Lead Time)</strong>
         </div>
@@ -484,7 +553,7 @@
                 Catatan: Scan di sini adalah scan saat pengambilan (picking/delivery), bukan scan saat input stok.
                 Durasi Proses = waktu dari mulai picking sampai selesai. Durasi Scan = waktu dari scan pertama sampai scan terakhir.
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
             <table class="table table-sm table-striped align-middle">
                 <thead>
                     <tr>
@@ -515,6 +584,11 @@
         </div>
     </div>
 
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-throughput-table')
+    @else
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
             <strong>Warehouse Throughput</strong>
@@ -543,7 +617,12 @@
         </div>
     </div>
 
-    <div class="card shadow-sm border-0 mb-4">
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-issues-table')
+    @else
+    <div class="card shadow-sm border-0 mb-4" id="scan-issues">
         <div class="card-header bg-white">
             <strong>Scan Mismatch Report</strong>
         </div>
@@ -577,6 +656,16 @@
         </div>
     </div>
 
+    @endif
+
+    @if(request()->routeIs('dashboard'))
+        @include('shared.partials.dashboard-order-table', [
+            'sectionId' => 'schedule-fulfillment',
+            'title' => 'Schedule Fulfillment Performance',
+            'description' => 'Pemenuhan jadwal sesuai periode dan filter Full/Partial yang dipilih. Required dan Fulfilled dalam PCS.',
+            'rows' => $fulfillmentRows,
+        ])
+    @else
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
             <strong>Schedule Fulfillment Performance</strong>
@@ -613,11 +702,16 @@
         </div>
     </div>
 
+    @endif
+
     <div class="card shadow-sm border-0 mb-4">
         <div class="card-header bg-white">
             <strong>Audit Report</strong>
         </div>
         <div class="card-body">
+            @if(request()->routeIs('dashboard'))
+                @include('shared.partials.dashboard-audit-filters')
+            @else
             <form id="audit-filter-form" method="GET" action="{{ url()->current() }}" class="row g-2 align-items-end mb-3">
                 <div class="col-md-3">
                     <label class="form-label">Type</label>
@@ -653,7 +747,17 @@
                     <a href="{{ url()->current() }}?period={{ request('period', 'week') }}" class="btn btn-outline-secondary w-100" id="audit-filter-reset">Reset</a>
                 </div>
             </form>
-            <div id="audit-report-content">
+            @endif
+            @if(request()->routeIs('dashboard'))
+                <div id="audit-feedback" class="dashboard-audit-feedback">
+                    <p id="audit-feedback-message" role="status" aria-live="polite" aria-atomic="true"></p>
+                    <button type="button" id="audit-retry" class="btn btn-outline-secondary" hidden>Coba lagi</button>
+                </div>
+            @endif
+            <div id="audit-report-content" @if(request()->routeIs('dashboard')) tabindex="-1" aria-label="Hasil laporan audit" @endif>
+                @if(request()->routeIs('dashboard'))
+                    @include('shared.partials.dashboard-audit-results')
+                @else
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <h6 class="fw-bold">Summary</h6>
@@ -684,7 +788,7 @@
                 <div class="text-muted small mb-2">
                     User = nama operator/admin yang melakukan aksi.
                 </div>
-                <div class="table-responsive">
+                <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel data, geser untuk melihat kolom lainnya">
                     <table class="table table-sm table-striped align-middle">
                         <thead>
                             <tr>
@@ -720,6 +824,7 @@
                         {{ $auditLogs->onEachSide(1)->fragment('audit-report')->links('pagination::bootstrap-5') }}
                     </div>
                 @endif
+                @endif
             </div>
         </div>
     </div>
@@ -743,6 +848,24 @@
     const throughputLabels = JSON.parse(document.getElementById('throughput-labels').textContent || '[]');
     const inboundData = JSON.parse(document.getElementById('throughput-inbound').textContent || '[]');
     const outboundData = JSON.parse(document.getElementById('throughput-outbound').textContent || '[]');
+    const dashboardCharts = Boolean(document.querySelector('.dashboard-charts'));
+    const stockChartOptions = (dates = false) => dashboardCharts ? {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 10, padding: 16, color: '#595d65' } } },
+        scales: {
+            x: { grid: { display: false }, ticks: {
+                maxRotation: 0, autoSkip: true, maxTicksLimit: 6, color: '#595d65',
+                ...(dates ? { callback: (value) => {
+                    const label = throughputLabels[value] || '';
+                    return /^\d{4}-\d{2}-\d{2}$/.test(label) ? `${label.slice(8, 10)}/${label.slice(5, 7)}` : label;
+                } } : {}),
+            } },
+            y: { beginAtZero: true, title: { display: true, text: 'PCS' }, ticks: { precision: 0, maxTicksLimit: 5, color: '#595d65' }, grid: { color: '#eef0f2' } },
+        },
+    } : { responsive: true, scales: { y: { beginAtZero: true } } };
 
     new Chart(document.getElementById('trendChart'), {
         type: 'line',
@@ -761,11 +884,12 @@
                     data: outboundData,
                     borderColor: '#f97316',
                     backgroundColor: 'rgba(249,115,22,0.2)',
+                    ...(dashboardCharts ? { borderDash: [6, 4], pointStyle: 'rectRot' } : {}),
                     tension: 0.3,
                 }
             ]
         },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        options: stockChartOptions(true)
     });
 
     const peakLabels = JSON.parse(document.getElementById('peak-labels').textContent || '[]');
@@ -781,7 +905,7 @@
                 { label: 'Outbound', data: peakOutbound, backgroundColor: '#f97316' }
             ]
         },
-        options: { responsive: true, scales: { y: { beginAtZero: true } } }
+        options: stockChartOptions()
     });
 
     const deliveryLabels = JSON.parse(document.getElementById('delivery-labels').textContent || '[]');
@@ -789,21 +913,32 @@
     const deliveryActual = JSON.parse(document.getElementById('delivery-actual').textContent || '[]');
 
     Highcharts.chart('fulfillmentChart', {
-        chart: { type: 'column' },
+        chart: { type: 'column', ...(dashboardCharts ? { backgroundColor: '#ffffff', plotBackgroundColor: '#ffffff', animation: false, style: { fontFamily: 'system-ui, sans-serif' } } : {}) },
         title: { text: null },
+        ...(dashboardCharts ? { responsive: { rules: [{
+            condition: { maxWidth: 480 },
+            chartOptions: {
+                xAxis: { labels: { rotation: -45, step: Math.max(1, Math.ceil(deliveryLabels.length / 3)) } },
+                legend: { itemStyle: { fontSize: '11px' }, itemDistance: 12 },
+            },
+        }] } } : {}),
         xAxis: {
             categories: deliveryLabels,
-            crosshair: true
+            crosshair: true,
+            ...(dashboardCharts ? { lineColor: '#dfe1e5', labels: { step: Math.max(1, Math.ceil(deliveryLabels.length / 5)), style: { color: '#595d65', fontSize: '11px' } } } : {})
         },
         yAxis: {
             min: 0,
-            title: { text: 'QTY' }
+            title: { text: 'QTY', ...(dashboardCharts ? { style: { color: '#595d65' } } : {}) },
+            ...(dashboardCharts ? { gridLineColor: '#eef0f2', labels: { style: { color: '#595d65' } }, allowDecimals: false } : {})
         },
         tooltip: {
             shared: true,
-            valueSuffix: ' QTY'
+            valueSuffix: ' QTY',
+            ...(dashboardCharts ? { backgroundColor: '#ffffff', borderColor: '#dfe1e5', style: { color: '#202124' }, animation: false } : {})
         },
         plotOptions: {
+            ...(dashboardCharts ? { series: { animation: false } } : {}),
             column: {
                 pointPadding: 0.1,
                 borderWidth: 0
@@ -833,10 +968,11 @@
             }
         ],
         credits: { enabled: false },
-        legend: { align: 'center', verticalAlign: 'bottom' }
+        legend: { align: 'center', verticalAlign: 'bottom', ...(dashboardCharts ? { itemStyle: { color: '#595d65', fontWeight: 'normal' }, itemHoverStyle: { color: '#202124' } } : {}) }
     });
 
     const popoverTriggers = document.querySelectorAll('[data-bs-toggle="popover"]');
+    const popoverBoundary = document.getElementById('main-content');
     popoverTriggers.forEach((el) => {
         const targetId = el.getAttribute('data-popover-target');
         const title = el.getAttribute('data-popover-title') || '';
@@ -847,18 +983,35 @@
                 content = template.innerHTML;
             }
         }
-        new bootstrap.Popover(el, {
+        const popover = new bootstrap.Popover(el, {
             html: true,
             sanitize: false,
             trigger: 'hover focus',
-            placement: 'left',
+            placement: 'bottom',
+            animation: false,
+            boundary: popoverBoundary,
             customClass: 'popover-wide',
             title,
             content,
-            container: 'body'
+            container: 'body',
+            popperConfig(defaultConfig) {
+                return {
+                    ...defaultConfig,
+                    placement: 'bottom-start',
+                    modifiers: [
+                        ...defaultConfig.modifiers,
+                        { name: 'flip', options: { boundary: popoverBoundary, fallbackPlacements: ['top-start', 'bottom-end', 'top-end'], padding: 12 } },
+                        { name: 'preventOverflow', options: { boundary: popoverBoundary, padding: 12, tether: false } },
+                    ],
+                };
+            },
+        });
+        el.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') popover.hide();
         });
     });
 
+    @unless(request()->routeIs('dashboard'))
     const auditForm = document.getElementById('audit-filter-form');
     const auditContent = document.getElementById('audit-report-content');
     const auditReset = document.getElementById('audit-filter-reset');
@@ -909,5 +1062,9 @@
             loadAuditReport(link.href);
         });
     }
+    @endunless
 </script>
+@if(request()->routeIs('dashboard'))
+    <script src="{{ asset('js/pages/dashboard-audit.js') }}?v={{ filemtime(public_path('js/pages/dashboard-audit.js')) }}"></script>
+@endif
 @endsection

@@ -49,5 +49,24 @@ class AuditBoxEditFilterTest extends TestCase
                 && $auditLogs->first()->type === 'other'
                 && $auditLogs->first()->action === 'box_updated_by_admin_warehouse';
         });
+        $response->assertSee('1 filter aktif')
+            ->assertSee('aria-current="page"', false)
+            ->assertSee('1 aktivitas sesuai filter')
+            ->assertSee('Edit detail box oleh admin warehouse')
+            ->assertDontSee('Input stok biasa');
+
+        $this->get(route('audit.index', ['type' => 'delivery_redo']))
+            ->assertOk()
+            ->assertSee('Tidak ada aktivitas sesuai filter');
+
+        $today = now()->toDateString();
+        $datedFilters = ['start_date' => $today, 'end_date' => $today, 'type' => 'other'];
+        $this->get(route('audit.index', $datedFilters))
+            ->assertOk()
+            ->assertSee($today.' – '.$today)
+            ->assertSee('<dd><strong>2</strong><span>Seluruh aktivitas tercatat</span></dd>', false)
+            ->assertSee('<dd><strong>1</strong><span>Stok masuk</span></dd>', false)
+            ->assertSee('1 aktivitas sesuai filter')
+            ->assertSee(route('audit.export', $datedFilters));
     }
 }

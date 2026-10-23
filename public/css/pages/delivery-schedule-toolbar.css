@@ -1,0 +1,23 @@
+.warehouse-app .delivery-schedule-header { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; margin: .75rem 0 1.5rem; }
+.warehouse-app .delivery-schedule-header h1 { margin: 0 0 .5rem; font-size: clamp(1.5rem, 2.5vw, 2rem); }
+.delivery-schedule-header p { margin: 0; color: var(--ui-muted, #595d65); font-size: .9375rem; max-width: 65ch; }
+.delivery-schedule-total { display: flex; align-items: baseline; gap: .5rem; flex-shrink: 0; font-size: .8125rem; color: var(--ui-muted, #595d65); }
+.delivery-schedule-total strong { color: var(--ui-ink, #202124); font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.delivery-schedule-filters { padding: 1.25rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); }
+.delivery-schedule-filter-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; gap: 1rem; }
+.delivery-schedule-filter-grid > div { min-width: 0; }
+.delivery-schedule-filter-grid label { display: block; margin-bottom: .375rem; font-size: .8125rem; font-weight: 600; }
+.warehouse-app .delivery-schedule-filter-grid :is(input,select,button) { min-height: 44px; }
+.warehouse-app .delivery-schedule-filter-grid :is(input,select) { width: 100%; min-width: 0; font-size: 1rem; }
+.delivery-schedule-filter-meta { display: flex; justify-content: space-between; gap: .75rem 1.5rem; flex-wrap: wrap; margin-top: .75rem; }
+.delivery-schedule-filter-meta p { margin: 0; color: var(--ui-muted, #595d65); font-size: .8125rem; }
+#delivery-schedule-filter-count { font-variant-numeric: tabular-nums; }
+.warehouse-app .delivery-schedule-filters :is(input,select,button):focus-visible { outline: 3px solid var(--ui-accent, #0b7072); outline-offset: 3px; box-shadow: none; }
+.delivery-schedule-no-results { padding: 1.5rem 1.25rem; color: var(--ui-ink, #202124); }
+.delivery-schedule-no-results p { margin: .375rem 0 0; color: var(--ui-muted, #595d65); font-size: .875rem; }
+#delivery-schedule-results tr[hidden], #delivery-schedule-filters[hidden], #delivery-schedule-no-results[hidden] { display: none !important; }
+@media (max-width: 767.98px) {
+    .warehouse-app .delivery-schedule-header { align-items: flex-start; flex-direction: column; gap: .75rem; }
+    .delivery-schedule-filter-grid { grid-template-columns: minmax(0, 1fr); gap: .75rem; }
+    .delivery-schedule-filters { padding: 1rem; }
+}

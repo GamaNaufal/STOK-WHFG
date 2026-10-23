@@ -39,13 +39,97 @@
     const detailModal = detailModalEl ? new bootstrap.Modal(detailModalEl) : null;
     const palletDetailModal = palletDetailModalEl ? new bootstrap.Modal(palletDetailModalEl) : null;
     let initialEditBoxState = null;
-    let currentPartNumber = null;
-    let currentPalletId = null;
     let currentPalletDetailData = null;
     let pendingHighlightBoxId = null;
     let hasAutoOpenedDirectBox = false;
     let editPartSelectEnhanced = false;
     let pendingDeleteAction = null;
+    let deleting = false;
+    let editing = false;
+    let partRequest = 0;
+    let palletRequest = 0;
+    let historyRequest = 0;
+    let deletePreviewRequest = 0;
+    const stockModals = [detailModalEl, palletDetailModalEl, editBoxModalEl, boxHistoryModalEl, deleteConfirmModalEl].filter(Boolean);
+    const modalParents = new Map();
+    const modalTriggers = new Map();
+    const suspendedModals = new Set();
+    const busyControls = new WeakMap();
+
+    function showStockModal(instance, element) {
+        if (element.classList.contains('show')) return;
+        const trigger = document.activeElement;
+        const parent = stockModals.find(modal => modal.classList.contains('show'));
+        modalTriggers.set(element, trigger);
+        if (parent) {
+            modalParents.set(element, parent);
+            suspendedModals.add(parent);
+            bootstrap.Modal.getInstance(parent).hide();
+        }
+        element.removeAttribute('inert');
+        instance.show();
+    }
+
+    async function readStockResponse(response) {
+        let data;
+        try { data = await response.json(); }
+        catch { throw new Error('Respons server tidak dapat dibaca. Silakan coba lagi.'); }
+        if (!data || typeof data !== 'object') {
+            throw new Error('Respons server tidak dapat dibaca. Silakan coba lagi.');
+        }
+        if (!response.ok || data.error || data.success === false) {
+            const validation = data.errors ? Object.values(data.errors).flat()[0] : null;
+            throw new Error(validation || data.message || data.error || 'Permintaan gagal. Silakan coba lagi.');
+        }
+        return data;
+    }
+
+    function showStockError(container, message, retry) {
+        container.replaceChildren();
+        container.style.display = 'block';
+        const alert = document.createElement('div');
+        alert.className = container.classList.contains('alert') ? 'text-start' : 'alert alert-danger text-start';
+        if (container.getAttribute('role') !== 'alert') alert.setAttribute('role', 'alert');
+        alert.textContent = message || 'Gagal memuat data. Silakan coba lagi.';
+        container.appendChild(alert);
+        if (retry) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-outline-primary';
+            button.textContent = 'Coba lagi';
+            button.addEventListener('click', retry);
+            container.appendChild(button);
+        }
+    }
+
+    function startStockLoading(element) {
+        element.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Memuat detail stok...</span></div>';
+        element.style.display = 'block';
+    }
+
+    function setModalBusy(element, busy) {
+        element.dataset.busy = String(busy);
+        element.setAttribute('aria-busy', String(busy));
+        if (busy) element.focus();
+        if (busy && !busyControls.has(element)) {
+            const controls = [...element.querySelectorAll('input, select, textarea, [data-bs-dismiss="modal"], button[type="submit"]')];
+            busyControls.set(element, controls.map(control => [control, control.disabled]));
+            controls.forEach(control => control.disabled = true);
+        } else if (!busy && busyControls.has(element)) {
+            busyControls.get(element).forEach(([control, disabled]) => control.disabled = disabled);
+            busyControls.delete(element);
+        }
+    }
+
+    function refreshStockWithFeedback(message) {
+        try {
+            sessionStorage.setItem('stockViewSuccess', message);
+            window.location.reload();
+        } catch {
+            showAutoPopup(message, 'success', 1800);
+            setTimeout(() => window.location.reload(), 1900);
+        }
+    }
 
     function sortLabelsAscending(items) {
         return [...new Set((items || []).filter(Boolean))].sort((left, right) =>
@@ -76,7 +160,11 @@
 
     function showAutoPopup(message, type = 'success', duration = 1800) {
         const popup = document.createElement('div');
-        const isSuccess = type === 'success';
+        const appearance = {
+            success: { color: '#065f46', background: '#d1fae5', border: '#86efac', role: 'status' },
+            info: { color: '#075b5d', background: '#e8f3f1', border: '#b5d9d7', role: 'status' },
+            danger: { color: '#7f1d1d', background: '#fee2e2', border: '#fca5a5', role: 'alert' },
+        }[type] || { color: '#075b5d', background: '#e8f3f1', border: '#b5d9d7', role: 'status' };
 
         popup.style.position = 'fixed';
         popup.style.top = '24px';
@@ -86,15 +174,20 @@
         popup.style.padding = '12px 16px';
         popup.style.borderRadius = '10px';
         popup.style.boxShadow = '0 8px 24px rgba(0,0,0,0.18)';
-        popup.style.color = isSuccess ? '#065f46' : '#7f1d1d';
-        popup.style.background = isSuccess ? '#d1fae5' : '#fee2e2';
-        popup.style.border = isSuccess ? '1px solid #86efac' : '1px solid #fca5a5';
+        popup.style.color = appearance.color;
+        popup.style.background = appearance.background;
+        popup.style.border = `1px solid ${appearance.border}`;
         popup.style.fontWeight = '600';
         popup.style.fontSize = '14px';
         popup.style.opacity = '0';
         popup.style.transform = 'translateY(-8px)';
         popup.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
-        popup.textContent = message || (isSuccess ? 'Berhasil.' : 'Terjadi kesalahan.');
+        popup.textContent = message || (type === 'success' ? 'Berhasil.' : (type === 'danger' ? 'Terjadi kesalahan.' : 'Informasi stok tersedia.'));
+        popup.setAttribute('role', appearance.role);
+        popup.style.maxWidth = 'min(380px, calc(100vw - 48px))';
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            popup.style.transition = 'none';
+        }
 
         document.body.appendChild(popup);
         requestAnimationFrame(() => {
@@ -137,9 +230,10 @@
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
-            showToast('Popup diblokir browser. Izinkan popup untuk mencetak.', 'warning');
+            showStockError(document.getElementById('palletDetailLoadingSpinner'), 'Popup diblokir browser. Izinkan popup lalu tekan Print kembali.');
             return;
         }
+        document.getElementById('palletDetailLoadingSpinner').style.display = 'none';
 
         const printedAt = new Date().toLocaleString('id-ID');
         const doc = `
@@ -242,18 +336,23 @@
 
     function syncModalA11y(modalEl) {
         if (!modalEl) return;
-        modalEl.addEventListener('hide.bs.modal', () => {
-            const active = document.activeElement;
-            if (active && modalEl.contains(active)) {
-                active.blur();
-            }
+        modalEl.addEventListener('hide.bs.modal', event => {
+            if (modalEl.dataset.busy === 'true') { event.preventDefault(); return; }
+            if (modalEl.contains(document.activeElement)) document.activeElement.blur();
         });
         modalEl.addEventListener('hidden.bs.modal', () => {
             modalEl.setAttribute('inert', '');
+            if (suspendedModals.delete(modalEl)) return;
+            const parent = modalParents.get(modalEl);
+            modalParents.delete(modalEl);
+            if (parent) {
+                parent.removeAttribute('inert');
+                bootstrap.Modal.getInstance(parent).show();
+            }
+            const trigger = modalTriggers.get(modalEl);
+            if (trigger?.isConnected && !trigger.closest('[inert]')) trigger.focus();
         });
-        modalEl.addEventListener('shown.bs.modal', () => {
-            modalEl.removeAttribute('inert');
-        });
+        modalEl.addEventListener('show.bs.modal', () => modalEl.removeAttribute('inert'));
     }
 
     syncModalA11y(detailModalEl);
@@ -272,6 +371,7 @@
             return;
         }
 
+        document.getElementById('deleteConfirmError').classList.add('d-none');
         titleEl.textContent = config.title || 'Konfirmasi Penghapusan';
         summaryEl.innerHTML = config.summary || '';
 
@@ -291,10 +391,11 @@
 
         pendingDeleteAction = config.action || null;
         submitBtn.disabled = !pendingDeleteAction;
-        deleteConfirmModal.show();
+        showStockModal(deleteConfirmModal, deleteConfirmModalEl);
     }
 
     function openDeleteBoxConfirm(dataset) {
+        ++deletePreviewRequest;
         if (!canDeleteStock || !deleteConfirmModal) {
             return;
         }
@@ -316,7 +417,7 @@
                 id: dataset.boxNumber || boxId,
                 part_number: dataset.partNumber || '-',
                 pcs_quantity: dataset.pcsQuantity || 0,
-                note: 'Box ini akan dihapus permanen',
+                note: 'Dikeluarkan dari stok aktif; riwayat tetap tersimpan',
             }],
             action: {
                 type: 'box',
@@ -336,12 +437,12 @@
             return;
         }
 
+        const requestId = ++deletePreviewRequest;
+        renderDeleteConfirmation({ title: 'Memuat detail pallet', summary: 'Sedang memeriksa isi pallet...', items: [] });
         try {
             const response = await fetch(`/api/stock/pallet-detail/${palletId}`);
-            const data = await response.json();
-            if (!response.ok || data.error) {
-                throw new Error(data.error || 'Gagal mengambil detail pallet.');
-            }
+            const data = await readStockResponse(response);
+            if (requestId !== deletePreviewRequest || !deleteConfirmModalEl.classList.contains('show')) return;
 
             const items = Array.isArray(data.items) ? data.items : [];
             renderDeleteConfirmation({
@@ -363,18 +464,27 @@
                 },
             });
         } catch (error) {
-            showToast(error.message || 'Gagal membuka konfirmasi hapus pallet.', 'danger');
+            if (requestId !== deletePreviewRequest) return;
+            const alert = document.getElementById('deleteConfirmError');
+            alert.classList.remove('d-none');
+            document.getElementById('deleteConfirmTitle').textContent = 'Detail pallet belum tersedia';
+            document.getElementById('deleteConfirmSummary').textContent = 'Muat ulang detail sebelum menghapus pallet.';
+            showStockError(alert, error.message, () => openDeletePalletConfirm(dataset));
         }
     }
 
     async function executePendingDelete() {
-        if (!pendingDeleteAction) {
+        if (!pendingDeleteAction || deleting) {
             return;
         }
 
         const submitBtn = document.getElementById('deleteConfirmSubmitBtn');
         if (submitBtn) submitBtn.disabled = true;
-        const deleteType = pendingDeleteAction.type;
+        deleting = true;
+        setModalBusy(deleteConfirmModalEl, true);
+        const previousLabel = submitBtn.textContent;
+        submitBtn.textContent = 'Menghapus...';
+        document.getElementById('deleteConfirmError').classList.add('d-none');
 
         try {
             const endpoint = pendingDeleteAction.type === 'pallet'
@@ -389,27 +499,25 @@
                 },
             });
 
-            const data = await response.json();
-            if (!response.ok) {
-                throw new Error(data.message || 'Gagal menghapus data');
-            }
+            const data = await readStockResponse(response);
+            setModalBusy(deleteConfirmModalEl, false);
 
             if (deleteConfirmModal) {
                 deleteConfirmModal.hide();
             }
 
             pendingDeleteAction = null;
-            const successMessage = data.message || 'Data berhasil dihapus.';
-            if (deleteType === 'box') {
-                showAutoPopup(successMessage, 'success', 1800);
-            } else {
-                showToast(successMessage, 'success');
-            }
-            setTimeout(() => window.location.reload(), deleteType === 'box' ? 1900 : 450);
+            refreshStockWithFeedback(data.message || 'Data berhasil dihapus.');
         } catch (error) {
-            showToast(error.message || 'Gagal menghapus data.', 'danger');
+            const alert = document.getElementById('deleteConfirmError');
+            alert.textContent = error.message || 'Gagal menghapus data.';
+            alert.classList.remove('d-none');
+            alert.focus();
         } finally {
-            if (submitBtn) submitBtn.disabled = false;
+            deleting = false;
+            setModalBusy(deleteConfirmModalEl, false);
+            submitBtn.textContent = previousLabel;
+            if (submitBtn) submitBtn.disabled = !pendingDeleteAction;
         }
     }
 
@@ -428,6 +536,7 @@
         alertEl.classList.remove('d-none', 'alert-warning', 'alert-danger', 'alert-success', 'alert-info');
         alertEl.classList.add(`alert-${resolvedType}`);
         alertEl.textContent = message || '';
+        if (editBoxModalEl.classList.contains('show')) alertEl.focus();
     }
 
     function initEditPartSelect() {
@@ -441,7 +550,19 @@
                 width: '100%',
                 placeholder: 'Pilih Part Number',
                 minimumResultsForSearch: 0,
+                language: { noResults: () => 'Part number tidak ditemukan.' },
                 dropdownParent: window.jQuery('#editBoxModal')
+            });
+            window.jQuery(selectEl).on('select2:open', () => {
+                window.jQuery('#editBoxModal .select2-search__field')
+                    .attr('aria-label', 'Cari part number')
+                    .off('keydown.stockEdit')
+                    .on('keydown.stockEdit', event => {
+                        if (event.key === 'Escape') {
+                            event.stopPropagation();
+                            window.jQuery(selectEl).select2('close');
+                        }
+                    });
             });
             editPartSelectEnhanced = true;
         }
@@ -451,98 +572,64 @@
 
     function loadSearchSuggestions(searchTerm) {
         if (!hasSearchUi) return;
-        const dataSource = sortedAllSearchTerms;
-        let filtered = dataSource;
-        
-        if (searchTerm.trim()) {
-            filtered = dataSource.filter(item => 
-                item.toLowerCase().includes(searchTerm.toLowerCase())
-            );
+        const filtered = sortedAllSearchTerms.filter(item =>
+            item.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        searchDropdown.replaceChildren();
+        if (!filtered.length) {
+            const message = document.createElement('div');
+            message.className = 'stock-toolbar__message';
+            message.textContent = searchTerm.trim()
+                ? 'Tidak ada saran yang cocok. Tekan Terapkan untuk mencari.'
+                : 'Belum ada saran pencarian.';
+            searchDropdown.appendChild(message);
         }
-        
-        searchDropdown.innerHTML = '';
-        
-        if (filtered.length === 0 && searchTerm.trim()) {
-            const noResult = document.createElement('div');
-            noResult.className = 'dropdown-item text-muted';
-            noResult.style.padding = '12px 16px';
-            noResult.innerHTML = '<i class="bi bi-search me-2"></i>Tidak ada hasil untuk "' + searchTerm + '"';
-            searchDropdown.appendChild(noResult);
-            return;
-        }
-        
-        if (!searchTerm.trim() && filtered.length > 0) {
-            const header = document.createElement('div');
-            header.style.cssText = 'padding: 12px 16px; font-weight: 600; color: #0C7779; border-bottom: 1px solid #e5e7eb; font-size: 12px; text-transform: uppercase;';
-            header.textContent = 'Rekomendasi Pencarian';
-            searchDropdown.appendChild(header);
-        }
-        
         filtered.slice(0, 8).forEach(item => {
-            const suggestion = document.createElement('div');
-            suggestion.className = 'dropdown-item';
-            suggestion.style.cssText = 'padding: 12px 16px; cursor: pointer; border-bottom: 1px solid #f3f4f6; transition: all 0.2s ease; font-size: 14px; background: white;';
-
-            const typeBadges = getSearchTermTypes(item)
-                .map(type => `<span style="display:inline-block; margin-left:6px; padding:2px 8px; border-radius:999px; background:#ecfeff; color:#0f766e; font-size:11px; font-weight:700;">${escapeHtml(type)}</span>`)
-                .join('');
-
-            suggestion.innerHTML = `
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-                    <div style="min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                        <i class="bi bi-check-circle" style="color: #0C7779; margin-right: 8px; opacity: 0;"></i>${escapeHtml(item)}
-                    </div>
-                    <div style="display:flex; align-items:center; flex-wrap:wrap; justify-content:flex-end;">
-                        ${typeBadges}
-                    </div>
-                </div>
-            `;
-            
-            suggestion.addEventListener('click', function(e) {
-                e.stopPropagation();
+            const suggestion = document.createElement('button');
+            suggestion.type = 'button';
+            suggestion.className = 'stock-toolbar__suggestion';
+            suggestion.innerHTML = `<span>${escapeHtml(item)}</span><span class="stock-toolbar__types">${
+                getSearchTermTypes(item).map(type => `<span>${escapeHtml(type)}</span>`).join('')
+            }</span>`;
+            suggestion.addEventListener('click', () => {
                 searchInput.value = item;
                 searchDropdown.style.display = 'none';
+                searchInput.setAttribute('aria-expanded', 'false');
                 searchForm.submit();
             });
-            
-            suggestion.addEventListener('mouseover', function() {
-                this.style.backgroundColor = '#f0f4f8';
-                this.style.color = '#0C7779';
-                this.style.fontWeight = '600';
-                this.querySelector('i').style.opacity = '1';
-            });
-            
-            suggestion.addEventListener('mouseout', function() {
-                this.style.backgroundColor = 'white';
-                this.style.color = '#374151';
-                this.style.fontWeight = '400';
-                this.querySelector('i').style.opacity = '0';
-            });
-            
             searchDropdown.appendChild(suggestion);
         });
     }
 
     if (hasSearchUi) {
-        searchInput.addEventListener('focus', function() {
+        const searchRegion = searchInput.closest('.stock-toolbar__search');
+        const hideSuggestions = () => {
+            searchDropdown.style.display = 'none';
+            searchInput.setAttribute('aria-expanded', 'false');
+        };
+        const showSuggestions = () => {
             loadSearchSuggestions(searchInput.value);
             searchDropdown.style.display = 'block';
+            searchInput.setAttribute('aria-expanded', 'true');
+        };
+        searchInput.addEventListener('focus', showSuggestions);
+        searchInput.addEventListener('input', showSuggestions);
+        searchRegion.addEventListener('focusout', event => {
+            if (!searchRegion.contains(event.relatedTarget)) hideSuggestions();
         });
-
-        searchInput.addEventListener('input', function() {
-            loadSearchSuggestions(this.value);
-            searchDropdown.style.display = 'block';
+        document.addEventListener('pointerdown', event => {
+            if (!searchRegion.contains(event.target)) hideSuggestions();
         });
-
-        searchInput.addEventListener('blur', function() {
-            setTimeout(() => {
-                searchDropdown.style.display = 'none';
-            }, 150);
+        searchRegion.addEventListener('keydown', event => {
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                searchInput.focus();
+                hideSuggestions();
+            }
         });
     }
 
     window.viewDetail = function(partNumber) {
-        currentPartNumber = partNumber;
         const loadingEl = document.getElementById('detailLoadingSpinner');
         const contentEl = document.getElementById('detailContent');
         if (!loadingEl || !contentEl || !detailModal) {
@@ -550,16 +637,14 @@
             return;
         }
 
-        loadingEl.style.display = 'block';
+        const requestId = ++partRequest;
+        startStockLoading(loadingEl);
         contentEl.style.display = 'none';
 
         fetch(`/api/stock/part-detail/${encodeURIComponent(partNumber)}`)
-            .then(response => response.json())
+            .then(readStockResponse)
             .then(data => {
-                if (data.error) {
-                    showToast('Error: ' + data.error, 'danger');
-                    return;
-                }
+                if (requestId !== partRequest) return;
 
                 document.getElementById('modalPartNumber').textContent = data.part_number;
                 document.getElementById('modalTotalBox').textContent = data.total_box;
@@ -603,7 +688,7 @@
                     tableBody.innerHTML = groupedPallets.map((pallet) => `
                         <tr style="border-bottom: 1px solid #e5e7eb; transition: all 0.2s ease;">
                             <td style="padding: 12px 8px; color: #0C7779; font-weight: 600; font-size: 13px;">
-                                <i class="bi bi-box2"></i> ${pallet.pallet_number}
+                                <i class="bi bi-box2"></i> ${escapeHtml(pallet.pallet_number)}
                                 ${pallet.expired_box ? `<span class="badge bg-danger">${pallet.expired_box} box Expired</span>` : ''}
                             </td>
                             <td style="padding: 12px 8px; color: #1f2937; font-size: 13px;">
@@ -613,20 +698,22 @@
                                 <span class="badge bg-success">${pallet.total_pcs} PCS</span>
                             </td>
                             <td style="padding: 12px 8px; color: #6b7280; font-size: 13px;">
-                                <i class="bi bi-geo-alt"></i> ${pallet.location}
+                                <i class="bi bi-geo-alt"></i> ${escapeHtml(pallet.location)}
                             </td>
                             <td style="padding: 12px 8px; color: #6b7280; font-size: 12px;">
-                                ${pallet.latest_created_at}
+                                ${escapeHtml(pallet.latest_created_at)}
                             </td>
                             <td style="padding: 12px 8px; white-space: nowrap;">
                                 ${pallet.pallet_id ? `
                                     <button type="button" class="btn btn-sm btn-outline-primary js-detail-pallet"
+                                        aria-label="Detail pallet ${escapeHtml(pallet.pallet_number)}"
                                         data-pallet-id="${pallet.pallet_id}">
                                         Detail Pallet
                                     </button>
                                     ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-danger js-delete-pallet ms-1"
+                                        aria-label="Hapus pallet ${escapeHtml(pallet.pallet_number)} dari stok aktif"
                                         data-pallet-id="${pallet.pallet_id}"
-                                        data-pallet-number="${pallet.pallet_number || ''}">
+                                        data-pallet-number="${escapeHtml(pallet.pallet_number || '')}">
                                         Hapus Pallet
                                     </button>` : ''}
                                 ` : '<span class="text-muted">-</span>'}
@@ -639,16 +726,14 @@
                 contentEl.style.display = 'block';
             })
             .catch(error => {
-                console.error('Error:', error);
-                showToast('Error loading detail data', 'danger');
-                loadingEl.style.display = 'none';
+                if (requestId !== partRequest) return;
+                showStockError(loadingEl, error.message, () => window.viewDetail(partNumber));
             });
 
-        detailModal.show();
+        showStockModal(detailModal, detailModalEl);
     };
 
     window.viewPalletDetail = function(palletId) {
-        currentPalletId = palletId;
         currentPalletDetailData = null;
         setPrintPalletButtonState(false);
         const loadingEl = document.getElementById('palletDetailLoadingSpinner');
@@ -658,16 +743,14 @@
             return;
         }
 
-        loadingEl.style.display = 'block';
+        const requestId = ++palletRequest;
+        startStockLoading(loadingEl);
         contentEl.style.display = 'none';
 
         fetch(`/api/stock/pallet-detail/${palletId}`)
-            .then(response => response.json())
+            .then(readStockResponse)
             .then(data => {
-                if (data.error) {
-                    showToast('Error: ' + data.error, 'danger');
-                    return;
-                }
+                if (requestId !== palletRequest) return;
 
                 currentPalletDetailData = data;
                 setPrintPalletButtonState(true);
@@ -681,35 +764,39 @@
                 } else {
                     tableBody.innerHTML = data.items.map(item => `
                         <tr data-box-id="${item.box_id || ''}">
-                            <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.box_number || '-'}</td>
-                            <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${item.part_number}</td>
+                            <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${escapeHtml(item.box_number || '-')}</td>
+                            <td style="font-weight: 600; color: #374151; padding: 12px 8px;">${escapeHtml(item.part_number)}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.box_quantity}</td>
                             <td style="color: #6b7280; padding: 12px 8px;">${item.pcs_quantity}</td>
                             <td style="padding: 12px 8px;">
                                 ${item.is_expired ? '<span class="badge bg-danger">Expired</span> ' : ''}${item.is_not_full ? '<span class="badge bg-warning text-dark">Not Full</span>' : (item.is_expired ? '' : '<span class="badge bg-success">OK</span>')}
                             </td>
-                            <td style="color: #6b7280; padding: 12px 8px;">${item.origin_pallet || '-'}</td>
-                            <td style="color: #6b7280; padding: 12px 8px;">${item.created_at}</td>
+                            <td style="color: #6b7280; padding: 12px 8px;">${escapeHtml(item.origin_pallet || '-')}</td>
+                            <td style="color: #6b7280; padding: 12px 8px;">${escapeHtml(item.created_at)}</td>
                             <td style="padding: 12px 8px; white-space: nowrap;">
                                 ${item.box_id ? `
                                     ${canEditBox && !item.is_expired ? `<button type="button" class="btn btn-sm btn-outline-primary js-edit-box"
-                                        data-box-id="${item.box_id}" 
-                                        data-box-number="${item.box_number || ''}" 
-                                        data-part-number="${item.part_number || ''}" 
-                                        data-pcs-quantity="${item.pcs_quantity || 0}" 
+                                        aria-label="Edit box ${escapeHtml(item.box_number || '-')}"
+                                        data-box-id="${item.box_id}"
+                                        data-box-number="${escapeHtml(item.box_number || '')}"
+                                        data-part-number="${escapeHtml(item.part_number || '')}"
+                                        data-pcs-quantity="${item.pcs_quantity || 0}"
                                         data-stored-at="${item.stored_at_raw || ''}"
                                         data-pallet-id="${palletId || ''}"
-                                        data-pallet-number="${data.pallet_number || ''}"
-                                        data-location="${data.location || ''}">Edit</button>` : ''}
-                                    <button type="button" class="btn btn-sm btn-outline-secondary js-box-history" data-box-id="${item.box_id}">History</button>
+                                        data-pallet-number="${escapeHtml(data.pallet_number || '')}"
+                                        data-location="${escapeHtml(data.location || '')}">Edit</button>` : ''}
+                                    <button type="button" class="btn btn-sm btn-outline-secondary js-box-history"
+                                        aria-label="Riwayat box ${escapeHtml(item.box_number || '-')}"
+                                        data-box-id="${item.box_id}">Riwayat</button>
                                     ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                        aria-label="Hapus box ${escapeHtml(item.box_number || '-')} dari stok aktif"
                                         data-box-id="${item.box_id}"
-                                        data-box-number="${item.box_number || ''}"
-                                        data-part-number="${item.part_number || ''}"
+                                        data-box-number="${escapeHtml(item.box_number || '')}"
+                                        data-part-number="${escapeHtml(item.part_number || '')}"
                                         data-pcs-quantity="${item.pcs_quantity || 0}"
                                         data-pallet-id="${palletId || ''}"
-                                        data-pallet-number="${data.pallet_number || ''}"
-                                        data-location="${data.location || ''}">Hapus</button>` : ''}
+                                        data-pallet-number="${escapeHtml(data.pallet_number || '')}"
+                                        data-location="${escapeHtml(data.location || '')}">Hapus</button>` : ''}
                                 ` : '<span class="text-muted">-</span>'}
                             </td>
                         </tr>
@@ -758,7 +845,10 @@
                         targetRow.style.backgroundColor = '#ecfeff';
                         targetRow.style.outline = '2px solid #14b8a6';
                         targetRow.style.outlineOffset = '-2px';
-                        targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetRow.scrollIntoView({
+                            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+                            block: 'center'
+                        });
 
                         setTimeout(() => {
                             targetRow.style.backgroundColor = '';
@@ -774,12 +864,12 @@
                 loadingEl.style.display = 'none';
             })
             .catch(error => {
-                console.error('Error:', error);
-                loadingEl.innerHTML = '<p class="text-danger">Gagal memuat data</p>';
+                if (requestId !== palletRequest) return;
+                showStockError(loadingEl, error.message, () => window.viewPalletDetail(palletId));
                 setPrintPalletButtonState(false);
             });
-            
-        palletDetailModal.show();
+
+        showStockModal(palletDetailModal, palletDetailModalEl);
     };
 
     function parseDisplayDateToInputValue(displayDate) {
@@ -829,7 +919,7 @@
             pcsQuantity: Number.parseInt(dataset.pcsQuantity || '0', 10) || 0,
             storedAt: initialStoredAt,
         };
-        editBoxModal.show();
+        showStockModal(editBoxModal, editBoxModalEl);
     }
 
     async function openBoxHistoryModal(boxId) {
@@ -838,21 +928,20 @@
         const tableBody = document.getElementById('boxHistoryTableBody');
         if (!tableBody || !loading) return;
 
+        const requestId = ++historyRequest;
+        loading.textContent = 'Memuat riwayat...';
         loading.style.display = 'block';
         tableBody.innerHTML = '';
-        boxHistoryModal.show();
+        showStockModal(boxHistoryModal, boxHistoryModalEl);
 
         try {
             const response = await fetch(`/stock-view/boxes/${boxId}/history`);
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Gagal mengambil history box');
-            }
+            const data = await readStockResponse(response);
+            if (requestId !== historyRequest) return;
 
             const historyRows = data.history || [];
             if (historyRows.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada history perubahan.</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Belum ada riwayat perubahan.</td></tr>';
             } else {
                 tableBody.innerHTML = historyRows.map((row) => {
                     const oldVal = row.old_values || {};
@@ -865,9 +954,9 @@
                         badgeClass = 'bg-warning text-dark';
                         actionLabel = 'Edit Box';
                         const diffLines = [
-                            `Part: ${escapeHtml(oldVal.part_number ?? '-')} → ${escapeHtml(newVal.part_number ?? '-')}`,
-                            `PCS: ${escapeHtml(String(oldVal.pcs_quantity ?? '-'))} → ${escapeHtml(String(newVal.pcs_quantity ?? '-'))}`,
-                            `Tanggal: ${escapeHtml(oldVal.stored_at ?? '-')} → ${escapeHtml(newVal.stored_at ?? '-')}`,
+                            `Part: ${escapeHtml(oldVal.part_number ?? '-')} menjadi ${escapeHtml(newVal.part_number ?? '-')}`,
+                            `PCS: ${escapeHtml(String(oldVal.pcs_quantity ?? '-'))} menjadi ${escapeHtml(String(newVal.pcs_quantity ?? '-'))}`,
+                            `Tanggal: ${escapeHtml(oldVal.stored_at ?? '-')} menjadi ${escapeHtml(newVal.stored_at ?? '-')}`,
                         ];
                         if (newVal.reason) {
                             diffLines.push(`Alasan: ${escapeHtml(newVal.reason)}`);
@@ -900,9 +989,10 @@
                 }).join('');
             }
         } catch (error) {
-            tableBody.innerHTML = `<tr><td colspan="4" class="text-center text-danger">${error.message}</td></tr>`;
+            if (requestId !== historyRequest) return;
+            showStockError(loading, error.message, () => openBoxHistoryModal(boxId));
         } finally {
-            loading.style.display = 'none';
+            if (requestId === historyRequest && tableBody.children.length) loading.style.display = 'none';
         }
     }
 
@@ -910,11 +1000,18 @@
     if (editBoxForm) {
         editBoxForm.addEventListener('submit', function (event) {
             event.preventDefault();
+            if (editing) return;
 
             const boxId = document.getElementById('editBoxId').value;
             const currentPartNumber = document.getElementById('editPartNumber').value.trim();
             const currentPcsQuantity = Number.parseInt(document.getElementById('editPcsQuantity').value || '0', 10) || 0;
             const currentStoredAt = document.getElementById('editStoredAt').value;
+            const reason = document.getElementById('editReason').value.trim();
+            if (reason.length < 3) {
+                showEditBoxInlineAlert('Jelaskan alasan perubahan minimal 3 karakter.', 'danger');
+                document.getElementById('editReason').focus();
+                return;
+            }
 
             if (
                 initialEditBoxState
@@ -935,64 +1032,65 @@
 
             const fixedQty = (bootstrapData.masterPartCapacities ?? {})[currentPartNumber] ?? 0;
             if (fixedQty > 0 && currentPcsQuantity < fixedQty) {
-                warningItems.push(`<strong class="text-danger">PERINGATAN: Kuantitas PCS (${currentPcsQuantity}) di bawah kapasitas standar (${fixedQty}). Box ini akan berubah status menjadi NOT FULL!</strong>`);
+                warningItems.push(`<strong class="text-danger">PERINGATAN: Kuantitas PCS (${currentPcsQuantity}) di bawah kapasitas standar (${fixedQty}). Perubahan menjadi Not Full memerlukan request yang sudah disetujui. Server akan memvalidasi kelayakan koreksi.</strong>`);
             }
 
             const infoHtml = `
                 <div class="small">
-                    <strong>Part Number:</strong> ${initialEditBoxState ? initialEditBoxState.partNumber : '-'} &rarr; ${currentPartNumber}<br>
+                    <strong>Part Number:</strong> ${escapeHtml(initialEditBoxState ? initialEditBoxState.partNumber : '-')} &rarr; ${escapeHtml(currentPartNumber)}<br>
                     <strong>PCS Quantity:</strong> ${initialEditBoxState ? initialEditBoxState.pcsQuantity : '-'} &rarr; ${currentPcsQuantity}<br>
                     <strong>Tanggal Masuk:</strong> ${initialEditBoxState ? initialEditBoxState.storedAt.replace('T', ' ') : '-'} &rarr; ${currentStoredAt.replace('T', ' ')}<br>
                     <strong>Alasan Perubahan:</strong> ${escapeHtml(document.getElementById('editReason').value)}
                 </div>
             `;
 
-            WarehouseAlert.confirm({
+            editing = true;
+            suspendedModals.add(editBoxModalEl);
+            editBoxModal.hide();
+            Swal.fire({
                 title: 'Konfirmasi Perubahan Detail Box',
-                message: 'Apakah Anda yakin ingin menyimpan perubahan data box berikut?',
-                warningItems: warningItems,
-                infoText: infoHtml,
-                confirmText: 'Ya, Simpan',
-                confirmColor: '#0C7779',
-                onConfirm: async () => {
-                    const payload = {
-                        part_number: currentPartNumber,
-                        pcs_quantity: currentPcsQuantity,
-                        stored_at: currentStoredAt,
-                        reason: document.getElementById('editReason').value,
-                    };
+                html: `<p>Periksa perubahan sebelum menyimpan.</p><ul class="text-start">${warningItems.map(item => `<li>${item}</li>`).join('')}</ul>${infoHtml}`,
+                icon: 'warning', showCancelButton: true, reverseButtons: true,
+                showClass: { popup: '' }, hideClass: { popup: '' }, returnFocus: false,
+                confirmButtonText: 'Ya, Simpan', cancelButtonText: 'Kembali',
+                confirmButtonColor: '#0C7779',
+            }).then(async result => {
+                editBoxModalEl.removeAttribute('inert');
+                editBoxModal.show();
+                if (!result.isConfirmed) { editing = false; return; }
+                setModalBusy(editBoxModalEl, true);
+                const saveButton = editBoxForm.querySelector('button[type="submit"]');
+                const previousLabel = saveButton.textContent;
+                saveButton.textContent = 'Menyimpan...';
+                const payload = {
+                    part_number: currentPartNumber,
+                    pcs_quantity: currentPcsQuantity,
+                    stored_at: currentStoredAt,
+                    reason: document.getElementById('editReason').value,
+                };
 
-                    try {
-                        const response = await fetch(`/stock-view/boxes/${boxId}/update`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': csrfToken,
-                                'Accept': 'application/json',
-                            },
-                            body: JSON.stringify(payload),
-                        });
+                try {
+                    const response = await fetch(`/stock-view/boxes/${boxId}/update`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'Accept': 'application/json',
+                        },
+                        body: JSON.stringify(payload),
+                    });
 
-                        const data = await response.json();
-                        if (!response.ok) {
-                            const firstError = data?.errors ? Object.values(data.errors)[0][0] : (data.message || 'Gagal update box');
-                            throw new Error(firstError);
-                        }
-
-                        if (editBoxModal) {
-                            editBoxModal.hide();
-                        }
-
-                        showToast(data.message || 'Detail box berhasil diperbarui.', 'success');
-                        if (currentPalletId) {
-                            window.viewPalletDetail(currentPalletId);
-                        }
-                        if (currentPartNumber && detailModalEl?.classList.contains('show')) {
-                            window.viewDetail(currentPartNumber);
-                        }
-                    } catch (error) {
-                        showEditBoxInlineAlert(error.message || 'Gagal update box', 'danger');
-                    }
+                    const data = await readStockResponse(response);
+                    setModalBusy(editBoxModalEl, false);
+                    editBoxModal.hide();
+                    // Refresh summaries and all row data while preserving the current URL filters.
+                    refreshStockWithFeedback(data.message || 'Detail box berhasil diperbarui.');
+                } catch (error) {
+                    showEditBoxInlineAlert(error.message || 'Gagal update box', 'danger');
+                } finally {
+                    editing = false;
+                    setModalBusy(editBoxModalEl, false);
+                    saveButton.textContent = previousLabel;
                 }
             });
         });
@@ -1063,6 +1161,15 @@
     }, true);
 
     window.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.stock-results .stock-sort-link.is-active').forEach(link => {
+            const heading = link.closest('th');
+            if (heading) heading.setAttribute('aria-sort', link.querySelector('.bi-sort-up') ? 'ascending' : 'descending');
+        });
+        try {
+            const message = sessionStorage.getItem('stockViewSuccess');
+            sessionStorage.removeItem('stockViewSuccess');
+            if (message) showAutoPopup(message, 'success', 3000);
+        } catch { /* Storage may be unavailable in private browsing. */ }
         if (hasSearchUi && searchInput.value) {
             loadSearchSuggestions(searchInput.value);
         }

@@ -14,8 +14,11 @@
     @include('shared.layouts.partials.layout-shell-styles')
     
     @yield('styles')
+    <link rel="stylesheet" href="{{ asset('css/application-ui.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/apple-design.css') }}">
 </head>
-<body>
+<body class="warehouse-app">
+    <a href="#main-content" class="skip-to-content">Lewati navigasi</a>
     <div class="container-fluid">
         @include('shared.layouts.partials.top-navbar')
 
@@ -23,7 +26,7 @@
             @include('shared.layouts.partials.sidebar')
 
             <!-- Main Content -->
-            <main class="col-md-10 main-content">
+            <main class="col-md-10 main-content" id="main-content" tabindex="-1">
                 @if (session('success'))
                     <script>
                         document.addEventListener('DOMContentLoaded', function() {

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MasterLocation;
+use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -34,10 +35,14 @@ class MasterLocationController extends Controller
             'code' => 'required|unique:master_locations|max:255',
         ]);
 
-        MasterLocation::create([
-            'code' => strtoupper($request->code),
-            'is_occupied' => false
-        ]);
+        DB::transaction(function () use ($request) {
+            $location = MasterLocation::create([
+                'code' => strtoupper($request->code),
+                'is_occupied' => false
+            ]);
+            AuditService::record('master_location', 'created', 'MasterLocation', $location->id, $request->user()->id,
+                [], ['location' => $location->code], "Lokasi {$location->code} dibuat.");
+        });
 
         return redirect()->route('locations.index')->with('success', 'Lokasi berhasil ditambahkan!');
     }
@@ -61,9 +66,12 @@ class MasterLocationController extends Controller
                     throw new \RuntimeException('Gagal edit! Lokasi ini sedang terisi.');
                 }
 
+                $previousCode = $locked->code;
                 $locked->update([
                     'code' => strtoupper($request->code),
                 ]);
+                AuditService::record('master_location', 'updated', 'MasterLocation', $locked->id, $request->user()->id,
+                    ['location' => $previousCode], ['location' => $locked->code], "Lokasi {$previousCode} diperbarui menjadi {$locked->code}.");
             });
         } catch (\Throwable $e) {
             return redirect()->route('locations.index')->with('error', $e->getMessage());
@@ -88,6 +96,8 @@ class MasterLocationController extends Controller
                 }
 
                 $locked->delete();
+                AuditService::record('master_location', 'deleted', 'MasterLocation', $locked->id, request()->user()->id,
+                    ['location' => $locked->code], [], "Lokasi {$locked->code} dihapus.");
             });
         } catch (\Throwable $e) {
             return redirect()->route('locations.index')->with('error', $e->getMessage());

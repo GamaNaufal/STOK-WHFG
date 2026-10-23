@@ -1,0 +1,122 @@
+/* Apple-inspired operational UI: solid content, restrained chrome, direct feedback. */
+@media screen {
+    :root {
+        --ui-ink: #202124;
+        --ui-muted: #595d65;
+        --ui-border: #dfe1e5;
+        --ui-accent: #0b7072;
+        --ui-soft: #e8f3f1;
+        --ui-canvas: #f5f5f7;
+        --ui-surface: #fff;
+        --ui-radius: .875rem;
+        --ui-shadow: 0 1px 3px rgb(20 25 32 / 5%);
+    }
+    .warehouse-app, body.login-apple {
+        --ui-ink: #202124;
+        --ui-muted: #595d65;
+        --ui-border: #dfe1e5;
+        --ui-accent: #0b7072;
+        --ui-soft: #e8f3f1;
+        background: var(--ui-canvas);
+        color: var(--ui-ink);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-optical-sizing: auto;
+        line-height: 1.5;
+    }
+    .warehouse-app :is(h1, h2, h3), .login-apple :is(h1, h2) { font-weight: 650; }
+    .warehouse-app h1 { letter-spacing: -.03em; line-height: 1.2; }
+    .warehouse-app :is(.app-page-hero, .app-page-banner, .hero-responsive) {
+        border: 0; border-radius: 0; box-shadow: none !important;
+        background: transparent !important; padding: .75rem 0 1.25rem !important;
+    }
+    .warehouse-app :is(.app-page-hero, .app-page-banner, .hero-responsive) h1 {
+        font-size: clamp(1.5rem, 2.5vw, 2rem); letter-spacing: -.03em;
+    }
+    .warehouse-app .hero-subtitle { font-size: .9375rem; line-height: 1.55; }
+    .warehouse-app .card, .warehouse-app :is(.section-card, .history-card, .approval-card) {
+        border-radius: var(--ui-radius) !important; box-shadow: var(--ui-shadow) !important;
+    }
+    .warehouse-app .app-section-heading, .warehouse-app .section-header {
+        background: #f8f9fa !important; color: var(--ui-ink) !important;
+        border-bottom: 1px solid var(--ui-border) !important;
+        font-size: .9375rem; letter-spacing: 0; padding: 1rem 1.25rem;
+    }
+    .warehouse-app .app-section-heading :is(h2, h3, h4, h5, h6),
+    .warehouse-app .section-header :is(h2, h3, h4, h5, h6) { color: var(--ui-ink) !important; letter-spacing: 0; font-size: 1rem; }
+    .warehouse-app .app-section-heading > i, .warehouse-app .section-header > i { color: var(--ui-accent); font-size: 1.125rem; }
+    .warehouse-app .top-navbar { background: #fff; border-bottom: 1px solid var(--ui-border); box-shadow: 0 3px 12px rgb(20 25 32 / 3%); }
+    .warehouse-app .top-navbar .navbar-inner { background: transparent; }
+    @supports (backdrop-filter: blur(16px)) {
+        .warehouse-app .top-navbar { background: rgb(255 255 255 / 92%); backdrop-filter: blur(16px) saturate(130%); }
+    }
+    .warehouse-app .sidebar.offcanvas { background: #eceef0; border-right-color: #d9dde1; }
+    .warehouse-app .sidebar .nav-link { color: #454a52; border-radius: .625rem; font-weight: 500; }
+    .warehouse-app .sidebar .nav-link.active { background: #d5e9e5; color: #075b5d; font-weight: 650; box-shadow: inset 3px 0 0 #0b7072; }
+    .warehouse-app .sidebar .nav-link.active i { color: #075b5d; }
+    .warehouse-app .sidebar .menu-group-toggle { font-size: .8125rem; font-weight: 650; letter-spacing: .015em; }
+    .warehouse-app .sidebar .nav-link i { color: #626873; }
+    .warehouse-app .sidebar .menu-chevron { transition: none; }
+    .warehouse-app .top-search-form .input-group-text { background: #f5f5f7; border-color: var(--ui-border); }
+    .warehouse-app .top-search-form .form-control { background: #f5f5f7; border-color: var(--ui-border); }
+    .warehouse-app .avatar-trigger { border-color: var(--ui-border); }
+    .warehouse-app :is(.dropdown-menu, .global-search-dropdown) { border-radius: .875rem !important; border-color: var(--ui-border) !important; box-shadow: 0 8px 28px rgb(20 25 32 / 12%) !important; background: #fff; }
+    .warehouse-app .dropdown-item { border-radius: .375rem; }
+    .warehouse-app .global-search-item.active { background: var(--ui-soft); color: #075b5d; }
+    .warehouse-app .table { --bs-table-hover-bg: #f3f6f5; color: var(--ui-ink); }
+    .warehouse-app .table > thead > tr > th { background: #f6f7f8; color: #4b515a; font-size: .8125rem; letter-spacing: .01em; border-bottom-color: var(--ui-border); }
+    .warehouse-app .table > tbody > tr > td { border-bottom-color: #e8eaed; }
+    .warehouse-app .form-control, .warehouse-app .form-select { border-color: #b7bdc5; border-radius: .625rem; box-shadow: none; }
+    .warehouse-app .form-label { font-weight: 600; }
+    .warehouse-app .btn, .warehouse-app .app-button { border-radius: .625rem !important; letter-spacing: 0; }
+    .warehouse-app .text-primary { color: var(--ui-accent) !important; }
+    .warehouse-app .btn-outline-primary {
+        --bs-btn-color: #0b7072; --bs-btn-border-color: #8eb7b5;
+        --bs-btn-hover-bg: #0b7072; --bs-btn-hover-border-color: #0b7072;
+        --bs-btn-active-bg: #085e60; --bs-btn-active-border-color: #085e60;
+        --bs-btn-disabled-color: #647580; --bs-btn-disabled-border-color: #bccbd1;
+    }
+    .warehouse-app .pagination { --bs-pagination-color: #0b7072; --bs-pagination-active-bg: #0b7072; --bs-pagination-active-border-color: #0b7072; }
+    .warehouse-app .alert-info { --bs-alert-bg: #edf5f7; --bs-alert-border-color: #cbdde3; --bs-alert-color: #245363; }
+    .warehouse-app .input-group > .btn:not(:first-child) { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
+    .warehouse-app .input-group > .btn:not(:last-child) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+    .warehouse-app .btn:not(:disabled):active, .login-apple .btn-login:active {
+        transform: scale(.98); transition: transform 100ms cubic-bezier(.23, 1, .32, 1);
+    }
+    .warehouse-app .btn:focus-visible, .warehouse-app .btn:focus-visible:active,
+    .login-apple .btn-login:focus-visible { transform: none; transition: none; }
+    .warehouse-app .btn.disabled:active { transform: none; }
+    .warehouse-app .modal-content { border-radius: 1.125rem !important; background: #fff; border: 1px solid var(--ui-border) !important; box-shadow: 0 24px 72px rgb(20 25 32 / 22%) !important; }
+    .warehouse-app .modal-header, .warehouse-app .modal-footer { border-color: #e8eaed; }
+    .warehouse-app .modal.fade .modal-dialog { transform: none; transition: none; }
+    .warehouse-app .modal.fade { transition: opacity 150ms ease-out; }
+    .warehouse-app .dashboard-stat-value, .warehouse-app .app-summary-value { color: var(--ui-ink) !important; font-weight: 650; font-variant-numeric: tabular-nums; }
+    .warehouse-app .dashboard-role { background: #e8f3f1; border: 0; color: #075b5d; }
+    .warehouse-app .dashboard-action-icon, .warehouse-app .dashboard-stat-icon { background: #eef3f2; border-radius: .75rem; }
+    .warehouse-app .dashboard-info { border-top-color: var(--ui-border); }
+    .warehouse-app :is(button, .btn, .nav-link), .login-apple button { touch-action: manipulation; }
+    .login-apple .login-container { border-radius: 1.25rem; box-shadow: 0 16px 48px rgb(20 25 32 / 8%); }
+    .login-apple .login-info h2 { color: var(--ui-ink); font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.04em; }
+    .login-apple .login-header h1 { letter-spacing: -.025em; }
+    .login-apple .login-info p { color: var(--ui-muted); }
+    .login-apple .btn-login { border-radius: .625rem; }
+    @media (hover: hover) and (pointer: fine) {
+        .warehouse-app .sidebar .nav-link:not(.active):hover { background: #e1e5e8; color: #252c32; }
+    }
+    @media (pointer: coarse) {
+        .warehouse-app :is(.btn, .btn-sm, .page-link, .btn-close) { min-height: 44px; min-width: 44px; }
+    }
+    @media (prefers-reduced-transparency: reduce) {
+        .warehouse-app .top-navbar { background: #fff; backdrop-filter: none; }
+    }
+    @media (prefers-contrast: more) {
+        .warehouse-app { --ui-muted: #35383d; --ui-border: #747981; }
+        .warehouse-app .top-navbar { background: #fff; backdrop-filter: none; }
+        .warehouse-app .card.border-0, .warehouse-app :is(.card, .form-control, .form-select, .btn, .modal-content),
+        .login-apple :is(.login-container, .form-control, .btn-login) { border: 1px solid #565c64 !important; }
+        .warehouse-app .sidebar .nav-link.active { outline: 2px solid #075b5d; outline-offset: -2px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .warehouse-app .btn:active, .login-apple .btn-login:active { transform: none; transition: none; }
+        .warehouse-app .top-navbar { backdrop-filter: none; background: #fff; }
+    }
+}

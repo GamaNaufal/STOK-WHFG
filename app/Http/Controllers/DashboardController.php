@@ -199,6 +199,12 @@ class DashboardController extends Controller
                 'warning_boxes' => $warningBoxes,
                 'expired_boxes' => $expiredBoxesCount,
             ];
+
+            // Admin Utama uses the same operational dashboard as Supervisi.
+            // Retain existing stock statistics and expiry synchronization above.
+            $data = app(OperationalReportService::class)->build($request);
+
+            return view('operator.reports.operational', array_merge($data, compact('stats', 'userRole')));
         }
 
         return view('shared.dashboard', compact('stats', 'userRole'));

@@ -253,76 +253,41 @@
             border: 1.5px solid #e5e9f0;
         }
     </style>
+    <link rel="stylesheet" href="{{ asset('css/pages/sales-delivery-order.css') }}">
 @endsection
 
 @section('content')
-<div class="page-header">
-    <h1 class="h2">
-        <i class="bi bi-cart-plus" style="color: #0C7779;"></i> Sales Input & History
-    </h1>
-    <p class="text-muted mb-0">Buat pesanan delivery baru dan kelola riwayat permintaan Anda</p>
+@php
+    $initialItems = collect(old('items', [['part_number' => '', 'quantity' => '']]));
+    if ($initialItems->isEmpty()) $initialItems = collect([['part_number' => '', 'quantity' => '']]);
+@endphp
+<div class="page-header sales-order-page-header">
+    <span class="sales-order-eyebrow">Sales / Permintaan delivery</span>
+    <h1>Sales Input & History</h1>
+    <p>Buat pesanan baru untuk ditinjau PPC dan pantau permintaan yang sudah Anda kirim.</p>
 </div>
 
-<div class="container-fluid">
+<div class="container-fluid sales-order-page">
     <div class="row g-4">
         <!-- Form Section -->
-        <div class="col-lg-5">
+        <div class="col-xl-6">
             @if(auth()->user()->canAccess('delivery_order'))
-                <form action="{{ route('delivery.store') }}" method="POST" class="form-card">
+                <form action="{{ route('delivery.store') }}" method="POST" class="form-card sales-order-form"
+                    id="sales-order-form" data-sales-order-form="create">
                     @csrf
                     <div class="card-header">
-                        <h6>
-                            <i class="bi bi-plus-circle"></i> Pesanan Delivery Baru
-                        </h6>
+                        <span class="sales-order-card-icon"><i class="bi bi-plus-lg" aria-hidden="true"></i></span>
+                        <div>
+                            <h2>Pesanan delivery baru</h2>
+                            <p>Lengkapi detail dan kebutuhan part sebelum mengirim ke PPC.</p>
+                        </div>
                     </div>
                     <div class="card-body">
-                        <!-- Customer Name -->
-                        <div class="mb-4">
-                            <label class="form-label">Nama Pelanggan</label>
-                            <input type="text" name="customer_name" class="form-control" placeholder="Masukkan nama pelanggan" required>
+                        @include('operator.delivery.partials.sales-order-fields')
+                        <div class="sales-order-submit-panel">
+                            <p><i class="bi bi-info-circle" aria-hidden="true"></i> Pesanan akan berstatus <strong>menunggu</strong> sampai PPC memberi keputusan.</p>
+                            <button type="submit" class="btn btn-primary sales-order-submit"><i class="bi bi-send" aria-hidden="true"></i> Kirim pesanan</button>
                         </div>
-
-                        <!-- Delivery Date -->
-                        <div class="mb-4">
-                            <label class="form-label">Tanggal Delivery</label>
-                            <input type="date" name="delivery_date" class="form-control" required>
-                        </div>
-
-                        <!-- Items Section -->
-                        <div class="mb-4">
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <label class="form-label mb-0">Item Barang</label>
-                                <button type="button" class="btn btn-sm btn-add" id="add-item-btn">
-                                    <i class="bi bi-plus-lg"></i> Tambah Item
-                                </button>
-                            </div>
-                            
-                            <div id="items-container" class="space-y-2">
-                                <div class="row g-2 item-row">
-                                    <div class="col-lg-6">
-                                        <select name="items[0][part_number]" class="form-control form-select part-select" required>
-                                            <option value="">Pilih No Part</option>
-                                            @foreach($partNumbers as $partNumber)
-                                                <option value="{{ $partNumber }}">{{ $partNumber }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div class="col-lg-4">
-                                        <input type="number" name="items[0][quantity]" class="form-control" placeholder="Qty" min="1" required>
-                                    </div>
-                                    <div class="col-lg-2">
-                                        <button type="button" class="btn btn-remove remove-item w-100" title="Hapus item">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Submit Button -->
-                        <button type="submit" class="btn btn-submit">
-                            <i class="bi bi-check-circle"></i> Submit Pesanan
-                        </button>
                     </div>
                 </form>
             @else
@@ -341,96 +306,102 @@
             @endif
         </div>
 
-        <!-- History Section -->
-        <div class="col-lg-7">
-            <div class="history-card">
+        <div class="col-xl-6">
+            <section class="history-card sales-order-history" aria-labelledby="sales-history-title">
                 <div class="card-header">
-                    <h6>
-                        <i class="bi bi-clock-history"></i> Riwayat Pesanan
-                    </h6>
+                    <div>
+                        <span class="sales-order-eyebrow">Aktivitas Sales</span>
+                        <h2 id="sales-history-title">Riwayat pesanan</h2>
+                        <p>Hingga 50 pesanan terbaru milik Anda.</p>
+                    </div>
+                    <span class="sales-history-count">{{ $myOrders->count() }} ditampilkan</span>
                 </div>
-                <div class="card-body p-0">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
+                <div class="sales-history-scroll" tabindex="0" role="region" aria-label="Riwayat pesanan Sales, geser untuk melihat semua kolom">
+                        <table class="table sales-history-table {{ $myOrders->isEmpty() ? 'is-empty' : '' }}">
+                            <caption class="visually-hidden">Tanggal delivery, pelanggan, status, dan rincian hingga 50 pesanan terbaru.</caption>
                             <thead>
                                 <tr>
-                                    <th style="width: 12%;">Tanggal</th>
-                                    <th style="width: 25%;">Pelanggan</th>
-                                    <th style="width: 20%;">Status</th>
-                                    <th style="width: 43%;">Keterangan</th>
+                                    <th scope="col">Order / tanggal delivery</th>
+                                    <th scope="col">Pelanggan / status</th>
+                                    <th scope="col">Rincian &amp; tindakan</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse($myOrders as $order)
-                                <tr>
-                                    <td class="fw-500">{{ $order->delivery_date->format('d M Y') }}</td>
-                                    <td>{{ $order->customer_name }}</td>
-                                    <td>
-                                        @if($order->status == 'pending')
-                                            <span class="badge bg-warning">
-                                                <i class="bi bi-clock"></i> Menunggu
-                                            </span>
-                                        @elseif($order->status == 'approved')
-                                            <span class="badge bg-primary">
-                                                <i class="bi bi-check-circle"></i> Disetujui
-                                            </span>
-                                        @elseif($order->status == 'correction')
-                                            <span class="badge bg-danger">
-                                                <i class="bi bi-exclamation-circle"></i> Koreksi
-                                            </span>
-                                        @elseif($order->status == 'completed')
-                                            <span class="badge bg-success">
-                                                <i class="bi bi-check2-all"></i> Selesai
-                                            </span>
-                                        @else
-                                            <span class="badge bg-secondary">{{ ucfirst($order->status) }}</span>
-                                        @endif
+                                @php
+                                    $historyStatus = match ($order->status) {
+                                        'pending' => ['Menunggu PPC', 'pending', 'bi-clock'],
+                                        'approved' => ['Disetujui', 'approved', 'bi-check-circle'],
+                                        'correction' => ['Perlu koreksi', 'correction', 'bi-exclamation-circle'],
+                                        'completed' => ['Selesai', 'completed', 'bi-check2-all'],
+                                        'rejected' => ['Ditolak', 'rejected', 'bi-x-circle'],
+                                        'partial' => ['Terbagi', 'partial', 'bi-diagram-3'],
+                                        default => [ucfirst(str_replace('_', ' ', $order->status)), 'neutral', 'bi-circle'],
+                                    };
+                                @endphp
+                                <tr class="sales-history-main-row">
+                                    <th scope="row" class="sales-history-order-cell">
+                                        <strong>Order #{{ $order->id }}</strong>
+                                        <time datetime="{{ $order->delivery_date->format('Y-m-d') }}">{{ $order->delivery_date->format('d M Y') }}</time>
+                                    </th>
+                                    <td class="sales-history-customer-cell">
+                                        <strong>{{ $order->customer_name }}</strong>
+                                        <span class="sales-history-status is-{{ $historyStatus[1] }}">
+                                            <i class="bi {{ $historyStatus[2] }}" aria-hidden="true"></i>{{ $historyStatus[0] }}
+                                        </span>
                                     </td>
-                                    <td>
-                                        @if($order->status == 'correction')
-                                            <div class="alert-correction">
-                                                <strong>Perlu Koreksi:</strong> {{ $order->notes }}
-                                            </div>
-                                            @if(auth()->user()->canAccess('delivery_order'))
-                                                <a href="{{ route('delivery.edit', $order->id) }}" class="btn btn-edit-correction btn-sm">
-                                                    <i class="bi bi-pencil-square"></i> Edit Koreksi
-                                                </a>
-                                            @endif
-                                        @else
-                                            <div class="d-flex align-items-center gap-2">
-                                                <small class="text-muted">{{ $order->items->count() }} Item</small>
-                                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#order-detail-{{ $order->id }}">
-                                                    <i class="bi bi-eye"></i> Detail
-                                                </button>
-                                            </div>
+                                    <td class="sales-history-action-cell">
+                                        <span class="sales-history-item-count">{{ $order->items->count() }} item</span>
+                                        @if($order->status === 'correction')
+                                            <p class="sales-history-note"><strong>Catatan PPC:</strong> {{ $order->notes ?: 'Periksa kembali pesanan sebelum mengirim ulang.' }}</p>
+                                        @elseif($order->status === 'rejected' && $order->notes)
+                                            <p class="sales-history-note"><strong>Catatan PPC:</strong> {{ $order->notes }}</p>
                                         @endif
+                                        <div class="sales-history-actions">
+                                            <button class="btn btn-outline-secondary sales-history-detail-toggle" type="button"
+                                                data-bs-toggle="collapse" data-bs-target="#order-detail-{{ $order->id }}"
+                                                aria-controls="order-detail-{{ $order->id }}" aria-expanded="false"
+                                                aria-label="Lihat item Order #{{ $order->id }}">
+                                                <i class="bi bi-list-ul" aria-hidden="true"></i> Lihat item
+                                            </button>
+                                            @if(auth()->user()->canAccess('delivery_order'))
+                                                @if($order->status === 'correction')
+                                                    <a href="{{ route('delivery.edit', $order->id) }}" class="btn sales-history-edit">
+                                                        <i class="bi bi-pencil-square" aria-hidden="true"></i> Edit koreksi
+                                                    </a>
+                                                @endif
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
-                                <tr class="collapse" id="order-detail-{{ $order->id }}">
-                                    <td colspan="4" class="bg-light">
-                                        <div class="p-3">
-                                            <div class="fw-bold mb-2">Detail Item</div>
-                                            <ul class="mb-0">
+                                <tr class="sales-history-detail-row">
+                                    <td colspan="3">
+                                        <div class="collapse sales-history-detail" id="order-detail-{{ $order->id }}">
+                                            <div class="sales-history-detail-heading">
+                                                <strong>Item Order #{{ $order->id }}</strong>
+                                                <span>{{ $order->items->count() }} nomor part</span>
+                                            </div>
+                                            <ul class="sales-history-item-list">
                                                 @foreach($order->items as $item)
-                                                    <li>{{ $item->part_number }} - {{ $item->quantity }} PCS</li>
+                                                    <li><span>{{ $item->part_number }}</span><strong>{{ number_format($item->quantity, 0, ',', '.') }} PCS</strong></li>
                                                 @endforeach
                                             </ul>
                                         </div>
                                     </td>
                                 </tr>
                                 @empty
-                                <tr>
-                                    <td colspan="4" class="text-center py-4">
-                                        <i class="bi bi-inbox" style="font-size: 2rem; color: #9ca3af;"></i>
-                                        <p class="text-muted mt-2 mb-0">Belum ada pesanan</p>
+                                <tr class="sales-history-empty-row">
+                                    <td colspan="3">
+                                        <i class="bi bi-inbox" aria-hidden="true"></i>
+                                        <strong>Belum ada pesanan</strong>
+                                        <span>Pesanan yang Anda kirim akan muncul di sini.</span>
                                     </td>
                                 </tr>
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
                 </div>
-            </div>
+            </section>
         </div>
     </div>
 </div>
@@ -440,111 +411,5 @@
 @section('scripts')
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            let itemIndex = 1;
-            const container = document.getElementById('items-container');
-            const addBtn = document.getElementById('add-item-btn');
-
-            if (!container || !addBtn) {
-                return;
-            }
-
-            function initPartSelects(context) {
-                const selects = (context || document).querySelectorAll('.part-select');
-                selects.forEach(select => {
-                    if (!select.dataset.enhanced) {
-                        window.jQuery(select).select2({
-                            width: '100%',
-                            placeholder: 'Pilih No Part',
-                            allowClear: true,
-                            minimumResultsForSearch: 0
-                        });
-                        select.dataset.enhanced = 'true';
-                    }
-                });
-            }
-
-            function updateRemoveButtons() {
-                const rows = container.getElementsByClassName('item-row');
-                if (rows.length === 1) {
-                    rows[0].querySelector('.remove-item').disabled = true;
-                } else {
-                    Array.from(rows).forEach(row => {
-                        row.querySelector('.remove-item').disabled = false;
-                    });
-                }
-            }
-
-            addBtn.addEventListener('click', function() {
-                const row = document.createElement('div');
-                row.className = 'row g-2 item-row';
-                row.innerHTML = `
-                    <div class="col-lg-6">
-                        <select name="items[${itemIndex}][part_number]" class="form-control form-select part-select" required>
-                            <option value="">Pilih No Part</option>
-                            @foreach($partNumbers as $partNumber)
-                                <option value="{{ $partNumber }}">{{ $partNumber }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div class="col-lg-4">
-                        <input type="number" name="items[${itemIndex}][quantity]" class="form-control" placeholder="Qty" min="1" required>
-                    </div>
-                    <div class="col-lg-2">
-                        <button type="button" class="btn btn-remove remove-item w-100" title="Hapus item">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                `;
-                container.appendChild(row);
-                itemIndex++;
-                updateRemoveButtons();
-                initPartSelects(row);
-            });
-
-            container.addEventListener('click', function(e) {
-                if (e.target.closest('.remove-item')) {
-                    const row = e.target.closest('.item-row');
-                    if (container.getElementsByClassName('item-row').length > 1) {
-                        row.remove();
-                        updateRemoveButtons();
-                    }
-                }
-            });
-
-            updateRemoveButtons();
-            initPartSelects(document);
-        });
-
-        // Add SweetAlert2 confirmation before form submission
-        document.querySelector('form')?.addEventListener('submit', function(e) {
-            e.preventDefault();
-            const form = this;
-            const items = form.querySelectorAll('.item-row').length;
-            const customerName = form.querySelector('[name="customer_name"]')?.value || '';
-            
-            if (!customerName || items === 0) {
-                WarehouseAlert.error({
-                    title: 'Data Tidak Lengkap',
-                    message: 'Harap isi nama customer dan minimal 1 item pesanan'
-                });
-                return;
-            }
-
-            WarehouseAlert.info({
-                title: 'Konfirmasi Submit Pesanan',
-                message: 'Pesanan delivery order akan dibuat dan menunggu approval dari <strong style="color: #0C7779;">PPC</strong>.',
-                details: {
-                    'Customer': customerName,
-                    'Jumlah Item': `${items} item`
-                },
-                infoText: 'Pastikan data pesanan sudah benar sebelum submit.',
-                confirmText: 'Submit Pesanan',
-                onConfirm: () => {
-                    form.submit();
-                }
-            });
-        });
-    </script>
+    <script src="{{ asset('js/pages/sales-delivery-order.js') }}"></script>
 @endsection
