@@ -6,6 +6,7 @@ $supervisor = ['supervisi'];
 return [
     'roles' => [
         'warehouse_operator' => 'Warehouse Operator',
+        'export_operator' => 'Operator Export',
         'admin_warehouse' => 'Admin Warehouse',
         'sales' => 'Sales',
         'ppc' => 'PPC',

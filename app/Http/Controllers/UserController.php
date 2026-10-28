@@ -18,7 +18,7 @@ class UserController extends Controller
         $search = $request->query('q');
         $search = is_string($search) ? trim(mb_substr($search, 0, 100)) : '';
         $role = $request->query('role');
-        $role = in_array($role, ['admin', 'admin_warehouse', 'warehouse_operator', 'sales', 'ppc', 'supervisi'], true)
+        $role = in_array($role, ['admin', 'admin_warehouse', 'warehouse_operator', 'export_operator', 'sales', 'ppc', 'supervisi'], true)
             ? $role : '';
         $status = $request->query('status');
         $status = in_array($status, ['active', 'inactive'], true) ? $status : '';
@@ -52,6 +52,7 @@ class UserController extends Controller
             'admin',
             'admin_warehouse',
             'warehouse_operator',
+            'export_operator',
             'sales',
             'ppc',
             'supervisi',
@@ -68,7 +69,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email',
-            'role' => 'required|in:admin,admin_warehouse,warehouse_operator,sales,ppc,supervisi',
+            'role' => 'required|in:admin,admin_warehouse,warehouse_operator,export_operator,sales,ppc,supervisi',
             'password' => 'required|string|min:6|confirmed',
         ]);
 
@@ -104,6 +105,7 @@ class UserController extends Controller
             'admin',
             'admin_warehouse',
             'warehouse_operator',
+            'export_operator',
             'sales',
             'ppc',
             'supervisi',
@@ -120,7 +122,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255|unique:users,email,' . $user->id,
-            'role' => 'required|in:admin,admin_warehouse,warehouse_operator,sales,ppc,supervisi',
+            'role' => 'required|in:admin,admin_warehouse,warehouse_operator,export_operator,sales,ppc,supervisi',
             'password' => 'nullable|string|min:6|confirmed',
             'is_active' => 'sometimes|boolean',
         ]);
