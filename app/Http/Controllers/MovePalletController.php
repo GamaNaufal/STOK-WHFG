@@ -137,7 +137,7 @@ class MovePalletController extends Controller
     {
         $data = $request->validate([
             'pallet_id' => ['required', 'integer', 'exists:pallets,id'],
-            'location_id' => ['required', 'integer', 'exists:master_locations,id'],
+            'location_id' => ['required', 'integer', 'exists:master_locations,id,scope,domestic'],
         ]);
 
         try {

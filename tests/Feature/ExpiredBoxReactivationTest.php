@@ -24,6 +24,22 @@ class ExpiredBoxReactivationTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_packing_receipt_rejects_export_location_without_creating_replacement(): void
+    {
+        [, $supervisor, $box] = $this->inventory();
+        $handling = $this->readyForPacking($box, $supervisor);
+        $export = \App\Models\ExportMasterLocation::create(['code' => 'EXPORT-PACKING']);
+
+        $this->actingAs($supervisor)->postJson(route('expired-box.receive', $handling),
+            $this->receipt($handling, ['location_id' => $export->id]))
+            ->assertUnprocessable()->assertJsonValidationErrors('location_id');
+
+        $this->assertSame('at_packing', $handling->fresh()->status);
+        $this->assertFalse($export->fresh()->is_occupied);
+        $this->assertDatabaseMissing('stock_locations', ['master_location_id' => $export->id]);
+        $this->assertNull($handling->fresh()->replacement_box_id);
+    }
+
     private function inventory(int $ageMonths = 13): array
     {
         $this->travelTo(now()->setDate(2026, 1, 31)->setTime(10, 0));

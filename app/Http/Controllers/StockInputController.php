@@ -602,7 +602,7 @@ class StockInputController extends Controller
         return $request->validate([
             'pallet_id' => 'required|exists:pallets,id',
             'input_date' => 'nullable|date|date_format:Y-m-d',
-            'location_id' => 'nullable|integer|exists:master_locations,id',
+            'location_id' => 'nullable|integer|exists:master_locations,id,scope,domestic',
             'warehouse_location' => 'nullable|string',
         ]);
     }

@@ -1,16 +1,109 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 23 Oktober 2026 (QA/packing dan pengelompokan per transaksi pada branch codex/expired-qa-packing; database kerja belum dimigrasikan dalam pengerjaan ini).
+Terakhir diverifikasi dari source code: 28 Oktober 2026 (pembaruan inkremental).
+
+Integrasi 28 Oktober 2026 pada checkout utama branch Export-plan: fitur master
+dan Rencana Delivery Ekspor digabungkan dengan alur QA/packing terbaru. Handle
+tetap memulai penyerahan QA; validasi lokasi penerimaan packing tunggal, massal,
+dan per transaksi hanya menerima scope domestic. Seluruh regresi gabungan lulus
+304 tes backend (2.493 assertions) memakai SQLite in-memory serta 51 tes frontend;
+npm ci dan build aset berhasil pada checkout utama. Jalur Unicode Windows diuji
+melalui alias drive sementara ke checkout yang sama. Tidak ada migration pada
+database kerja/production dalam integrasi ini. Sesuai instruksi pengguna, pekerjaan
+selanjutnya dilakukan langsung pada branch aktif tanpa branch/worktree baru.
+
+Verifikasi tambahan 28 Oktober 2026 (Rencana Delivery Ekspor):
+- Menu /export/delivery-plans memakai izin export_delivery_plans, bawaan
+  Operator Export dan dapat diatur Admin Utama. Migration 000004 membuat tabel
+  export_delivery_plans/items dan menambah izin ke pengaturan role existing
+  beserta audit sistem. Produksi belum dimigrasikan oleh agent.
+- Input customer, batas tanggal pengiriman, nomor part dan jumlah PCS.
+  Kapasitas diambil hanya dari master ekspor; box dan total dihitung ulang di
+  server. Jumlah wajib kelipatan kapasitas, tidak boleh part duplikat atau box
+  tidak penuh. Tidak ada input nomor rencana atau jumlah pallet.
+- Rencana disimpan sebagai draft, bisa diubah dan diarsipkan (soft delete).
+  Perencanaan pallet dan approval belum diterapkan pada tahap ini. Tidak ada
+  pembuatan/alokasi box fisik, mutasi inventory domestik, atau assignment lokasi.
+- Setiap item menyimpan snapshot nomor part dan kapasitas. Mengubah kapasitas
+  master tidak mengubah rencana lama; item yang baru ditambahkan mengambil
+  kapasitas master terkini. Identitas part yang sudah direferensikan rencana,
+  termasuk yang diarsipkan, tidak boleh diganti/dihapus dari master.
+  Simpan memakai transaksi, lock master/header, revision untuk mencegah
+  penimpaan edit bersamaan, serta audit sebelum/sesudah.
+- Impor Excel .xlsx/.xls maksimal 5 MB, 500 part, satu sheet berisi satu
+  customer. Template dapat diunduh; header dua tingkat pada layout contoh
+  didukung. Preview tidak membuat data. Formula tidak dieksekusi; hasil cache
+  Excel dipakai jika tersedia, selain itu operator harus mengoreksi nilainya.
+- Foto JPG/PNG/WebP maksimal 10 MB dan 40 megapiksel. OpenCV.js merapikan
+  perspektif/tabel dan Tesseract.js membaca header serta sel part/PCS di browser.
+  Tahap ini untuk dokumen cetak dengan layout contoh; tulisan tangan dan
+  layout bebas belum didukung. Tidak ada pelatihan model atau API eksternal.
+  Foto asli tidak dikirim/disimpan di server. Nomor part tidak dikoreksi secara
+  fuzzy. Hasil impor bisa diedit dan wajib dikonfirmasi sebelum disimpan.
+- npm ci lalu npm run build menyiapkan aset lokal public/vendor/ocr dan
+  public/build; kedua direktori harus ikut deployment. Tidak perlu service OCR,
+  Python, API key, queue worker, atau konfigurasi OCR pada OS server.
+- Verifikasi: 274 tes backend (2.212 assertions) dan 51 tes frontend lulus.
+  Browser Chromium terpisah berhasil membaca 9 baris foto contoh, customer,
+  tanggal, total 732 box, lalu menyimpan draft; impor Excel dan penolakan
+  jumlah tidak kelipatan juga diverifikasi. Chrome desktop adalah target,
+  tetapi koneksi Chrome aktual tidak tersedia pada sesi verifikasi.
+  Seluruh data UI uji memakai SQLite preview terpisah; production tidak diubah.
+
+
+
+Verifikasi tambahan 28 Oktober 2026 (Master ekspor): tabel `part_settings` dan
+`master_locations` mempunyai `scope=domestic/export`. Migration
+`2026_10_28_000002_add_scope_to_master_data` memberi default domestic pada data
+existing tanpa mengganti ID, kapasitas, occupancy, atau foreign key; unique
+menjadi (scope, part_number) dan (scope, code). Kapasitas part yang sama dapat
+berbeda lintas lingkup, dan kode lokasi dapat dipakai di area fisik yang terpisah.
+Master ekspor dimulai kosong; migration/seeder tidak menyalin master domestik.
+
+Model PartSetting/MasterLocation memakai scope domestik secara otomatis;
+ExportPartSetting/ExportMasterLocation memakai scope ekspor pada tabel yang sama.
+Lingkup tetap ditentukan oleh model dan nama route, bukan role/login atau input
+request. Endpoint ekspor terpisah di /export/part-settings dan /export/locations;
+CRUD, pencarian, validasi unik dan akses ID semuanya dibatasi sesuai lingkup.
+API/validasi lokasi pada transaksi domestik dan LocationAssignmentService tetap
+hanya menerima master domestik. Master ekspor belum terhubung ke inventory fisik.
+Rencana Delivery Ekspor memakai part ekspor dan pemeriksaan referensi master
+mencakup item rencana, termasuk rencana yang telah diarsipkan.
+
+Izin baru `export_parts` dan `export_locations` merupakan bawaan Operator Export.
+Admin Utama dapat mengakses kedua lingkup melalui menu terpisah. Migration
+`2026_10_28_000003_enable_export_master_features` menambahkan dua izin ini ke
+pengaturan Operator Export yang sudah tersimpan, mempertahankan izin lain, dan
+mencatat audit sistem sekali. Setelah deployment, Admin Utama tetap dapat
+mencabut/mengubahnya melalui Hak Akses seperti biasa. Sebelum membuka fitur,
+jalankan seluruh migration baru; production belum dimigrasikan oleh agent.
+
+Verifikasi master ekspor pada 28 Oktober 2026: seluruh suite lulus 263 tes
+(2.079 assertions) menggunakan SQLite sementara, termasuk migrasi skema legacy,
+isolasi ID/API, kapasitas part lintas lingkup, penolakan assignment lokasi ekspor
+pada transaksi domestik, dan pengaturan ulang hak akses. Browser diperiksa pada
+viewport desktop 1440x900 dan ponsel 390x844, kondisi kosong/berisi, pencarian dan
+navigasi keyboard. Database preview terpisah dipakai untuk data uji antarmuka;
+database operasional/production tidak diubah. Cabang MySQL migration belum
+dijalankan pada database production.
 
 Verifikasi tambahan 28 Oktober 2026 (Operator Export): role `export_operator`
 tersedia pada tambah/edit/filter user dan pengaturan Hak Akses. Akses fitur
-operasional bawaan kosong; login, profil, logout, dan dashboard placeholder tetap
-tersedia. Dashboard role ini tidak memuat statistik atau transaksi domestik.
+saat ini mencakup Rencana Delivery dan dua master ekspor; login, profil, logout,
+dan dashboard ekspor tetap tersedia. Dashboard role ini tidak memuat statistik atau transaksi domestik.
 Migration `2026_10_28_000001_add_export_operator_role_to_users` memperluas enum
 `users.role` tanpa mengubah akun atau inventory existing; wajib dijalankan saat
 deployment sebelum membuat akun Operator Export. Alur ekspor dan alih peruntukan
 stok belum diimplementasikan. Admin Utama tetap dapat mengatur izin role ini
 melalui mekanisme Hak Akses yang sama dengan role lain.
+
+Seeder akun `ExportOperatorSeeder` (28 Oktober 2026) dipanggil oleh `UserSeeder`
+dan dapat dijalankan sendiri melalui `php artisan db:seed --class=ExportOperatorSeeder`
+setelah migration role. Akun awal: `export@warehouse.local`, sandi `password`,
+role `export_operator`, aktif. Menggunakan `firstOrCreate` berdasarkan email;
+seeding ulang tidak mengubah akun existing, sandi, status aktif, maupun hak akses.
+Seeder ini tidak membuat stok atau transaksi ekspor.
+
 
 Verifikasi tambahan 21 Oktober 2026 (Audit Trail): Handle box expired kini membuat
 `audit_logs` bertipe `expired_box` dalam transaksi yang sama dengan aktivasi dan

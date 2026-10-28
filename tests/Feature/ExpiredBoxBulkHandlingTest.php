@@ -21,6 +21,25 @@ class ExpiredBoxBulkHandlingTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_bulk_and_transaction_packing_receipts_reject_export_location(): void
+    {
+        [$user, $boxes, $domestic] = $this->inventory();
+        $handlings = $this->atPacking($boxes, $user);
+        $export = \App\Models\ExportMasterLocation::create(['code' => 'EXPORT-BULK']);
+        $payload = $this->receipt($handlings, $domestic);
+        $payload['location_id'] = $export->id;
+
+        foreach ([route('expired-box.bulk.store'),
+            route('expired-box.transactions.update', $handlings->first()->transaction_id)] as $url) {
+            $this->postJson($url, $payload)->assertUnprocessable()->assertJsonValidationErrors('location_id');
+        }
+
+        $this->assertSame(['at_packing'], $handlings->map->fresh()->pluck('status')->unique()->values()->all());
+        $this->assertFalse($export->fresh()->is_occupied);
+        $this->assertDatabaseMissing('stock_locations', ['master_location_id' => $export->id]);
+        $this->assertDatabaseMissing('audit_logs', ['action' => 'packing_received']);
+    }
+
     private function inventory(int $count = 2): array
     {
         $this->travelTo(now()->setDate(2026, 1, 31)->setTime(10, 0, 0));

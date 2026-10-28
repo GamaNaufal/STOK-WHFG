@@ -1,4 +1,8 @@
 @extends('shared.layouts.app')
+@php
+    $isExport = $isExport ?? false;
+    $routePrefix = $routePrefix ?? 'locations';
+@endphp
 
 @section('title', 'Edit Lokasi Penyimpanan')
 
@@ -10,11 +14,11 @@
 @php($isOccupied = (bool) $location->is_occupied)
 <div class="location-page location-edit-page">
     <header class="location-page-header">
-        <a href="{{ route('locations.index') }}" class="location-back-link">
+        <a href="{{ route($routePrefix.'.index') }}" class="location-back-link">
             <i class="bi bi-arrow-left" aria-hidden="true"></i> Daftar lokasi
         </a>
-        <span class="location-page-eyebrow">Master data / Penyimpanan</span>
-        <h1>Ubah kode lokasi</h1>
+        <span class="location-page-eyebrow">{{ $isExport ? 'Master data / Ekspor' : 'Master data / Domestik' }}</span>
+        <h1>Ubah kode lokasi{{ $isExport ? " ekspor" : "" }}</h1>
         <p>Periksa kondisi lokasi sebelum menyimpan perubahan kode.</p>
     </header>
 
@@ -38,7 +42,7 @@
                             </div>
                         </div>
                     @endif
-                    <form action="{{ route('locations.update', $location->id) }}" method="POST">
+                    <form action="{{ route($routePrefix.'.update', $location->id) }}" method="POST">
                         @csrf
                         @method('PUT')
                         <div class="location-form-field">
@@ -54,7 +58,7 @@
                             @enderror
                         </div>
                         <div class="location-form-actions">
-                            <a href="{{ route('locations.index') }}" class="btn btn-outline-secondary">Kembali ke daftar</a>
+                            <a href="{{ route($routePrefix.'.index') }}" class="btn btn-outline-secondary">Kembali ke daftar</a>
                             <button type="submit" class="btn btn-primary location-form-submit" @if($isOccupied) disabled @endif>
                                 <i class="bi bi-check-lg" aria-hidden="true"></i> Simpan perubahan
                             </button>

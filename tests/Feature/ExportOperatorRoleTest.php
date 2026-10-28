@@ -38,7 +38,7 @@ class ExportOperatorRoleTest extends TestCase
         $this->assertSame('admin', $admin->fresh()->role);
     }
 
-    public function test_export_operator_can_login_use_empty_dashboard_manage_profile_and_logout(): void
+    public function test_export_operator_can_login_use_master_dashboard_manage_profile_and_logout(): void
     {
         $operator = User::factory()->create(['role' => 'export_operator']);
         $this->post('/login', ['email' => $operator->email, 'password' => 'password'])
@@ -46,7 +46,7 @@ class ExportOperatorRoleTest extends TestCase
         $this->assertAuthenticatedAs($operator);
 
         $this->get(route('dashboard'))->assertOk()->assertViewIs('export.dashboard')
-            ->assertSee('Operator Export')->assertSee('Belum ada fitur ekspor')
+            ->assertSee('Operator Export')->assertSee('Master data ekspor')
             ->assertDontSee('Ringkasan operasional')->assertDontSee('Total PCS')
             ->assertDontSee(route('stock-input.index'), false)
             ->assertDontSee(route('delivery.index'), false)
@@ -63,9 +63,9 @@ class ExportOperatorRoleTest extends TestCase
     {
         $operator = User::factory()->create(['role' => 'export_operator']);
         $access = app(FeatureAccessService::class);
-        $this->assertSame([], $access->defaults($operator->role));
+        $this->assertSame(['export_delivery_plans', 'export_parts', 'export_locations'], $access->defaults($operator->role));
         foreach (array_keys(config('feature_access.features')) as $feature) {
-            $this->assertFalse($access->allows($operator, $feature), $feature);
+            $this->assertSame(in_array($feature, ['export_delivery_plans', 'export_parts', 'export_locations'], true), $access->allows($operator, $feature), $feature);
         }
 
         $this->actingAs($operator);
@@ -84,11 +84,11 @@ class ExportOperatorRoleTest extends TestCase
         $this->assertDatabaseCount('boxes', 0);
     }
 
-    public function test_export_operator_is_available_in_access_management_with_empty_defaults(): void
+    public function test_export_operator_is_available_in_access_management_with_master_defaults(): void
     {
         $this->actingAs(User::factory()->create(['role' => 'admin']))
             ->get(route('access.index', ['role' => 'export_operator']))
-            ->assertOk()->assertSee('Operator Export')->assertViewHas('selected', []);
+            ->assertOk()->assertSee('Operator Export')->assertViewHas('selected', ['export_delivery_plans', 'export_parts', 'export_locations']);
         $this->put(route('access.update'), ['role' => 'export_operator', 'permissions' => []])
             ->assertSessionHasNoErrors()->assertRedirect(route('access.index', ['role' => 'export_operator']));
         $this->assertDatabaseHas('role_feature_access', ['role' => 'export_operator', 'permissions' => '[]']);

@@ -1,4 +1,8 @@
 @extends('shared.layouts.app')
+@php
+    $isExport = $isExport ?? false;
+    $routePrefix = $routePrefix ?? 'locations';
+@endphp
 
 @section('title', 'Kelola Lokasi Penyimpanan')
 
@@ -9,8 +13,8 @@
 @section('content')
 <div class="location-page">
     <header class="location-page-header">
-        <span class="location-page-eyebrow">Master data / Penyimpanan</span>
-        <h1>Lokasi penyimpanan</h1>
+        <span class="location-page-eyebrow">{{ $isExport ? 'Master data / Ekspor' : 'Master data / Domestik' }}</span>
+        <h1>Lokasi penyimpanan{{ $isExport ? " ekspor" : "" }}</h1>
         <p>Kelola kode posisi gudang dan lihat pallet yang sedang menempatinya.</p>
     </header>
 
@@ -25,7 +29,7 @@
                 </div>
             </div>
             <div class="location-form-body">
-                <form action="{{ route('locations.store') }}" method="POST">
+                <form action="{{ route($routePrefix.'.store') }}" method="POST">
                     @csrf
                     <div class="location-form-field">
                         <label for="code" class="form-label">Kode lokasi</label>
@@ -40,7 +44,7 @@
                     </div>
                     <div class="location-form-outcome">
                         <i class="bi bi-check-circle" aria-hidden="true"></i>
-                        <span>Setelah disimpan, lokasi baru tersedia untuk penempatan pallet.</span>
+                        <span>{{ $isExport ? "Lokasi dicatat untuk area penyimpanan ekspor." : "Setelah disimpan, lokasi baru tersedia untuk penempatan pallet." }}</span>
                     </div>
                     <button type="submit" class="btn btn-primary location-form-submit">
                         <i class="bi bi-plus-lg" aria-hidden="true"></i> Tambah lokasi
@@ -96,12 +100,12 @@
                                 <td>
                                     <div>
                                         <div class="location-list-actions">
-                                            <a href="{{ route('locations.edit', $location->id) }}" class="btn btn-sm btn-outline-primary" aria-label="Edit lokasi {{ $location->code }}">
+                                            <a href="{{ route($routePrefix.'.edit', $location->id) }}" class="btn btn-sm btn-outline-primary" aria-label="Edit lokasi {{ $location->code }}">
                                                 <i class="bi bi-pencil" aria-hidden="true"></i> Edit
                                             </a>
                                             <button type="button" class="btn btn-sm btn-outline-danger js-delete-location"
                                                 aria-label="Hapus lokasi {{ $location->code }}"
-                                                data-delete-url="{{ route('locations.destroy', $location->id) }}"
+                                                data-delete-url="{{ route($routePrefix.'.destroy', $location->id) }}"
                                                 data-location-code="{{ $location->code }}"
                                                 @if($deletionBlocked) disabled @endif>
                                                 <i class="bi bi-trash" aria-hidden="true"></i> Hapus
@@ -122,7 +126,7 @@
                                     @if($locations->total() > 0)
                                         <strong>Halaman ini kosong</strong>
                                         <span>Lokasi tersedia di halaman sebelumnya.</span>
-                                        <a href="{{ route('locations.index') }}">Kembali ke halaman pertama</a>
+                                        <a href="{{ route($routePrefix.'.index') }}">Kembali ke halaman pertama</a>
                                     @else
                                         <strong>Belum ada lokasi</strong>
                                         <span>Tambahkan kode lokasi melalui formulir Tambah Lokasi Baru.</span>

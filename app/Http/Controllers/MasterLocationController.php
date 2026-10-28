@@ -2,121 +2,122 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ExportMasterLocation;
 use App\Models\MasterLocation;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class MasterLocationController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+    private function modelClass(): string
+    {
+        return request()->routeIs('export.*') ? ExportMasterLocation::class : MasterLocation::class;
+    }
+
+    private function context(): array
+    {
+        $isExport = $this->modelClass() === ExportMasterLocation::class;
+
+        return ['isExport' => $isExport, 'routePrefix' => $isExport ? 'export.locations' : 'locations'];
+    }
+
     public function index()
     {
-        $locations = MasterLocation::with('currentPallet')->orderBy('code', 'asc')->paginate(10);
-        return view('admin.locations.index', compact('locations'));
+        $model = $this->modelClass();
+        $locations = $model::with('currentPallet')->orderBy('code')->paginate(10);
+
+        return view('admin.locations.index', $this->context() + compact('locations'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(MasterLocation $location)
+    public function edit(string $location)
     {
-        return view('admin.locations.edit', compact('location'));
+        $model = $this->modelClass();
+        $location = $model::findOrFail($location);
+
+        return view('admin.locations.edit', $this->context() + compact('location'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        $request->validate([
-            'code' => 'required|unique:master_locations|max:255',
+        $model = $this->modelClass();
+        $request->merge(['code' => is_string($request->code) ? strtoupper(trim($request->code)) : $request->code]);
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:255', Rule::unique('master_locations', 'code')->where('scope', $model::MASTER_SCOPE)],
         ]);
 
-        DB::transaction(function () use ($request) {
-            $location = MasterLocation::create([
-                'code' => strtoupper($request->code),
-                'is_occupied' => false
-            ]);
-            AuditService::record('master_location', 'created', 'MasterLocation', $location->id, $request->user()->id,
-                [], ['location' => $location->code], "Lokasi {$location->code} dibuat.");
+        DB::transaction(function () use ($validated, $request, $model) {
+            $location = $model::create(['code' => $validated['code'], 'is_occupied' => false]);
+            AuditService::record('master_location', 'created', class_basename($location), $location->id, $request->user()->id,
+                [], ['scope' => $location->scope, 'location' => $location->code], "Lokasi {$location->code} ({$location->scope}) dibuat.");
         });
 
-        return redirect()->route('locations.index')->with('success', 'Lokasi berhasil ditambahkan!');
+        return redirect()->route($this->context()['routePrefix'].'.index')->with('success', 'Lokasi berhasil ditambahkan!');
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, MasterLocation $location)
+    public function update(Request $request, string $location)
     {
-        $request->validate([
-            'code' => 'required|max:255|unique:master_locations,code,' . $location->id,
+        $model = $this->modelClass();
+        $location = $model::findOrFail($location);
+        $request->merge(['code' => is_string($request->code) ? strtoupper(trim($request->code)) : $request->code]);
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:255', Rule::unique('master_locations', 'code')->where('scope', $model::MASTER_SCOPE)->ignore($location->id)],
         ]);
 
         try {
-            DB::transaction(function () use ($request, $location) {
-                $locked = MasterLocation::whereKey($location->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
-
+            DB::transaction(function () use ($request, $location, $validated, $model) {
+                $locked = $model::whereKey($location->id)->lockForUpdate()->firstOrFail();
                 if ($locked->is_occupied) {
                     throw new \RuntimeException('Gagal edit! Lokasi ini sedang terisi.');
                 }
 
                 $previousCode = $locked->code;
-                $locked->update([
-                    'code' => strtoupper($request->code),
-                ]);
-                AuditService::record('master_location', 'updated', 'MasterLocation', $locked->id, $request->user()->id,
-                    ['location' => $previousCode], ['location' => $locked->code], "Lokasi {$previousCode} diperbarui menjadi {$locked->code}.");
+                $locked->update(['code' => $validated['code']]);
+                AuditService::record('master_location', 'updated', class_basename($locked), $locked->id, $request->user()->id,
+                    ['scope' => $locked->scope, 'location' => $previousCode],
+                    ['scope' => $locked->scope, 'location' => $locked->code],
+                    "Lokasi {$previousCode} ({$locked->scope}) diperbarui menjadi {$locked->code}.");
             });
         } catch (\Throwable $e) {
-            return redirect()->route('locations.index')->with('error', $e->getMessage());
+            return redirect()->route($this->context()['routePrefix'].'.index')->with('error', $e->getMessage());
         }
 
-        return redirect()->route('locations.index')->with('success', 'Lokasi berhasil diperbarui!');
+        return redirect()->route($this->context()['routePrefix'].'.index')->with('success', 'Lokasi berhasil diperbarui!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(MasterLocation $location)
+    public function destroy(string $location)
     {
-        try {
-            DB::transaction(function () use ($location) {
-                $locked = MasterLocation::whereKey($location->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
+        $model = $this->modelClass();
+        $location = $model::findOrFail($location);
 
-                if ($locked->is_occupied && $locked->current_pallet_id) {
-                    throw new \RuntimeException('Gagal hapus! Lokasi ini sedang terisi.');
+        try {
+            DB::transaction(function () use ($location, $model) {
+                $locked = $model::whereKey($location->id)->lockForUpdate()->firstOrFail();
+                if (($locked->is_occupied && $locked->current_pallet_id) || $locked->stockLocations()->exists()) {
+                    throw new \RuntimeException('Gagal hapus! Lokasi ini sedang digunakan.');
                 }
 
                 $locked->delete();
-                AuditService::record('master_location', 'deleted', 'MasterLocation', $locked->id, request()->user()->id,
-                    ['location' => $locked->code], [], "Lokasi {$locked->code} dihapus.");
+                AuditService::record('master_location', 'deleted', class_basename($locked), $locked->id, request()->user()->id,
+                    ['scope' => $locked->scope, 'location' => $locked->code], [], "Lokasi {$locked->code} ({$locked->scope}) dihapus.");
             });
         } catch (\Throwable $e) {
-            return redirect()->route('locations.index')->with('error', $e->getMessage());
+            return redirect()->route($this->context()['routePrefix'].'.index')->with('error', $e->getMessage());
         }
 
-        return redirect()->route('locations.index')->with('success', 'Lokasi berhasil dihapus!');
+        return redirect()->route($this->context()['routePrefix'].'.index')->with('success', 'Lokasi berhasil dihapus!');
     }
 
-    // API Search Available Locations
     public function apiSearchAvailable(Request $request)
     {
         $search = $request->query('q');
-        
-        $query = MasterLocation::where('is_occupied', false);
-        
+        $model = $this->modelClass();
+        $query = $model::where('is_occupied', false);
         if ($search) {
             $query->where('code', 'like', "%{$search}%");
         }
-        
+
         return response()->json($query->limit(20)->get(['id', 'code']));
     }
 }

@@ -1,0 +1,119 @@
+@extends('shared.layouts.app')
+@section('title', $plan ? 'Ubah Rencana Delivery Ekspor' : 'Rencana Delivery Ekspor Baru')
+@section('styles')
+<link rel="stylesheet" href="{{ asset('css/pages/export-delivery-plans.css') }}">
+@endsection
+
+@section('content')
+@php
+    $initialRows = old('items', $rows) ?: [['part_number' => '', 'pcs_quantity' => '']];
+    $initialSource = old('source_type', $plan?->source_type ?? 'manual');
+@endphp
+<div class="delivery-plan-page" id="delivery-plan-editor" data-import-url="{{ route('export.delivery-plans.import-excel') }}" data-ocr-base="{{ asset('vendor/ocr') }}">
+    <header class="plan-header">
+        <div>
+            <a class="plan-back" href="{{ route('export.delivery-plans.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Rencana delivery</a>
+            <span class="plan-eyebrow">Pengiriman ekspor</span>
+            <h1>{{ $plan ? 'Ubah rencana delivery' : 'Rencana delivery baru' }}</h1>
+            <p>Isi kebutuhan pengiriman. Kapasitas box mengikuti master part ekspor.</p>
+        </div>
+    </header>
+    @if($errors->any())
+        <div class="alert alert-danger" role="alert">
+            <strong>Periksa kembali rencana sebelum menyimpan.</strong>
+            <ul class="mb-0 mt-2">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
+        </div>
+    @endif
+    <section class="plan-panel" aria-labelledby="plan-import-title">
+        <div class="plan-panel-heading"><div><h2 id="plan-import-title">Mulai dari input atau dokumen</h2><p>Satu dokumen untuk satu customer. Hasil pembacaan dapat dikoreksi sebelum disimpan.</p></div></div>
+        <div class="plan-panel-body">
+            <div class="plan-input-methods" aria-label="Cara mengisi rencana">
+                <button type="button" class="btn btn-outline-secondary is-selected" data-input-mode="manual" aria-pressed="true">Isi manual</button>
+                <button type="button" class="btn btn-outline-secondary" data-input-mode="excel" aria-pressed="false"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Dari Excel</button>
+                <button type="button" class="btn btn-outline-secondary" data-input-mode="photo" aria-pressed="false"><i class="bi bi-image" aria-hidden="true"></i> Dari foto</button>
+            </div>
+            <div id="plan-excel-panel" class="plan-import-panel" hidden>
+                <label class="form-label" for="plan-excel-file">File Excel</label>
+                <input class="form-control" type="file" id="plan-excel-file" accept=".xlsx,.xls" aria-describedby="excel-help">
+                <p class="plan-help" id="excel-help">Format .xlsx atau .xls, maksimal 5 MB dan 500 baris part. Gunakan satu sheet untuk satu customer.</p>
+                <div class="plan-inline-actions">
+                    <button type="button" class="btn btn-primary" id="plan-read-excel">Baca Excel</button>
+                    <a class="btn btn-outline-secondary" href="{{ route('export.delivery-plans.template') }}">Unduh template Excel</a>
+                </div>
+            </div>
+            <div id="plan-photo-panel" class="plan-import-panel" hidden>
+                <label class="form-label" for="plan-photo-file">Foto rencana delivery</label>
+                <input class="form-control" type="file" id="plan-photo-file" accept="image/jpeg,image/png,image/webp" aria-describedby="photo-help">
+                <p class="plan-help" id="photo-help">Dokumen cetak dengan layout yang sama, maksimal 10 MB. Pastikan tabel utuh dan tulisan jelas. Foto dibaca di komputer Anda.</p>
+                <div id="plan-photo-preview" class="plan-photo-preview" hidden>
+                    <img id="plan-photo-image" alt="Foto dokumen yang akan dibaca">
+                    <div class="plan-inline-actions">
+                        <button type="button" class="btn btn-outline-secondary" id="plan-rotate-left" aria-label="Putar foto ke kiri"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Putar kiri</button>
+                        <button type="button" class="btn btn-outline-secondary" id="plan-rotate-right" aria-label="Putar foto ke kanan"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Putar kanan</button>
+                    </div>
+                </div>
+                <div class="plan-inline-actions"><button type="button" class="btn btn-primary" id="plan-read-photo">Baca foto</button></div>
+                <progress id="plan-photo-progress" max="100" value="0" aria-label="Progres pembacaan foto" hidden></progress>
+            </div>
+            <p id="plan-import-status" class="plan-import-status" role="status" aria-live="polite"></p>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="plan-undo-import" hidden>Batalkan hasil impor</button>
+        </div>
+    </section>
+
+    <form method="POST" action="{{ $plan ? route('export.delivery-plans.update', $plan) : route('export.delivery-plans.store') }}" id="delivery-plan-form">
+        @csrf
+        @if($plan) @method('PUT') @endif
+        <input type="hidden" name="revision" value="{{ old('revision', $plan?->revision ?? 1) }}">
+        <input type="hidden" name="source_type" id="plan-source-type" value="{{ $initialSource }}">
+        <input type="hidden" name="source_name" id="plan-source-name" value="{{ old('source_name', $plan?->source_name) }}">
+        <section class="plan-panel" aria-labelledby="plan-customer-title">
+            <div class="plan-panel-heading"><div><h2 id="plan-customer-title">Tujuan pengiriman</h2><p>Lengkapi customer dan batas tanggal pengiriman.</p></div></div>
+            <div class="plan-panel-body plan-fields">
+                <div><label class="form-label" for="plan-customer">Nama customer</label>
+                    <input type="text" class="form-control" name="customer_name" id="plan-customer" maxlength="255" value="{{ old('customer_name', $plan?->customer_name) }}" required autocomplete="off">
+                </div>
+                <div><label class="form-label" for="plan-deadline">Batas tanggal pengiriman</label>
+                    <input type="date" class="form-control" name="delivery_deadline" id="plan-deadline" value="{{ old('delivery_deadline', $plan?->delivery_deadline?->format('Y-m-d')) }}" required>
+                </div>
+            </div>
+        </section>
+        <section class="plan-panel" aria-labelledby="plan-items-title">
+            <div class="plan-panel-heading">
+                <div><h2 id="plan-items-title">Nomor part dan kebutuhan</h2><p>Jumlah PCS wajib kelipatan kapasitas box. Box tidak penuh belum didukung.</p></div>
+                <button type="button" class="btn btn-outline-primary" id="plan-add-item"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tambah part</button>
+            </div>
+            <div class="plan-table-scroll" role="region" aria-label="Daftar part rencana delivery, geser untuk melihat semua kolom" tabindex="0">
+                <table class="table plan-table">
+                    <thead><tr><th scope="col">No</th><th scope="col">Nomor part</th><th scope="col">Jumlah PCS</th><th scope="col">PCS / box</th><th scope="col">Jumlah box</th><th scope="col">Aksi</th></tr></thead>
+                    <tbody id="plan-items"></tbody>
+                </table>
+            </div>
+            <div class="plan-totals" aria-live="polite">
+                <span><strong id="plan-row-count">0</strong> nomor part</span>
+                <span>Total PCS <strong id="plan-total-pcs">—</strong></span>
+                <span>Total box <strong id="plan-total-boxes">—</strong></span>
+            </div>
+        </section>
+        <section class="plan-review" id="plan-review" @if($initialSource === 'manual') hidden @endif>
+            <label for="plan-reviewed"><input class="form-check-input" type="checkbox" name="reviewed" id="plan-reviewed" value="1" @checked(old('reviewed', $plan ? '1' : '') === '1')> Saya sudah mencocokkan customer, tanggal, nomor part, dan jumlah PCS dengan dokumen sumber.</label>
+        </section>
+        <div class="plan-save-bar">
+            <div><strong>Periksa rencana sebelum menyimpan</strong><p id="plan-save-help">Rencana disimpan sebagai draft. Jumlah box dihitung otomatis.</p></div>
+            <div class="plan-inline-actions"><a class="btn btn-outline-secondary" href="{{ route('export.delivery-plans.index') }}">Kembali</a><button type="submit" class="btn btn-primary" id="plan-save" disabled>Simpan rencana</button></div>
+        </div>
+    </form>
+    <datalist id="plan-part-options">@foreach($parts as $part)<option value="{{ $part->part_number }}">{{ $part->qty_box }} PCS / box</option>@endforeach</datalist>
+    <template id="plan-row-template">
+        <tr><td class="plan-row-number"></td><td><input type="text" class="form-control plan-part" maxlength="100" list="plan-part-options" autocomplete="off" required><p class="plan-row-error" aria-live="polite"></p></td>
+            <td><input type="number" class="form-control plan-quantity" min="1" max="4294967295" step="1" inputmode="numeric" required></td>
+            <td class="plan-capacity">—</td><td class="plan-boxes">—</td><td><button type="button" class="btn btn-sm btn-outline-danger plan-remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="visually-hidden">Hapus baris</span></button></td>
+        </tr>
+    </template>
+    <script type="application/json" id="plan-bootstrap">@json(['parts' => $parts, 'rows' => $initialRows, 'snapshots' => $rows])</script>
+    <noscript><div class="alert alert-warning">Aktifkan JavaScript untuk mengisi dan memeriksa rencana delivery.</div></noscript>
+</div>
+@endsection
+
+@section('scripts')
+@vite('resources/js/export-delivery-plan.js')
+@endsection

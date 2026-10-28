@@ -77,5 +77,6 @@ class UserSeeder extends Seeder
             ]
         );
         
+        $this->call(ExportOperatorSeeder::class);
     }
 }

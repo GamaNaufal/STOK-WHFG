@@ -38,7 +38,7 @@ class ExpiredBoxBulkService
                 'rows.*.pcs_quantity' => ['required', 'integer', 'min:1'],
                 'rows.*.label_issued_at' => ['required', 'date', 'before_or_equal:now'],
                 'pallet_id' => ['nullable', 'integer', 'exists:pallets,id'],
-                'location_id' => ['nullable', 'required_without:pallet_id', 'integer', 'exists:master_locations,id'],
+                'location_id' => ['nullable', 'required_without:pallet_id', 'integer', 'exists:master_locations,id,scope,domestic'],
             ];
         }
         $data = Validator::make($input, $rules)->validate();

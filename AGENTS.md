@@ -1,5 +1,8 @@
 # Petunjuk Agent Repository STOK WHFG
 
+Kerjakan perubahan langsung pada branch dan checkout yang sedang dipakai pengguna.
+Jangan membuat branch atau worktree baru kecuali pengguna memintanya secara eksplisit.
+
 Sebelum menganalisis atau mengubah sistem, baca:
 
 - `docs/AGENT_SYSTEM_MEMO.md`

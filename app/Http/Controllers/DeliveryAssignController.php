@@ -1039,7 +1039,7 @@ class DeliveryAssignController extends Controller
             'new_boxes_pallet_mode' => ['nullable', 'string', 'in:new,existing'],
             'new_boxes_pallet_id' => ['nullable', 'integer', 'exists:pallets,id'],
             'new_boxes_pallet_number' => ['nullable', 'string', 'max:255'],
-            'new_boxes_location_id' => ['nullable', 'integer', 'exists:master_locations,id'],
+            'new_boxes_location_id' => ['nullable', 'integer', 'exists:master_locations,id,scope,domestic'],
             'confirm_overage' => ['nullable', 'boolean'],
         ], [
             'new_boxes.*.box_number.digits' => 'ID Box harus 8 angka.',

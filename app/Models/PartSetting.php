@@ -6,6 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class PartSetting extends Model
 {
+    use \App\Models\Concerns\HasMasterScope;
+
+    public const MASTER_SCOPE = 'domestic';
+
+    protected $attributes = ['scope' => self::MASTER_SCOPE];
+
     protected $fillable = [
         'part_number',
         'qty_box',
@@ -17,8 +23,7 @@ class PartSetting extends Model
         'updated_at' => 'datetime',
     ];
 
-    // Ensure unique part_number
-    protected $unique = ['part_number'];
+    // Database uniqueness is enforced on (scope, part_number).
 
     /**
      * Scope untuk cari by part number

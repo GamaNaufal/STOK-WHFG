@@ -35,6 +35,20 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::resource('users', \App\Http\Controllers\UserController::class);
     });
 
+    // Export masters have independent permissions and server-selected data scope.
+    Route::prefix('export')->name('export.')->group(function () {
+        Route::get('part-settings/search', [\App\Http\Controllers\PartSettingController::class, 'search'])->name('part-settings.search');
+        Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
+        Route::get('locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable'])->name('locations.search');
+        Route::resource('locations', \App\Http\Controllers\MasterLocationController::class)->except(['show', 'create']);
+    });
+
+    Route::prefix('export')->name('export.')->group(function () {
+        Route::get('delivery-plans/template', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'template'])->name('delivery-plans.template');
+        Route::post('delivery-plans/import-excel', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'importExcel'])->name('delivery-plans.import-excel');
+        Route::resource('delivery-plans', \App\Http\Controllers\ExportDeliveryPlanController::class);
+    });
+
     // Master Locations - Admin Warehouse + Admin IT
     Route::group([], function () {
         Route::resource('locations', \App\Http\Controllers\MasterLocationController::class)
