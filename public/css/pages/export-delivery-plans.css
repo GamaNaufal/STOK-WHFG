@@ -1,0 +1,53 @@
+.delivery-plan-page { min-width:0; max-width:94rem; }
+.plan-header { display:flex; align-items:flex-end; justify-content:space-between; gap:1rem; margin-bottom:1.5rem; padding-bottom:1.25rem; border-bottom:1px solid var(--ui-border,#dfe1e5); }
+.plan-eyebrow { display:block; color:var(--ui-accent,#0b7072); font-size:.6875rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; margin-bottom:.4rem; }
+.warehouse-app .plan-header h1 { margin:0 0 .4rem; font-size:clamp(1.5rem,2.5vw,1.9rem); font-weight:700; letter-spacing:-.025em; overflow-wrap:anywhere; }
+.plan-header p,.plan-panel-heading p,.plan-help { color:var(--ui-muted,#595d65); font-size:.8125rem; line-height:1.6; margin:.4rem 0 0; }
+.plan-back { display:inline-flex; gap:.4rem; align-items:center; color:var(--ui-muted,#595d65); font-size:.8125rem; margin-bottom:1rem; text-decoration:none; }
+.plan-panel { background:var(--ui-surface,#fff); border:1px solid var(--ui-border,#dfe1e5); border-radius:var(--ui-radius,.875rem); margin-bottom:1.25rem; overflow:hidden; min-width:0; }
+.plan-panel-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.125rem 1.25rem; border-bottom:1px solid var(--ui-border,#dfe1e5); }
+.warehouse-app .plan-panel h2 { font-size:1rem; font-weight:700; margin:0; }
+.plan-panel-body { padding:1.25rem; }
+.plan-fields { display:grid; grid-template-columns:1.3fr 1fr; gap:1.25rem; }
+.delivery-plan-page .form-label { font-size:.8125rem; font-weight:600; }
+.delivery-plan-page .form-control,.delivery-plan-page .btn { min-height:44px; }
+.plan-input-methods,.plan-inline-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.65rem; }
+.plan-input-methods .is-selected { background:var(--ui-soft,#e8f3f1); border-color:var(--ui-accent,#0b7072); color:var(--ui-accent,#0b7072); }
+.plan-import-panel { margin-top:1.25rem; max-width:62rem; }
+.plan-import-panel .plan-inline-actions { margin-top:1rem; }
+.delivery-plan-page [hidden] { display:none!important; }
+.plan-import-status { color:var(--ui-muted,#595d65); font-size:.8125rem; margin:.85rem 0 0; overflow-wrap:anywhere; }
+.plan-import-status.is-error { color:#a52622; }
+.plan-photo-preview { margin-top:1rem; }
+.plan-photo-preview img { display:block; max-width:100%; max-height:20rem; object-fit:contain; border:1px solid var(--ui-border,#dfe1e5); border-radius:.5rem; background:#f4f5f6; }
+#plan-photo-progress { width:100%; height:.8rem; margin-top:1rem; accent-color:var(--ui-accent,#0b7072); }
+.plan-table-scroll { overflow-x:auto; position:relative; }
+.plan-table-scroll:focus-visible { outline:3px solid var(--ui-accent,#0b7072); outline-offset:-3px; }
+.warehouse-app .plan-table { min-width:720px; margin:0; }
+.warehouse-app .plan-table :is(th,td) { padding:.875rem 1rem; vertical-align:top; font-size:.8125rem; border-color:var(--ui-border,#dfe1e5); }
+.warehouse-app .plan-table thead th { background:#f7f8fa; color:var(--ui-muted,#595d65); font-size:.75rem; font-weight:600; white-space:nowrap; }
+.plan-part { min-width:13rem; }
+.plan-quantity { min-width:8rem; max-width:12rem; }
+.plan-capacity,.plan-boxes { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.plan-row-error { max-width:28rem; color:#a52622; font-size:.75rem; line-height:1.45; margin:.35rem 0 0; }
+.plan-totals { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:1rem 2rem; padding:1.25rem; background:var(--ui-soft,#e8f3f1); border-top:1px solid var(--ui-border,#dfe1e5); font-size:.875rem; }
+.plan-totals strong { margin-left:.4rem; font-variant-numeric:tabular-nums; }
+.plan-review { padding:1rem 1.25rem; border:1px solid var(--ui-border,#dfe1e5); border-radius:.75rem; background:#fff; margin-bottom:1rem; }
+.plan-review label { display:flex; gap:.65rem; align-items:flex-start; font-size:.875rem; line-height:1.6; }
+.plan-review input { flex:none; margin-top:.3rem; }
+.plan-save-bar { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1.25rem; background:#fff; border:1px solid var(--ui-border,#dfe1e5); border-radius:.75rem; }
+.plan-save-bar strong { font-size:.875rem; }
+.plan-save-bar p { font-size:.75rem; color:var(--ui-muted,#595d65); margin:.3rem 0 0; }
+.plan-search { margin-bottom:1.25rem; max-width:38rem; }
+.plan-search input { flex:1; min-width:10rem; }
+.warehouse-app .plan-table .plan-empty { text-align:center; padding:3rem 1rem; color:var(--ui-muted,#595d65); }
+.plan-empty :is(strong,span) { display:block; margin-top:.5rem; }
+.plan-empty i { font-size:1.8rem; }
+@media(max-width:767.98px) {
+ .plan-header,.plan-panel-heading,.plan-save-bar { align-items:stretch; flex-direction:column; }
+ .plan-fields { grid-template-columns:1fr; }
+ .plan-save-bar .plan-inline-actions { display:grid; grid-template-columns:1fr 1fr; }
+ .plan-input-methods { display:grid; grid-template-columns:repeat(3,1fr); gap:.35rem; }
+ .plan-input-methods .btn { font-size:.75rem; padding:.5rem .4rem; }
+ .plan-totals { justify-content:flex-start; }
+}

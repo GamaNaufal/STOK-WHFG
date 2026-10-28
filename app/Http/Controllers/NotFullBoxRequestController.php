@@ -167,7 +167,7 @@ class NotFullBoxRequestController extends Controller
             'request_type' => 'required|in:supplement,additional',
             'target_type' => 'required|in:pallet,location',
             'target_pallet_id' => 'nullable|integer|exists:pallets,id',
-            'target_location_id' => 'nullable|integer|exists:master_locations,id',
+            'target_location_id' => 'nullable|integer|exists:master_locations,id,scope,domestic',
         ], [
             'box_number.size' => 'ID Box harus 8 karakter.',
             'box_number.regex' => 'ID Box hanya boleh berisi angka.',

@@ -1,4 +1,8 @@
 @extends('shared.layouts.app')
+@php
+    $isExport = $isExport ?? false;
+    $routePrefix = $routePrefix ?? 'part-settings';
+@endphp
 
 @section('title', 'Edit No Part')
 
@@ -10,9 +14,9 @@
 <div class="part-page part-form-page">
     <header class="part-page-header">
         <div>
-            <a href="{{ route('part-settings.index') }}" class="part-back-link"><i class="bi bi-arrow-left" aria-hidden="true"></i> Daftar nomor part</a>
-            <span class="part-page-eyebrow">Master data / Stok</span>
-            <h1>Ubah nomor part & Qty</h1>
+            <a href="{{ route($routePrefix.'.index') }}" class="part-back-link"><i class="bi bi-arrow-left" aria-hidden="true"></i> Daftar nomor part</a>
+            <span class="part-page-eyebrow">{{ $isExport ? 'Master data / Ekspor' : 'Master data / Domestik' }}</span>
+            <h1>Ubah nomor part & Qty{{ $isExport ? " Ekspor" : "" }}</h1>
             <p>Periksa identitas part dan kapasitas box sebelum menyimpan perubahan.</p>
         </div>
     </header>
@@ -27,7 +31,7 @@
                         <p>Perubahan kapasitas akan menjadi acuan validasi berikutnya.</p>
                     </div>
                 </div>
-                <form id="partSettingForm" method="POST" action="{{ route('part-settings.update', $partSetting) }}" class="part-form-body">
+                <form id="partSettingForm" method="POST" action="{{ route($routePrefix.'.update', $partSetting) }}" class="part-form-body">
                     @csrf
                     @method('PUT')
                     @if(session('error'))
@@ -40,7 +44,7 @@
                             value="{{ old('part_number', $partSetting->part_number) }}" placeholder="Contoh: ABC123XYZ"
                             maxlength="100" required aria-invalid="{{ $errors->has('part_number') ? 'true' : 'false' }}"
                             aria-describedby="part-number-help @error('part_number') part-number-error @enderror">
-                        <p class="part-form-help" id="part-number-help">Nomor part yang sudah dipakai di transaksi atau histori tidak dapat diganti.</p>
+                        <p class="part-form-help" id="part-number-help">{{ $isExport ? "Nomor part harus unik pada master ekspor." : "Nomor part yang sudah dipakai di transaksi atau histori tidak dapat diganti." }}</p>
                         @error('part_number')
                             <div class="invalid-feedback" id="part-number-error" role="alert">{{ $message }}</div>
                         @enderror
@@ -61,7 +65,7 @@
                         @enderror
                     </div>
                     <div class="part-form-actions">
-                        <a href="{{ route('part-settings.index') }}" class="btn btn-outline-secondary">Batal</a>
+                        <a href="{{ route($routePrefix.'.index') }}" class="btn btn-outline-secondary">Batal</a>
                         <button type="submit" class="btn btn-primary part-primary-action"><i class="bi bi-check-lg" aria-hidden="true"></i> Simpan perubahan</button>
                     </div>
                 </form>
@@ -72,7 +76,7 @@
                 <span class="part-page-eyebrow">Data saat ini</span>
                 <h2 id="part-context-title">{{ $partSetting->part_number }}</h2>
                 <span class="part-quantity"><strong>{{ number_format($partSetting->qty_box, 0, ',', '.') }}</strong> PCS / box</span>
-                <p>Qty per box tetap dapat diperbarui meskipun nomor part sudah digunakan dalam transaksi atau histori.</p>
+                <p>{{ $isExport ? "Perubahan ini berlaku untuk kapasitas box ekspor." : "Qty per box tetap dapat diperbarui meskipun nomor part sudah digunakan dalam transaksi atau histori." }}</p>
             </aside>
         </div>
     </div>

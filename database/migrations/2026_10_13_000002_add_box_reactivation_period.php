@@ -20,46 +20,49 @@ return new class extends Migration
             'other',
         ];
 
-        $column = DB::selectOne(
-            "SELECT COLUMN_TYPE AS column_type
-             FROM INFORMATION_SCHEMA.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME = ?
-               AND COLUMN_NAME = ?",
-            ['delivery_issues', 'issue_type']
-        );
-
-        if (!$column || !str_starts_with(
-            strtolower($column->column_type),
-            'enum('
-        )) {
-            throw new RuntimeException(
-                'delivery_issues.issue_type is not an ENUM.'
+        $existingTypes = [];
+        if (DB::getDriverName() === 'mysql') {
+            $column = DB::selectOne(
+                "SELECT COLUMN_TYPE AS column_type
+                 FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME = ?
+                   AND COLUMN_NAME = ?",
+                ['delivery_issues', 'issue_type']
             );
-        }
 
-        preg_match_all(
-            "/'((?:''|[^'])*)'/",
-            $column->column_type,
-            $matches
-        );
+            if (!$column || !str_starts_with(
+                strtolower($column->column_type),
+                'enum('
+            )) {
+                throw new RuntimeException(
+                    'delivery_issues.issue_type is not an ENUM.'
+                );
+            }
 
-        $existingTypes = array_map(
-            fn ($value) => str_replace("''", "'", $value),
-            $matches[1]
-        );
-
-        // Never silently remove existing ENUM values.
-        $unexpectedTypes = array_diff(
-            $existingTypes,
-            $allowedTypes
-        );
-
-        if (!empty($unexpectedTypes)) {
-            throw new RuntimeException(
-                'Unexpected issue_type values: ' .
-                implode(', ', $unexpectedTypes)
+            preg_match_all(
+                "/'((?:''|[^'])*)'/",
+                $column->column_type,
+                $matches
             );
+
+            $existingTypes = array_map(
+                fn ($value) => str_replace("''", "'", $value),
+                $matches[1]
+            );
+
+            // Never silently remove existing ENUM values.
+            $unexpectedTypes = array_diff(
+                $existingTypes,
+                $allowedTypes
+            );
+
+            if (!empty($unexpectedTypes)) {
+                throw new RuntimeException(
+                    'Unexpected issue_type values: ' .
+                    implode(', ', $unexpectedTypes)
+                );
+            }
         }
 
         // 1. Boxes: avoid duplicate column creation.

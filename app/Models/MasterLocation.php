@@ -6,6 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class MasterLocation extends Model
 {
+    use \App\Models\Concerns\HasMasterScope;
+
+    public const MASTER_SCOPE = 'domestic';
+
+    protected $attributes = ['scope' => self::MASTER_SCOPE];
+
     protected $fillable = [
         'code',
         'is_occupied',
@@ -26,7 +32,7 @@ class MasterLocation extends Model
     // Relationship ke stock locations
     public function stockLocations()
     {
-        return $this->hasMany(StockLocation::class);
+        return $this->hasMany(StockLocation::class, 'master_location_id');
     }
 
     /**

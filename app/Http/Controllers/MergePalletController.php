@@ -37,7 +37,7 @@ class MergePalletController extends Controller
         return $request->validate([
             'pallet_ids' => 'required|array|min:2',
             'pallet_ids.*' => 'exists:pallets,id',
-            'location_id' => 'nullable|integer|exists:master_locations,id',
+            'location_id' => 'nullable|integer|exists:master_locations,id,scope,domestic',
             'warehouse_location' => 'nullable|string',
         ]);
     }

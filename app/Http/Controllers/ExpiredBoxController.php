@@ -38,7 +38,7 @@ class ExpiredBoxController extends Controller
 
     public function handle(Request $request, int $boxId, ExpiredBoxService $service): RedirectResponse
     {
-        $validated = $request->validate(['location_id' => ['nullable', 'integer', 'exists:master_locations,id']]);
+        $validated = $request->validate(['location_id' => ['nullable', 'integer', 'exists:master_locations,id,scope,domestic']]);
         try {
             $service->handleBox($boxId, $request->user()->id, isset($validated['location_id']) ? (int) $validated['location_id'] : null);
         } catch (\RuntimeException $e) {
