@@ -108,6 +108,10 @@ class DashboardController extends Controller
     {
         $user = Auth::user();
         $userRole = $user->role;
+        if ($userRole === 'export_operator') {
+            return view('export.dashboard');
+        }
+
         $stats = [];
         $stockSummaryTotals = $this->buildStockSummaryTotals();
 

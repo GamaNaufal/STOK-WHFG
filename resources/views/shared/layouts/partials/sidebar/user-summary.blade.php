@@ -4,6 +4,6 @@
     <p class="mb-3">
         <strong>{{ auth()->user()->name }}</strong>
         <br>
-        <span class="badge bg-info">{{ ucfirst(str_replace('_', ' ', auth()->user()->role)) }}</span>
+        <span class="badge bg-info">{{ config('feature_access.roles.'.auth()->user()->role, ucfirst(str_replace('_', ' ', auth()->user()->role))) }}</span>
     </p>
 </div>

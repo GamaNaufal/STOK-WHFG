@@ -2,6 +2,16 @@
 
 Terakhir diverifikasi dari source code: 23 Oktober 2026 (QA/packing dan pengelompokan per transaksi pada branch codex/expired-qa-packing; database kerja belum dimigrasikan dalam pengerjaan ini).
 
+Verifikasi tambahan 28 Oktober 2026 (Operator Export): role `export_operator`
+tersedia pada tambah/edit/filter user dan pengaturan Hak Akses. Akses fitur
+operasional bawaan kosong; login, profil, logout, dan dashboard placeholder tetap
+tersedia. Dashboard role ini tidak memuat statistik atau transaksi domestik.
+Migration `2026_10_28_000001_add_export_operator_role_to_users` memperluas enum
+`users.role` tanpa mengubah akun atau inventory existing; wajib dijalankan saat
+deployment sebelum membuat akun Operator Export. Alur ekspor dan alih peruntukan
+stok belum diimplementasikan. Admin Utama tetap dapat mengatur izin role ini
+melalui mekanisme Hak Akses yang sama dengan role lain.
+
 Verifikasi tambahan 21 Oktober 2026 (Audit Trail): Handle box expired kini membuat
 `audit_logs` bertipe `expired_box` dalam transaksi yang sama dengan aktivasi dan
 `expired_box_reports`; request berulang saat box masih aktif tidak membuat entri baru.

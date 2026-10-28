@@ -12,6 +12,7 @@
         'admin' => 'Administrator',
         'admin_warehouse' => 'Admin Warehouse',
         'warehouse_operator' => 'Operator Warehouse',
+        'export_operator' => 'Operator Export',
         'sales' => 'Sales',
         'ppc' => 'PPC',
         'supervisi' => 'Supervisi',
