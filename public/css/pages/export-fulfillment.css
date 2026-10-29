@@ -1,0 +1,50 @@
+.fulfillment-page { font-variant-numeric:tabular-nums; }
+.fulfillment-page .plan-header .btn { white-space:nowrap; }
+.fulfillment-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-bottom:1.25rem; }
+.fulfillment-summary>div { padding:1rem 1.25rem; background:var(--ui-surface,#fff); border:1px solid var(--ui-border,#dfe1e5); border-radius:var(--ui-radius,.875rem); }
+.fulfillment-summary span,.fulfillment-numbers span { display:block; color:var(--ui-muted,#595d65); font-size:.8rem; line-height:1.5; }
+.fulfillment-summary strong { display:block; font-size:1.5rem; margin-top:.25rem; }
+.fulfillment-filters { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.8rem; margin-bottom:1rem; }
+.fulfillment-filters>div:first-child { flex:1; min-width:15rem; max-width:32rem; }
+.fulfillment-filters>div:nth-child(2) { min-width:13rem; }
+.fulfillment-filters :is(.form-control,.form-select) { min-height:44px; }
+.fulfillment-page .fulfillment-overview-table { min-width:65rem; }
+.fulfillment-customer,.fulfillment-progress-label,.fulfillment-row-warning { display:block; margin-top:.3rem; font-size:.72rem; font-weight:400; color:var(--ui-muted,#595d65); line-height:1.5; }
+.fulfillment-customer { max-width:20rem; overflow-wrap:anywhere; white-space:normal; }
+.fulfillment-status { display:inline-block; border:1px solid var(--ui-border,#dfe1e5); border-radius:.4rem; padding:.25rem .5rem; font-size:.72rem; font-weight:600; line-height:1.5; white-space:nowrap; background:#f3f4f6; color:#4a5059; }
+.fulfillment-status-partial,.fulfillment-status-reserved { background:var(--ui-soft,#e8f3f1); color:var(--ui-accent,#0b7072); border-color:#b8d8d5; }
+.fulfillment-status-complete,.fulfillment-status-placed { background:#e9f4ed; border-color:#b5d8c2; color:#22603f; }
+.fulfillment-status-paused,.fulfillment-status-attention,.fulfillment-status-invalid { background:#fff4da; border-color:#e8d09a; color:#715013; }
+.fulfillment-numbers { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1rem; margin-bottom:1.2rem; }
+.fulfillment-numbers strong { display:block; font-size:1.4rem; margin-top:.35rem; }
+.fulfillment-numbers strong small { font-size:.8rem; font-weight:400; color:var(--ui-muted,#595d65); }
+.fulfillment-progress { height:.5rem; overflow:hidden; background:var(--ui-border,#dfe1e5); border-radius:.3rem; }
+.fulfillment-progress>span { display:block; height:100%; background:var(--ui-accent,#0b7072); }
+.fulfillment-section-heading { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:.5rem; margin:1.5rem 0 .75rem; }
+.warehouse-app .fulfillment-section-heading h2 { margin:0; font-size:1rem; font-weight:700; }
+.fulfillment-section-heading p { margin:0; font-size:.78rem; color:var(--ui-muted,#595d65); }
+.fulfillment-pallet { margin-bottom:.7rem; }
+.fulfillment-pallet summary { display:flex; gap:1rem; align-items:center; padding:1rem 1.25rem; cursor:pointer; list-style:none; min-height:44px; }
+.fulfillment-pallet summary::-webkit-details-marker { display:none; }
+.fulfillment-pallet summary>span:first-child { flex:1; }
+.fulfillment-pallet summary strong { display:block; font-size:.875rem; }
+.fulfillment-pallet summary small { display:block; color:var(--ui-muted,#595d65); font-size:.75rem; margin-top:.3rem; }
+.fulfillment-pallet summary:focus-visible { outline:3px solid var(--ui-accent,#0b7072); outline-offset:-3px; border-radius:.75rem; }
+.fulfillment-pallet summary i { color:var(--ui-muted,#595d65); }
+.fulfillment-pallet[open] summary { border-bottom:1px solid var(--ui-border,#dfe1e5); }
+.fulfillment-pallet[open] summary i { transform:rotate(180deg); }
+.fulfillment-pallet .plan-table { min-width:38rem; }
+.fulfillment-page .fulfillment-box-table { min-width:55rem; }
+.fulfillment-table-note { padding:.75rem 1.25rem; margin:0; }
+.fulfillment-row-warning { color:#715013; }
+@media(max-width:767.98px) {
+ .fulfillment-summary { gap:.5rem; }
+ .fulfillment-summary>div { padding:.8rem; }
+ .fulfillment-summary span { font-size:.72rem; }
+ .fulfillment-filters>div { width:100%; max-width:none!important; }
+ .fulfillment-filters .plan-inline-actions .btn { flex:1; }
+ .fulfillment-numbers { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .fulfillment-pallet summary { gap:.5rem; padding:1rem; }
+ .fulfillment-pallet-count { text-align:right; }
+ .fulfillment-pallet summary small { font-size:.7rem; }
+}

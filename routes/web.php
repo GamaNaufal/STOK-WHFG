@@ -47,6 +47,13 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::get('delivery-plans/template', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'template'])->name('delivery-plans.template');
         Route::post('delivery-plans/import-excel', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'importExcel'])->name('delivery-plans.import-excel');
         Route::resource('delivery-plans', \App\Http\Controllers\ExportDeliveryPlanController::class);
+        Route::get('pallet-plans', [\App\Http\Controllers\ExportPalletPlanController::class, 'index'])->name('pallet-plans.index');
+        Route::get('pallet-plans/{deliveryPlan}', [\App\Http\Controllers\ExportPalletPlanController::class, 'show'])->name('pallet-plans.show');
+        Route::get('pallet-plans/{deliveryPlan}/edit', [\App\Http\Controllers\ExportPalletPlanController::class, 'edit'])->name('pallet-plans.edit');
+        Route::put('pallet-plans/{deliveryPlan}', [\App\Http\Controllers\ExportPalletPlanController::class, 'update'])->name('pallet-plans.update');
+        Route::post('pallet-plans/{deliveryPlan}/transition', [\App\Http\Controllers\ExportPalletPlanController::class, 'transition'])->name('pallet-plans.transition');
+        Route::get('fulfillment', [\App\Http\Controllers\ExportFulfillmentController::class, 'index'])->name('fulfillment.index');
+        Route::get('fulfillment/{deliveryPlan}', [\App\Http\Controllers\ExportFulfillmentController::class, 'show'])->name('fulfillment.show');
     });
 
     // Master Locations - Admin Warehouse + Admin IT

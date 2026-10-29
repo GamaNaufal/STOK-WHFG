@@ -1,6 +1,97 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 28 Oktober 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 29 Oktober 2026 (pembaruan inkremental).
+
+Verifikasi Pemenuhan Permintaan Ekspor 29 Oktober 2026:
+- Detail implementasi/tahap berikutnya ada di docs/EXPORT_FULFILLMENT.md. Menu
+  /export/fulfillment memakai izin export_fulfillment, bawaan Operator Export,
+  independen dari hak mengubah perencanaan. Halaman daftar dan detail bersifat
+  pemantauan; belum ada input/scan, penerimaan inventory ekspor, FIFO alokasi
+  otomatis, atau alur pengembalian. Jangan menghitung stok domestik di sini.
+- Finalisasi mengisi entered_fulfillment pada export_pallet_plans. Rencana yang
+  pernah final tetap muncul saat revisi, meski seluruh lokasi sudah dilepas.
+  Draft awal tidak ditampilkan; cancelled/arsip dikeluarkan dari daftar aktif.
+  Migration 2026_10_29_000001 melakukan backfill penanda dari final/klaim/audit.
+- export_fulfillment_boxes menyimpan komitmen aktif unik per nomor box beserta
+  snapshot penerimaan pertama, part/PCS, aktor/waktu reservasi dan konfirmasi
+  penempatan/lokasi. Ini fondasi pencatatan, bukan penerimaan inventory fisik.
+  Belum ada endpoint write. Catatan baru tidak dibuat oleh GET/finalisasi.
+- Terpenuhi hanya dari konfirmasi dengan part/PCS sesuai item dan lokasi tujuan
+  benar. Reservasi belum ditempatkan dipisah. Catatan tidak sesuai dan kelebihan
+  ditandai; kekurangan/progres dihitung per item agar kelebihan part lain tidak
+  menutupi kebutuhan. Daftar box urut penerimaan pertama lalu nomor box.
+- Selama ada komitmen, perubahan delivery/pembagian, buka revisi, dan pembatalan
+  ditolak agar penempatan tidak hilang. Revisi dengan pengembalian masih tahap
+  berikutnya; pelepasan harus terhubung ke transaksi/audit/FIFO sebelum guard
+  diganti. Transaksi delivery rollback seluruh perubahan jika guard gagal.
+- Regresi 338 tes backend lulus (2.806 assertions); pemeriksaan terakhir 13 tes
+  pemenuhan (110 assertions) lulus. Browser Chromium: desktop 1440x900, simulasi
+  390x844, pencarian/status/reset/hasil kosong, rincian keyboard, tanpa error.
+- MySQL lokal stock diperiksa baca saja: migration baru sudah tersedia, query
+  agregasi dan izin operator valid, 0 komitmen dan 0 permintaan dipantau. Agent
+  tidak menjalankan ulang migration/menambahkan data uji di MySQL lokal. Semua
+  contoh nonnol memakai SQLite preview; production remote tidak diubah.
+
+Verifikasi UI Perencanaan Pallet 29 Oktober 2026 pada branch Export-plan:
+- Editor desktop memakai dua panel: kebutuhan part yang dapat dicari/difilter
+  di kiri, satu pallet aktif dengan navigator di kanan. Klik part menambah atau
+  memfokuskan baris pada pallet aktif; tidak menggandakan part yang sudah ada.
+- Kebutuhan, total alokasi, dan sisa tampil di dekat jumlah box. Alokasikan sisa
+  mengganti jumlah pada baris tersebut dengan kebutuhan yang tersedia setelah
+  memperhitungkan alokasi pada baris/pallet lain; tidak mengambil alokasi lain.
+- Semua pallet tetap dikirim dalam pallets_json meskipun hanya satu ditampilkan.
+  Tombol simpan/finalisasi tetap terlihat; layar sempit memakai panel bertumpuk.
+  Route, payload, otorisasi, draft/final, revisi, dan reservasi tidak berubah.
+- Build dan 55 tes frontend lulus; 32 tes delivery/perencanaan lulus (323
+  assertions). Browser Chromium memeriksa 59 part/20 pallet, simpan-buka ulang,
+  navigasi, pencarian/filter/keyboard, koreksi kelebihan, lokasi duplikat, dan
+  finalisasi. Tampilan diperiksa pada 1440x900, 1366x768, dan simulasi 390x844.
+  Preview menggunakan SQLite terpisah; tidak ada perubahan database operasional
+  atau migration tambahan pada perubahan UI ini.
+
+Verifikasi database lokal 29 Oktober 2026 (import master ekspor): atas permintaan
+pengguna, 275 part dengan Qty/Bx valid dari Test 1.xlsx ditambahkan ke MySQL
+127.0.0.1:3306, database stock (APP_ENV local). A1-A20 sudah ada sebagai lokasi
+ekspor sehingga tidak ditambahkan ulang. Seluruh data master existing, termasuk
+domestik, kapasitas, ID dan occupancy lokasi, diverifikasi tetap utuh. Import
+memakai transaksi dan menambahkan 275 audit master_part bertipe created dengan
+aktor sistem. Tiga part G kosong belum diimpor: 7105-0477, 7210-4285, BR-139.
+Backup sebelum import dan receipt tersimpan di storage/app/backups dengan prefix
+export_master_import_2026-10-29_082342_a7d2aa. Migration ekspor 000001-000006
+teramati sudah diterapkan pada database lokal stock sebelum import; agent tidak
+menjalankan migration dalam langkah ini. Ini bukan perubahan database production
+remote. Catatan SQLite preview sebelumnya tetap merupakan histori pengujian.
+
+Verifikasi tambahan 28 Oktober 2026 (Perencanaan Pallet Ekspor):
+- Implementasi dan keputusan tahap lanjutan ada di docs/EXPORT_PALLET_PLANNING.md.
+  Menu /export/pallet-plans memakai izin export_pallet_plans, bawaan Operator
+  Export. Migration 000006 menambah empat tabel dan memperbarui izin tersimpan
+  beserta audit. Belum dimigrasikan pada database operasional/production.
+- Satu perencanaan per delivery, nomor pallet 1..N, part campuran, pembagian
+  box manual. Draft boleh parsial; finalisasi mensyaratkan alokasi tepat untuk
+  semua part serta lokasi ekspor berbeda dan tersedia pada setiap pallet.
+- Finalisasi oleh Operator Export mereservasi lokasi melalui tabel
+  export_pallet_location_reservations dengan master_location_id sebagai primary
+  key. Reservasi berbeda dari occupancy fisik. Buka revisi mempertahankan klaim;
+  simpan draft melepas lokasi yang dikeluarkan, finalisasi mengklaim lokasi baru.
+  Pembatalan mempertahankan baris sebagai riwayat dan melepas semua reservasi.
+- Revisi delivery mengembalikan perencanaan aktif ke draft sambil mempertahankan
+  baris, ID, dan lokasi yang sudah direservasi. Kekurangan/kelebihan dan part yang
+  dihapus harus dikoreksi operator sebelum finalisasi ulang. Revision mencegah
+  penimpaan bersamaan; transaksi mengunci delivery, planning, dan lokasi.
+- Master lokasi ekspor menampilkan status Direservasi serta menyaringnya dari
+  pencarian lokasi tersedia. Identitas part/lokasi yang direferensikan dilindungi.
+  Arsip delivery aktif mensyaratkan pembatalan perencanaan terlebih dahulu.
+- Input box, stok ekspor/cadangan, reservasi nomor box, FIFO dan pengembalian
+  fisik merupakan tahap Pemenuhan Permintaan berikutnya. Jangan mengambil stok
+  domestik otomatis. Keputusan pengguna: FIFO tanggal penerimaan pertama,
+  prioritas tenggat lalu pallet terkecil; saat kebutuhan turun, box terbaru
+  dikembalikan ke lokasi/pallet pilihan dengan tanggal FIFO asal dipertahankan.
+- Verifikasi: regresi 324 tes backend (2.685 assertions) lulus, dilanjutkan 32 tes
+  delivery/planning (323 assertions) setelah perbaikan terakhir. Seluruh 53 tes
+  frontend dan build lulus. Browser memverifikasi draft/final, part campuran,
+  lokasi A1/A2, alokasi berlebih, revisi delivery dan finalisasi ulang. Semua data
+  uji memakai SQLite terpisah; produksi tidak diubah.
 
 Integrasi 28 Oktober 2026 pada checkout utama branch Export-plan: fitur master
 dan Rencana Delivery Ekspor digabungkan dengan alur QA/packing terbaru. Handle
@@ -13,17 +104,28 @@ database kerja/production dalam integrasi ini. Sesuai instruksi pengguna, pekerj
 selanjutnya dilakukan langsung pada branch aktif tanpa branch/worktree baru.
 
 Verifikasi tambahan 28 Oktober 2026 (Rencana Delivery Ekspor):
+- Format contoh dan keputusan pemetaan dicatat di
+  docs/EXPORT_DELIVERY_IMPORT_NOTES.md. Impor memakai kolom QTY(PCS) (C pada
+  contoh), mengabaikan jumlah kosong/nol dengan peringatan terpisah untuk kedua
+  jumlah baris. Qty2(Pcs), footer box, serta total pallet tidak menjadi input.
+- Kode dokumen (contoh RDYR0925) menjadi plan_code, terbaca dari header Excel
+  atau diisi manual, dapat dikoreksi di form dan dicari dari daftar/detail. Migration
+  000005 menambahkan kolom nullable dan index, mempertahankan data lama dengan
+  kode null. Kode belum dibatasi unik; relasi tetap memakai ID internal rencana.
+  Template Excel menyediakan label Kode Rencana Delivery. Kode masuk audit dan
+  perubahan field mewajibkan pemeriksaan ulang hasil impor sebelum simpan.
 - Menu /export/delivery-plans memakai izin export_delivery_plans, bawaan
   Operator Export dan dapat diatur Admin Utama. Migration 000004 membuat tabel
   export_delivery_plans/items dan menambah izin ke pengaturan role existing
   beserta audit sistem. Produksi belum dimigrasikan oleh agent.
-- Input customer, batas tanggal pengiriman, nomor part dan jumlah PCS.
+- Input kode rencana (opsional untuk kompatibilitas data lama), customer,
+  batas tanggal pengiriman, nomor part dan jumlah PCS.
   Kapasitas diambil hanya dari master ekspor; box dan total dihitung ulang di
   server. Jumlah wajib kelipatan kapasitas, tidak boleh part duplikat atau box
-  tidak penuh. Tidak ada input nomor rencana atau jumlah pallet.
-- Rencana disimpan sebagai draft, bisa diubah dan diarsipkan (soft delete).
-  Perencanaan pallet dan approval belum diterapkan pada tahap ini. Tidak ada
-  pembuatan/alokasi box fisik, mutasi inventory domestik, atau assignment lokasi.
+  tidak penuh. Tidak ada input jumlah pallet.
+- Rencana delivery disimpan sebagai draft, bisa diubah dan diarsipkan (soft
+  delete). Perencanaan pallet tersedia sebagai modul tersendiri; finalisasi dan
+  reservasi lokasi dijelaskan di atas. Belum ada mutasi inventory fisik.
 - Setiap item menyimpan snapshot nomor part dan kapasitas. Mengubah kapasitas
   master tidak mengubah rencana lama; item yang baru ditambahkan mengambil
   kapasitas master terkini. Identitas part yang sudah direferensikan rencana,
@@ -34,21 +136,31 @@ Verifikasi tambahan 28 Oktober 2026 (Rencana Delivery Ekspor):
   customer. Template dapat diunduh; header dua tingkat pada layout contoh
   didukung. Preview tidak membuat data. Formula tidak dieksekusi; hasil cache
   Excel dipakai jika tersedia, selain itu operator harus mengoreksi nilainya.
-- Foto JPG/PNG/WebP maksimal 10 MB dan 40 megapiksel. OpenCV.js merapikan
-  perspektif/tabel dan Tesseract.js membaca header serta sel part/PCS di browser.
-  Tahap ini untuk dokumen cetak dengan layout contoh; tulisan tangan dan
-  layout bebas belum didukung. Tidak ada pelatihan model atau API eksternal.
-  Foto asli tidak dikirim/disimpan di server. Nomor part tidak dikoreksi secara
-  fuzzy. Hasil impor bisa diedit dan wajib dikonfirmasi sebelum disimpan.
-- npm ci lalu npm run build menyiapkan aset lokal public/vendor/ocr dan
-  public/build; kedua direktori harus ikut deployment. Tidak perlu service OCR,
-  Python, API key, queue worker, atau konfigurasi OCR pada OS server.
-- Verifikasi: 274 tes backend (2.212 assertions) dan 51 tes frontend lulus.
+- Pembacaan foto dihapus pada 28 Oktober 2026 atas permintaan pengguna. Form
+  hanya menyediakan input manual dan Excel. Kode OCR, pemrosesan gambar,
+  dependency Tesseract/OpenCV/model bahasa, serta aset vendor/ocr dihapus.
+  Build memakai Vite langsung dan hanya public/build yang perlu disertakan.
+  Sumber photo tidak diterima untuk rencana baru atau rencana manual/Excel.
+  Rencana historis bersumber photo tetap bisa dilihat/diedit dengan provenance
+  yang sama; label sumber menunjukkan foto (riwayat), tanpa opsi deteksi foto.
+  Verifikasi penghapusan: 18 tes Rencana Delivery (184 assertions), 49 tes
+  frontend dan build lulus. Browser memastikan hanya input manual/Excel,
+  tanpa error konsol; penghapusan tidak memerlukan migration tambahan dan
+  tidak mengubah database operasional.
+- Verifikasi tahap awal sebelum penghapusan foto: 274 tes backend
+  (2.212 assertions) dan 51 tes frontend lulus.
   Browser Chromium terpisah berhasil membaca 9 baris foto contoh, customer,
   tanggal, total 732 box, lalu menyimpan draft; impor Excel dan penolakan
   jumlah tidak kelipatan juga diverifikasi. Chrome desktop adalah target,
   tetapi koneksi Chrome aktual tidak tersedia pada sesi verifikasi.
   Seluruh data UI uji memakai SQLite preview terpisah; production tidak diubah.
+- Verifikasi pembaruan kode/pemetaan (28 Oktober 2026): 309 tes backend
+  (2.534 assertions), 52 tes frontend, serta build lulus pada Export-plan.
+  Browser memverifikasi file contoh menjadi 59 part, peringatan 219 jumlah
+  kosong/0 jumlah nol, kode RDYR0925 dan 662 box menggunakan kapasitas master
+  preview dari contoh. Pembatalan impor memulihkan kode/peringatan; simpan dan
+  pencarian kode berhasil. Migration 000005 hanya diuji pada SQLite test/preview,
+  belum diterapkan pada database operasional/production.
 
 
 
@@ -67,8 +179,8 @@ request. Endpoint ekspor terpisah di /export/part-settings dan /export/locations
 CRUD, pencarian, validasi unik dan akses ID semuanya dibatasi sesuai lingkup.
 API/validasi lokasi pada transaksi domestik dan LocationAssignmentService tetap
 hanya menerima master domestik. Master ekspor belum terhubung ke inventory fisik.
-Rencana Delivery Ekspor memakai part ekspor dan pemeriksaan referensi master
-mencakup item rencana, termasuk rencana yang telah diarsipkan.
+Rencana Delivery dan Perencanaan Pallet Ekspor memakai master ekspor. Pemeriksaan
+referensi mencakup kedua modul, termasuk rencana yang diarsipkan/dibatalkan.
 
 Izin baru `export_parts` dan `export_locations` merupakan bawaan Operator Export.
 Admin Utama dapat mengakses kedua lingkup melalui menu terpisah. Migration
@@ -89,7 +201,7 @@ dijalankan pada database production.
 
 Verifikasi tambahan 28 Oktober 2026 (Operator Export): role `export_operator`
 tersedia pada tambah/edit/filter user dan pengaturan Hak Akses. Akses fitur
-saat ini mencakup Rencana Delivery dan dua master ekspor; login, profil, logout,
+saat ini mencakup Rencana Delivery, Perencanaan Pallet dan dua master ekspor; login, profil, logout,
 dan dashboard ekspor tetap tersedia. Dashboard role ini tidak memuat statistik atau transaksi domestik.
 Migration `2026_10_28_000001_add_export_operator_role_to_users` memperluas enum
 `users.role` tanpa mengubah akun atau inventory existing; wajib dijalankan saat

@@ -152,12 +152,24 @@ class ExportDeliveryPlanImportService
         }
         $customer = '';
         $deadline = '';
+        $planCodes = [];
         $header = null;
         $partColumn = null;
         $quantityColumn = null;
         foreach (array_slice($grid, 0, 40, true) as $index => $cells) {
             foreach ($cells as $column => $value) {
                 $label = $this->label($value);
+                $code = '';
+                if (in_array($label, ['koderencana', 'koderencanadelivery', 'plancode', 'deliveryplancode'], true)) {
+                    $code = trim((string) ($cells[$column + 1] ?? ''));
+                } elseif (preg_match('/^(?:kode\s+rencana(?:\s+delivery)?|plan\s+code)\s*[:：]\s*(.+)$/iu', (string) $value, $match)) {
+                    $code = trim($match[1]);
+                } elseif (preg_match('/\b(RD[A-Z0-9][A-Z0-9._\/-]{1,97})\b/i', (string) $value, $match)) {
+                    $code = $match[1];
+                }
+                if ($code !== '') {
+                    $planCodes[$code] = true;
+                }
                 if (preg_match('/^(?:customer|pelanggan)\s*[:：]\s*(.+)$/iu', (string) $value, $match)) {
                     $customer = trim($match[1]);
                 } elseif (in_array($label, ['customer', 'pelanggan', 'namacustomer'], true)) {
@@ -182,7 +194,11 @@ class ExportDeliveryPlanImportService
         if ($header === null) {
             $this->failure('Kolom Nomor Part dan Jumlah PCS tidak ditemukan. Gunakan template Excel.');
         }
+        if (count($planCodes) > 1) {
+            $this->failure('File berisi beberapa kode rencana. Gunakan satu rencana per file.');
+        }
         $items = [];
+        $skipped = ['empty' => 0, 'zero' => 0];
         foreach (array_slice($grid, $header + 1) as $cells) {
             $part = trim((string) ($cells[$partColumn] ?? ''));
             $quantity = $cells[$quantityColumn] ?? '';
@@ -193,6 +209,15 @@ class ExportDeliveryPlanImportService
             if ($part === '' && ($quantity === null || $quantity === '')) {
                 continue;
             }
+            $quantityText = trim((string) $quantity);
+            if ($quantityText === '') {
+                $skipped['empty']++;
+                continue;
+            }
+            if (is_numeric($quantityText) && (float) $quantityText === 0.0) {
+                $skipped['zero']++;
+                continue;
+            }
             // Formula cells are left as text and must be corrected; nothing is evaluated.
             $items[] = ['part_number' => $part, 'pcs_quantity' => $quantity];
             if (count($items) > 500) {
@@ -200,10 +225,19 @@ class ExportDeliveryPlanImportService
             }
         }
         if (! $items) {
-            $this->failure('File belum berisi baris nomor part dan jumlah PCS.');
+            $this->failure('Tidak ada baris dengan jumlah PCS yang dapat diimpor. '
+                .$skipped['empty'].' baris jumlah kosong dan '.$skipped['zero'].' baris bernilai 0 diabaikan.');
         }
 
-        return ['customer_name' => $customer, 'delivery_deadline' => $deadline,
-            'items' => $items, 'source_name' => mb_substr($fileName, 0, 255)];
+        $warnings = [];
+        if (array_sum($skipped) > 0) {
+            $warnings[] = array_sum($skipped).' baris diabaikan: '.$skipped['empty']
+                .' jumlah kosong dan '.$skipped['zero'].' bernilai 0. Periksa kembali daftar part yang dimasukkan.';
+        }
+
+        return ['plan_code' => (string) (array_key_first($planCodes) ?? ''),
+            'customer_name' => $customer, 'delivery_deadline' => $deadline,
+            'items' => $items, 'source_name' => mb_substr($fileName, 0, 255),
+            'skipped_rows' => $skipped, 'warnings' => $warnings];
     }
 }

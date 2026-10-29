@@ -9,4 +9,19 @@ class ExportMasterLocation extends MasterLocation
     protected $table = 'master_locations';
 
     protected $attributes = ['scope' => self::MASTER_SCOPE];
+
+    public function reservation()
+    {
+        return $this->hasOne(ExportPalletLocationReservation::class, 'master_location_id');
+    }
+
+    public function plannedPallets()
+    {
+        return $this->hasMany(ExportPlannedPallet::class, 'master_location_id');
+    }
+
+    public function scopeAvailable($query)
+    {
+        return parent::scopeAvailable($query)->whereDoesntHave('reservation');
+    }
 }

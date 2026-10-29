@@ -78,18 +78,22 @@
                         @forelse($locations as $location)
                             @php
                                 $isOccupied = (bool) $location->is_occupied;
-                                $deletionBlocked = $isOccupied && $location->current_pallet_id;
+                                $isReserved = $isExport && $location->reservation;
+                                $hasPlanning = $isExport && $location->planned_pallets_exists;
+                                $deletionBlocked = ($isOccupied && $location->current_pallet_id) || $hasPlanning;
                             @endphp
                             <tr>
                                 <th scope="row" class="location-list-code">{{ $location->code }}</th>
                                 <td>
-                                    <span class="location-list-status {{ $isOccupied ? 'is-occupied' : 'is-available' }}">
+                                    <span class="location-list-status {{ $isOccupied || $isReserved ? 'is-occupied' : 'is-available' }}">
                                         <span class="location-list-status-dot" aria-hidden="true"></span>
-                                        {{ $isOccupied ? 'Terisi' : 'Kosong' }}
+                                        {{ $isReserved ? 'Direservasi' : ($isOccupied ? 'Terisi' : 'Kosong') }}
                                     </span>
                                 </td>
                                 <td class="location-list-pallet">
-                                    @if($location->currentPallet)
+                                    @if($isReserved)
+                                        Pallet {{ $location->reservation->pallet->position }} · {{ $location->reservation->palletPlan->deliveryPlan?->plan_code ?? 'Rencana delivery' }}
+                                    @elseif($location->currentPallet)
                                         {{ $location->currentPallet->pallet_number }}
                                     @elseif($isOccupied)
                                         <span class="location-list-muted">Data pallet tidak tersedia</span>
@@ -111,7 +115,9 @@
                                                 <i class="bi bi-trash" aria-hidden="true"></i> Hapus
                                             </button>
                                         </div>
-                                        @if($deletionBlocked)
+                                        @if($hasPlanning)
+                                            <small class="location-list-action-note">Lokasi tercatat pada perencanaan pallet.</small>
+                                        @elseif($deletionBlocked)
                                             <small class="location-list-action-note">Pindahkan pallet sebelum mengubah atau menghapus.</small>
                                         @elseif($isOccupied)
                                             <small class="location-list-action-note">Periksa data pallet lokasi ini sebelum mengubah.</small>

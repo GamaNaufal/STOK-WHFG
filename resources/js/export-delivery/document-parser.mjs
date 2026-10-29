@@ -7,37 +7,6 @@ export function parseCount(value) {
     return normalized && Number.isSafeInteger(number) && number > 0 && number <= 4294967295 ? number : null;
 }
 
-export function parseDocumentDate(text) {
-    const months = { januari:1,january:1,februari:2,february:2,maret:3,march:3,april:4,mei:5,may:5,
-        juni:6,june:6,juli:7,july:7,agustus:8,august:8,september:9,oktober:10,october:10,november:11,desember:12,december:12 };
-    const valid = (year,month,day) => {
-        const date = new Date(Date.UTC(year,month-1,day));
-        return date.getUTCFullYear()===year && date.getUTCMonth()===month-1 && date.getUTCDate()===day ?
-            year+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0') : '';
-    };
-    let m=String(text).match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
-    if(m) return valid(Number(m[1]),Number(m[2]),Number(m[3]));
-    m=String(text).match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})\b/);
-    if(m) return valid(Number(m[3]),Number(m[2]),Number(m[1]));
-    m=String(text).match(/\b(\d{1,2})\s+([a-z]+)\s+(\d{4})\b/i);
-    return m ? valid(Number(m[3]),months[m[2].toLowerCase()] ?? 0,Number(m[1])) : '';
-}
-
-export function parsePhotoResult(headerText, cells, catalog) {
-    const customer = String(headerText).match(/(?:CUSTOMER|PELANGGAN)\s*[:：]\s*([^\n]+)/i)?.[1]?.trim() ?? '';
-    const known = new Set(catalog.map(part=>part.part_number));
-    const items = cells.map(cell => {
-        const raw = String(cell.part ?? '').trim().replace(/[–—−]/g,'-');
-        const tokens = raw.split(/\s+/).map(value=>value.replace(/^[\[\]|]+|[\[\]|]+$/g,''));
-        const exact = [...new Set(tokens.filter(token=>known.has(token)))];
-        // Only choose a literal master match; never fuzzy-correct an OCR code.
-        const partNumber = exact.length===1 ? exact[0] : raw;
-        return { part_number:partNumber, pcs_quantity:parseCount(cell.quantity) ?? '',
-            warning: Math.min(cell.partConfidence ?? 0, cell.quantityConfidence ?? 0)<70 ? 'Cocokkan kembali dengan foto.' : '' };
-    }).filter(row=>row.part_number || row.pcs_quantity);
-    return { customer_name:customer,delivery_deadline:parseDocumentDate(headerText),items };
-}
-
 export function checkRows(rows, catalog, snapshots=[]) {
     const master = new Map(catalog.map(part=>[part.part_number,Number(part.qty_box)]));
     const saved = new Map(snapshots.map(row=>[row.part_number,Number(row.pcs_per_box)]));

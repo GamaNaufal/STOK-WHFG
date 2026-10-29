@@ -13,7 +13,17 @@
     @if(auth()->user()->canAccess('export_delivery_plans'))
         <h2 class="dashboard-section-title">Rencana pengiriman</h2>
         <ul class="dashboard-actions" aria-label="Rencana pengiriman ekspor">
-            <x-dashboard-action icon="calendar2-check" title="Rencana Delivery Ekspor" description="Susun kebutuhan pengiriman melalui input manual, foto atau Excel" route-name="export.delivery-plans.index" label="Kelola rencana" />
+            <x-dashboard-action icon="calendar2-check" title="Rencana Delivery Ekspor" description="Susun kebutuhan pengiriman melalui input manual atau Excel" route-name="export.delivery-plans.index" label="Kelola rencana" />
+        </ul>
+    @endif
+    @if(auth()->user()->canAccess('export_pallet_plans'))
+        <ul class="dashboard-actions" aria-label="Perencanaan pallet ekspor">
+            <x-dashboard-action icon="boxes" title="Perencanaan Pallet" description="Bagi kebutuhan delivery ke pallet dan reservasi lokasi" route-name="export.pallet-plans.index" label="Rencanakan pallet" />
+        </ul>
+    @endif
+    @if(auth()->user()->canAccess('export_fulfillment'))
+        <ul class="dashboard-actions" aria-label="Pemenuhan permintaan ekspor">
+            <x-dashboard-action icon="clipboard-data" title="Pemenuhan Permintaan" description="Pantau kebutuhan, reservasi box, dan penempatan per pallet" route-name="export.fulfillment.index" label="Pantau pemenuhan" />
         </ul>
     @endif
     <h2 class="dashboard-section-title">Master data ekspor</h2>

@@ -26,7 +26,8 @@ class PartSettingController extends Controller
     private function isPartReferenced(PartSetting $part): bool
     {
         if ($part->scope === 'export') {
-            return DB::table('export_delivery_plan_items')->where('part_setting_id', $part->id)->exists();
+            return DB::table('export_delivery_plan_items')->where('part_setting_id', $part->id)->exists()
+                || DB::table('export_planned_pallet_items')->where('part_setting_id', $part->id)->exists();
         }
 
         $partNumber = $part->part_number;

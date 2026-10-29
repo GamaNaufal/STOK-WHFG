@@ -9,7 +9,7 @@ class ExportDeliveryPlan extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['customer_name', 'delivery_deadline', 'status', 'revision', 'source_type',
+    protected $fillable = ['plan_code', 'customer_name', 'delivery_deadline', 'status', 'revision', 'source_type',
         'source_name', 'total_pcs', 'total_boxes', 'created_by', 'updated_by'];
 
     protected $casts = ['delivery_deadline' => 'date', 'revision' => 'integer',
@@ -23,5 +23,10 @@ class ExportDeliveryPlan extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function palletPlan()
+    {
+        return $this->hasOne(ExportPalletPlan::class);
     }
 }

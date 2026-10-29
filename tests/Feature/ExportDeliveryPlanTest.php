@@ -62,7 +62,8 @@ class ExportDeliveryPlanTest extends TestCase
         }
         $operator = $this->operator();
         $this->actingAs($operator)->get(route('export.delivery-plans.create'))->assertOk()
-            ->assertSee('Rencana delivery baru')->assertSee('Dari foto')->assertSee('Dari Excel');
+            ->assertSee('Rencana delivery baru')->assertSee('Isi manual')->assertSee('Dari Excel')
+            ->assertDontSee('Dari foto')->assertDontSee('plan-photo-file')->assertDontSee('data-ocr-base');
         $this->get(route('export.delivery-plans.template'))->assertOk()
             ->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         RoleFeatureAccess::create(['role' => 'export_operator', 'permissions' => []]);
@@ -123,18 +124,51 @@ class ExportDeliveryPlanTest extends TestCase
         $this->assertDatabaseCount('export_delivery_plans', 0);
     }
 
-    public function test_photo_and_excel_results_require_explicit_review_before_save(): void
+    public function test_excel_results_require_explicit_review_before_save(): void
     {
         ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator());
-        foreach (['photo', 'excel'] as $source) {
-            $this->postJson(route('export.delivery-plans.store'), $this->payload(['source_type' => $source]))
-                ->assertUnprocessable()->assertJsonValidationErrors('reviewed');
-        }
+        $this->postJson(route('export.delivery-plans.store'), $this->payload(['source_type' => 'excel']))
+            ->assertUnprocessable()->assertJsonValidationErrors('reviewed');
         $this->post(route('export.delivery-plans.store'), $this->payload([
-            'source_type' => 'photo', 'source_name' => 'rencana.jpg', 'reviewed' => '1',
+            'source_type' => 'excel', 'source_name' => 'rencana.xlsx', 'reviewed' => '1',
         ]))->assertSessionHasNoErrors()->assertRedirect();
-        $this->assertDatabaseHas('export_delivery_plans', ['source_type' => 'photo', 'source_name' => 'rencana.jpg']);
+        $this->assertDatabaseHas('export_delivery_plans', ['source_type' => 'excel', 'source_name' => 'rencana.xlsx']);
+    }
+
+    public function test_photo_source_is_rejected_for_new_plans_and_existing_non_photo_plans(): void
+    {
+        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        $this->actingAs($this->operator());
+        $this->postJson(route('export.delivery-plans.store'), $this->payload([
+            'source_type' => 'photo', 'reviewed' => '1',
+        ]))->assertUnprocessable()->assertJsonValidationErrors('source_type');
+        $this->assertDatabaseCount('export_delivery_plans', 0);
+        $this->post(route('export.delivery-plans.store'), $this->payload())->assertSessionHasNoErrors();
+        $plan = ExportDeliveryPlan::sole();
+        $this->putJson(route('export.delivery-plans.update', $plan), $this->payload([
+            'source_type' => 'photo', 'reviewed' => '1', 'revision' => 1,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('source_type');
+        $this->assertSame('manual', $plan->fresh()->source_type);
+        $this->assertSame(1, $plan->fresh()->revision);
+    }
+
+    public function test_historical_photo_plan_can_be_viewed_and_edited_without_losing_provenance(): void
+    {
+        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        $this->actingAs($this->operator())->post(route('export.delivery-plans.store'), $this->payload());
+        $plan = ExportDeliveryPlan::sole();
+        $plan->update(['source_type' => 'photo', 'source_name' => 'historis.jpg']);
+        $this->get(route('export.delivery-plans.show', $plan))->assertOk()->assertSee('foto (riwayat)');
+        $this->get(route('export.delivery-plans.edit', $plan))->assertOk()
+            ->assertDontSee('Dari foto')->assertDontSee('plan-photo-file');
+        $this->put(route('export.delivery-plans.update', $plan), $this->payload([
+            'source_type' => 'photo', 'source_name' => 'historis.jpg', 'reviewed' => '1', 'revision' => 1,
+            'items' => [['part_number' => 'EXP-001', 'pcs_quantity' => 120]],
+        ]))->assertSessionHasNoErrors();
+        $this->assertSame('photo', $plan->fresh()->source_type);
+        $this->assertSame('historis.jpg', $plan->fresh()->source_name);
+        $this->assertSame(120, $plan->fresh()->total_pcs);
     }
 
     public function test_update_keeps_capacity_snapshot_and_rejects_stale_revisions_atomically(): void
@@ -219,5 +253,83 @@ class ExportDeliveryPlanTest extends TestCase
         $this->postJson(route('export.delivery-plans.import-excel'), ['file' => $file])
             ->assertUnprocessable()->assertJsonValidationErrors('file');
         $this->assertDatabaseCount('export_delivery_plans', 0);
+    }
+
+    public function test_excel_import_uses_original_pcs_column_reads_code_and_warns_about_skipped_rows(): void
+    {
+        $file = $this->workbook([
+            ['RENCANA DELIVERY', null, null, null, null, null, null, null, null, null, null, null, 'RDYR0925'],
+            ['JUMAT,25 SEPTEMBER 2026'], ['Customer : Customer A'],
+            ['No', 'Part No', 'QTY(PCS)', 'RENCANA DELIVERY'],
+            [null, null, null, 'Qty2(Pcs)', 'RABU', 'Box', 'Qty/Bx', 'Bx'],
+            [1, '001-ABC', 3000, 1500, 1500, null, 1500, 1],
+            [2, 'EMPTY-PART', null, 999], [3, 'ZERO-PART', 0, 999],
+            [4, 'SPACE-PART', '  ', 999], [5, 'TEXT-ZERO-PART', '0', 999],
+            ['TOTAL BOX', null, null, null, null, null, 999],
+            [6, 'AFTER-TOTAL', 999],
+        ]);
+        $this->actingAs($this->operator())->postJson(route('export.delivery-plans.import-excel'), ['file' => $file])
+            ->assertOk()->assertJsonPath('plan_code', 'RDYR0925')
+            ->assertJsonPath('customer_name', 'Customer A')->assertJsonPath('delivery_deadline', '2026-09-25')
+            ->assertJsonCount(1, 'items')->assertJsonPath('items.0.part_number', '001-ABC')
+            ->assertJsonPath('items.0.pcs_quantity', 3000)
+            ->assertJsonPath('skipped_rows.empty', 2)->assertJsonPath('skipped_rows.zero', 2)
+            ->assertJsonPath('warnings.0', '4 baris diabaikan: 2 jumlah kosong dan 2 bernilai 0. Periksa kembali daftar part yang dimasukkan.');
+        $this->assertDatabaseCount('export_delivery_plans', 0);
+    }
+
+    public function test_import_keeps_invalid_quantities_for_correction_instead_of_silently_skipping_them(): void
+    {
+        $parsed = app(ExportDeliveryPlanImportService::class)->parseRows([
+            ['Kode Rencana Delivery', 'CUSTOM-001'], ['Nomor Part', 'Jumlah PCS'],
+            ['NEGATIVE', -1], ['FORMULA', '=1+1'], ['FRACTION', 1.5],
+        ]);
+        $this->assertSame('CUSTOM-001', $parsed['plan_code']);
+        $this->assertCount(3, $parsed['items']);
+        $this->assertSame(['empty' => 0, 'zero' => 0], $parsed['skipped_rows']);
+        $this->assertSame([], $parsed['warnings']);
+    }
+
+    public function test_import_with_only_empty_and_zero_quantities_reports_skipped_counts(): void
+    {
+        $this->actingAs($this->operator())->postJson(route('export.delivery-plans.import-excel'), [
+            'file' => $this->workbook([['Nomor Part', 'Jumlah PCS'], ['EMPTY', null], ['ZERO', 0]]),
+        ])->assertUnprocessable()->assertJsonValidationErrors('file')
+            ->assertJsonPath('errors.file.0', 'Tidak ada baris dengan jumlah PCS yang dapat diimpor. 1 baris jumlah kosong dan 1 baris bernilai 0 diabaikan.');
+        $this->assertDatabaseCount('export_delivery_plans', 0);
+    }
+
+    public function test_plan_code_is_saved_audited_searchable_and_editable_while_legacy_plans_remain_valid(): void
+    {
+        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        $this->actingAs($this->operator());
+        $this->post(route('export.delivery-plans.store'), $this->payload())->assertSessionHasNoErrors();
+        $legacy = ExportDeliveryPlan::sole();
+        $this->assertNull($legacy->plan_code);
+        $this->post(route('export.delivery-plans.store'), $this->payload(['plan_code' => ' RDYR0925 ']))
+            ->assertSessionHasNoErrors();
+        $plan = ExportDeliveryPlan::latest('id')->first();
+        $this->assertSame('RDYR0925', $plan->plan_code);
+        $audit = AuditLog::where('type', 'export_delivery_plan')->where('model_id', $plan->id)->sole();
+        $this->assertSame('RDYR0925', $audit->getNewValuesArray()['plan_code']);
+        $this->get(route('export.delivery-plans.index', ['q' => 'RDYR0925']))->assertOk()
+            ->assertViewHas('plans', fn ($plans) => $plans->total() === 1 && $plans->first()->id === $plan->id);
+        $this->get(route('export.delivery-plans.show', $plan))->assertOk()->assertSee('RDYR0925');
+        $this->get(route('export.delivery-plans.edit', $plan))->assertOk()->assertSee('RDYR0925');
+        $this->put(route('export.delivery-plans.update', $plan), $this->payload(['revision' => 1]))
+            ->assertSessionHasNoErrors();
+        $this->assertSame('RDYR0925', $plan->fresh()->plan_code);
+        $this->put(route('export.delivery-plans.update', $plan), $this->payload(['revision' => 2, 'plan_code' => 'RDYR0926']))
+            ->assertSessionHasNoErrors();
+        $this->assertSame('RDYR0926', $plan->fresh()->plan_code);
+        $this->postJson(route('export.delivery-plans.store'), $this->payload(['plan_code' => str_repeat('R', 101)]))
+            ->assertUnprocessable()->assertJsonValidationErrors('plan_code');
+    }
+
+    public function test_import_rejects_multiple_plan_codes_in_one_document(): void
+    {
+        $this->actingAs($this->operator())->postJson(route('export.delivery-plans.import-excel'), [
+            'file' => $this->workbook([['RDYR0925', 'RDYR0926'], ['Nomor Part', 'Jumlah PCS'], ['P-1', 100]]),
+        ])->assertUnprocessable()->assertJsonValidationErrors('file');
     }
 }

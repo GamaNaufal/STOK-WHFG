@@ -1,0 +1,5 @@
+<section class="plan-panel" aria-labelledby="allocation-title"><div class="plan-panel-heading"><div><h2 id="allocation-title">Ringkasan alokasi part</h2><p>Setiap part harus dialokasikan tepat sesuai kebutuhan sebelum finalisasi.</p></div></div>
+    <div class="plan-table-scroll" tabindex="0" role="region" aria-label="Ringkasan kebutuhan dan alokasi"><table class="table plan-table"><thead><tr><th>Nomor part</th><th>PCS / box</th><th>Kebutuhan box</th><th>Dialokasikan</th><th>Sisa / kelebihan</th></tr></thead><tbody id="allocation-summary">
+        @foreach($summary as $row)<tr data-part-id="{{ $row['part_setting_id'] }}"><th scope="row">{{ $row['part_number'] }}</th><td>{{ number_format($row['pcs_per_box'], 0, ',', '.') }}</td><td>{{ number_format($row['required'], 0, ',', '.') }}</td><td class="allocation-allocated">{{ number_format($row['allocated'], 0, ',', '.') }}</td><td class="allocation-remaining {{ $row['remaining'] < 0 ? 'text-danger' : '' }}">{{ $row['remaining'] === 0 ? 'Sesuai' : ($row['remaining'] > 0 ? 'Kurang ' : 'Lebih ').number_format(abs($row['remaining']), 0, ',', '.') }}</td></tr>@endforeach
+    </tbody></table></div>
+</section>

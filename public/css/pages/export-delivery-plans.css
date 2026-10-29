@@ -18,15 +18,17 @@
 .delivery-plan-page [hidden] { display:none!important; }
 .plan-import-status { color:var(--ui-muted,#595d65); font-size:.8125rem; margin:.85rem 0 0; overflow-wrap:anywhere; }
 .plan-import-status.is-error { color:#a52622; }
-.plan-photo-preview { margin-top:1rem; }
-.plan-photo-preview img { display:block; max-width:100%; max-height:20rem; object-fit:contain; border:1px solid var(--ui-border,#dfe1e5); border-radius:.5rem; background:#f4f5f6; }
-#plan-photo-progress { width:100%; height:.8rem; margin-top:1rem; accent-color:var(--ui-accent,#0b7072); }
 .plan-table-scroll { overflow-x:auto; position:relative; }
 .plan-table-scroll:focus-visible { outline:3px solid var(--ui-accent,#0b7072); outline-offset:-3px; }
 .warehouse-app .plan-table { min-width:720px; margin:0; }
 .warehouse-app .plan-table :is(th,td) { padding:.875rem 1rem; vertical-align:top; font-size:.8125rem; border-color:var(--ui-border,#dfe1e5); }
 .warehouse-app .plan-table thead th { background:#f7f8fa; color:var(--ui-muted,#595d65); font-size:.75rem; font-weight:600; white-space:nowrap; }
 .plan-part { min-width:13rem; }
+.pallet-add-count { width:8rem; }
+.planned-pallet .form-select,.planned-pallet .btn { min-height:44px; }
+.planned-pallet .pallet-part { min-width:15rem; }
+.planned-pallet .pallet-quantity { min-width:7rem; max-width:11rem; }
+.planned-pallet .pallet-location { max-width:30rem; }
 .plan-quantity { min-width:8rem; max-width:12rem; }
 .plan-capacity,.plan-boxes { font-variant-numeric:tabular-nums; white-space:nowrap; }
 .plan-row-error { max-width:28rem; color:#a52622; font-size:.75rem; line-height:1.45; margin:.35rem 0 0; }
@@ -47,7 +49,7 @@
  .plan-header,.plan-panel-heading,.plan-save-bar { align-items:stretch; flex-direction:column; }
  .plan-fields { grid-template-columns:1fr; }
  .plan-save-bar .plan-inline-actions { display:grid; grid-template-columns:1fr 1fr; }
- .plan-input-methods { display:grid; grid-template-columns:repeat(3,1fr); gap:.35rem; }
+ .plan-input-methods { display:grid; grid-template-columns:repeat(2,1fr); gap:.35rem; }
  .plan-input-methods .btn { font-size:.75rem; padding:.5rem .4rem; }
  .plan-totals { justify-content:flex-start; }
 }

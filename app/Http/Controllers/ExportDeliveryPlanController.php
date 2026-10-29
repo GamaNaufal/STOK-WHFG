@@ -19,7 +19,8 @@ class ExportDeliveryPlanController extends Controller
     {
         $search = trim(mb_substr((string) $request->query('q', ''), 0, 100));
         $plans = ExportDeliveryPlan::with('creator')
-            ->when($search !== '', fn ($query) => $query->where('customer_name', 'like', '%'.$search.'%'))
+            ->when($search !== '', fn ($query) => $query->where(fn ($match) => $match
+                ->where('customer_name', 'like', '%'.$search.'%')->orWhere('plan_code', 'like', '%'.$search.'%')))
             ->orderByDesc('id')->paginate(15)->withQueryString();
 
         return view('export.delivery-plans.index', compact('plans', 'search'));
@@ -48,20 +49,27 @@ class ExportDeliveryPlanController extends Controller
 
     public function show(ExportDeliveryPlan $deliveryPlan)
     {
-        $deliveryPlan->load(['items', 'creator']);
+        $deliveryPlan->load(['items', 'creator', 'palletPlan']);
 
         return view('export.delivery-plans.show', ['plan' => $deliveryPlan]);
     }
 
-    private function validated(Request $request, bool $updating = false): array
+    private function validated(Request $request, ?ExportDeliveryPlan $plan = null): array
     {
+        $sources = ['manual', 'excel'];
+        // Preserve provenance when editing a historical plan; new photo input is disabled.
+        if ($plan?->source_type === 'photo') {
+            $sources[] = 'photo';
+        }
+
         return $request->validate([
+            'plan_code' => 'nullable|string|max:100',
             'customer_name' => 'required|string|max:255',
             'delivery_deadline' => 'required|date_format:Y-m-d',
-            'source_type' => 'required|in:manual,excel,photo',
+            'source_type' => 'required|in:'.implode(',', $sources),
             'source_name' => 'nullable|string|max:255',
             'reviewed' => ['exclude_if:source_type,manual', 'required', 'accepted'],
-            'revision' => $updating ? 'required|integer|min:1' : 'sometimes|integer|min:1',
+            'revision' => $plan ? 'required|integer|min:1' : 'sometimes|integer|min:1',
             'items' => 'required|array|min:1|max:500',
             'items.*.part_number' => 'required|string|max:100|distinct:strict',
             'items.*.pcs_quantity' => 'required|integer|min:1|max:4294967295',
@@ -80,7 +88,7 @@ class ExportDeliveryPlanController extends Controller
 
     public function update(Request $request, ExportDeliveryPlan $deliveryPlan, ExportDeliveryPlanService $service)
     {
-        $plan = $service->save($this->validated($request, true), $request->user(), $deliveryPlan->id);
+        $plan = $service->save($this->validated($request, $deliveryPlan), $request->user(), $deliveryPlan->id);
 
         return redirect()->route('export.delivery-plans.show', $plan)->with('success', 'Rencana delivery berhasil diperbarui.');
     }
@@ -92,6 +100,11 @@ class ExportDeliveryPlanController extends Controller
             $locked = ExportDeliveryPlan::with('items')->lockForUpdate()->findOrFail($deliveryPlan->id);
             abort_unless($locked->status === 'draft' && $locked->revision === (int) $data['revision'], 409, 'Rencana sudah berubah. Muat ulang halaman.');
             $before = $service->snapshot($locked);
+            if ($locked->palletPlan()->where('status', '!=', 'cancelled')->exists()) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'pallet_plan' => 'Batalkan perencanaan pallet terlebih dahulu sebelum mengarsipkan rencana delivery.',
+                ]);
+            }
             $locked->delete();
             AuditService::record('export_delivery_plan', 'deleted', 'ExportDeliveryPlan', $locked->id,
                 $request->user()->id, $before, [], 'Rencana delivery ekspor diarsipkan.');
@@ -114,6 +127,7 @@ class ExportDeliveryPlanController extends Controller
         $sheet->setCellValue('A1', 'Customer');
         $sheet->setCellValue('A2', 'Batas Tanggal Pengiriman');
         $sheet->setCellValueExplicit('B2', 'YYYY-MM-DD', DataType::TYPE_STRING);
+        $sheet->setCellValue('A3', 'Kode Rencana Delivery');
         $sheet->setCellValue('A4', 'Nomor Part');
         $sheet->setCellValue('B4', 'Jumlah PCS');
         $sheet->getStyle('A1:A4')->getFont()->setBold(true);

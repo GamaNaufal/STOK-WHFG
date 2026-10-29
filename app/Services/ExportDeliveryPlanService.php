@@ -13,6 +13,7 @@ class ExportDeliveryPlanService
     public function snapshot(ExportDeliveryPlan $plan): array
     {
         return [
+            'plan_code' => $plan->plan_code,
             'customer_name' => $plan->customer_name,
             'delivery_deadline' => $plan->delivery_deadline->format('Y-m-d'),
             'revision' => $plan->revision, 'total_pcs' => $plan->total_pcs, 'total_boxes' => $plan->total_boxes,
@@ -56,7 +57,9 @@ class ExportDeliveryPlanService
             if ($errors) {
                 throw ValidationException::withMessages($errors);
             }
+            $code = trim((string) (array_key_exists('plan_code', $data) ? $data['plan_code'] : $plan->plan_code));
             $plan->fill([
+                'plan_code' => $code !== '' ? $code : null,
                 'customer_name' => trim($data['customer_name']), 'delivery_deadline' => $data['delivery_deadline'],
                 'status' => 'draft', 'revision' => $id ? $plan->revision + 1 : 1,
                 'source_type' => $data['source_type'], 'source_name' => $data['source_name'] ?? null,
@@ -69,6 +72,7 @@ class ExportDeliveryPlanService
                 $plan->items()->updateOrCreate(['part_setting_id' => $item['part_setting_id']], $item);
             }
             $plan->load('items');
+            if ($id) app(ExportPalletPlanningService::class)->invalidateForDeliveryRevision($plan, $actor);
             AuditService::record('export_delivery_plan', $id ? 'updated' : 'created', 'ExportDeliveryPlan',
                 $plan->id, $actor->id, $before, $this->snapshot($plan), 'Rencana delivery ekspor disimpan.');
 

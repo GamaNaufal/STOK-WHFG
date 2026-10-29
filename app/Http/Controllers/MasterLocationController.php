@@ -26,7 +26,11 @@ class MasterLocationController extends Controller
     public function index()
     {
         $model = $this->modelClass();
-        $locations = $model::with('currentPallet')->orderBy('code')->paginate(10);
+        $query = $model::with('currentPallet');
+        if ($model === ExportMasterLocation::class) {
+            $query->with('reservation.pallet', 'reservation.palletPlan.deliveryPlan')->withExists('plannedPallets');
+        }
+        $locations = $query->orderBy('code')->paginate(10);
 
         return view('admin.locations.index', $this->context() + compact('locations'));
     }
@@ -68,6 +72,9 @@ class MasterLocationController extends Controller
         try {
             DB::transaction(function () use ($request, $location, $validated, $model) {
                 $locked = $model::whereKey($location->id)->lockForUpdate()->firstOrFail();
+                if ($locked instanceof ExportMasterLocation && $locked->plannedPallets()->exists()) {
+                    throw new \RuntimeException('Lokasi ini tercatat pada perencanaan pallet; identitasnya tidak dapat diubah.');
+                }
                 if ($locked->is_occupied) {
                     throw new \RuntimeException('Gagal edit! Lokasi ini sedang terisi.');
                 }
@@ -94,6 +101,9 @@ class MasterLocationController extends Controller
         try {
             DB::transaction(function () use ($location, $model) {
                 $locked = $model::whereKey($location->id)->lockForUpdate()->firstOrFail();
+                if ($locked instanceof ExportMasterLocation && $locked->plannedPallets()->exists()) {
+                    throw new \RuntimeException('Lokasi ini tercatat pada perencanaan pallet dan tidak dapat dihapus.');
+                }
                 if (($locked->is_occupied && $locked->current_pallet_id) || $locked->stockLocations()->exists()) {
                     throw new \RuntimeException('Gagal hapus! Lokasi ini sedang digunakan.');
                 }
@@ -114,6 +124,7 @@ class MasterLocationController extends Controller
         $search = $request->query('q');
         $model = $this->modelClass();
         $query = $model::where('is_occupied', false);
+        if ($model === ExportMasterLocation::class) $query->whereDoesntHave('reservation');
         if ($search) {
             $query->where('code', 'like', "%{$search}%");
         }

@@ -45,7 +45,7 @@ php artisan db:seed --class=ExportOperatorSeeder
 
 - Email: `export@warehouse.local`
 - Password awal: `password`
-- Role: `export_operator` (Operator Export), akses bawaan Rencana Delivery dan master ekspor.
+- Role: `export_operator` (Operator Export), akses bawaan Rencana Delivery, Perencanaan Pallet dan master ekspor.
 
 Seeder ini juga dipanggil oleh `UserSeeder`. Seeding ulang mempertahankan akun
 existing, termasuk password dan status aktif yang sudah diperbarui. Perintah
@@ -69,18 +69,29 @@ yang memahami lingkup data. Rollback ke query lama yang belum memfilter scope
 dapat mencampurkan master. Migration scope sengaja mempertahankan struktur saat
 rollback agar identitas dan data kedua lingkup tidak hilang.
 
-## Rencana Delivery Ekspor dan OCR browser
+## Rencana Delivery Ekspor
 
 Target penggunaan adalah Chrome desktop. Operator Export mengisi customer,
-batas tanggal pengiriman, nomor part dan jumlah PCS. Isi master nomor part
+batas tanggal pengiriman, kode rencana, nomor part dan jumlah PCS. Isi master nomor part
 ekspor terlebih dahulu. Kapasitas dan total box dihitung otomatis; jumlah
-nonkelipatan kapasitas ditolak. Rencana saat ini disimpan sebagai draft;
-perencanaan pallet belum termasuk tahap ini.
+nonkelipatan kapasitas ditolak. Rencana delivery disimpan sebagai draft;
+pembagiannya tersedia melalui menu Perencanaan Pallet Ekspor.
 
 Jalankan seluruh migration baru sebelum membuka fitur. Migration
 2026_10_28_000004_create_export_delivery_plans membuat tabel rencana/item dan
 mengaktifkan izin export_delivery_plans pada pengaturan Operator Export existing.
 Tidak perlu menjalankan ulang seluruh seeder pada production.
+
+Migration 2026_10_28_000005_add_plan_code_to_export_delivery_plans menambahkan
+kode rencana nullable dan index pencarian. Rencana lama tetap mempunyai kode
+kosong sampai dilengkapi. Kode dapat diisi manual atau dibaca dari header dokumen.
+
+Migration 2026_10_28_000006_create_export_pallet_planning menambahkan perencanaan
+dan reservasi lokasi. Operator Export menyusun pallet dan lokasi, menyimpan draft,
+lalu finalisasi jika seluruh alokasi sesuai. Izin export_pallet_plans ditambahkan
+ke pengaturan role yang tersimpan. Detail revisi, pembatalan, dan batas tahap
+pengerjaan tersedia di docs/EXPORT_PALLET_PLANNING.md. Tidak ada migrasi atau
+input stok fisik ekspor dalam modul ini.
 
 Untuk membangun aset:
 
@@ -89,25 +100,40 @@ npm ci
 npm run build
 ```
 
-Build menyalin model bahasa, worker, WebAssembly Tesseract, dan OpenCV.js dari
-dependency yang dikunci di package-lock.json ke public/vendor/ocr. Direktori
-ini diabaikan Git dan dibuat ulang saat build. Jika build dilakukan di CI atau
-komputer lain, sertakan **public/build dan public/vendor/ocr** dalam deployment.
-Node hanya diperlukan saat build; pembacaan foto berjalan di browser pengguna.
-Tidak perlu instalasi OCR/Python pada server, API key, atau layanan OCR terpisah.
-
-Impor foto mendukung JPG/PNG/WebP maksimal 10 MB dan 40 megapiksel, dokumen cetak
-dengan layout tabel contoh. Foto tetap berada di browser; hanya field yang sudah
-diperiksa yang dikirim saat simpan. Pembacaan pertama memuat aset/model lokal
-dan dapat lebih lambat. Tulisan tangan serta layout bebas belum didukung.
+Sertakan **public/build** dalam deployment jika build dilakukan di CI atau
+komputer lain. Node hanya diperlukan saat build. Input rencana tersedia melalui
+form manual atau impor Excel. Fitur pembacaan foto dan dependency OCR sudah
+dihapus atas permintaan pengguna pada 28 Oktober 2026; aset vendor/ocr tidak
+lagi dibuat atau diperlukan.
 
 Impor Excel mendukung .xlsx/.xls maksimal 5 MB, 500 part, satu sheet berisi satu
 customer. Gunakan template yang disediakan. Isi file dikirim ke endpoint preview
 aplikasi, tanpa menyimpan workbook sebagai arsip. Formula tidak dihitung ulang;
-gunakan nilai atau hasil formula yang sudah disimpan Excel. Kedua sumber impor
+gunakan nilai atau hasil formula yang sudah disimpan Excel. Hasil impor
 menampilkan field yang dapat dikoreksi dan meminta konfirmasi sebelum disimpan.
+
+Pada format contoh dengan kolom QTY(PCS) dan Qty2(Pcs), jumlah memakai QTY(PCS)
+(kolom C), bukan Qty2(Pcs). Baris jumlah kosong/nol diabaikan dengan peringatan
+jumlah masing-masing. Footer total box tidak dipakai; total tetap dihitung dari
+jumlah part dan kapasitas master ekspor.
 
 Kapasitas tiap item disimpan sebagai snapshot; perubahan master tidak mengubah
 perhitungan rencana lama. Part yang dipakai rencana tidak dapat diganti kodenya
 atau dihapus, termasuk jika rencana diarsipkan. Migration rencana sengaja
 menolak rollback otomatis agar histori tidak hilang; rollback perlu ditinjau.
+
+## Pembaruan Pemenuhan Permintaan Ekspor (29 Oktober 2026)
+
+Setelah migration ekspor sebelumnya tersedia, modul pemantauan memerlukan:
+
+```powershell
+php artisan migrate --path=database/migrations/2026_10_29_000001_create_export_fulfillment_monitoring.php
+```
+
+Migration ini menambah penanda rencana yang pernah final, tabel komitmen box
+kosong, dan izin `export_fulfillment` pada pengaturan Operator Export existing.
+Rencana final muncul otomatis di Pengiriman Ekspor / Pemenuhan Permintaan.
+Tidak perlu konfigurasi PC atau layanan tambahan. Input/scan dan penerimaan
+stok ekspor belum merupakan bagian tahap ini. Rincian: docs/EXPORT_FULFILLMENT.md.
+Jangan menjalankan migration QA/packing yang belum ditinjau hanya untuk modul
+ini. Pada MySQL lokal stock, migration ini sudah teramati tersedia saat verifikasi.

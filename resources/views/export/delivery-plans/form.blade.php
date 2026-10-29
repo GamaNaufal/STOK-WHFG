@@ -9,7 +9,7 @@
     $initialRows = old('items', $rows) ?: [['part_number' => '', 'pcs_quantity' => '']];
     $initialSource = old('source_type', $plan?->source_type ?? 'manual');
 @endphp
-<div class="delivery-plan-page" id="delivery-plan-editor" data-import-url="{{ route('export.delivery-plans.import-excel') }}" data-ocr-base="{{ asset('vendor/ocr') }}">
+<div class="delivery-plan-page" id="delivery-plan-editor" data-import-url="{{ route('export.delivery-plans.import-excel') }}">
     <header class="plan-header">
         <div>
             <a class="plan-back" href="{{ route('export.delivery-plans.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Rencana delivery</a>
@@ -30,7 +30,6 @@
             <div class="plan-input-methods" aria-label="Cara mengisi rencana">
                 <button type="button" class="btn btn-outline-secondary is-selected" data-input-mode="manual" aria-pressed="true">Isi manual</button>
                 <button type="button" class="btn btn-outline-secondary" data-input-mode="excel" aria-pressed="false"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Dari Excel</button>
-                <button type="button" class="btn btn-outline-secondary" data-input-mode="photo" aria-pressed="false"><i class="bi bi-image" aria-hidden="true"></i> Dari foto</button>
             </div>
             <div id="plan-excel-panel" class="plan-import-panel" hidden>
                 <label class="form-label" for="plan-excel-file">File Excel</label>
@@ -41,21 +40,10 @@
                     <a class="btn btn-outline-secondary" href="{{ route('export.delivery-plans.template') }}">Unduh template Excel</a>
                 </div>
             </div>
-            <div id="plan-photo-panel" class="plan-import-panel" hidden>
-                <label class="form-label" for="plan-photo-file">Foto rencana delivery</label>
-                <input class="form-control" type="file" id="plan-photo-file" accept="image/jpeg,image/png,image/webp" aria-describedby="photo-help">
-                <p class="plan-help" id="photo-help">Dokumen cetak dengan layout yang sama, maksimal 10 MB. Pastikan tabel utuh dan tulisan jelas. Foto dibaca di komputer Anda.</p>
-                <div id="plan-photo-preview" class="plan-photo-preview" hidden>
-                    <img id="plan-photo-image" alt="Foto dokumen yang akan dibaca">
-                    <div class="plan-inline-actions">
-                        <button type="button" class="btn btn-outline-secondary" id="plan-rotate-left" aria-label="Putar foto ke kiri"><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Putar kiri</button>
-                        <button type="button" class="btn btn-outline-secondary" id="plan-rotate-right" aria-label="Putar foto ke kanan"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Putar kanan</button>
-                    </div>
-                </div>
-                <div class="plan-inline-actions"><button type="button" class="btn btn-primary" id="plan-read-photo">Baca foto</button></div>
-                <progress id="plan-photo-progress" max="100" value="0" aria-label="Progres pembacaan foto" hidden></progress>
-            </div>
             <p id="plan-import-status" class="plan-import-status" role="status" aria-live="polite"></p>
+            <div id="plan-import-warnings" class="alert alert-warning mt-3 mb-0" role="status" aria-live="polite" hidden>
+                <strong>Periksa hasil impor</strong><ul id="plan-warning-list" class="mb-0 mt-2"></ul>
+            </div>
             <button type="button" class="btn btn-sm btn-outline-secondary" id="plan-undo-import" hidden>Batalkan hasil impor</button>
         </div>
     </section>
@@ -67,8 +55,12 @@
         <input type="hidden" name="source_type" id="plan-source-type" value="{{ $initialSource }}">
         <input type="hidden" name="source_name" id="plan-source-name" value="{{ old('source_name', $plan?->source_name) }}">
         <section class="plan-panel" aria-labelledby="plan-customer-title">
-            <div class="plan-panel-heading"><div><h2 id="plan-customer-title">Tujuan pengiriman</h2><p>Lengkapi customer dan batas tanggal pengiriman.</p></div></div>
+            <div class="plan-panel-heading"><div><h2 id="plan-customer-title">Tujuan pengiriman</h2><p>Lengkapi kode rencana, customer dan batas tanggal pengiriman.</p></div></div>
             <div class="plan-panel-body plan-fields">
+                <div><label class="form-label" for="plan-code">Kode rencana delivery</label>
+                    <input type="text" class="form-control" name="plan_code" id="plan-code" maxlength="100" value="{{ old('plan_code', $plan?->plan_code) }}" placeholder="Contoh: RDYR0925" autocomplete="off" aria-describedby="plan-code-help">
+                    <p class="plan-help" id="plan-code-help">Diambil dari dokumen jika terbaca. Dapat diisi atau dikoreksi secara manual.</p>
+                </div>
                 <div><label class="form-label" for="plan-customer">Nama customer</label>
                     <input type="text" class="form-control" name="customer_name" id="plan-customer" maxlength="255" value="{{ old('customer_name', $plan?->customer_name) }}" required autocomplete="off">
                 </div>
@@ -95,7 +87,7 @@
             </div>
         </section>
         <section class="plan-review" id="plan-review" @if($initialSource === 'manual') hidden @endif>
-            <label for="plan-reviewed"><input class="form-check-input" type="checkbox" name="reviewed" id="plan-reviewed" value="1" @checked(old('reviewed', $plan ? '1' : '') === '1')> Saya sudah mencocokkan customer, tanggal, nomor part, dan jumlah PCS dengan dokumen sumber.</label>
+            <label for="plan-reviewed"><input class="form-check-input" type="checkbox" name="reviewed" id="plan-reviewed" value="1" @checked(old('reviewed', $plan ? '1' : '') === '1')> Saya sudah mencocokkan kode rencana, customer, tanggal, nomor part, dan jumlah PCS dengan dokumen sumber.</label>
         </section>
         <div class="plan-save-bar">
             <div><strong>Periksa rencana sebelum menyimpan</strong><p id="plan-save-help">Rencana disimpan sebagai draft. Jumlah box dihitung otomatis.</p></div>
