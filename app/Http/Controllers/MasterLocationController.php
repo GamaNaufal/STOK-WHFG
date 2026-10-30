@@ -28,7 +28,7 @@ class MasterLocationController extends Controller
         $model = $this->modelClass();
         $query = $model::with('currentPallet');
         if ($model === ExportMasterLocation::class) {
-            $query->with('reservation.pallet', 'reservation.palletPlan.deliveryPlan')->withExists('plannedPallets');
+            $query->with('reservation.pallet', 'reservation.palletPlan.deliveryPlan', 'stockPallet')->withExists(['plannedPallets', 'stockPalletHistory']);
         }
         $locations = $query->orderBy('code')->paginate(10);
 
@@ -72,8 +72,8 @@ class MasterLocationController extends Controller
         try {
             DB::transaction(function () use ($request, $location, $validated, $model) {
                 $locked = $model::whereKey($location->id)->lockForUpdate()->firstOrFail();
-                if ($locked instanceof ExportMasterLocation && $locked->plannedPallets()->exists()) {
-                    throw new \RuntimeException('Lokasi ini tercatat pada perencanaan pallet; identitasnya tidak dapat diubah.');
+                if ($locked instanceof ExportMasterLocation && ($locked->plannedPallets()->exists() || $locked->stockPalletHistory()->exists())) {
+                    throw new \RuntimeException('Lokasi ini tercatat pada perencanaan atau stok ekspor; identitasnya tidak dapat diubah.');
                 }
                 if ($locked->is_occupied) {
                     throw new \RuntimeException('Gagal edit! Lokasi ini sedang terisi.');
@@ -101,8 +101,8 @@ class MasterLocationController extends Controller
         try {
             DB::transaction(function () use ($location, $model) {
                 $locked = $model::whereKey($location->id)->lockForUpdate()->firstOrFail();
-                if ($locked instanceof ExportMasterLocation && $locked->plannedPallets()->exists()) {
-                    throw new \RuntimeException('Lokasi ini tercatat pada perencanaan pallet dan tidak dapat dihapus.');
+                if ($locked instanceof ExportMasterLocation && ($locked->plannedPallets()->exists() || $locked->stockPalletHistory()->exists())) {
+                    throw new \RuntimeException('Lokasi ini tercatat pada perencanaan atau stok ekspor dan tidak dapat dihapus.');
                 }
                 if (($locked->is_occupied && $locked->current_pallet_id) || $locked->stockLocations()->exists()) {
                     throw new \RuntimeException('Gagal hapus! Lokasi ini sedang digunakan.');
@@ -124,7 +124,8 @@ class MasterLocationController extends Controller
         $search = $request->query('q');
         $model = $this->modelClass();
         $query = $model::where('is_occupied', false);
-        if ($model === ExportMasterLocation::class) $query->whereDoesntHave('reservation');
+        if ($model === ExportMasterLocation::class) $query->whereDoesntHave('reservation')->whereDoesntHave('stockPallet')
+            ->whereDoesntHave('stockLocations')->whereNull('current_pallet_id');
         if ($search) {
             $query->where('code', 'like', "%{$search}%");
         }

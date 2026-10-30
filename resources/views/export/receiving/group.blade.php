@@ -1,0 +1,22 @@
+<section class="plan-panel receiving-result-group">
+    <div class="plan-panel-heading"><div><h3>{{ $group['planned'] ? 'Pallet '.$group['planned']->position.' · '.$group['planned']->location_code : 'Stok cadangan' }}</h3>@if($group['delivery'])<p class="plan-help">{{ $group['delivery']->plan_code ?? 'Rencana delivery' }} · {{ $group['delivery']->customer_name }} · {{ $group['delivery']->delivery_deadline->format('d/m/Y') }}</p>@endif</div><strong>{{ $group['boxes']->count() }} box</strong></div>
+    <div class="receiving-destination {{ !$group['planned'] && $group['pending']->isNotEmpty() ? 'is-unassigned' : '' }}" @if(!$group['planned'] && $group['pending']->isNotEmpty()) data-spare-guide-destination aria-live="polite" @endif>
+        <p>{{ $group['pending']->isNotEmpty() ? 'Antarkan box ke' : 'Penempatan selesai' }}</p>
+        <div class="receiving-destination-values"><div><span>Pallet tujuan</span><strong data-guide-pallet>{{ $group['planned'] ? 'Pallet '.$group['planned']->position : 'Pallet cadangan' }}</strong></div><div><span>Lokasi tujuan</span><strong data-guide-location>{{ $group['planned']?->location_code ?? ($group['pending']->isNotEmpty() ? 'Belum dipilih' : 'Lihat posisi masing-masing box') }}</strong></div></div>
+        @if(!$group['planned'] && $group['pending']->isNotEmpty())<small>Pilih lokasi atau pallet cadangan di bawah. Pilihan ini akan disertakan saat mencetak panduan.</small>@endif
+    </div>
+    @if($group['load'])<div class="receiving-group-load"><p class="plan-help mb-2">Isi pallet {{ $group['load']['current'] }} box + {{ $group['load']['incoming'] }} box masuk. Total setelah penempatan:</p><x-export-pallet-load :boxes="$group['load']['total']" /></div>@endif
+    <div class="plan-table-scroll" role="region" tabindex="0" aria-label="Daftar box dalam kelompok penempatan"><table class="table plan-table"><thead><tr><th>Nomor box</th><th>Nomor part / PCS</th><th>Posisi saat ini</th><th>Status</th></tr></thead><tbody>@foreach($group['boxes'] as $box)<tr><th scope="row">{{ $box->box_number }}</th><td>{{ $box->part_number }}<small class="fulfillment-customer">{{ number_format($box->pcs_quantity, 0, ',', '.') }} PCS</small></td><td>{{ $box->currentPallet ? $box->currentPallet->display_name.' · '.$box->currentPallet->location_code : 'Belum ditempatkan' }}</td><td>@include('export.receiving.box-status')</td></tr>@endforeach</tbody></table></div>
+    @if($group['pending']->isNotEmpty())
+        <form method="POST" action="{{ route('export.receiving.place-bulk') }}" class="plan-panel-body receiving-group-form" data-placement-form>
+            @csrf
+            @if($batch)<input type="hidden" name="return_batch" value="{{ $batch->id }}">@elseif($returnBox)<input type="hidden" name="return_box" value="{{ $returnBox }}">@endif
+            <input type="hidden" name="placements_json" value="{{ json_encode($group['placements'], JSON_THROW_ON_ERROR) }}">
+            @unless($group['planned'])
+                <label class="form-label" for="group-destination-{{ $group['key'] }}">Penempatan untuk {{ $group['pending']->count() }} box cadangan</label><select class="form-select mb-3" id="group-destination-{{ $group['key'] }}" name="destination" required data-pallet-load-select data-incoming-count="{{ $group['pending']->count() }}"><option value="">Pilih lokasi kosong atau pallet ekspor</option><optgroup label="Lokasi kosong">@foreach($locations as $loc)<option value="location:{{ $loc->id }}" data-box-count="0" data-guide-pallet="Pallet cadangan" data-guide-location="{{ $loc->code }}">{{ $loc->code }} · pallet cadangan baru</option>@endforeach</optgroup><optgroup label="Pallet ekspor existing">@foreach($pallets as $physical)<option value="pallet:{{ $physical->id }}" data-box-count="{{ $physical->boxes_count }}" data-guide-pallet="{{ $physical->display_name }}" data-guide-location="{{ $physical->location_code }}">{{ $physical->display_name }} · {{ $physical->location_code }} · {{ $physical->boxes_count }} box saat ini</option>@endforeach</optgroup></select>
+                @include('export.receiving.destination-load')
+            @endunless
+            <p class="plan-help mb-2">Konfirmasikan hanya setelah semua box pada kelompok ini sudah ditempatkan.</p><button class="btn btn-primary" type="submit">Konfirmasi {{ $group['pending']->count() }} box sudah ditempatkan</button>
+        </form>
+    @else<p class="plan-help receiving-table-note">Penempatan kelompok ini sudah dikonfirmasi.</p>@endif
+</section>

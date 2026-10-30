@@ -90,7 +90,9 @@ class ExportFulfillmentService
             ->join('export_planned_pallet_items as item', 'item.id', '=', 'box.export_planned_pallet_item_id')
             ->join('export_planned_pallets as pallet', 'pallet.id', '=', 'item.export_planned_pallet_id')
             ->where('pallet.export_pallet_plan_id', $plan->id)->exists();
-        if ($exists) {
+        $physicalStock = \App\Models\ExportStockPallet::whereHas('plannedPallet', fn ($q) => $q->where('export_pallet_plan_id', $plan->id))
+            ->whereHas('boxes')->exists();
+        if ($exists || $physicalStock) {
             throw ValidationException::withMessages(['fulfillment' =>
                 'Rencana sudah memiliki reservasi atau penempatan box. Pelepasan reservasi dan pengembalian box harus diselesaikan sebelum revisi atau pembatalan.']);
         }

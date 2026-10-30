@@ -53,6 +53,24 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::put('pallet-plans/{deliveryPlan}', [\App\Http\Controllers\ExportPalletPlanController::class, 'update'])->name('pallet-plans.update');
         Route::post('pallet-plans/{deliveryPlan}/transition', [\App\Http\Controllers\ExportPalletPlanController::class, 'transition'])->name('pallet-plans.transition');
         Route::get('fulfillment', [\App\Http\Controllers\ExportFulfillmentController::class, 'index'])->name('fulfillment.index');
+        Route::get('receiving', [\App\Http\Controllers\ExportStockReceivingController::class, 'index'])->name('receiving.index');
+        Route::get('receiving/transactions/{batch}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'show'])->whereNumber('batch')->name('receiving.transactions.show');
+        Route::get('receiving/transactions/{batch}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printBatch'])->whereNumber('batch')->name('receiving.transactions.print');
+        Route::get('receiving/transactions/box/{stockBox}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'legacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy');
+        Route::get('receiving/transactions/box/{stockBox}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printLegacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy-print');
+        Route::get('stock', [\App\Http\Controllers\ExportStockController::class, 'index'])->name('stock.index');
+        Route::get('stock/{stockBox}', [\App\Http\Controllers\ExportStockController::class, 'show'])->name('stock.show');
+        Route::post('receiving/batches', [\App\Http\Controllers\ExportStockReceivingController::class, 'start'])->name('receiving.batches.start');
+        Route::get('receiving/batches/{batch}', [\App\Http\Controllers\ExportStockReceivingController::class, 'batchState'])->name('receiving.batches.state');
+        Route::post('receiving/batches/{batch}/scan', [\App\Http\Controllers\ExportStockReceivingController::class, 'scan'])->name('receiving.batches.scan');
+        Route::delete('receiving/batches/{batch}/items/{item}', [\App\Http\Controllers\ExportStockReceivingController::class, 'remove'])->name('receiving.batches.remove');
+        Route::delete('receiving/batches/{batch}', [\App\Http\Controllers\ExportStockReceivingController::class, 'discard'])->name('receiving.batches.discard');
+        Route::post('receiving/batches/{batch}/process', [\App\Http\Controllers\ExportStockReceivingController::class, 'process'])->name('receiving.batches.process');
+        Route::post('receiving/place-bulk', [\App\Http\Controllers\ExportStockReceivingController::class, 'placeBulk'])->name('receiving.place-bulk');
+        Route::post('receiving/check-box', [\App\Http\Controllers\ExportStockReceivingController::class, 'checkBox'])->name('receiving.check-box');
+        Route::get('receiving/part', [\App\Http\Controllers\ExportStockReceivingController::class, 'part'])->name('receiving.part');
+        Route::post('receiving', [\App\Http\Controllers\ExportStockReceivingController::class, 'store'])->name('receiving.store');
+        Route::post('receiving/{stockBox}/place', [\App\Http\Controllers\ExportStockReceivingController::class, 'place'])->name('receiving.place');
         Route::get('fulfillment/{deliveryPlan}', [\App\Http\Controllers\ExportFulfillmentController::class, 'show'])->name('fulfillment.show');
     });
 

@@ -47,7 +47,7 @@
 
     // Prepare audio only for scan controls, not navigation or status links.
     function prepare(event) {
-        if (!event.target?.closest?.('#scanForm, #scanInput, #btnScan')) return;
+        if (!event.target?.closest?.('#scanForm, #scanInput, #btnScan, [data-scan-feedback]')) return;
         try {
             const audioContext = getContext();
             if (!audioContext) return;

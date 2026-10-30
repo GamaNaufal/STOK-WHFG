@@ -39,9 +39,9 @@ class ExportPalletPlanController extends Controller
         $summary = $service->requirements($delivery, $rows);
         foreach ($summary as &$row) $row['part_number'] = $catalog->get($row['part_setting_id'])['part_number'] ?? $row['part_number'];
         unset($row);
-        $locations = ExportMasterLocation::with('reservation')->withExists('stockLocations')->orderBy('code')->get()->map(fn ($loc) => [
+        $locations = ExportMasterLocation::with('reservation')->withExists(['stockLocations', 'stockPallet'])->orderBy('code')->get()->map(fn ($loc) => [
             'id' => $loc->id, 'code' => $loc->code,
-            'blocked' => $loc->is_occupied || $loc->current_pallet_id || $loc->stock_locations_exists
+            'blocked' => $loc->is_occupied || $loc->current_pallet_id || $loc->stock_locations_exists || $loc->stock_pallet_exists
                 || ($loc->reservation && $loc->reservation->export_pallet_plan_id !== $planning?->id),
             'reserved' => (bool) $loc->reservation,
         ])->all();

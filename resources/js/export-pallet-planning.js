@@ -1,5 +1,6 @@
 import {parseCount} from './export-delivery/document-parser.mjs';
 import {analyzePallets, availableForRow} from './export-delivery/pallet-planning.mjs';
+import {updatePalletLoad} from './export-stock/pallet-load.mjs';
 
 const page = document.getElementById('pallet-planning-editor');
 if (page) {
@@ -112,13 +113,14 @@ if (page) {
                 fill.title = available ? 'Jadikan ' + format(available) + ' box tanpa mengubah alokasi di pallet lain' : 'Tidak ada sisa kebutuhan untuk baris ini';
             });
             const result = analysis.pallets[i];
-            card.querySelector('.pallet-box-count').textContent = format(result.boxes) + ' box';
+            const loadLevel = updatePalletLoad(card.querySelector('.pallet-box-count'), result.boxes);
             const errors = card.querySelector('.pallet-errors');
             errors.textContent = [...result.errors, ...result.finalErrors].join(' ');
             errors.classList.toggle('text-danger', result.errors.length > 0);
             card.querySelector('.pallet-add-part').disabled = submitting || entries.length >= 500;
             const locationLabel = places.get(String(rows[i].master_location_id))?.code ?? 'Belum ada lokasi';
-            const suffix = result.errors.length ? ' · Periksa isian' : result.finalErrors.length ? ' · Belum lengkap' : '';
+            const suffix = (loadLevel === 'danger' ? ' · Perlu perhatian' : loadLevel === 'warning' ? ' · Peringatan' : '')
+                + (result.errors.length ? ' · Periksa isian' : result.finalErrors.length ? ' · Belum lengkap' : '');
             navigation.options[i].textContent = 'Pallet ' + (i + 1) + ' · ' + locationLabel + ' · ' + format(result.boxes) + ' box' + suffix;
         });
         navigation.value = String(activeIndex);

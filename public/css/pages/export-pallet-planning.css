@@ -71,3 +71,5 @@
 }
 @media(max-width:575.98px) { .pallet-item { grid-template-columns:minmax(0,1fr) 6rem 2.2rem; gap:.45rem; } .pallet-editor-scroll { padding:.8rem; } .pallet-item .pallet-remove-part { min-width:2.2rem; } #pallet-planning-editor .pallet-save-bar { padding:.7rem; } #pallet-planning-editor .pallet-save-bar .plan-inline-actions { display:flex; width:100%; } #pallet-planning-editor .pallet-save-bar .plan-inline-actions .btn { flex:1; font-size:.75rem; } }
 @media(pointer:coarse) { .allocation-pick,.pallet-fill-remaining { min-height:44px; } }
+.pallet-load-legend { margin:0; padding:0 1.25rem .75rem; }
+.pallet-card-heading { flex-wrap:wrap; }

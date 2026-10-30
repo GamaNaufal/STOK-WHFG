@@ -63,23 +63,41 @@ duplikat dan finalisasi. Tampilan diperiksa pada 1440x900, 1366x768 serta simula
 - Batas formulir: 500 pallet, 500 baris per pallet, 5.000 alokasi per perencanaan.
   Payload editor dikirim sebagai JSON agar tidak terpotong max_input_vars PHP.
 
+## Peringatan jumlah box per pallet (30 Oktober 2026)
+
+Jumlah seluruh part pada satu pallet dijumlahkan: 0–35 box tanpa peringatan,
+36–71 box label kuning **Peringatan**, dan mulai 72 box label merah **Perlu
+perhatian**. Ini penanda untuk operator, bukan batas kapasitas. Simpan/finalisasi
+tetap diizinkan jika seluruh validasi alokasi dan lokasi existing terpenuhi.
+
+Label berada di bagian atas pallet aktif dan berubah langsung saat part/jumlah
+diubah; navigator menyertakan status teks. Hasil perencanaan yang disimpan
+memakai threshold yang sama. Aturan juga berlaku pada Penerimaan Transfer Box
+Ekspor dengan proyeksi isi fisik + box yang akan masuk; detail di
+docs/EXPORT_STOCK_RECEIVING.md. Threshold bersumber dari ExportPalletLoad dan
+diteruskan ke JS melalui komponen Blade, tanpa perubahan skema/izin.
+
+38 tes backend terkait (434 assertions), 67 tes frontend dan build lulus.
+Browser Chromium desktop memeriksa 35/36, 71/72 dan simpan draft dua pallet
+dengan part campuran. Data contoh hanya pada SQLite preview.
+
 ## Kesepakatan untuk tahap Pemenuhan Permintaan
 
-Pemantauan dan fondasi catatan per box tersedia sejak 29 Oktober 2026; lihat
-docs/EXPORT_FULFILLMENT.md. Finalisasi memasukkan rencana ke pemantauan, dan
-revisi tetap terlihat meskipun seluruh lokasi dilepas. Rencana yang mempunyai
-komitmen box sementara dilindungi dari revisi/pembatalan sampai pelepasan dan
-pengembalian terhubung. Belum tersedia pada tahap pemantauan ini:
+Pemantauan serta penerimaan/reservasi FIFO tersedia sejak 29 Oktober 2026; lihat
+docs/EXPORT_FULFILLMENT.md dan docs/EXPORT_STOCK_RECEIVING.md. Finalisasi memasukkan
+rencana ke pemantauan dan mereservasi stok ekspor tersedia. Revisi tetap terlihat
+meskipun seluruh lokasi dilepas, tetapi rencana dengan komitmen/stock fisik masih
+dilindungi sampai alur pelepasan dan pengembalian karena revisi terhubung.
+Kesepakatan penerimaan dan tahap berikutnya:
 
-- Box baru membawa nomor box, nomor part dan jumlah PCS. Penerimaan nantinya
-  menambah stok ekspor dan mengarahkan box ke lokasi pallet yang direncanakan.
+- Scan nomor box dan part; PCS dari master ekspor. Penerimaan menambah catatan
+  received, lalu konfirmasi menempatkan stok fisik di lokasi yang ditentukan.
 - Operator tidak memilih delivery; kebutuhan diprioritaskan menurut tenggat
   pengiriman terdekat, lalu nomor pallet terkecil dalam delivery tersebut.
 - Box tanpa kebutuhan yang cocok boleh diterima sebagai stok cadangan dengan
   memilih lokasi/pallet yang tersedia.
-- Pemeriksaan stok ekspor tersedia harus mendahulukan box FIFO dan mereservasi
-  box yang dipilih. Inventory ekspor serta reservasi per nomor box belum dibuat;
-  jangan memakai inventory domestik sebagai stok ekspor secara otomatis.
+- Pemeriksaan stok ekspor memakai FIFO dan reservasi unik per box. Inventory
+  ekspor tersendiri; jangan memakai stok domestik sebagai stok ekspor otomatis.
 - FIFO memakai tanggal pertama box diterima gudang. Pemindahan/pengembalian
   mempertahankan tanggal asal. Jika kebutuhan turun, keluarkan box terbaru dahulu
   agar box tertua tetap diprioritaskan untuk pengiriman.

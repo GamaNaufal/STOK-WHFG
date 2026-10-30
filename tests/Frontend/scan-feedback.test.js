@@ -33,6 +33,6 @@ test('status navigation does not fetch scan audio, while scan controls prepare i
     listeners.get('keydown')({ target: navigation });
     assert.deepEqual(requests, []);
 
-    listeners.get('pointerdown')({ target: { closest: () => ({}) } });
+    listeners.get('pointerdown')({ target: { closest: selector => selector.includes('[data-scan-feedback]') ? {} : null } });
     assert.deepEqual(requests, ['/audio/OK.mp3', '/audio/NG.mp3']);
 });

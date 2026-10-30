@@ -34,6 +34,10 @@
 
 - Login via `/login`.
 - Role menentukan menu yang tampil.
+- Aset UI bersama disertakan lokal di public/vendor. Saat deploy, sertakan
+  seluruh folder tersebut serta public/css/layout-shell.css,
+  public/js/layout-shell.js dan public/js/toast.js. Tidak perlu unduhan dari PC
+  operator. Rincian benchmark dan cache production: docs/PERFORMANCE_NAVIGATION.md.
 
 ## Akun awal Operator Export
 
@@ -133,7 +137,68 @@ php artisan migrate --path=database/migrations/2026_10_29_000001_create_export_f
 Migration ini menambah penanda rencana yang pernah final, tabel komitmen box
 kosong, dan izin `export_fulfillment` pada pengaturan Operator Export existing.
 Rencana final muncul otomatis di Pengiriman Ekspor / Pemenuhan Permintaan.
-Tidak perlu konfigurasi PC atau layanan tambahan. Input/scan dan penerimaan
-stok ekspor belum merupakan bagian tahap ini. Rincian: docs/EXPORT_FULFILLMENT.md.
+Tidak perlu konfigurasi PC atau layanan tambahan. Pemantauan bersifat read-only;
+input/scan tersedia melalui modul penerimaan pada bagian berikutnya.
+Rincian: docs/EXPORT_FULFILLMENT.md.
 Jangan menjalankan migration QA/packing yang belum ditinjau hanya untuk modul
 ini. Pada MySQL lokal stock, migration ini sudah teramati tersedia saat verifikasi.
+
+## Penerimaan Box Ekspor (29 Oktober 2026)
+
+Setelah migration pemenuhan di atas tersedia, jalankan secara terarah:
+
+```powershell
+php artisan migrate --path=database/migrations/2026_10_29_000002_create_export_stock_receiving.php
+npm run build
+```
+
+Sertakan public/build dan CSS halaman baru pada deployment. Migration menambah
+empat tabel inventory ekspor, FK komitmen nullable dan izin export_stock_input;
+stok domestik tidak disalin. Modul memakai scan nomor box lalu part, PCS dari
+master ekspor, konfirmasi penempatan, serta FIFO stok lama. Nomor box boleh sama
+lintas lingkup. Tidak perlu konfigurasi PC/layanan baru. Migration ini sudah
+teramati tersedia pada MySQL lokal stock saat verifikasi. Detail dan batas alur:
+docs/EXPORT_STOCK_RECEIVING.md. Jangan menjalankan cutover QA/packing yang belum
+ditinjau hanya untuk mengaktifkan penerimaan ekspor.
+
+## Penerimaan Bulk dan Halaman Stok Ekspor (29 Oktober 2026)
+
+Sesudah migration penerimaan 000002 tersedia:
+
+```powershell
+php artisan migrate --path=database/migrations/2026_10_29_000003_create_export_receiving_batches.php
+npm run build
+```
+
+Migration hanya menambah export_receiving_batches dan export_receiving_batch_items;
+tidak perlu seeder/permission baru. Sudah diterapkan pada MySQL lokal stock dengan
+jumlah data existing tetap. Untuk production jalankan migration terarah tersebut,
+sertakan public/build, CSS penerimaan dan public/js/scan-feedback.js terbaru.
+
+Operator scan banyak pasangan nomor box/part dahulu, lalu Proses penerimaan
+untuk melihat kelompok lokasi/pallet. Draft tersimpan setelah refresh, maksimal
+1.000 box, dan belum masuk stok sebelum diproses. Indikator/audio OK/NG sama
+dengan Stock Input. Menu Stok Ekspor tersendiri berada di /export/stock; memakai
+izin export_stock_input existing. Tidak memerlukan library, layanan, atau
+konfigurasi PC tambahan. Detail transaksi/FIFO: docs/EXPORT_STOCK_RECEIVING.md.
+
+Antrean kini satu baris per transaksi penerimaan. Atur penempatan membuka halaman
+khusus pada /export/receiving/transactions/{batch}; penerimaan lama tanpa batch
+tetap tersedia. Perubahan ini memakai schema/izin existing, tanpa migration
+atau seeder tambahan. Sertakan controller/service/view/rute terbaru dan bangun
+ulang cache rute saat deployment jika sebelumnya memakai route cache.
+
+Pembaruan 30 Oktober 2026 menambah sorotan tujuan dan panduan cetak per
+transaksi. Sertakan ExportPlacementGuideService, controller/rute/view transaksi
+terbaru, public/css/pages/export-placement-guide.css, CSS penerimaan dan hasil
+`npm run build` pada deployment. Bangun ulang cache rute jika digunakan.
+Tidak ada migration, seeder, dependency runtime atau konfigurasi PC tambahan.
+Operator membuka Cetak panduan lalu Cetak / simpan PDF melalui Chrome;
+pilihan lokasi cadangan ikut cetakan tanpa mengonfirmasi stok.
+
+Nama menu menjadi Penerimaan Transfer Box Ekspor; rebuild config cache bila
+deployment memakai config:cache agar label baru tampil. Peringatan jumlah box
+per pallet (kuning mulai 36, merah mulai 72) memerlukan App\Support\ExportPalletLoad,
+komponen Blade export-pallet-load, view/CSS terbaru dan public/build hasil build.
+Tidak ada migration, seeder atau konfigurasi PC tambahan. Threshold hanya
+peringatan; validasi dan izin existing tetap digunakan.

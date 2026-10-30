@@ -90,6 +90,9 @@ class FeatureAccessService
                 if ($key === 'reports') {
                     $items[] = ['key' => $key, 'label' => 'Laporan Pengambilan', 'group' => 'Laporan', 'icon' => 'file-earmark-text', 'route' => 'reports.withdrawal'];
                 }
+                if ($key === 'export_stock_input') {
+                    $items[] = ['key' => $key, 'label' => 'Stok Ekspor', 'group' => 'Pengiriman Ekspor', 'icon' => 'box-seam', 'route' => 'export.stock.index'];
+                }
             }
         }
 

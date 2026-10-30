@@ -20,6 +20,9 @@ class ExportMasterLocation extends MasterLocation
         return $this->hasMany(ExportPlannedPallet::class, 'master_location_id');
     }
 
+    public function stockPallet() { return $this->hasOne(ExportStockPallet::class, 'master_location_id')->whereNull('retired_at'); }
+    public function stockPalletHistory() { return $this->hasMany(ExportStockPallet::class, 'initial_location_id'); }
+
     public function scopeAvailable($query)
     {
         return parent::scopeAvailable($query)->whereDoesntHave('reservation');

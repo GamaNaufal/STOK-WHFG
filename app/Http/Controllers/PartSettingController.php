@@ -27,6 +27,8 @@ class PartSettingController extends Controller
     {
         if ($part->scope === 'export') {
             return DB::table('export_delivery_plan_items')->where('part_setting_id', $part->id)->exists()
+                || DB::table('export_receiving_batch_items')->where('part_setting_id', $part->id)->exists()
+                || DB::table('export_stock_boxes')->where('part_setting_id', $part->id)->exists()
                 || DB::table('export_planned_pallet_items')->where('part_setting_id', $part->id)->exists();
         }
 

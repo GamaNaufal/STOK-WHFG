@@ -4,10 +4,11 @@ Verifikasi 29 Oktober 2026, branch aktif Export-plan.
 
 ## Cakupan tahap ini
 
-Halaman pemantauan dan fondasi pencatatan per nomor box sudah tersedia. Tahap ini
-belum menyediakan input/scan box, penerimaan stok ekspor, pemilihan box FIFO
-otomatis, pemindahan, atau pengembalian. Tidak ada penghitungan stok domestik
-sebagai pemenuhan ekspor dan tidak ada tombol untuk menaikkan jumlah secara manual.
+Halaman pemantauan terhubung ke Penerimaan Transfer Box Ekspor sejak 29 Oktober 2026 (nama menu diperbarui 30 Oktober).
+Scan dua langkah, stok ekspor, reservasi FIFO dan konfirmasi penempatan dijelaskan
+di docs/EXPORT_STOCK_RECEIVING.md. Tidak ada penghitungan stok domestik sebagai
+pemenuhan ekspor dan tidak ada tombol untuk menaikkan jumlah secara manual.
+Pengembalian karena revisi/pembatalan masih tahap berikutnya.
 
 - Izin `export_fulfillment`, bawaan Operator Export dan dapat diatur melalui
   Hak Akses. Tidak bergantung pada izin mengubah delivery atau perencanaan.
@@ -54,8 +55,11 @@ penghapusan referensi. Nomor box dipertahankan sebagai string termasuk nol awal.
 - Status Terpenuhi memerlukan seluruh kebutuhan sesuai, tanpa ketidaksesuaian
   atau kelebihan. Terpenuhi pada tahap ini bukan status sudah dikirim/withdrawn.
 
-Saat ini tabel operasional baru tetap kosong sampai modul penerimaan terhubung.
-Contoh dengan angka nonnol hanya berada pada database preview dan tes.
+Modul penerimaan menulis komitmen dengan export_stock_box_id. Pada pembaruan
+bulk 29 Oktober, scan tersimpan sebagai draft dan belum dihitung sebagai stok
+atau pemenuhan. Proses penerimaan seluruh daftar membuat stok/reservasi; hanya
+konfirmasi penempatan kelompok atau box yang menambah terpenuhi. Stok dan
+antrean fisik tersedia di /export/stock; lihat docs/EXPORT_STOCK_RECEIVING.md.
 
 ## Perlindungan revisi dan integrasi tahap berikutnya
 
@@ -65,18 +69,19 @@ Perubahan delivery yang sudah mulai ditulis dibatalkan oleh transaksi yang sama
 jika pemeriksaan komitmen gagal. Ini pembatasan sementara sampai alur pelepasan
 reservasi/pengembalian tersedia, bukan pengganti proses pengembalian fisik.
 
-Modul penerimaan berikutnya harus mengunci delivery lalu perencanaan sebelum
+Modul penerimaan mengunci mutex ekspor sebelum delivery/perencanaan dan stok.
+Alur lanjutan harus mempertahankan urutan tersebut sebelum
 menulis komitmen, memvalidasi seluruh data, mencegah kelebihan/duplikat secara
-atomik, dan mencatat audit pada transaksi yang sama. Tidak ada endpoint write
-untuk catatan komitmen pada tahap pemantauan ini. Riwayat pelepasan harus diaudit
+atomik, dan mencatat audit pada transaksi yang sama. Endpoint pemantauan tetap
+read-only; mutasi tersedia melalui penerimaan. Riwayat pelepasan harus diaudit
 sebelum catatan komitmen aktif diubah/dilepas.
 
 Kesepakatan berikutnya tetap: pilih delivery final bertenggat terdekat lalu nomor
 pallet terkecil; FIFO berdasarkan tanggal pertama diterima; reservasi box stok
 tersedia; stok cadangan memakai lokasi/pallet pilihan. Revisi harus mempertahankan
 FIFO dan mengembalikan box terbaru terlebih dahulu ke lokasi/pallet pilihan.
-Keunikan identitas box lintas domestik/ekspor dan format payload scanner perlu
-dipastikan pada tahap input box. Pemantauan ini tidak mengalihkan peruntukan box.
+Identitas box sudah diputuskan terpisah lintas domestik/ekspor; scan box lalu
+nomor part dengan PCS master ekspor. Pemantauan tidak mengalihkan peruntukan box.
 
 ## Deployment dan verifikasi
 

@@ -1,0 +1,47 @@
+@page { size:A4 portrait; margin:12mm; }
+* { box-sizing:border-box; }
+body { margin:0; background:#eef0f2; color:#111; font-family:Arial,"DejaVu Sans",sans-serif; font-size:10pt; line-height:1.35; }
+.guide-toolbar { max-width:210mm; margin:1rem auto; display:flex; justify-content:space-between; gap:1rem; padding:0 1rem; }
+.guide-toolbar a,.guide-toolbar button { display:inline-block; font:inherit; padding:.7rem 1rem; min-height:44px; border:1px solid #0b7072; border-radius:6px; background:#fff; color:#0b7072; text-decoration:none; cursor:pointer; }
+.guide-toolbar button { background:#0b7072; color:#fff; }
+.guide-sheet { width:210mm; max-width:100%; margin:0 auto 1.5rem; padding:12mm; background:#fff; }
+.guide-header { border-bottom:2px solid #111; padding-bottom:3mm; margin-bottom:3mm; }
+.guide-header p { margin:0 0 2mm; font-size:8pt; font-weight:bold; }
+.guide-header h1 { margin:0; font-size:19pt; }
+.guide-code { display:block; margin-top:1mm; font-size:14pt; }
+.guide-meta { width:100%; border-collapse:collapse; font-size:8pt; margin:0 0 4mm; }
+.guide-meta th,.guide-meta td { text-align:left; vertical-align:top; padding:1mm 2mm 1mm 0; overflow-wrap:anywhere; }
+.guide-meta th { width:17%; }
+.guide-meta td { width:33%; }
+.guide-warning { border:2px dashed #754c0b; padding:3mm; font-weight:bold; background:#fff8e7; }
+.guide-complete { padding:2mm 0; font-weight:bold; }
+.guide-table { width:100%; table-layout:auto; border-collapse:collapse; margin:3mm 0 4mm; page-break-inside:auto; }
+.guide-table th,.guide-table td { border:1px solid #777; padding:1.5mm 2mm; vertical-align:middle; text-align:left; overflow-wrap:anywhere; word-wrap:break-word; }
+.guide-table thead { display:table-header-group; }
+.guide-table tr { break-inside:avoid; page-break-inside:avoid; }
+.guide-table thead tr:last-child { font-size:8pt; background:#f2f3f4; }
+.guide-table .guide-destination { border:2px solid #111; padding:2.5mm; background:#e8f3f1; }
+.guide-section-label { display:block; font-size:8pt; margin-bottom:1mm; }
+.guide-target-pallet { display:inline-block; font-size:15pt; line-height:1.2; margin-right:6mm; }
+.guide-target-location { display:inline-block; font-size:19pt; line-height:1.25; }
+.guide-delivery { display:block; font-size:8pt; font-weight:normal; margin-top:1mm; }
+.guide-load { display:block; font-size:9pt; font-weight:bold; margin-top:2mm; padding:1mm 2mm; border:1px solid #111; }
+.guide-destination.is-unassigned { background:#fff8e7; border-style:dashed; }
+.guide-table .col-number { width:7%; }.guide-table .col-box { width:19%; }.guide-table .col-pcs { width:9%; }.guide-table .col-check { width:10%; }
+.guide-table .col-part { width:25%; }.guide-table .col-source { width:30%; }
+.guide-box { font-size:10pt; font-variant-numeric:tabular-nums; }
+.guide-table td { font-size:8.5pt; }
+.guide-table small { display:block; font-size:7pt; margin-top:1mm; }
+.guide-table .number { text-align:right; }
+.guide-table .check-cell { text-align:center; font-size:8pt; }
+.paper-check { display:inline-block; width:4mm; height:4mm; border:1px solid #111; }
+.guide-footer { border-top:1px solid #777; padding-top:3mm; font-size:8pt; }
+@media print {
+    body { background:#fff; }
+    .no-print { display:none !important; }
+    .guide-sheet { width:auto; max-width:none; margin:0; padding:0; }
+    .guide-table .guide-destination { background:#fff; border-color:#000; }
+    .guide-table th,.guide-table td { border-color:#444; }
+    .guide-table thead tr:last-child { background:#fff; }
+    .guide-warning { background:#fff; color:#111; border-color:#111; }
+}

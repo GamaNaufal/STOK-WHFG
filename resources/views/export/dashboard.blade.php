@@ -26,6 +26,12 @@
             <x-dashboard-action icon="clipboard-data" title="Pemenuhan Permintaan" description="Pantau kebutuhan, reservasi box, dan penempatan per pallet" route-name="export.fulfillment.index" label="Pantau pemenuhan" />
         </ul>
     @endif
+    @if(auth()->user()->canAccess('export_stock_input'))
+        <ul class="dashboard-actions" aria-label="Penerimaan transfer box ekspor">
+            <x-dashboard-action icon="upc-scan" title="Penerimaan Transfer Box Ekspor" description="Scan box dan part, lalu ikuti penempatan sesuai kebutuhan dan FIFO" route-name="export.receiving.index" label="Terima box" />
+            <x-dashboard-action icon="box-seam" title="Stok Ekspor" description="Lihat stok fisik, cadangan, dan antrean penempatan ekspor" route-name="export.stock.index" label="Lihat stok ekspor" />
+        </ul>
+    @endif
     <h2 class="dashboard-section-title">Master data ekspor</h2>
     @if(auth()->user()->canAccess('export_parts') || auth()->user()->canAccess('export_locations'))
         <ul class="dashboard-actions" aria-label="Master data ekspor">

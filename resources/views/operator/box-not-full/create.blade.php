@@ -3,7 +3,7 @@
 @section('title', 'Box Not Full - Warehouse FG Yamato')
 
 @section('styles')
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link href="{{ asset('vendor/select2-4.1.0-rc.0/dist/css/select2.min.css') }}" rel="stylesheet" />
     <link rel="stylesheet" href="{{ asset('css/not-full.css') }}">
 @endsection
 
@@ -210,7 +210,7 @@
 @endsection
 
 @section('scripts')
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+    <script src="{{ asset('vendor/jquery-3.7.1/dist/jquery.min.js') }}"></script>
+    <script src="{{ asset('vendor/select2-4.1.0-rc.0/dist/js/select2.min.js') }}"></script>
 <script src="{{ asset('js/pages/not-full.js') }}"></script>
 @endsection

@@ -1,6 +1,208 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 29 Oktober 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 30 Oktober 2026 (pembaruan inkremental).
+
+Verifikasi Nama Transfer dan Peringatan Muatan Pallet 30 Oktober 2026:
+- Nama fitur sekarang Penerimaan Transfer Box Ekspor pada menu/hak akses,
+  dashboard, judul halaman dan tautan stok. Key export_stock_input, URL,
+  identitas, izin, transaksi dan alur FIFO tidak berubah; tanpa migration/seeder.
+- App\Support\ExportPalletLoad menetapkan kuning untuk 36–71 box dan merah
+  mulai 72 box. Komponen export-pallet-load menyediakan threshold bagi JS
+  export-stock/pallet-load.mjs. Ini peringatan, bukan hard limit/pemblokiran.
+- Editor menjumlah seluruh part per pallet dan memperbarui label langsung di
+  atas lokasi/part, termasuk status teks pada navigator. Hasil simpan juga
+  menampilkan label. Validasi alokasi/lokasi/finalisasi existing dipertahankan.
+- Penempatan cadangan menampilkan jumlah fisik saat ini + box yang akan masuk
+  dalam kelompok tersebut. Berlaku pada bulk transaksi, penerimaan lama dan
+  relokasi/detail box yang dimuat di modal (delegated change). Pergantian ke
+  lokasi kosong/placeholder menghapus indikator pilihan lama.
+- Kelompok tujuan rencana memakai agregat fisik seluruh transaksi di pallet
+  tersebut + anggota pending kelompok yang belum berada di tujuan. Box yang
+  sudah di sana tidak dihitung dua kali. Agregat target diambil satu query
+  untuk seluruh kelompok; scan/daftar stok tanpa detail tidak memuat katalog.
+- Panduan cetak menampilkan teks peringatan berdasarkan proyeksi kelompok
+  saat dibuka; tetap read-only. Angka merupakan snapshot, bukan batas kapasitas
+  atau reservasi baru. Tidak ada perubahan proses penerimaan/penempatan fisik.
+- 38 tes backend (434 assertions), 67 tes frontend dan Vite build lulus.
+  Browser Chromium memeriksa 35/36 dan 71/72, simpan draft dua part dengan
+  label hasil, 34+2/70+2 pada bulk, 70+1 pada modal, dan peringatan cetak;
+  tanpa error konsol. Contoh hanya pada SQLite preview; MySQL/production
+  tidak diubah. Tampilan desktop diperiksa; bukan uji perangkat/printer fisik.
+
+Verifikasi Sorotan Tujuan dan Panduan Cetak Ekspor 30 Oktober 2026:
+- Halaman transaksi menonjolkan Antarkan box ke, nomor pallet dan lokasi di
+  atas daftar box. Cadangan mengikuti pilihan operator secara langsung;
+  belum dipilih ditandai eksplisit, bukan memakai nomor internal EX sebagai tujuan.
+- Cetak tersedia per transaksi pada antrean dan detail, termasuk penerimaan
+  lama tanpa batch. GET transactions/{batch}/print dan
+  transactions/box/{stockBox}/print memakai izin export_stock_input existing,
+  menolak draft, dan mengirim private/no-store. Tidak ada migration/izin baru.
+- ExportPlacementGuideService menyusun kelompok tujuan A4 dengan kode/waktu
+  transaksi, operator, box/part/PCS, posisi fisik, checklist dan penanda Sudah.
+  Tujuan dan judul kolom diulang pada halaman lanjutan; terbaca hitam-putih.
+- Pilihan cadangan hanya parameter cetak sementara, diverifikasi terhadap
+  lokasi/pallet ekspor yang tersedia. GET tidak mengonfirmasi, mereservasi,
+  mengubah stok/occupancy/audit. Tujuan kosong/stale diberi peringatan dan
+  BELUM DITENTUKAN. Box selesai tetap dicetak pada lokasi fisiknya sendiri.
+- Empat tes panduan (35 assertions), 64 tes frontend dan build lulus, di
+  samping regresi transaksi/penerimaan sebelumnya. Browser Chromium memeriksa
+  sorotan, pilihan cadangan dan halaman cetak tanpa error konsol. QA PDF A4
+  memakai renderer Dompdf existing: 10 box dua pallet muat satu halaman;
+  60 box dengan part panjang menjadi empat halaman, header berulang dan
+  seluruh halaman diperiksa visual. Ini bukan uji printer fisik/mesin cetak
+  Chrome. Fixture hanya SQLite preview; database operasional tidak diubah.
+
+Verifikasi Antrean Per Transaksi Penerimaan Ekspor 29 Oktober 2026:
+- Antrean di bawah scan memakai satu baris per batch processed yang masih
+  mempunyai box menunggu. Kode TRX-000001 berbasis ID batch; menampilkan waktu,
+  operator, total/sudah ditempatkan/menunggu. Pengelompokan memakai FK existing.
+- ExportReceivingTransactionService mengagregasi di SQL dan menggabungkan
+  penerimaan lama tanpa batch sebagai transaksi satu box (kode BOX-000001).
+  FIFO mengikuti first_received_at box pending lalu ID; 20 transaksi per halaman.
+  Transaksi selesai keluar antrean dan bisa kembali jika stok cadangannya
+  mendapat reservasi pemindahan. Header batch tetap processed.
+- Atur penempatan membuka halaman /export/receiving/transactions/{batch}.
+  Anggota transaksi tampil menurut tujuan pallet/lokasi dengan konfirmasi
+  bertahap per kelompok. Penerimaan lama memakai transactions/box/{stockBox}.
+  Proses penerimaan dan konfirmasi kembali ke halaman transaksi; ?batch=ID
+  lama diarahkan ke halaman baru. Pop-up Lihat box di Stok Ekspor tetap tersedia.
+- Transaksi processed dapat dibaca/diselesaikan operator berizin lain seperti
+  stok bersama. Draft/state/scan/discard/process tetap milik pembuat. Konfirmasi
+  memeriksa anggota return_batch/return_box. Tugas FIFO dari stok lama tampil
+  melalui transaksi asalnya, tidak dicampur ke anggota penerimaan yang baru.
+- 45 tes terkait lulus (503 assertions); sesudah perapian sidebar, 11 tes
+  transaksi/role lulus lagi (142 assertions). Browser menguji 10 box jadi satu
+  baris, halaman dua pallet, progres 5/10 dan selesai/keluar antrean tanpa error.
+  Query agregasi valid di MySQL lokal stock secara baca saja. Mutasi contoh
+  hanya pada SQLite preview; tidak ada migration atau perubahan inventory
+  operasional/production.
+
+Verifikasi Label Pallet dan Pop-up Stok Ekspor 29 Oktober 2026:
+- Lokasi fisik di stok/antrean/hasil penerimaan/pilihan pallet memakai
+  ExportStockPallet::display_name: Pallet N dari plannedPallet.position pada
+  pallet fisik saat ini, atau Pallet cadangan bila tidak terkait perencanaan.
+  Lokasi menyusul label. Nomor EX-000001 tetap identifier internal; tidak ada
+  migrasi/renumbering. Jangan memakai target reservasi sebagai posisi fisik
+  stok lama yang belum dipindahkan. Semua relasi label dimuat eager.
+- Lihat box membuka modal Bootstrap seperti pola detail stok lokal, bukan panel
+  di atas tabel. GET /export/stock/{stockBox} (export.stock.show) mengirim HTML
+  detail di JSON, private/no-store, memakai izin export_stock_input existing.
+  Detail dimuat saat klik, menjaga filter/posisi daftar saat dibuka/ditutup;
+  request lama dibatalkan/diabaikan, tersedia error/retry dan pemulihan fokus.
+- Deep link ?box=ID dari antrean atau redirect penempatan membuka modal otomatis.
+  Konfirmasi/relokasi tetap POST native dengan token/revision/validasi existing;
+  kegagalan validasi HTML kembali ke modal box yang sama. Submit guard delegated
+  melindungi form yang baru dimuat. Modal memuat nomor box, part/PCS, status,
+  posisi fisik, instruksi yang relevan dan waktu penerimaan/penempatan.
+- 39 tes backend terkait lulus (460 assertions), 62 tes frontend dan build lulus.
+  Browser memeriksa label rencana/cadangan, dialog tanpa navigasi, pergantian box,
+  Escape/fokus, filter tetap, hasil kosong dan konfirmasi lewat dialog dengan
+  modal otomatis setelah redirect. Tanpa error konsol. Semua data contoh tetap
+  pada SQLite preview; database operasional/production tidak diubah.
+
+Verifikasi Batas Input ID Box Ekspor 29 Oktober 2026:
+- Kolom receive-box-number memakai maxlength 8 dan filter input angka ASCII di
+  resources/js/export-stock-receiving.js. Nol di awal dan posisi kursor dijaga;
+  validasi server tetap tepat delapan digit. Build dan pemeriksaan sintaks lulus.
+  Browser memverifikasi huruf/simbol dibuang, digit kesembilan ditolak, campuran
+  input difilter, serta 00123456 tetap utuh dan bisa lanjut ke part. Tanpa error
+  konsol. Pengujian memakai SQLite preview tanpa menambah penerimaan stok.
+
+Verifikasi Pemindahan Antrean Penempatan Ekspor 29 Oktober 2026:
+- Tabel Antrean penempatan / pemindahan dipindah dari /export/stock ke bawah
+  area scan/daftar scan pada /export/receiving. Partial baru:
+  resources/views/export/receiving/pending-queue.blade.php. Tabel juga tersedia
+  di bawah hasil batch. Urutan first_received_at lalu ID dan 20 baris per halaman
+  dipertahankan; pagination mengarah ke anchor tabel pada halaman penerimaan.
+- ExportStockViewService::pendingQuery berbagi predicate box received atau
+  reservasi belum ditempatkan. Stok Ekspor tetap memuat counter menunggu, daftar,
+  pencarian/filter dan detail/relokasi box; tidak memuat tabel antrean lagi.
+  Tombol Atur penempatan tetap membuka detail box pada halaman stok.
+- 35 tes terkait penerimaan, batch, performa dan role lulus (431 assertions).
+  Browser memeriksa tabel berisi di bawah area input, urutan FIFO, tautan ke
+  detail penempatan dan ketiadaan antrean di stok; tanpa error konsol. Preview
+  memakai SQLite terpisah. Tidak ada migration atau perubahan DB operasional.
+
+Verifikasi Performa Navigasi 29 Oktober 2026:
+- Detail pengukuran dan deployment: docs/PERFORMANCE_NAVIGATION.md. Bootstrap,
+  ikon, SweetAlert, kedua jQuery existing dan Select2 kini memakai public/vendor
+  versi tetap/lisensi/checksum; sertakan folder ini saat deploy. Dependency grafik
+  laporan operasional masih terpisah. Tidak ada dependency runtime/PC baru.
+- CSS kerangka dan JS sidebar/pencarian/toast dipindah dari inline Blade ke
+  public/css/layout-shell.css serta public/js/layout-shell.js dan toast.js.
+  Partial lama hanya include aset dengan v=filemtime. Data menu sesuai izin
+  tetap per request; urutan script dan fungsi bisnis/hak akses dipertahankan.
+- Query katalog penempatan hanya saat dibutuhkan cadangan; total antrean memakai
+  paginator; daftar stock tidak memuat hierarki delivery yang hanya dipakai detail.
+  HTML preview turun 65–70%; query penerimaan 6 ke 3, stok 15 ke 9. Ini bukan
+  klaim persentase durasi production; boot PHP lokal masih berpengaruh.
+- Regresi 368 backend (3.151 assertions), 57 frontend dan build lulus. Browser
+  memeriksa navigasi ekspor, pencarian, dialog, scan/proses, pilihan dan toast
+  tanpa error. Optimize Laravel diuji hanya pada cache preview terisolasi;
+  cache permanen development, database operasional dan production tidak diubah.
+
+Verifikasi Penerimaan Bulk dan Stok Ekspor terpisah 29 Oktober 2026:
+- Menggantikan UI penerimaan satu box pada catatan sebelumnya. Scan box lalu
+  part menambah draft, maksimal 1.000 box. OK/NG visual dan audio memakai helper
+  Stock Input existing. PCS dari master ekspor; draft belum menjadi stok atau
+  reservasi. Daftar tersimpan di DB dan tetap ada setelah refresh.
+- ExportReceivingBatchService / export_receiving_batches dan items menangani
+  scan, hapus baris, batal draft, token retry, revision/tab lama, serta kepemilikan
+  operator. Model memberi default status/revision pada respons draft pertama.
+- Proses penerimaan memvalidasi seluruh baris dan kapasitas ulang dalam satu
+  transaksi, membuat stock boxes, lalu alokasi FIFO sekali. Tanggal scan server
+  menjadi first_received_at. Hasil berkelompok per pallet/lokasi dan cadangan;
+  tugas stok lama didahulukan. Konfirmasi kelompok atomik, cadangan satu lokasi
+  memakai satu pallet fisik. Pemenuhan tetap menunggu konfirmasi fisik.
+- /export/stock (ExportStockController) memisahkan daftar/filter/antrean/detail
+  dan relokasi stok dari /export/receiving. Keduanya memakai izin existing
+  export_stock_input; tidak ada permission baru. Legacy single-receipt API
+  dipertahankan. Detail di docs/EXPORT_STOCK_RECEIVING.md.
+- Migration 2026_10_29_000003 hanya menambah dua tabel draft setelah 000002.
+  Diterapkan pada MySQL lokal stock; tidak menambahkan data uji. Jumlah data
+  existing dipertahankan: 12 boxes/identities, 16 pallets, 3 stock_locations,
+  276 part/27 lokasi, 2 delivery/planning dan 2 stock box/komitmen ekspor.
+  Kedua tabel draft baru kosong; production remote tidak diubah.
+- Regresi 366 backend (3.092 assertions), 57 frontend dan build lulus; setelah
+  perbaikan respons draft pertama, 13 tes batch (133 assertions) lulus kembali.
+  Browser Chromium desktop memeriksa lima scan, OK/NG, refresh, tidak ada stok
+  sebelum proses, dua pallet + cadangan, konfirmasi grup, halaman stok terpisah
+  dan daftar baru. Tanpa error konsol; bukan uji scanner fisik. Semua data uji
+  browser berada pada SQLite preview, bukan MySQL operasional.
+
+Verifikasi Penerimaan Box Ekspor 29 Oktober 2026:
+- Rincian: docs/EXPORT_STOCK_RECEIVING.md. Izin export_stock_input, menu
+  /export/receiving. Sesuai jawaban pengguna: scan nomor box lalu nomor part,
+  PCS otomatis dari master ekspor; nomor delapan digit boleh sama dengan domestik.
+- Penerimaan mencatat export_stock_boxes sebagai received dan melakukan alokasi
+  otomatis, tanpa menulis boxes/box_identities domestik. Konfirmasi penempatan
+  menghasilkan export_stock_pallets, export_stock_movements, status stored,
+  occupancy lokasi ekspor dan placed_at pada komitmen. Reservasi belum terpenuhi.
+- Finalisasi planning dan penerimaan memeriksa stock tersedia. Kebutuhan diurut
+  tenggat/ID delivery lalu posisi pallet; stok memakai first_received_at lalu ID.
+  Reservasi existing dipertahankan. Stok lama dapat mendapat tugas pemindahan,
+  sedangkan box baru menjadi cadangan. Snapshot PCS harus persis cocok.
+- Cadangan dapat memilih lokasi ekspor kosong atau pallet fisik ekspor existing,
+  boleh part campuran; relokasi cadangan tidak mengubah tanggal FIFO. Sumber
+  dibebaskan setelah box terakhir berpindah. Pallet rencana bernomor 1..N berbeda
+  dari pallet fisik berlabel EX-000001. Jangan menulis ID fisik ekspor ke kolom
+  current_pallet_id master yang merupakan FK pallet domestik.
+- Semua mutasi inventory/planning/delivery ekspor mengunci row mutex ekspor
+  sebelum lock lain agar FIFO/finalisasi/receipt tidak berlomba. Token unik
+  mencegah double submit; revision dan tujuan server menolak instruksi stale.
+  Mutasi dan audit satu transaksi. Guard master mencakup histori stok ekspor.
+- Pengembalian/perubahan kebutuhan dengan komitmen belum tersedia. Guard revisi
+  juga melindungi box cadangan fisik pada pallet rencana, selain komitmen aktif.
+  Withdrawal, pelepasan reservasi dan alih lingkup tetap tahap berikutnya.
+- Migration 2026_10_29_000002 membuat empat tabel dan FK komitmen nullable serta
+  memperbarui izin saved role. Existing monitoring tidak dibackfill menjadi
+  stok fiktif. Regresi 353 backend (2.954 assertions), 55 frontend, dan build
+  lulus; browser Chromium menguji dua scan, pemenuhan, FIFO, cadangan, duplikat,
+  desktop dan simulasi 390px tanpa error. Bukan uji scanner/perangkat fisik.
+- MySQL lokal stock sudah teramati memiliki migration/izin/query yang sesuai,
+  dengan 0 stock ekspor dan 0 pending. Verifikasi lokal baca saja; agent tidak
+  menjalankan ulang migration/menambahkan contoh ke MySQL. Transaksi contoh
+  hanya pada SQLite preview, tidak mengubah inventory domestik/production remote.
 
 Verifikasi Pemenuhan Permintaan Ekspor 29 Oktober 2026:
 - Detail implementasi/tahap berikutnya ada di docs/EXPORT_FULFILLMENT.md. Menu

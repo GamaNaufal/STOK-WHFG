@@ -3,7 +3,7 @@
 @section('title', 'Lihat Stok - Warehouse FG Yamato')
 
 @section('styles')
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="{{ asset('vendor/select2-4.1.0-rc.0/dist/css/select2.min.css') }}" rel="stylesheet" />
 @include('shared.stock-view.partials.styles')
 <link href="{{ asset('css/stock-view-toolbar.css') }}" rel="stylesheet">
 <link href="{{ asset('css/stock-view-results.css') }}" rel="stylesheet">

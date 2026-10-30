@@ -1,0 +1,126 @@
+{
+  "packages": [
+    {
+      "name": "bootstrap",
+      "version": "5.3.0",
+      "files": [
+        {
+          "path": "dist/css/bootstrap.min.css",
+          "url": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css",
+          "sha256": "7f1d37f0d90b6385354c2ac10e2bb91563c46bd7a266ed351222ebcac8496c2a"
+        },
+        {
+          "path": "dist/js/bootstrap.bundle.min.js",
+          "url": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js",
+          "sha256": "aa53d582f97eb594c2a5cc5824574707f9ba9837bce3046bfa5f3556860f4e04"
+        },
+        {
+          "path": "LICENSE",
+          "url": "https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/LICENSE",
+          "sha256": "3d0b0c88216e4752b9afd3d24e36faaf27873b5a45a61458bb3c83e794c26832"
+        }
+      ],
+      "license": "MIT"
+    },
+    {
+      "name": "bootstrap-icons",
+      "version": "1.11.0",
+      "files": [
+        {
+          "path": "font/bootstrap-icons.min.css",
+          "url": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.min.css",
+          "sha256": "42cc7996b4ad1d9c91f5112a85417c890b7bdd7d3a73c2c62143f3a4e87046b2"
+        },
+        {
+          "path": "font/fonts/bootstrap-icons.woff2",
+          "url": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/fonts/bootstrap-icons.woff2",
+          "sha256": "ae167342f8ad5aad834e774ddc99528b72ac9171a684f23ed79d83ea176ca04e"
+        },
+        {
+          "path": "font/fonts/bootstrap-icons.woff",
+          "url": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/fonts/bootstrap-icons.woff",
+          "sha256": "40f14c01ceff49ce457ff1e54fdf51b39498f845a85741cb08047172ac556bb9"
+        },
+        {
+          "path": "LICENSE",
+          "url": "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/LICENSE",
+          "sha256": "0623348b57e817b6897c41b6065380b599d5befe2839d83270566c605e430441"
+        }
+      ],
+      "license": "MIT"
+    },
+    {
+      "name": "sweetalert2",
+      "version": "11.26.25",
+      "files": [
+        {
+          "path": "dist/sweetalert2.all.min.js",
+          "url": "https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/dist/sweetalert2.all.min.js",
+          "sha256": "4e86f0e22e4771b5b8aac24c613c661806a678b1afa284d03cf6ad03d3e21a0a"
+        },
+        {
+          "path": "LICENSE",
+          "url": "https://cdn.jsdelivr.net/npm/sweetalert2@11.26.25/LICENSE",
+          "sha256": "879aa33feba35b3428c6485fc17cddd8c820d7a8780281aa945e60582a28c4b4"
+        }
+      ],
+      "license": "MIT"
+    },
+    {
+      "name": "jquery",
+      "version": "3.6.0",
+      "files": [
+        {
+          "path": "dist/jquery.min.js",
+          "url": "https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js",
+          "sha256": "ff1523fb7389539c84c65aba19260648793bb4f5e29329d2ee8804bc37a3fe6e"
+        },
+        {
+          "path": "LICENSE.txt",
+          "url": "https://cdn.jsdelivr.net/npm/jquery@3.6.0/LICENSE.txt",
+          "sha256": "d4db9ebe6f29f5168eac45ad713f055623ac5d0dcd5ba92da23d650ae012020d"
+        }
+      ],
+      "license": "MIT"
+    },
+    {
+      "name": "jquery",
+      "version": "3.7.1",
+      "files": [
+        {
+          "path": "dist/jquery.min.js",
+          "url": "https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js",
+          "sha256": "fc9a93dd241f6b045cbff0481cf4e1901becd0e12fb45166a8f17f95823f0b1a"
+        },
+        {
+          "path": "LICENSE.txt",
+          "url": "https://cdn.jsdelivr.net/npm/jquery@3.7.1/LICENSE.txt",
+          "sha256": "d4db9ebe6f29f5168eac45ad713f055623ac5d0dcd5ba92da23d650ae012020d"
+        }
+      ],
+      "license": "MIT"
+    },
+    {
+      "name": "select2",
+      "version": "4.1.0-rc.0",
+      "files": [
+        {
+          "path": "dist/css/select2.min.css",
+          "url": "https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css",
+          "sha256": "cda4a81c187015d95ed2c71f1841540b08203cdec5fa2a7d5d1825a3c2166f8c"
+        },
+        {
+          "path": "dist/js/select2.min.js",
+          "url": "https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js",
+          "sha256": "f7244fff610595b944f76bf3080d74e3af42b5dd234f8f079e698cc39ac966b0"
+        },
+        {
+          "path": "LICENSE.md",
+          "url": "https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/LICENSE.md",
+          "sha256": "4ee0cbc51370afde358652a0f977972053729ed578b6a42f5e2a037d114f0b39"
+        }
+      ],
+      "license": "MIT"
+    }
+  ]
+}

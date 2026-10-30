@@ -80,7 +80,8 @@
                                 $isOccupied = (bool) $location->is_occupied;
                                 $isReserved = $isExport && $location->reservation;
                                 $hasPlanning = $isExport && $location->planned_pallets_exists;
-                                $deletionBlocked = ($isOccupied && $location->current_pallet_id) || $hasPlanning;
+                                $hasExportStock = $isExport && $location->stock_pallet_history_exists;
+                                $deletionBlocked = ($isOccupied && $location->current_pallet_id) || $hasPlanning || $hasExportStock;
                             @endphp
                             <tr>
                                 <th scope="row" class="location-list-code">{{ $location->code }}</th>
@@ -91,7 +92,9 @@
                                     </span>
                                 </td>
                                 <td class="location-list-pallet">
-                                    @if($isReserved)
+                                    @if($isExport && $location->stockPallet)
+                                        {{ $location->stockPallet->number }} · {{ $location->stockPallet->location_code }}
+                                    @elseif($isReserved)
                                         Pallet {{ $location->reservation->pallet->position }} · {{ $location->reservation->palletPlan->deliveryPlan?->plan_code ?? 'Rencana delivery' }}
                                     @elseif($location->currentPallet)
                                         {{ $location->currentPallet->pallet_number }}
@@ -115,7 +118,9 @@
                                                 <i class="bi bi-trash" aria-hidden="true"></i> Hapus
                                             </button>
                                         </div>
-                                        @if($hasPlanning)
+                                        @if($hasExportStock)
+                                            <small class="location-list-action-note">Lokasi tercatat pada histori stok ekspor.</small>
+                                        @elseif($hasPlanning)
                                             <small class="location-list-action-note">Lokasi tercatat pada perencanaan pallet.</small>
                                         @elseif($deletionBlocked)
                                             <small class="location-list-action-note">Pindahkan pallet sebelum mengubah atau menghapus.</small>

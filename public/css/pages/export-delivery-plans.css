@@ -42,6 +42,11 @@
 .plan-save-bar p { font-size:.75rem; color:var(--ui-muted,#595d65); margin:.3rem 0 0; }
 .plan-search { margin-bottom:1.25rem; max-width:38rem; }
 .plan-search input { flex:1; min-width:10rem; }
+.export-pallet-load { display:inline-flex; flex-wrap:wrap; align-items:center; gap:.3rem .6rem; padding:.35rem .65rem; border:1px solid var(--ui-border,#dfe1e5); border-radius:.45rem; font-size:.85rem; line-height:1.4; color:var(--ui-muted,#595d65); }
+.export-pallet-load strong { font-size:inherit; font-variant-numeric:tabular-nums; }
+.export-pallet-load [data-load-note] { font-size:.8rem; font-weight:600; }
+.export-pallet-load[data-level="warning"] { background:#fff3cd; border-color:#c58a13; color:#704c00; }
+.export-pallet-load[data-level="danger"] { background:#fce3e5; border-color:#ce6b70; color:#97212b; }
 .warehouse-app .plan-table .plan-empty { text-align:center; padding:3rem 1rem; color:var(--ui-muted,#595d65); }
 .plan-empty :is(strong,span) { display:block; margin-top:.5rem; }
 .plan-empty i { font-size:1.8rem; }

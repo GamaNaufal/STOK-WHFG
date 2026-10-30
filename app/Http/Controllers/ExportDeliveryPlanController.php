@@ -8,7 +8,7 @@ use App\Services\AuditService;
 use App\Services\ExportDeliveryPlanImportService;
 use App\Services\ExportDeliveryPlanService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use App\Services\ExportInventoryService;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -96,7 +96,7 @@ class ExportDeliveryPlanController extends Controller
     public function destroy(Request $request, ExportDeliveryPlan $deliveryPlan, ExportDeliveryPlanService $service)
     {
         $data = $request->validate(['revision' => 'required|integer|min:1']);
-        DB::transaction(function () use ($deliveryPlan, $data, $request, $service) {
+        app(ExportInventoryService::class)->transaction(function () use ($deliveryPlan, $data, $request, $service) {
             $locked = ExportDeliveryPlan::with('items')->lockForUpdate()->findOrFail($deliveryPlan->id);
             abort_unless($locked->status === 'draft' && $locked->revision === (int) $data['revision'], 409, 'Rencana sudah berubah. Muat ulang halaman.');
             $before = $service->snapshot($locked);

@@ -7,7 +7,6 @@ use App\Models\ExportMasterLocation;
 use App\Models\ExportPalletLocationReservation;
 use App\Models\ExportPalletPlan;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ExportPalletPlanningService
@@ -64,7 +63,7 @@ class ExportPalletPlanningService
 
     public function save(int $deliveryId, array $data, User $actor): ExportPalletPlan
     {
-        return DB::transaction(function () use ($deliveryId, $data, $actor) {
+        return app(ExportInventoryService::class)->transaction(function () use ($deliveryId, $data, $actor) {
             // All delivery/planning writes lock this parent first, including revisions and archive.
             $delivery = ExportDeliveryPlan::with('items')->lockForUpdate()->findOrFail($deliveryId);
             if ($delivery->revision !== (int) $data['delivery_revision']) {
@@ -106,7 +105,7 @@ class ExportPalletPlanningService
                 if ($locationId) {
                     $location = $locations->get($locationId);
                     if (! $location) $this->fail("pallets.$i.master_location_id", 'Pilih lokasi dari master ekspor.');
-                    if ($location->is_occupied || $location->current_pallet_id || $location->stockLocations()->exists()) {
+                    if ($location->is_occupied || $location->current_pallet_id || $location->stockLocations()->exists() || $location->stockPallet()->exists()) {
                         $this->fail("pallets.$i.master_location_id", "Lokasi {$location->code} sudah ditempati pallet fisik.");
                     }
                     $claim = $claims->get($locationId);
@@ -167,13 +166,14 @@ class ExportPalletPlanningService
             }
             AuditService::record('export_pallet_plan', $final ? 'finalized' : 'saved', 'ExportPalletPlan', $plan->id,
                 $actor->id, $before, $this->snapshot($plan), $final ? 'Perencanaan pallet difinalisasi dan lokasi direservasi.' : 'Draft perencanaan pallet disimpan.');
+            if ($final) app(ExportStockAllocationService::class)->allocate($actor);
             return $plan;
         });
     }
 
     public function transition(int $deliveryId, int $revision, User $actor, bool $cancel = false): void
     {
-        DB::transaction(function () use ($deliveryId, $revision, $actor, $cancel) {
+        app(ExportInventoryService::class)->transaction(function () use ($deliveryId, $revision, $actor, $cancel) {
             ExportDeliveryPlan::lockForUpdate()->findOrFail($deliveryId);
             $plan = ExportPalletPlan::where('export_delivery_plan_id', $deliveryId)->lockForUpdate()->firstOrFail();
             if ($plan->revision !== $revision) $this->fail('revision', 'Perencanaan sudah berubah. Muat ulang halaman.');

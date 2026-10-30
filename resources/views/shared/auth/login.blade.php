@@ -8,8 +8,8 @@
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
     
     <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link href="{{ asset('vendor/bootstrap-5.3.0/dist/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons-1.11.0/font/bootstrap-icons.min.css') }}">
     
     <style>
         * {
@@ -400,7 +400,7 @@
 </div>
 
     <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ asset('vendor/bootstrap-5.3.0/dist/js/bootstrap.bundle.min.js') }}"></script>
     <script>
         const passwordInput = document.getElementById('password');
         const togglePasswordButton = document.getElementById('togglePassword');

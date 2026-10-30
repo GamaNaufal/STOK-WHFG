@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportPartSetting;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ExportDeliveryPlanService
@@ -26,7 +25,7 @@ class ExportDeliveryPlanService
 
     public function save(array $data, User $actor, ?int $id = null): ExportDeliveryPlan
     {
-        return DB::transaction(function () use ($data, $actor, $id) {
+        return app(ExportInventoryService::class)->transaction(function () use ($data, $actor, $id) {
             $plan = $id ? ExportDeliveryPlan::with('items')->lockForUpdate()->findOrFail($id) : new ExportDeliveryPlan;
             if ($id && ($plan->status !== 'draft' || $plan->revision !== (int) $data['revision'])) {
                 throw ValidationException::withMessages(['revision' => 'Rencana sudah berubah. Muat ulang halaman sebelum menyimpan.']);

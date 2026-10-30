@@ -1,0 +1,2 @@
+@props(['boxes' => 0])
+<span {{ $attributes->class(['export-pallet-load']) }} data-pallet-load data-level="{{ \App\Support\ExportPalletLoad::level((int) $boxes) }}" data-warning-at="{{ \App\Support\ExportPalletLoad::WARNING_AT }}" data-danger-at="{{ \App\Support\ExportPalletLoad::DANGER_AT }}"><strong data-load-count>{{ number_format($boxes, 0, ',', '.') }} box</strong><span data-load-note @if(!\App\Support\ExportPalletLoad::note((int) $boxes)) hidden @endif>{{ \App\Support\ExportPalletLoad::note((int) $boxes) }}</span></span>

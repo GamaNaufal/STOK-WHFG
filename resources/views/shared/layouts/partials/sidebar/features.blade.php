@@ -12,7 +12,7 @@
             <ul class="nav flex-column ms-3 mt-2 mb-1 submenu">
                 @foreach($items as $item)
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->routeIs($item['route']) ? 'active' : '' }}" href="{{ route($item['route']) }}">
+                        <a class="nav-link {{ (request()->routeIs($item['route']) || ($item['route'] === 'export.receiving.index' && request()->routeIs('export.receiving.transactions.*'))) ? 'active' : '' }}" href="{{ route($item['route']) }}">
                             <i class="bi bi-{{ $item['icon'] }}"></i> {{ $item['label'] }}
                             @php
                                 $badgeCount = match ($item['key']) {

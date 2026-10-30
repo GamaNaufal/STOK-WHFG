@@ -8,8 +8,8 @@
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
     
     <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <link href="{{ asset('vendor/bootstrap-5.3.0/dist/css/bootstrap.min.css') }}" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons-1.11.0/font/bootstrap-icons.min.css') }}">
     
     @include('shared.layouts.partials.layout-shell-styles')
     
@@ -55,8 +55,8 @@
     <div id="toast-container" class="toast-container position-fixed bottom-0 start-50 translate-middle-x p-3" style="z-index: 1300;"></div>
 
     <!-- Bootstrap 5 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="{{ asset('vendor/bootstrap-5.3.0/dist/js/bootstrap.bundle.min.js') }}"></script>
+    <script src="{{ asset('vendor/sweetalert2-11.26.25/dist/sweetalert2.all.min.js') }}"></script>
     <script src="{{ asset('js/alert-helper.js') }}"></script>
     @include('shared.layouts.partials.layout-shell-scripts')
     
