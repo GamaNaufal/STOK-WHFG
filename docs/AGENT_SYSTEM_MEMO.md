@@ -2,6 +2,27 @@
 
 Terakhir diverifikasi dari source code: 30 Oktober 2026 (pembaruan inkremental).
 
+Verifikasi Filter Pallet/Lokasi dan Excel Stok Ekspor 30 Oktober 2026:
+- Stok Ekspor menyediakan filter pallet fisik dan lokasi, digabung pencarian
+  box/part dan status. Pilihan hanya pallet berisi stok, dengan nomor pallet,
+  lokasi, kode delivery jika terhubung, dan jumlah box. Identitas filter memakai
+  ID pallet fisik; Pallet 1 dari delivery berbeda tidak tercampur.
+- ExportStockQueryService menyatukan filter daftar dan unduhan. Filter memakai
+  current_pallet_id/lokasi fisik, bukan tujuan reservasi. Pagination tetap 20;
+  katalog filter dimuat secara eager/berjumlah query tetap, tanpa katalog
+  penempatan. Modal detail box existing tetap tersedia.
+- GET export/stock/export-excel memakai izin export_stock_input existing dan
+  Maatwebsite Excel existing (FromQuery/chunk). Seluruh hasil filter diekspor,
+  termasuk halaman berikutnya: box, part, PCS, tanggal pertama, posisi fisik,
+  status serta delivery/pallet/lokasi tujuan reservasi pada kolom terpisah.
+  ID/naskah ditulis sebagai teks, PCS/tanggal numerik, header teal dibekukan dan
+  autofilter. Status memakai label model yang sama dengan tampilan.
+- 51 tes backend terkait lulus (623 assertions), termasuk regresi stok lokal,
+  FIFO, filter gabungan, validasi scope, izin, pagination dan isi workbook.
+  Browser memeriksa filter satu pallet, modal, unduhan dua box, desktop/ponsel
+  dan konsol tanpa error. Fixture hanya SQLite preview; tidak ada migration,
+  dependency baru atau perubahan data MySQL/production.
+
 Verifikasi Tinjauan FIFO Wajib dan Tinjau Ulang 30 Oktober 2026:
 - Pop-up hasil finalisasi terkini yang belum diakui hanya mempunyai satu tombol
   Oke, masukkan ke antrean (Oke bila hasil kosong). Tinjau nanti dan tombol X

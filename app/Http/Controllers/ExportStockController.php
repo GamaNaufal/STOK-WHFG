@@ -3,31 +3,38 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExportStockBox;
+use App\Exports\ExportStockExport;
+use App\Services\ExportStockQueryService;
 use App\Services\ExportStockViewService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ExportStockController extends Controller
 {
-    public function index(Request $request, ExportStockViewService $view)
+    public function index(Request $request, ExportStockViewService $view, ExportStockQueryService $stock)
     {
-        $data = $request->validate(['box' => 'nullable|integer|min:1', 'q' => 'nullable|string|max:100',
-            'status' => ['nullable', Rule::in(['stored', 'pending', 'spare', 'reserved'])]]);
-        $search = trim($data['q'] ?? ''); $status = $data['status'] ?? '';
+        $filters = $stock->filters($request);
+        $data = $request->validate(['box' => 'nullable|integer|min:1']);
+        $search = $filters['q']; $status = $filters['status'];
         $selected = !empty($data['box']) ? ExportStockBox::with($view::RELATIONS)->findOrFail($data['box']) : null;
-        $listRelations = ['currentPallet.plannedPallet', 'fulfillment.allocationNotice', 'fulfillment.plannedItem.pallet'];
         $pendingCount = $view->pendingQuery()->count();
-        $boxes = ExportStockBox::with($listRelations)->when($search !== '', fn ($q) => $q->where(fn ($s) =>
-            $s->where('box_number', 'like', '%'.$search.'%')->orWhere('part_number', 'like', '%'.$search.'%')))
-            ->when($status === 'stored', fn ($q) => $q->where('state', 'stored'))
-            ->when($status === 'pending', fn ($q) => $q->where(fn ($s) => $s->where('state', 'received')->orWhereHas('fulfillment', fn ($f) => $f->whereNull('placed_at')))->queueReady())
-            ->when($status === 'spare', fn ($q) => $q->where('state', 'stored')->whereDoesntHave('fulfillment'))
-            ->when($status === 'reserved', fn ($q) => $q->whereHas('fulfillment'))
-            ->orderBy('first_received_at')->orderBy('id')->paginate(20, ['*'], 'stock_page')->withQueryString();
+        $boxes = $stock->boxes($filters)->paginate(20, ['*'], 'stock_page')->withQueryString();
+        $filterPallets = $stock->palletOptions();
+        $filterLocations = $filterPallets->whereNotNull('master_location_id')->unique('master_location_id');
         $storedCount = ExportStockBox::where('state', 'stored')->count();
         $choices = $selected && !$selected->fulfillment ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
         $selectedLoad = $selected?->fulfillment ? $view->groups(collect([$selected]))->first()['load'] : null;
-        return view('export.stock.index', compact('selected', 'selectedLoad', 'pendingCount', 'boxes', 'storedCount', 'search', 'status') + $choices);
+        return view('export.stock.index', compact('selected', 'selectedLoad', 'pendingCount', 'boxes', 'storedCount', 'search', 'status', 'filters', 'filterPallets', 'filterLocations') + $choices);
+    }
+
+    public function export(Request $request, ExportStockQueryService $stock)
+    {
+        $query = $stock->boxes($stock->filters($request))
+            ->with('fulfillment.plannedItem.pallet.palletPlan.deliveryPlan');
+
+        $response = Excel::download(new ExportStockExport($query), 'stok_ekspor_'.now()->format('Ymd_His').'.xlsx');
+        $response->headers->set('Cache-Control', 'private, no-store');
+        return $response;
     }
 
     public function show(ExportStockBox $stockBox, ExportStockViewService $view)

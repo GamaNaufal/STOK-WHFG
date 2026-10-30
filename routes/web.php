@@ -63,6 +63,7 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::get('receiving/transactions/box/{stockBox}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'legacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy');
         Route::get('receiving/transactions/box/{stockBox}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printLegacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy-print');
         Route::get('stock', [\App\Http\Controllers\ExportStockController::class, 'index'])->name('stock.index');
+        Route::get('stock/export-excel', [\App\Http\Controllers\ExportStockController::class, 'export'])->name('stock.export');
         Route::get('stock/{stockBox}', [\App\Http\Controllers\ExportStockController::class, 'show'])->name('stock.show');
         Route::post('receiving/batches', [\App\Http\Controllers\ExportStockReceivingController::class, 'start'])->name('receiving.batches.start');
         Route::get('receiving/batches/{batch}', [\App\Http\Controllers\ExportStockReceivingController::class, 'batchState'])->name('receiving.batches.state');

@@ -28,7 +28,7 @@ class PageLoadingPerformanceTest extends TestCase
         }
     }
 
-    public function test_scan_and_stock_overview_do_not_read_unused_destination_catalogs(): void
+    public function test_scan_and_stock_overview_do_not_read_unused_placement_catalogs(): void
     {
         $this->withoutVite();
         $this->actingAs(User::factory()->create(['role' => 'export_operator']));
@@ -38,7 +38,15 @@ class PageLoadingPerformanceTest extends TestCase
             $queries = DB::getQueryLog(); DB::disableQueryLog();
             foreach ($queries as $query) {
                 $this->assertStringNotContainsString('master_locations', $query['query']);
-                $this->assertStringNotContainsString('export_stock_pallets', $query['query']);
+                if ($path === '/export/receiving') {
+                    $this->assertStringNotContainsString('export_stock_pallets', $query['query']);
+                }
+            }
+            if ($path === '/export/stock') {
+                // The stock filter now needs one compact catalog, not placement choices.
+                $catalog = collect($queries)->filter(fn ($q) => str_contains($q['query'], 'export_stock_pallets'))->values();
+                $this->assertCount(1, $catalog);
+                $this->assertStringContainsString('boxes_count', $catalog[0]['query']);
             }
         }
     }

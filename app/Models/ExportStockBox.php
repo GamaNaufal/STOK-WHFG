@@ -13,6 +13,16 @@ class ExportStockBox extends Model
     public function part() { return $this->belongsTo(ExportPartSetting::class, 'part_setting_id'); }
     public function currentPallet() { return $this->belongsTo(ExportStockPallet::class, 'current_pallet_id'); }
     public function fulfillment() { return $this->hasOne(ExportFulfillmentBox::class); }
+    public function getStatusLabelAttribute(): string
+    {
+        return match (true) {
+            (bool) $this->fulfillment?->placed_at => 'Terpenuhi',
+            (bool) $this->fulfillment?->awaitsQueueAcknowledgment() => 'Direservasi · menunggu Oke FIFO',
+            (bool) $this->fulfillment => 'Direservasi · menunggu penempatan',
+            $this->state === 'stored' => 'Stok cadangan',
+            default => 'Pilih penempatan cadangan',
+        };
+    }
     public function scopeQueueReady($query)
     {
         return $query->whereDoesntHave('fulfillment', fn ($q) => $q->whereNotNull('allocation_notice_id')
