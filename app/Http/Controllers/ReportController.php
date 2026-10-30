@@ -127,6 +127,10 @@ class ReportController extends Controller
      */
     public function withdrawalReport(Request $request)
     {
+        if ($this->exportScope($request)) {
+            $request->merge(['kind'=>'shipments']);
+            return app(WarehouseReportController::class)->index($request,app(\App\Services\WarehouseReportService::class));
+        }
         $query = StockWithdrawal::with(['user', 'palletItem', 'box']);
 
         // Date range filter
@@ -163,7 +167,7 @@ class ReportController extends Controller
         // Get all users for filter
         $users = User::whereIn('role', ['warehouse_operator', 'admin'])->get();
 
-        return view('operator.reports.withdrawal', [
+        return \App\Support\ReportPageResponse::make($request, 'operator.reports.withdrawal', [
             'withdrawals' => $withdrawals,
             'totalWithdrawals' => $totalWithdrawals,
             'totalPcsWithdrawn' => $totalPcsWithdrawn,
@@ -184,6 +188,10 @@ class ReportController extends Controller
      */
     public function stockInputReport(Request $request)
     {
+        if ($this->exportScope($request)) {
+            $request->merge(['kind'=>'receipts']);
+            return app(WarehouseReportController::class)->index($request,app(\App\Services\WarehouseReportService::class));
+        }
         // Get stock inputs from stock_inputs table
         $query = StockInput::with([
             'pallet',
@@ -260,7 +268,7 @@ class ReportController extends Controller
         // Get unique warehouse locations from stock_inputs
         $locations = StockInput::distinct('warehouse_location')->pluck('warehouse_location');
 
-        return view('operator.reports.stock-input', [
+        return \App\Support\ReportPageResponse::make($request, 'operator.reports.stock-input', [
             'stockInputs' => $stockInputs,
             'totalRecords' => $totalRecords,
             'totalItems' => $totalPcs,
@@ -280,6 +288,10 @@ class ReportController extends Controller
      */
     public function exportWithdrawalCsv(Request $request)
     {
+        if ($this->exportScope($request)) {
+            $request->merge(['kind'=>'shipments']);
+            return app(WarehouseReportController::class)->export($request,app(\App\Services\WarehouseReportService::class));
+        }
         $query = StockWithdrawal::query()
             ->select([
                 'id',
@@ -307,6 +319,8 @@ class ReportController extends Controller
             $query->where('status', $request->input('status'));
         }
 
+        if ($request->filled('part_number')) $query->where('part_number', 'like', '%'.$request->input('part_number').'%');
+        if ($request->filled('user_id')) $query->where('user_id', $request->input('user_id'));
         $withdrawals = $query->orderBy('withdrawn_at', 'desc')->get();
 
         return Excel::download(
@@ -320,6 +334,10 @@ class ReportController extends Controller
      */
     public function exportStockInputCsv(Request $request)
     {
+        if ($this->exportScope($request)) {
+            $request->merge(['kind'=>'receipts']);
+            return app(WarehouseReportController::class)->export($request,app(\App\Services\WarehouseReportService::class));
+        }
         $query = StockInput::query()
             ->select([
                 'id',
@@ -372,6 +390,19 @@ class ReportController extends Controller
             new StockInputExport($stockInputs),
             'stock_input_report_' . now()->format('Ymd_His') . '.xlsx'
         );
+    }
+
+    private function exportScope(Request $request): bool
+    {
+        $request->validate(['scope'=>'nullable|in:domestic,export']);
+        $export = $request->input('scope','domestic')==='export';
+        if (!$export) $request->validate(['start_date'=>'nullable|date_format:Y-m-d',
+            'end_date'=>['nullable','date_format:Y-m-d', ...($request->filled('start_date')?['after_or_equal:start_date']:[])],
+            'part_number'=>'nullable|string|max:100', 'warehouse_location'=>'nullable|string|max:100',
+            'user_id'=>'nullable|integer|min:1|exists:users,id', 'status'=>'nullable|string|max:30'],
+            ['end_date.after_or_equal'=>'Tanggal akhir harus sama dengan atau setelah tanggal awal.',
+                'start_date.date_format'=>'Tanggal awal tidak valid.', 'end_date.date_format'=>'Tanggal akhir tidak valid.']);
+        return $export;
     }
 
     private function buildBoxAuditItems(StockInput $input): array

@@ -17,6 +17,7 @@ class ExportPickingController extends Controller
     private function data(ExportPlannedPallet $pallet, ExportPickingService $service, Request $request, bool $helper): array
     {
         $pallet->load('palletPlan.deliveryPlan');
+        abort_unless($pallet->palletPlan?->deliveryPlan, 404);
         $rows = $service->rows($pallet->id);
         $issue = $helper ? null : $service->block($request->user(), $pallet->id);
         $issue?->load(['returnPallet.plannedPallet', 'reporter', 'part']);

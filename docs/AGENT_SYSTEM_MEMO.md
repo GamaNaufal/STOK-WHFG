@@ -2,6 +2,84 @@
 
 Terakhir diverifikasi dari source code: 30 Oktober 2026 (pembaruan inkremental).
 
+Verifikasi AJAX Filter Laporan 30 Oktober 2026:
+- Laporan domestik/ekspor dan rincian kini memakai public/js/report-browser.js.
+  Lingkup/jenis/select/tanggal langsung diterapkan; teks debounce 300 ms. GET
+  biasa tetap berfungsi; tombol Terapkan/Tampilkan disembunyikan saat JS aktif.
+- ReportPageResponse mengirim JSON html/title/url berisi partial tanpa layout
+  untuk Accept application/json; HTML biasa tetap view existing. Cache private/
+  no-store dan Vary Accept. Fokus/caret/scroll dipertahankan; URL, judul,
+  ringkasan serta tautan Excel sinkron. Pagination/reset dan Back/Forward AJAX.
+- AbortController/versi mengabaikan respons lama sejak awal edit/debounce.
+  Gagal/422 mempertahankan hasil, menampilkan Coba lagi dan menahan export/
+  pagination hingga filter berhasil. Pilihan operator/status tidak hilang pada
+  hasil kosong. Export pengambilan domestik kini mengikuti filter part/operator
+  juga. Izin, pencatatan inventory dan dashboard tidak berubah.
+- 454 tes backend lulus (4.191 assertions), 87 tes frontend lulus. Browser
+  memeriksa pencarian domestik, perpindahan ekspor, 27 hasil/pagination, Back,
+  satu box, reset/retry tanggal salah, Excel URL, fokus dan viewport 390px tanpa
+  overflow halaman atau exception JS. Fixture hanya SQLite preview khusus;
+  tidak ada migration/dependency/build baru atau perubahan MySQL/production.
+  Detail: docs/WAREHOUSE_SCOPED_REPORTS.md.
+
+Verifikasi Laporan Gabungan Domestik/Ekspor 30 Oktober 2026:
+- Fitur Laporan dan Export Operasional existing memiliki pemilih scope
+  domestic/export dan jenis penerimaan, pengiriman, stok aktif/cadangan,
+  pemenuhan serta revisi/pengembalian. Tanpa scope tetap domestik. Halaman dan
+  export penerimaan/pengambilan domestik dipertahankan, dengan pemilih tambahan.
+- Default reports untuk Admin Warehouse/Supervisi; Admin utama tetap akses
+  existing. Izin role tersimpan/revokasi tetap dihormati; operator ekspor tidak
+  diberi akses default. Rincian report baca sendiri tanpa izin operasi ekspor.
+- WarehouseReportService memakai query sama untuk tabel/ringkasan/Excel baru.
+  Histori penerimaan per box termasuk arsip dan lokasi movement pertama;
+  pengiriman hanya completed_at; stok hanya aktif dan posisi fisik. Pemenuhan
+  mencakup arsip selesai (overview includeArchived opsional, default tetap
+  aktif), terpisah dari metrik PCS domestik. Retur ekspor berasal dari snapshot
+  audit reduced, tidak dihitung inbound baru. Riwayat selesai tetap terbaca.
+- Filter tanggal inklusif, referensi/box/part/customer/lokasi/operator/status;
+  tabel 25 baris, rincian 50. Excel seluruh filter/halaman, leading zero dan
+  formula teks aman, tanggal/jumlah numerik. Route reports.records/export/detail
+  dan scope=export pada URL laporan/export lama memakai izin reports existing.
+- 450 tes backend akhir lulus (4.100 assertions); 31 tes terkait laporan/izin
+  lulus (474 assertions). Browser preview memeriksa filter
+  lingkup, histori pengiriman, satu box/Excel, rincian arsip, retur dan ponsel/
+  tanpa error konsol. Query MySQL lokal delapan jenis laporan/filter diuji baca
+  saja. Tidak ada mutation inventory, migration/dependency/seeder baru, fixture
+  MySQL atau perubahan dashboard/grafik maupun production remote. Detail:
+  docs/WAREHOUSE_SCOPED_REPORTS.md.
+
+Verifikasi Kesiapan Pallet dan Penyelesaian Permintaan Ekspor 30 Oktober 2026:
+- Detail pemenuhan memiliki Konfirmasi pallet siap setelah kebutuhan tepat.
+  Pop-up rincian part/PCS/box mewajibkan lokasi semula atau lokasi ekspor kosong
+  serta konfirmasi fisik. Lokasi/reservasi/komitmen dan movement ikut diperbarui
+  jika seluruh pallet berpindah, tanpa mengganti tanggal FIFO.
+- Pallet siap dikunci pada backend dari penempatan/penambahan dan alokasi.
+  Revisi membuka ulang kesiapan untuk koreksi lokasi, atau mengurangi kebutuhan
+  per part (minimal satu box tetap pada pallet). Tinjauan menentukan box tertua
+  menurut first_received_at/ID; wajib tujuan pallet existing belum siap selain
+  asal atau lokasi kosong serta konfirmasi pengembalian. Setelahnya reservasi
+  box dilepas, stok cadangan/FIFO tetap, kebutuhan delivery dan pallet/total/
+  revision disesuaikan atomik. Kesiapan pallet lain dipertahankan.
+- Selesaikan permintaan hanya setelah semua pallet siap dan isi fisik valid,
+  tanpa issue picking aktif. Alert/checkbox wajib menyatakan seluruh box sudah
+  keluar gudang. Box/delivery diarsipkan dari daftar aktif (soft delete), pallet
+  fisik diretir, lokasi/reservasi dibebaskan. Cadangan dan master tetap utuh.
+- Audit export_fulfillment menyimpan snapshot seluruh kebutuhan/pallet/lokasi/
+  box/PCS/FIFO sebelum selesai; filter dan rincian audit existing mendukungnya.
+  Mutex/revision/token mencegah konflik/retry; audit gagal membatalkan mutasi.
+  Izin export_fulfillment existing, tanpa seeder/dependency/config PC baru.
+- Migration 2026_10_30_000003 diterapkan ke MySQL lokal stock setelah backup
+  storage/app/backups/stock_export_fulfillment_20261030_193906_977c63.json.
+  Hash kolom lama/24 tabel tetap sama, 12 box lokal/8 ekspor dan 16 reservasi
+  tetap; aksi baru 0. Tidak ada fixture MySQL atau perubahan production remote.
+- 438 tes backend akhir (3.969 assertions) lulus; 15 tes khusus penyelesaian
+  (143 assertions) mencakup tambahan part campuran/part nol/pengembalian bulk.
+  Browser SQLite khusus menguji
+  lokasi kosong/semula, revisi/pengembalian FIFO, konfirmasi ulang, alert selesai,
+  stok cadangan tersisa, rincian audit sesudah arsip dan viewport ponsel/tanpa
+  error konsol halaman fitur. Detail implementasi
+  dan deployment: docs/EXPORT_FULFILLMENT_COMPLETION.md.
+
 Verifikasi Picking Verification Ekspor dan Approval Pengembalian 30 Oktober 2026:
 - Menu baru export_picking_verification (requires export_stock_input) berisi
   rekomendasi dari source campuran. Helper hanya mencari; NG tidak membuat

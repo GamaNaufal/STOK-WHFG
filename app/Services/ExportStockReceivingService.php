@@ -37,7 +37,7 @@ class ExportStockReceivingService
                 return $replay;
             }
             app(ExportPickingService::class)->assertReceiptAllowed($data['box_number']);
-            if (ExportStockBox::where('box_number', $data['box_number'])->exists()
+            if (ExportStockBox::withTrashed()->where('box_number', $data['box_number'])->exists()
                 || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
                 $this->fail('box_number', 'Nomor box ini sudah tercatat pada ekspor. Periksa daftar penerimaan/penempatannya.');
             }
@@ -114,6 +114,8 @@ class ExportStockReceivingService
             if ($box->revision !== (int) $data['revision']) $this->fail('revision', 'Data penempatan box sudah berubah. Muat ulang dan ikuti tujuan terbaru.');
             if (!in_array($box->state, ['received', 'stored'], true)) $this->fail('box', 'Box tidak tersedia untuk penempatan.');
             $source = $box->current_pallet_id ? ExportStockPallet::findOrFail($box->current_pallet_id) : null;
+            app(ExportFulfillmentCompletionService::class)->assertPalletUnlocked($source);
+            if ($planned?->ready_at) $this->fail('box', 'Pallet sudah siap. Buka revisi pallet melalui pemenuhan permintaan.');
             if (($box->state === 'stored' && !$source) || ($box->state === 'received' && $source)) {
                 $this->fail('box', 'Status penerimaan dan lokasi fisik box tidak konsisten.');
             }
@@ -159,6 +161,7 @@ class ExportStockReceivingService
                 $this->fail('box', 'Lokasi asal box tidak konsisten. Periksa stok ekspor.');
             }
             $moment = now();
+            app(ExportFulfillmentCompletionService::class)->assertPalletUnlocked($target);
             ExportStockMovement::create(['export_stock_box_id' => $box->id, 'request_token' => $data['request_token'],
                 'request_hash' => $hash, 'from_pallet_id' => $source?->id, 'to_pallet_id' => $target->id,
                 'export_fulfillment_box_id' => $commitment?->id, 'from_location_code' => $source?->location_code,

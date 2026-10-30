@@ -22,7 +22,7 @@ class ExportReceivingTransactionService
             ->join('export_receiving_batch_items as item', 'item.export_receiving_batch_id', '=', 'batch.id')
             ->join('export_stock_boxes as box', 'box.id', '=', 'item.export_stock_box_id')
             ->leftJoin('export_fulfillment_boxes as fulfillment', 'fulfillment.export_stock_box_id', '=', 'box.id')
-            ->where('batch.status', 'processed')
+            ->where('batch.status', 'processed')->whereNull('box.deleted_at')
             ->selectRaw("'batch' as kind, batch.id as transaction_id, batch.processed_at as received_at, batch.created_by as actor_id")
             ->selectRaw("COUNT(*) as total_boxes, SUM(CASE WHEN $pending THEN 1 ELSE 0 END) as pending_boxes")
             ->selectRaw("SUM(CASE WHEN $physicalPending AND NOT $queueReady THEN 1 ELSE 0 END) as waiting_boxes")
@@ -30,7 +30,7 @@ class ExportReceivingTransactionService
             ->groupBy('batch.id', 'batch.processed_at', 'batch.created_by')->havingRaw('SUM(CASE WHEN '.$pending.' THEN 1 ELSE 0 END) > 0');
         $legacy = DB::table('export_stock_boxes as box')
             ->leftJoin('export_fulfillment_boxes as fulfillment', 'fulfillment.export_stock_box_id', '=', 'box.id')
-            ->whereRaw($pending)->whereNotExists(fn ($query) => $query->selectRaw('1')->from('export_receiving_batch_items as item')
+            ->whereNull('box.deleted_at')->whereRaw($pending)->whereNotExists(fn ($query) => $query->selectRaw('1')->from('export_receiving_batch_items as item')
                 ->whereColumn('item.export_stock_box_id', 'box.id'))
             ->selectRaw("'legacy' as kind, box.id as transaction_id, box.first_received_at as received_at, box.received_by as actor_id")
             ->selectRaw('1 as total_boxes, 1 as pending_boxes, 0 as waiting_boxes, box.first_received_at as fifo_at, box.id as fifo_id');

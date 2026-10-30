@@ -34,6 +34,7 @@ class ExportPickingIssueService
             } else {
                 [$pallet, $location] = $this->destination($data['destination'] ?? null);
             }
+            if (!$box && ExportStockBox::onlyTrashed()->where('box_number', $issue->box_number)->exists()) $this->fail('issue', 'Nomor box ini sudah keluar gudang pada permintaan yang selesai. Periksa identitas box; riwayat tidak dapat didaftarkan ulang.');
             $part = !$box ? app(ExportStockReceivingService::class)->part(trim($data['part_number'] ?? ''), true) : null;
             $legacy = !$box ? ExportFulfillmentBox::where('box_number', $issue->box_number)->first() : null;
             if ($legacy && ((int) $legacy->part_setting_id !== $part->id || $legacy->pcs_quantity !== (int) $part->qty_box)) $this->fail('part_number', 'Nomor ini memiliki komitmen ekspor lama. Part dan kapasitas harus sesuai histori komitmen tersebut.');
@@ -69,6 +70,7 @@ class ExportPickingIssueService
 
             $box = ExportStockBox::where('box_number', $issue->box_number)->lockForUpdate()->first();
             if (!$box) {
+                if (ExportStockBox::onlyTrashed()->where('box_number', $issue->box_number)->exists()) $this->fail('issue', 'Box sudah keluar gudang. Riwayat box tidak dapat didaftarkan ulang.');
                 $part = $issue->part;
                 if (!$part || (int) $part->qty_box !== $issue->pcs_quantity) $this->fail('part_number', 'Kapasitas part berubah. Minta admin memperbarui approval sebelum konfirmasi.');
                 $box = ExportStockBox::create(['box_number' => $issue->box_number, 'part_setting_id' => $part->id, 'part_number' => $part->part_number,
@@ -86,6 +88,8 @@ class ExportPickingIssueService
             if ((int) $box->part_setting_id !== (int) $issue->part_setting_id || $box->pcs_quantity !== $issue->pcs_quantity) $this->fail('part_number', 'Data box berbeda dari approval. Minta admin meninjau kembali.');
             if ($issue->issue_type === 'wrong_box' && (int) $box->current_pallet_id !== (int) $target?->id) $this->fail('destination', 'Posisi box berubah dari asalnya. Minta admin meninjau ulang tujuan pengembalian.');
             if (!$target || (int) $box->current_pallet_id !== $target->id) {
+                app(ExportFulfillmentCompletionService::class)->assertPalletUnlocked($target);
+                app(ExportFulfillmentCompletionService::class)->assertPalletUnlocked($box->currentPallet);
                 $target ??= ExportStockPallet::create(['master_location_id' => $location->id, 'initial_location_id' => $location->id,
                     'location_code' => $location->code, 'created_by' => $actor->id]);
                 $source = $box->currentPallet;

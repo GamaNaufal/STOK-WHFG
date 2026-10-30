@@ -6,6 +6,7 @@
 @endsection
 @section('content')
 <div class="delivery-plan-page fulfillment-page">
+    @if($errors->any())<div class="alert alert-danger" role="alert">@foreach($errors->all() as $error)<p class="mb-1">{{ $error }}</p>@endforeach</div>@endif
     <header class="plan-header"><div><a class="plan-back" href="{{ route('export.fulfillment.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Pemenuhan permintaan</a><span class="plan-eyebrow">Pengiriman ekspor</span><h1>{{ $delivery->plan_code ?? 'Rencana tanpa kode' }}</h1><p>{{ $delivery->customer_name }} · Batas pengiriman {{ $delivery->delivery_deadline->format('d/m/Y') }} · {{ $overview->pallet_count }} pallet</p></div>
         <div class="plan-inline-actions">@if(auth()->user()->canAccess('export_pallet_plans'))<a class="btn btn-outline-secondary" href="{{ route('export.pallet-plans.show', $delivery) }}">Lihat perencanaan</a>@endif<a class="btn btn-outline-primary" href="{{ request()->fullUrl() }}">Perbarui tampilan</a></div>
     </header>
@@ -30,6 +31,13 @@
                         <tr><th scope="row">{{ $item->part_number }}@if($item->metrics['invalid'] || $item->metrics['excess'])<small class="fulfillment-row-warning">{{ $item->metrics['invalid'] }} tidak sesuai · {{ $item->metrics['excess'] }} berlebih</small>@endif</th><td>{{ number_format($item->pcs_per_box, 0, ',', '.') }}</td><td>{{ number_format($item->metrics['required'], 0, ',', '.') }}</td><td>{{ number_format($item->metrics['fulfilled'], 0, ',', '.') }}</td><td>{{ number_format($item->metrics['reserved'], 0, ',', '.') }}</td><td>{{ number_format($item->metrics['remaining'], 0, ',', '.') }}</td></tr>
                     @empty<tr><td colspan="6">Pembagian pallet belum diisi.</td></tr>@endforelse
                 </tbody></table></div>
+                <div class="plan-panel-body d-flex flex-wrap gap-2 align-items-center">
+                    @if($pallet->ready_at)<span class="fulfillment-status fulfillment-status-complete">Siap · {{ $pallet->ready_at->format('d/m/Y H:i') }} · Lokasi {{ $pallet->location_code }}</span>@endif
+                    @if($overview->fulfillment_status !== 'paused' && $pm['required'] > 0 && $pm['fulfilled'] === $pm['required'] && !$pm['invalid'] && !$pm['excess'])
+                        @unless($pallet->ready_at)<button type="button" class="btn btn-primary" data-ready-url="{{ route('export.fulfillment.ready-form', [$delivery, $pallet]) }}">Konfirmasi Pallet {{ $pallet->position }} siap</button>@endunless
+                        <a class="btn btn-outline-secondary" href="{{ route('export.fulfillment.revise', [$delivery, $pallet]) }}">Revisi pallet {{ $pallet->position }}</a>
+                    @else<span class="plan-help">Konfirmasi tersedia setelah seluruh kebutuhan pallet ditempatkan.</span>@endif
+                </div>
             </details>
         @endforeach
     </section>
@@ -58,5 +66,20 @@
         @if($boxes->hasPages())<div class="plan-panel-body">{{ $boxes->links('pagination::bootstrap-5') }}</div>@endif
         <p class="plan-help fulfillment-table-note">Urutan box memakai tanggal pertama diterima gudang, lalu nomor box. Data dimuat {{ now()->format('d/m/Y H:i') }}.</p>
     </section>
+    @php($readyCount = $pallets->filter(fn ($entry) => (bool) $entry['pallet']->ready_at)->count())
+    <section class="plan-panel"><div class="plan-panel-heading"><h2>Kesiapan pengiriman</h2><span>{{ $readyCount }} / {{ $pallets->count() }} pallet siap</span></div><div class="plan-panel-body">
+        <p>Setiap pallet harus dikonfirmasi siap beserta lokasi fisiknya. Selesaikan permintaan hanya setelah seluruh box keluar gudang.</p>
+        @if($overview->fulfillment_status === 'complete' && $readyCount === $pallets->count() && $readyCount > 0)
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#complete-request-modal">Selesaikan permintaan</button>
+        @else<button type="button" class="btn btn-secondary" disabled>Selesaikan permintaan</button>@endif
+    </div></section>
 </div>
+<div class="modal fade" id="ready-pallet-modal" tabindex="-1" aria-labelledby="ready-pallet-title" aria-hidden="true"><div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content" id="ready-pallet-content"></div></div></div>
+<div class="modal fade" id="complete-request-modal" tabindex="-1" aria-labelledby="complete-request-title" aria-hidden="true"><div class="modal-dialog"><div class="modal-content">
+    <form method="POST" action="{{ route('export.fulfillment.complete', $delivery->id) }}">@csrf<input type="hidden" name="revision" value="{{ $delivery->palletPlan->revision }}"><input type="hidden" name="request_token" value="{{ (string)\Illuminate\Support\Str::uuid() }}">
+    <div class="modal-header"><h2 class="modal-title fs-5" id="complete-request-title">Selesaikan permintaan?</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button></div>
+    <div class="modal-body"><div class="alert alert-warning"><strong>Pastikan seluruh box permintaan sudah keluar gudang.</strong></div><p>{{ $delivery->plan_code }} · {{ $delivery->customer_name }}<br>{{ $pallets->count() }} pallet · {{ number_format($metrics['required'],0,',','.') }} box</p><p>Box dan pallet permintaan akan dikeluarkan dari daftar aktif, lokasi dibebaskan, dan rincian disimpan pada audit trail.</p><div class="form-check"><input class="form-check-input" id="shipped-confirmed" type="checkbox" name="shipped_confirmed" value="1" required><label class="form-check-label" for="shipped-confirmed">Saya memastikan seluruh box permintaan ini sudah keluar gudang.</label></div></div>
+    <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Kembali</button><button type="submit" class="btn btn-primary">Ya, seluruh box sudah keluar</button></div></form>
+</div></div></div>
 @endsection
+@section('scripts')<script src="{{ asset('js/export-fulfillment.js') }}" defer></script>@endsection

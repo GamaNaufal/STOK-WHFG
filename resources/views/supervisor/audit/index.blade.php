@@ -99,6 +99,7 @@
                     <option value="stock_withdrawal" {{ $filters['type'] === 'stock_withdrawal' ? 'selected' : '' }}>Pengambilan Stok</option>
                     <option value="delivery_assignment" {{ $filters['type'] === 'delivery_assignment' ? 'selected' : '' }}>Assignment Delivery</option>
                     <option value="delivery_pickup" {{ $filters['type'] === 'delivery_pickup' ? 'selected' : '' }}>Pengiriman</option>
+                    <option value="export_fulfillment" {{ $filters['type'] === 'export_fulfillment' ? 'selected' : '' }}>Pemenuhan Permintaan Ekspor</option>
                     <option value="delivery_redo" {{ $filters['type'] === 'delivery_redo' ? 'selected' : '' }}>Redo Delivery</option>
                     <option value="pallet_location_moved" {{ $filters['type'] === 'pallet_location_moved' ? 'selected' : '' }}>Pemindahan Lokasi Pallet</option>
                     <option value="box_pallet_moved" {{ $filters['type'] === 'box_pallet_moved' ? 'selected' : '' }}>Pemindahan Box</option>
@@ -119,7 +120,7 @@
                 <label for="audit-action" class="form-label">Aksi</label>
                 <select id="audit-action" class="form-select" name="action">
                     <option value="">Semua aksi</option>
-                    @foreach(['created', 'updated', 'completed', 'reversed', 'redo', 'moved', 'merged', 'handled'] as $action)
+                    @foreach(['created', 'updated', 'completed', 'ready', 'reduced', 'reopened', 'reversed', 'redo', 'moved', 'merged', 'handled'] as $action)
                         <option value="{{ $action }}" {{ $filters['action'] === $action ? 'selected' : '' }}>{{ \App\Support\AuditLogPresenter::actionLabel($action) }}</option>
                     @endforeach
                     @foreach(['approved', 'rejected', 'started', 'cancelled', 'verified', 'scanned', 'terminated', 'timed_out', 'deleted', 'deactivated'] as $action)

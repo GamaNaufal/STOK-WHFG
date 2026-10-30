@@ -9,6 +9,7 @@ class AuditLogPresenter
 {
     private const FIELDS = [
         'box_number' => 'Nomor box', 'pallet_number' => 'Nomor pallet',
+        'plan_code' => 'Kode rencana delivery', 'customer_name' => 'Customer', 'completed_at' => 'Waktu selesai',
         'delivery_order_id' => 'Delivery order', 'part_number' => 'Nomor part',
         'pcs_quantity' => 'Jumlah PCS', 'box_quantity' => 'Jumlah box',
         'total_pcs_quantity' => 'Total PCS', 'total_box_quantity' => 'Total box',
@@ -39,6 +40,7 @@ class AuditLogPresenter
             'reversed' => 'Dibatalkan / dikembalikan', 'redo' => 'Ulangi delivery',
             'moved' => 'Dipindahkan', 'merged' => 'Pallet digabung',
             'handled' => 'Box di-Handle',
+            'ready' => 'Pallet siap', 'reduced' => 'Pengurangan box pallet', 'reopened' => 'Dibuka untuk revisi',
             'approved' => 'Disetujui', 'rejected' => 'Ditolak',
             'started' => 'Dimulai', 'cancelled' => 'Dibatalkan',
             'verified' => 'Diverifikasi', 'scanned' => 'Dipindai',
@@ -55,6 +57,7 @@ class AuditLogPresenter
     {
         return match ($type) {
             'stock_input' => 'Input stok', 'stock_withdrawal' => 'Pengambilan stok',
+            'export_fulfillment' => 'Pemenuhan permintaan ekspor',
             'delivery_pickup' => 'Pengiriman', 'delivery_assignment' => 'Assignment delivery',
             'delivery_redo' => 'Redo delivery', 'box_pallet_moved' => 'Pemindahan box',
             'expired_box' => 'Penanganan box expired',
@@ -78,6 +81,7 @@ class AuditLogPresenter
         }
         $changes = $facts = $tables = [];
         foreach (self::FIELDS as $key => $label) {
+            if ($log->type === 'export_fulfillment' && $key === 'pallets') continue;
             $hasOld = array_key_exists($key, $old);
             $hasNew = array_key_exists($key, $new);
             if (!$hasOld && !$hasNew) {
@@ -94,7 +98,8 @@ class AuditLogPresenter
         }
 
         foreach (['old' => $old, 'new' => $new] as $side => $values) {
-            foreach (['boxes', 'items', 'overage_adjustments'] as $key) {
+            foreach (['boxes', 'items', 'pallets', 'overage_adjustments'] as $key) {
+                if ($key === 'pallets' && $log->type !== 'export_fulfillment') continue;
                 if (!is_array($values[$key] ?? null) || !$values[$key]) {
                     continue;
                 }
@@ -102,6 +107,9 @@ class AuditLogPresenter
                 $columns = $isAdjustment
                     ? ['part_number' => 'Nomor part', 'old_quantity' => 'Sebelum (PCS)', 'new_quantity' => 'Sesudah (PCS)', 'increased_by' => 'Tambahan (PCS)']
                     : ['box_number' => 'Nomor box', 'part_number' => 'Nomor part', 'pcs_quantity' => 'Jumlah PCS', 'warehouse_location' => 'Lokasi gudang'];
+                if ($log->type === 'export_fulfillment' && $key === 'boxes') $columns += ['pallet_number' => 'Nomor pallet', 'first_received_at' => 'Pertama diterima'];
+                if ($log->type === 'export_fulfillment' && $key === 'items') $columns = ['part_number' => 'Nomor part', 'pcs_per_box' => 'PCS per box', 'box_quantity' => 'Jumlah box', 'pcs_quantity' => 'Total PCS'];
+                if ($log->type === 'export_fulfillment' && $key === 'pallets') $columns = ['pallet_number' => 'Nomor pallet', 'location' => 'Lokasi', 'total_boxes' => 'Jumlah box', 'ready_at' => 'Dikonfirmasi siap', 'ready_by' => 'ID operator'];
                 $rows = [];
                 foreach ($values[$key] as $item) {
                     if (!is_array($item)) {
@@ -115,7 +123,7 @@ class AuditLogPresenter
                 }
                 if ($rows) {
                     $tables[] = [
-                        'title' => ($isAdjustment ? 'Penyesuaian jumlah delivery' : 'Rincian box').($side === 'old' ? ' sebelum aksi' : ' saat aksi'),
+                        'title' => ($isAdjustment ? 'Penyesuaian jumlah delivery' : ($key === 'pallets' ? 'Rincian pallet' : ($log->type === 'export_fulfillment' && $key === 'items' ? 'Rincian kebutuhan' : 'Rincian box'))).($side === 'old' ? ' sebelum aksi' : ' saat aksi'),
                         'columns' => array_values($columns), 'rows' => $rows,
                     ];
                 }

@@ -286,6 +286,7 @@ class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, Shou
             'stock_input' => 'Input Stok',
             'stock_withdrawal' => 'Ambil Stok',
             'delivery_pickup' => 'Pengiriman',
+            'export_fulfillment' => 'Pemenuhan Permintaan Ekspor',
             'delivery_redo' => 'Redo Delivery',
             'expired_box' => 'Penanganan Box Expired',
             'not_full_box' => 'Box Not Full',

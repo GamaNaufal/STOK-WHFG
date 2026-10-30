@@ -84,6 +84,12 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::post('receiving', [\App\Http\Controllers\ExportStockReceivingController::class, 'store'])->name('receiving.store');
         Route::post('receiving/{stockBox}/place', [\App\Http\Controllers\ExportStockReceivingController::class, 'place'])->name('receiving.place');
         Route::get('fulfillment/{deliveryPlan}', [\App\Http\Controllers\ExportFulfillmentController::class, 'show'])->name('fulfillment.show');
+        Route::get('fulfillment/{deliveryPlan}/pallets/{pallet}/ready', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'readyForm'])->name('fulfillment.ready-form');
+        Route::post('fulfillment/{deliveryPlan}/pallets/{pallet}/ready', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'ready'])->name('fulfillment.ready');
+        Route::match(['get', 'post'], 'fulfillment/{deliveryPlan}/pallets/{pallet}/revision', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'revise'])->name('fulfillment.revise');
+        Route::post('fulfillment/{deliveryPlan}/pallets/{pallet}/reduce', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'reduce'])->name('fulfillment.reduce');
+        Route::post('fulfillment/{deliveryPlan}/pallets/{pallet}/reopen', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'reopen'])->name('fulfillment.reopen');
+        Route::post('fulfillment/{deliveryPlan}/complete', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'complete'])->whereNumber('deliveryPlan')->name('fulfillment.complete');
     });
 
     // Master Locations - Admin Warehouse + Admin IT
@@ -215,6 +221,9 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     Route::group([], function () {
         Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');
         Route::get('/reports/stock-input', [ReportController::class, 'stockInputReport'])->name('reports.stock-input');
+        Route::get('/reports/records', [\App\Http\Controllers\WarehouseReportController::class, 'index'])->name('reports.records');
+        Route::get('/reports/records/export', [\App\Http\Controllers\WarehouseReportController::class, 'export'])->name('reports.records.export');
+        Route::get('/reports/records/{record}', [\App\Http\Controllers\WarehouseReportController::class, 'detail'])->whereNumber('record')->name('reports.records.detail');
         Route::get('/reports/operational/export', [ReportController::class, 'exportOperationalExcel'])->name('reports.operational.export');
 
         Route::get('/expired-box', [\App\Http\Controllers\ExpiredBoxController::class, 'index'])->name('expired-box.index');

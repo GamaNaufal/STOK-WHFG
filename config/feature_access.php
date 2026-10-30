@@ -42,7 +42,7 @@ return [
         'export_fulfillment' => ['label' => 'Pemenuhan Permintaan', 'group' => 'Pengiriman Ekspor', 'icon' => 'clipboard-data', 'route' => 'export.fulfillment.index', 'routes' => ['export.fulfillment.*'], 'roles' => ['export_operator']],
         'export_parts' => ['label' => 'Master Nomor Part Ekspor', 'group' => 'Master Data Ekspor', 'icon' => 'list-check', 'route' => 'export.part-settings.index', 'routes' => ['export.part-settings.*'], 'roles' => ['export_operator']],
         'export_locations' => ['label' => 'Master Lokasi Ekspor', 'group' => 'Master Data Ekspor', 'icon' => 'geo-alt', 'route' => 'export.locations.index', 'routes' => ['export.locations.*'], 'roles' => ['export_operator']],
-        'reports' => ['label' => 'Laporan dan Export Operasional', 'group' => 'Laporan', 'icon' => 'file-earmark-bar-graph', 'route' => 'reports.stock-input', 'routes' => ['reports.*'], 'roles' => $supervisor],
+        'reports' => ['label' => 'Laporan dan Export Operasional', 'group' => 'Laporan', 'icon' => 'file-earmark-bar-graph', 'route' => 'reports.stock-input', 'routes' => ['reports.*'], 'roles' => ['admin_warehouse', 'supervisi']],
         'audit' => ['label' => 'Audit Trail', 'group' => 'Laporan', 'icon' => 'shield-check', 'route' => 'audit.index', 'routes' => ['audit.*'], 'roles' => $supervisor],
         'users' => ['label' => 'Kelola User', 'group' => 'Administrasi', 'icon' => 'people', 'route' => 'users.index', 'routes' => ['users.*'], 'roles' => [], 'admin_only' => true],
         'access_management' => ['label' => 'Hak Akses', 'group' => 'Administrasi', 'icon' => 'key', 'route' => 'access.index', 'routes' => ['access.*'], 'roles' => [], 'admin_only' => true],

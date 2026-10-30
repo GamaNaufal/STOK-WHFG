@@ -37,7 +37,7 @@ class ExportFulfillmentService
     }
 
     /** Finalized plans enter automatically. Previously finalized drafts remain visible on hold. */
-    public function overview(): Builder
+    public function overview(bool $includeArchived = false): Builder
     {
         $totals = DB::query()->fromSub($this->itemMetrics(), 'items')->select('plan_id')
             ->selectRaw('SUM(required_boxes) as required_boxes, SUM(fulfilled_boxes) as fulfilled_boxes, SUM(reserved_boxes) as reserved_boxes, SUM(invalid_boxes) as invalid_boxes')
@@ -50,11 +50,12 @@ class ExportFulfillmentService
         $plans = ExportPalletPlan::query()->join('export_delivery_plans as delivery', 'delivery.id', '=', 'export_pallet_plans.export_delivery_plan_id')
             ->leftJoinSub($totals, 'totals', 'totals.plan_id', '=', 'export_pallet_plans.id')
             ->leftJoinSub($pallets, 'pallets', 'pallets.export_pallet_plan_id', '=', 'export_pallet_plans.id')
-            ->whereNull('delivery.deleted_at')->where('export_pallet_plans.status', '<>', 'cancelled')
+            ->when(!$includeArchived, fn ($q) => $q->whereNull('delivery.deleted_at'))->where('export_pallet_plans.status', '<>', 'cancelled')
             ->where(fn ($query) => $query->where('export_pallet_plans.status', 'final')->orWhere('export_pallet_plans.entered_fulfillment', true))
             ->select(['export_pallet_plans.id as plan_id', 'delivery.id as delivery_id', 'delivery.plan_code',
                 'delivery.customer_name', 'delivery.delivery_deadline', 'export_pallet_plans.revision',
-                'export_pallet_plans.status as planning_status'])
+                'export_pallet_plans.status as planning_status', 'export_pallet_plans.completed_at', 'export_pallet_plans.completed_by',
+                'delivery.deleted_at as archived_at', 'delivery.created_by'])
             ->selectRaw('COALESCE(pallets.pallet_count, 0) as pallet_count')
             ->selectRaw('COALESCE(totals.required_boxes, 0) as required_boxes, COALESCE(totals.fulfilled_boxes, 0) as fulfilled_boxes, COALESCE(totals.reserved_boxes, 0) as reserved_boxes, COALESCE(totals.invalid_boxes, 0) as invalid_boxes, COALESCE(totals.excess_boxes, 0) as excess_boxes')
             ->selectRaw('COALESCE(totals.remaining_boxes, 0) as remaining_boxes, COALESCE(totals.unreserved_boxes, 0) as unreserved_boxes')

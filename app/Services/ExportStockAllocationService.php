@@ -26,6 +26,7 @@ class ExportStockAllocationService
             $plan = $plans->get($delivery->id);
             if (!$plan || $plan->delivery_revision !== $delivery->revision) continue;
             foreach ($plan->pallets as $pallet) foreach ($pallet->items as $item) {
+                if ($pallet->ready_at) continue;
                 if ($partIds !== null && !in_array($item->part_setting_id, $partIds, true)) continue;
                 $remaining = $item->box_quantity - $item->fulfillment_boxes_count;
                 if ($remaining <= 0) continue;

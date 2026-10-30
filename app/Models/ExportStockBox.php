@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ExportStockBox extends Model
 {
+    use \Illuminate\Database\Eloquent\SoftDeletes;
     protected $guarded = ['id'];
     protected $casts = ['box_number' => 'string', 'pcs_quantity' => 'integer', 'revision' => 'integer',
         'first_received_at' => 'datetime', 'stored_at' => 'datetime'];

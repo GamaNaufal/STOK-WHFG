@@ -48,7 +48,7 @@ class ExportReceivingBatchService
             $this->editable($batch, (int) $data['revision']);
             if ($batch->items()->count() >= 1000) $this->fail('batch', 'Maksimal 1.000 box dalam satu daftar scan. Proses dahulu daftar ini.');
             if ($batch->items()->where('box_number', $data['box_number'])->exists()) $this->fail('box_number', 'Nomor box sudah ada dalam daftar scan ini.');
-            if (ExportStockBox::where('box_number', $data['box_number'])->exists() || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
+            if (ExportStockBox::withTrashed()->where('box_number', $data['box_number'])->exists() || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
                 $this->fail('box_number', 'Nomor box sudah diterima di ekspor.');
             }
             $part = app(ExportStockReceivingService::class)->part($data['part_number'], true);

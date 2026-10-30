@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 class ExportPalletPlan extends Model
 {
     protected $guarded = ['id'];
-    protected $casts = ['revision' => 'integer', 'delivery_revision' => 'integer', 'finalized_at' => 'datetime', 'entered_fulfillment' => 'boolean'];
+    protected $casts = ['revision' => 'integer', 'delivery_revision' => 'integer', 'finalized_at' => 'datetime',
+        'completed_at' => 'datetime', 'entered_fulfillment' => 'boolean'];
 
     public function deliveryPlan() { return $this->belongsTo(ExportDeliveryPlan::class, 'export_delivery_plan_id'); }
     public function pallets() { return $this->hasMany(ExportPlannedPallet::class)->orderBy('position'); }

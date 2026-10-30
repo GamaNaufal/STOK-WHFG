@@ -20,6 +20,7 @@ class ExportStockViewService
     {
         return [
             'pallets' => ExportStockPallet::whereNull('retired_at')->whereHas('location')->whereHas('boxes')
+                ->whereDoesntHave('plannedPallet', fn ($p) => $p->whereNotNull('ready_at'))
                 ->with('plannedPallet')->withCount('boxes')->orderBy('id')->get(),
             'locations' => ExportMasterLocation::available()->whereNull('current_pallet_id')->whereDoesntHave('stockLocations')
                 ->whereDoesntHave('stockPallet')->orderBy('code')->get(),
