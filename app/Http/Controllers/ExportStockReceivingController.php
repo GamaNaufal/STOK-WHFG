@@ -44,9 +44,10 @@ class ExportStockReceivingController extends Controller
             $batch = app(ExportReceivingBatchService::class)->owned((int) $data['batch_id'], $request->user());
             $inDraft = $batch->items()->where('box_number', $data['box_number'])->exists();
         }
-        $exists = $box || $inDraft || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists();
+        $held = \App\Models\ExportPickingIssue::open()->where('box_number', $data['box_number'])->exists();
+        $exists = $box || $inDraft || $held || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists();
         return response()->json(['available' => !$exists, 'box_id' => $box?->id,
-            'message' => $inDraft ? 'Nomor box sudah ada dalam daftar scan.' : ($exists ? 'Nomor box sudah tercatat pada ekspor.' : 'Nomor box siap. Scan nomor part.')]);
+            'message' => $held ? 'Box sedang ditahan oleh issue picking ekspor; selesaikan pengembalian.' : ($inDraft ? 'Nomor box sudah ada dalam daftar scan.' : ($exists ? 'Nomor box sudah tercatat pada ekspor.' : 'Nomor box siap. Scan nomor part.'))]);
     }
 
     public function part(Request $request, ExportStockReceivingService $service)

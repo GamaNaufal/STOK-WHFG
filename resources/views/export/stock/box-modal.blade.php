@@ -3,12 +3,12 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h2 class="modal-title" id="export-stock-box-title">Detail box ekspor</h2>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup detail box"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup detail"></button>
             </div>
             <div class="modal-body" id="export-stock-box-content" aria-live="polite">
                 @if($selected)@include('export.stock.box-detail')@endif
             </div>
-            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button></div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-primary" id="export-stock-modal-back" hidden>Kembali ke isi pallet</button><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Tutup</button></div>
         </div>
     </div>
 </div>

@@ -31,7 +31,7 @@ class ExportStockAllocationService
                 if ($remaining <= 0) continue;
                 $boxes = ExportStockBox::where('part_setting_id', $item->part_setting_id)
                     ->where('pcs_quantity', $item->pcs_per_box)->whereIn('state', ['received', 'stored'])
-                    ->whereDoesntHave('fulfillment')->with('currentPallet')
+                    ->whereDoesntHave('fulfillment')->whereNotIn('box_number', \App\Models\ExportPickingIssue::open()->select('box_number'))->with('currentPallet')
                     ->orderBy('first_received_at')->orderBy('id')->limit($remaining)->lockForUpdate()->get();
                 if ($boxes->isEmpty()) continue;
                 $claim = $plan->reservations->firstWhere('export_planned_pallet_id', $pallet->id);
@@ -55,6 +55,8 @@ class ExportStockAllocationService
                         'placed_at' => $alreadyThere ? $box->stored_at : null,
                         'placed_by' => $alreadyThere ? $box->stored_by : null,
                         'placed_location_id' => $alreadyThere ? $pallet->master_location_id : null,
+                        'picking_required' => !$alreadyThere && $notice && (int) $notice->export_pallet_plan_id === $plan->id && $box->current_pallet_id
+                            && \App\Models\ExportStockPallet::whereKey($box->current_pallet_id)->mixed()->exists(),
                     ]);
                     $box->increment('revision');
                     AuditService::record('export_stock_reservation', 'reserved', 'ExportStockBox', $box->id, $actor->id,

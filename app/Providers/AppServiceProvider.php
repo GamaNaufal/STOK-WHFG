@@ -91,8 +91,8 @@ class AppServiceProvider extends ServiceProvider
 
                 // Scan Issues count for Admin Warehouse
                 if (Auth::user()->canAccess('delivery_issues')) {
-                    $scanIssueCount = Cache::remember('sidebar_scan_issue_count', $cacheTtlSeconds, function () {
-                        return DeliveryIssue::where('status', 'pending')->count();
+                    $scanIssueCount = Cache::remember('sidebar_scan_issue_count_v2', $cacheTtlSeconds, function () {
+                        return DeliveryIssue::where('status', 'pending')->count() + \App\Models\ExportPickingIssue::where('status', 'pending')->count();
                     });
                     $view->with('pendingScanIssueCount', $scanIssueCount);
                 }

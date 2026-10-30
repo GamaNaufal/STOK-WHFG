@@ -24,7 +24,7 @@
             <div>
                 <span class="scan-issues-eyebrow">Perlu keputusan</span>
                 <h2 id="pendingIssuesTitle">Menunggu approval</h2>
-                <p>Menyetujui issue membuka blokir sesi; kode yang salah tidak dihitung sebagai box terverifikasi.</p>
+                <p>Domestik: approval membuka blokir sesi. Ekspor: setelah approval, operator wajib mengonfirmasi penempatan pengembalian sebelum blokir dibuka.</p>
             </div>
             <span class="scan-issues-count scan-issues-count-pending">{{ $issues->count() }} pending</span>
         </div>
@@ -41,8 +41,12 @@
                 </thead>
                 <tbody>
                     @forelse($issues as $issue)
+                        @if($issue instanceof \App\Models\ExportPickingIssue)
+                            @include('operator.delivery.export-issue-row', ['history' => false])
+                        @else
                         <tr>
                             <td class="scan-issues-order">
+                                <span class="badge text-bg-secondary mb-2">Domestik / Lokal</span>
                                 <strong>#{{ $issue->session->delivery_order_id }}</strong>
                                 <small>{{ $issue->session->order?->customer_name ?? 'Customer tidak tersedia' }}</small>
                             </td>
@@ -69,6 +73,7 @@
                                 </form>
                             </td>
                         </tr>
+                        @endif
                     @empty
                         <tr>
                             <td colspan="5" class="scan-issues-empty">
@@ -105,8 +110,12 @@
                 </thead>
                 <tbody>
                     @forelse($historyIssues as $issue)
+                        @if($issue instanceof \App\Models\ExportPickingIssue)
+                            @include('operator.delivery.export-issue-row', ['history' => true])
+                        @else
                         <tr>
                             <td class="scan-issues-order">
+                                <span class="badge text-bg-secondary mb-2">Domestik / Lokal</span>
                                 <strong>#{{ $issue->session->delivery_order_id }}</strong>
                                 <small>{{ $issue->session->order?->customer_name ?? 'Customer tidak tersedia' }}</small>
                             </td>
@@ -127,6 +136,7 @@
                             </td>
                             <td class="scan-issues-history-notes">{{ $issue->notes ?? '—' }}</td>
                         </tr>
+                        @endif
                     @empty
                         <tr>
                             <td colspan="5" class="scan-issues-empty">
@@ -142,6 +152,7 @@
         <p id="historyIssuesHelp" class="scan-issues-table-hint">Geser tabel untuk membaca kode scan dan catatan lengkap.</p>
     </section>
 </div>
+<datalist id="export-approval-parts">@foreach($exportParts as $part)<option value="{{ $part->part_number }}">{{ $part->qty_box }} PCS / box</option>@endforeach</datalist>
 @endsection
 
 @section('scripts')

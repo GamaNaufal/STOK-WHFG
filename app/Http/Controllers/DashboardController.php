@@ -172,7 +172,7 @@ class DashboardController extends Controller
                 'total_pallets' => Pallet::count(),
                 'pallets_with_location' => $stockSummaryTotals['pallets_with_location'],
                 'total_pcs' => $stockSummaryTotals['total_pcs'],
-                'pending_scan_issues' => DeliveryIssue::where('status', 'pending')->count(),
+                'pending_scan_issues' => DeliveryIssue::where('status', 'pending')->count() + \App\Models\ExportPickingIssue::where('status', 'pending')->count(),
                 'total_items' => $stockSummaryTotals['total_items'],
                 'warning_boxes' => $warningBoxes,
                 'expired_boxes' => $expiredBoxesCount,

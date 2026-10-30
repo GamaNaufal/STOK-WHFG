@@ -23,6 +23,13 @@
 .stock-export-filters>div { min-width:0; }
 .stock-export-filters>p { grid-column:1/-1; margin:0; color:var(--ui-muted,#595d65); font-size:.8rem; line-height:1.5; }
 .stock-export-filters .stock-export-actions { grid-column:1/-1; display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:.75rem; }
+.stock-export-filters { border-bottom:1px solid var(--ui-border,#dfe1e5); }
+.stock-request-state { display:flex; align-items:center; gap:.75rem; padding:0 1.25rem; color:var(--ui-muted,#595d65); font-size:.8rem; }
+.stock-request-state:has(#stock-request-status:not(:empty)) { padding-top:.75rem; padding-bottom:.75rem; }
+.stock-pallet-detail-heading { padding:1rem; background:var(--ui-soft,#e8f3f1); border:1px solid var(--ui-border,#dfe1e5); border-radius:.6rem; }
+.stock-pallet-detail-heading h3 { font-size:1.3rem; margin:0 0 .5rem; }
+.stock-pallet-detail-heading p { margin:.25rem 0 0; font-size:.9rem; }
+.receiving-page .stock-pallet-contents .plan-table,.receiving-page .stock-pallet-overview .plan-table { min-width:38rem; }
 @media(max-width:575.98px) { .stock-export-filters { grid-template-columns:minmax(0,1fr); } .stock-export-actions>.btn { width:100%; } }
 .receiving-page .plan-table { min-width:52rem; }
 #receiving-scan-status:empty { display:none; }
@@ -32,6 +39,7 @@
 .receiving-page .receiving-field-action .btn { white-space:nowrap; }
 .receiving-scan-outcome { display:flex; flex-direction:column; gap:.4rem; padding:1rem; margin-top:.85rem; border:1px solid var(--ui-border,#dfe1e5); border-radius:.6rem; background:#f7f8fa; }
 .receiving-scan-outcome strong { font-size:1.3rem; }
+.receiving-scan-outcome[hidden] { display:none; }
 .receiving-scan-outcome span { font-size:.85rem; line-height:1.5; overflow-wrap:anywhere; }
 .receiving-scan-outcome.is-ok { background:#e9f4ed; border-color:#b5d8c2; color:#22603f; }
 .receiving-scan-outcome.is-ng { background:#fceeed; border-color:#e4b6b4; color:#9c2925; }

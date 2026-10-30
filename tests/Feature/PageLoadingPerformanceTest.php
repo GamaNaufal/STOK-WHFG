@@ -37,16 +37,16 @@ class PageLoadingPerformanceTest extends TestCase
             $this->get($path)->assertOk();
             $queries = DB::getQueryLog(); DB::disableQueryLog();
             foreach ($queries as $query) {
-                $this->assertStringNotContainsString('master_locations', $query['query']);
                 if ($path === '/export/receiving') {
+                    $this->assertStringNotContainsString('master_locations', $query['query']);
                     $this->assertStringNotContainsString('export_stock_pallets', $query['query']);
                 }
             }
             if ($path === '/export/stock') {
-                // The stock filter now needs one compact catalog, not placement choices.
-                $catalog = collect($queries)->filter(fn ($q) => str_contains($q['query'], 'export_stock_pallets'))->values();
+                // One query for occupied export locations, without the old pallet dropdown/catalog.
+                $catalog = collect($queries)->filter(fn ($q) => str_contains($q['query'], 'master_locations'))->values();
                 $this->assertCount(1, $catalog);
-                $this->assertStringContainsString('boxes_count', $catalog[0]['query']);
+                $this->assertStringContainsString('export_stock_boxes', $catalog[0]['query']);
             }
         }
     }

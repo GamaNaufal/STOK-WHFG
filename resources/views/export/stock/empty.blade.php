@@ -1,0 +1,1 @@
+<div class="plan-empty"><strong>{{ $hasFilters ? 'Tidak ada box yang cocok' : 'Belum ada stok ekspor' }}</strong><span>Ubah atau reset filter untuk melihat stok lain. Box baru masuk setelah daftar scan diproses pada Penerimaan Transfer Box Ekspor.</span></div>

@@ -86,6 +86,9 @@ class ExportFulfillmentService
 
     public function assertNoCommittedBoxes(ExportPalletPlan $plan): void
     {
+        if (\App\Models\ExportPickingIssue::open()->whereIn('export_planned_pallet_id', $plan->pallets()->select('id'))->exists()) {
+            throw ValidationException::withMessages(['picking' => 'Selesaikan approval dan penempatan pengembalian issue picking sebelum merevisi rencana.']);
+        }
         $exists = DB::table('export_fulfillment_boxes as box')
             ->join('export_planned_pallet_items as item', 'item.id', '=', 'box.export_planned_pallet_item_id')
             ->join('export_planned_pallets as pallet', 'pallet.id', '=', 'item.export_planned_pallet_id')

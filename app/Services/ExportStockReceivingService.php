@@ -36,6 +36,7 @@ class ExportStockReceivingService
                     || (int) $replay->received_by !== $actor->id) $this->fail('receive_token', 'Permintaan penerimaan sudah dipakai untuk data lain.');
                 return $replay;
             }
+            app(ExportPickingService::class)->assertReceiptAllowed($data['box_number']);
             if (ExportStockBox::where('box_number', $data['box_number'])->exists()
                 || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
                 $this->fail('box_number', 'Nomor box ini sudah tercatat pada ekspor. Periksa daftar penerimaan/penempatannya.');
@@ -116,6 +117,7 @@ class ExportStockReceivingService
             if (($box->state === 'stored' && !$source) || ($box->state === 'received' && $source)) {
                 $this->fail('box', 'Status penerimaan dan lokasi fisik box tidak konsisten.');
             }
+            app(ExportPickingService::class)->assertCanPlace($box, $commitment, $actor);
             $selected = null;
             if ($planned) {
                 if ($locationId || $palletId) $this->fail('location_id', 'Box sudah direservasi. Ikuti lokasi pallet yang ditentukan sistem.');
@@ -171,6 +173,7 @@ class ExportStockReceivingService
                 $source->update(['master_location_id' => null, 'export_planned_pallet_id' => null, 'retired_at' => $moment]);
                 $sourceLocation->update(['is_occupied' => false]);
             }
+            app(ExportPickingService::class)->requireForSource($target->id);
             AuditService::record('export_stock_placement', 'placed', 'ExportStockBox', $box->id, $actor->id,
                 $before, $box->only(['current_pallet_id', 'state', 'revision']) + [
                     'box_number' => $box->box_number, 'from_location' => $source?->location_code,

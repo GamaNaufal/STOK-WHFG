@@ -9,14 +9,15 @@ function element(extra = {}) {
         removeAttribute(name) { delete this.attributes[name]; },
         replaceChildren(...children) { this.children = children; this.innerHTML = ''; },
         append(...children) { this.children.push(...children); },
+        contains(target) { return !!target.inModal; },
         focus() { this.focused = true; }, ...extra};
 }
 function setup(fetcher, initial = false) {
-    const root = element({dataset: {openOnLoad: String(initial)}}), content = element(), search = element();
-    const documentRef = element({getElementById(id) { return {'export-stock-box-modal': root, 'export-stock-box-content': content, 'receiving-stock-search': search}[id]; }, createElement() { return element(); }});
+    const root = element({dataset: {openOnLoad: String(initial)}}), content = element(), search = element(), title = element(), backButton = element({hidden: true});
+    const documentRef = element({getElementById(id) { return {'export-stock-box-modal': root, 'export-stock-box-content': content, 'receiving-stock-search': search, 'export-stock-box-title': title, 'export-stock-modal-back': backButton}[id]; }, createElement() { return element(); }});
     const modal = {shows: 0, show() { this.shows++; }};
     const api = initBoxModal({documentRef, fetcher, Modal: {getOrCreateInstance() { return modal; }}});
-    return {root, content, search, documentRef, modal, ...api};
+    return {root, content, search, title, backButton, documentRef, modal, ...api};
 }
 const reply = html => ({ok: true, json: async () => ({html})});
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return {promise, resolve}; };
@@ -64,4 +65,48 @@ test('permission failures show an error, and direct box links open their server-
     assert.match(ui.content.children[0].children[0].textContent, /tidak memiliki akses/);
     let requests = 0; const initial = setup(async () => { requests++; }, true);
     assert.equal(initial.modal.shows, 1); assert.equal(requests, 0);
+});
+
+test('pallet list action loads boxes in one dialog and allows returning from a box detail', async () => {
+    const requests = [], ui = setup(async url => { requests.push(url); return reply(url); });
+    const pallet = element({dataset: {exportStockPallet: '/stock/pallets/1/boxes?q=PART'}});
+    await ui.documentRef.events.click({target: {closest: selector => selector === '[data-export-stock-pallet]' ? pallet : null}, preventDefault() {}});
+    assert.equal(ui.title.textContent, 'Detail pallet ekspor');
+    assert.equal(ui.content.innerHTML, '/stock/pallets/1/boxes?q=PART');
+    assert.equal(ui.backButton.hidden, true);
+    const box = element({inModal: true, dataset: {exportStockBox: '/stock/9'}});
+    await ui.documentRef.events.click({target: {closest: selector => selector === '[data-export-stock-box]' ? box : null}, preventDefault() {}});
+    assert.equal(ui.title.textContent, 'Detail box ekspor');
+    assert.equal(ui.backButton.hidden, false);
+    await ui.backButton.events.click();
+    assert.equal(ui.title.textContent, 'Detail pallet ekspor');
+    assert.equal(ui.backButton.hidden, true);
+    assert.deepEqual(requests, ['/stock/pallets/1/boxes?q=PART', '/stock/9', '/stock/pallets/1/boxes?q=PART']);
+    ui.root.events['hidden.bs.modal']();
+    assert.equal(pallet.focused, true);
+});
+
+test('pallet pagination stays in the dialog and back from box detail returns to the same box page', async () => {
+    const requests = [], ui = setup(async url => { requests.push(url); return reply(url); });
+    const trigger = element();
+    await ui.open('/stock/pallets/1/boxes', trigger, {kind: 'pallet'});
+    const link = element({inModal: true, href: '/stock/pallets/1/boxes?box_page=2', closest: selector => selector === '.pagination' ? {} : null});
+    await ui.documentRef.events.click({target: {closest: selector => selector === 'a[href]' ? link : null}, preventDefault() {}});
+    assert.equal(ui.content.innerHTML, '/stock/pallets/1/boxes?box_page=2');
+    const box = element({inModal: true, dataset: {exportStockBox: '/stock/99'}});
+    await ui.documentRef.events.click({target: {closest: selector => selector === '[data-export-stock-box]' ? box : null}, preventDefault() {}});
+    await ui.backButton.events.click();
+    assert.equal(requests.at(-1), '/stock/pallets/1/boxes?box_page=2');
+    assert.equal(ui.title.textContent, 'Detail pallet ekspor');
+});
+
+test('closing a pending pallet popup cancels rendering and returns focus to the list action', async () => {
+    const pending = deferred(), ui = setup(() => pending.promise), trigger = element();
+    const loading = ui.open('/stock/pallets/1/boxes', trigger, {kind: 'pallet'});
+    assert.equal(ui.content.children[0].textContent, 'Memuat isi pallet...');
+    ui.root.events['hidden.bs.modal']();
+    pending.resolve(reply('STALE PALLET')); await loading;
+    assert.equal(ui.content.innerHTML, '');
+    assert.equal(trigger.focused, true);
+    assert.equal(ui.backButton.hidden, true);
 });

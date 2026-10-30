@@ -63,7 +63,14 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::get('receiving/transactions/box/{stockBox}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'legacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy');
         Route::get('receiving/transactions/box/{stockBox}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printLegacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy-print');
         Route::get('stock', [\App\Http\Controllers\ExportStockController::class, 'index'])->name('stock.index');
+        Route::get('picking-verification', [\App\Http\Controllers\ExportPickingController::class, 'index'])->name('picking.index');
+        Route::get('picking-verification/{pallet}', [\App\Http\Controllers\ExportPickingController::class, 'helper'])->whereNumber('pallet')->name('picking.show');
+        Route::post('picking-verification/{pallet}/seek', [\App\Http\Controllers\ExportPickingController::class, 'seek'])->whereNumber('pallet')->name('picking.seek');
+        Route::get('receiving/picking/{pallet}', [\App\Http\Controllers\ExportPickingController::class, 'show'])->whereNumber('pallet')->name('receiving.picking.show');
+        Route::post('receiving/picking/{pallet}/scan', [\App\Http\Controllers\ExportPickingController::class, 'scan'])->whereNumber('pallet')->name('receiving.picking.scan');
+        Route::post('receiving/picking/issues/{issue}/return', [\App\Http\Controllers\ExportPickingController::class, 'confirmReturn'])->whereNumber('issue')->name('receiving.picking.return');
         Route::get('stock/export-excel', [\App\Http\Controllers\ExportStockController::class, 'export'])->name('stock.export');
+        Route::get('stock/pallets/{pallet}/boxes', [\App\Http\Controllers\ExportStockController::class, 'palletBoxes'])->where('pallet', '[0-9]+|unplaced')->name('stock.pallet-boxes');
         Route::get('stock/{stockBox}', [\App\Http\Controllers\ExportStockController::class, 'show'])->name('stock.show');
         Route::post('receiving/batches', [\App\Http\Controllers\ExportStockReceivingController::class, 'start'])->name('receiving.batches.start');
         Route::get('receiving/batches/{batch}', [\App\Http\Controllers\ExportStockReceivingController::class, 'batchState'])->name('receiving.batches.state');
@@ -237,6 +244,7 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     // Scan Issue Notifications (Admin Warehouse + Admin IT)
     Route::group([], function () {
         Route::get('/delivery-scan-issues', [DeliveryPickController::class, 'issues'])->name('delivery.pick.issues');
+        Route::post('/delivery-scan-issues/export/{issue}/approve', [\App\Http\Controllers\ExportPickingIssueController::class, 'approve'])->whereNumber('issue')->name('delivery.pick.export-issue.approve');
         Route::post('/delivery-scan-issues/{issue}/approve', [DeliveryPickController::class, 'approveIssue'])->name('delivery.pick.issue.approve');
         Route::get('/delivery-completions/{completion}/redo-options', [DeliveryPickController::class, 'redoOptions'])->name('delivery.pick.redo-options');
         Route::post('/delivery-completions/{completion}/redo', [DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');

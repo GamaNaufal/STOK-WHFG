@@ -2,26 +2,83 @@
 
 Terakhir diverifikasi dari source code: 30 Oktober 2026 (pembaruan inkremental).
 
-Verifikasi Filter Pallet/Lokasi dan Excel Stok Ekspor 30 Oktober 2026:
-- Stok Ekspor menyediakan filter pallet fisik dan lokasi, digabung pencarian
-  box/part dan status. Pilihan hanya pallet berisi stok, dengan nomor pallet,
-  lokasi, kode delivery jika terhubung, dan jumlah box. Identitas filter memakai
-  ID pallet fisik; Pallet 1 dari delivery berbeda tidak tercampur.
-- ExportStockQueryService menyatukan filter daftar dan unduhan. Filter memakai
-  current_pallet_id/lokasi fisik, bukan tujuan reservasi. Pagination tetap 20;
-  katalog filter dimuat secara eager/berjumlah query tetap, tanpa katalog
-  penempatan. Modal detail box existing tetap tersedia.
-- GET export/stock/export-excel memakai izin export_stock_input existing dan
-  Maatwebsite Excel existing (FromQuery/chunk). Seluruh hasil filter diekspor,
-  termasuk halaman berikutnya: box, part, PCS, tanggal pertama, posisi fisik,
-  status serta delivery/pallet/lokasi tujuan reservasi pada kolom terpisah.
-  ID/naskah ditulis sebagai teks, PCS/tanggal numerik, header teal dibekukan dan
-  autofilter. Status memakai label model yang sama dengan tampilan.
-- 51 tes backend terkait lulus (623 assertions), termasuk regresi stok lokal,
-  FIFO, filter gabungan, validasi scope, izin, pagination dan isi workbook.
-  Browser memeriksa filter satu pallet, modal, unduhan dua box, desktop/ponsel
-  dan konsol tanpa error. Fixture hanya SQLite preview; tidak ada migration,
-  dependency baru atau perubahan data MySQL/production.
+Verifikasi Picking Verification Ekspor dan Approval Pengembalian 30 Oktober 2026:
+- Menu baru export_picking_verification (requires export_stock_input) berisi
+  rekomendasi dari source campuran. Helper hanya mencari; NG tidak membuat
+  issue, sertifikat pengambilan, atau blokir. Detail: docs/EXPORT_PICKING_VERIFICATION.md.
+- Tahap wajib pada penerimaan/penempatan hanya memvalidasi pengambilan stok
+  rekomendasi finalisasi rencana pallet (allocation_notice_id terisi), dengan
+  nomor box reservasi FIFO. Penerimaan/input baru dan alokasi penerimaan berikutnya
+  tanpa notice tidak memerlukan verifikasi tambahan, termasuk pallet campuran;
+  scan input dan konfirmasi penempatan tetap berlaku. Campuran ditentukan dari
+  seluruh part di pallet fisik asal; flag hanya diwajibkan untuk rekomendasi
+  tersebut saat reservasi/ketika source menjadi campuran. Pallet satu part tetap boleh
+  menyuplai sebagian isi tanpa scan (teruji 36 dari 72 box). Bukti terikat
+  source dan revision box; penempatan satuan/bulk memeriksanya pada backend.
+- Input selain tepat 8 digit ASCII (termasuk 123) ditolak tanpa issue. Salah
+  box delapan digit membuat ExportPickingIssue pending yang persisten, menahan
+  operator/tujuan terkait dan box salah. Refresh/POST langsung tidak melepasnya.
+- Scan Issues dan Approval existing kini memuat Lokal/Domestik dan Ekspor,
+  berlabel per baris. Approval ekspor hanya menjadi awaiting_return. Asal
+  diketahui tetap asalnya; lokasi hilang wajib dipilih admin; box baru juga
+  wajib part master ekspor dengan PCS default. Data lokal tidak dipakai.
+  Indikator pending sidebar/dashboard Admin Warehouse juga menghitung kedua lingkup.
+- Hanya konfirmasi penempatan oleh operator pelapor yang menjadi returned dan
+  melepas issue. Box baru dibuat pada tahap ini, dengan waktu pertama terdeteksi;
+  return ke asal existing tidak menambah stok/mengubah FIFO. Tujuan/kapasitas
+  berubah memerlukan pembaruan approval. Retry dilindungi token/revision,
+  alokasi mengabaikan box ditahan dan revisi rencana ditolak selama issue aktif.
+- Migration 2026_10_30_000002 menambah metadata pada fulfillment dan tabel
+  export_picking_issues/scans. Diterapkan ke MySQL lokal stock setelah backup
+  storage/app/backups/stock_export_picking_20261030_173847_0c056a.json. Hash kolom
+  existing dan jumlah data tetap, termasuk 12 box lokal/8 ekspor/8 komitmen;
+  issue/scan baru 0. Tidak ada fixture MySQL atau perubahan production remote.
+- 422 tes backend (3.802 assertions), 80 frontend dan build lulus. Penyempurnaan
+  UI/indikator approval dilanjutkan 36 tes (494 assertions), lalu 15 tes picking
+  (173 assertions) untuk urutan tenggat dan query MySQL baca saja. Browser menguji
+  helper, NG format/nomor, approval gabungan, refresh, konfirmasi baru unblock,
+  registrasi part/PCS/lokasi box baru serta penempatan sesudah verifikasi dan
+  pengecualian satu part. Contoh hanya SQLite preview khusus.
+- Koreksi lingkup scan: 17 tes picking lulus (194 assertions), termasuk input
+  bulk setelah finalisasi serta alokasi berikutnya dari source campuran tanpa
+  notice/meskipun flag lama terisi. Browser SQLite preview juga mengonfirmasi
+  dua box input langsung berhasil ditempatkan tanpa verifikasi tambahan,
+  dengan tugas rekomendasi campuran tetap tersedia dan konsol tanpa error.
+  Tidak ada migration atau perubahan data MySQL untuk koreksi ini.
+
+Verifikasi Pengelompokan Box/Pallet dan AJAX Stok Ekspor 30 Oktober 2026:
+- Dropdown Pallet fisik dihapus sesuai koreksi pengguna. mode=box/pallet
+  memilih daftar box (20/halaman) atau kelompok berdasarkan current_pallet_id
+  (10 kelompok/halaman). Baris daftar menampilkan Pallet N/lokasi/kode
+  delivery, jumlah box/PCS sesuai filter dan total box fisik bila difilter.
+  Pallet 1 dari delivery berbeda tetap kelompok terpisah; box tanpa posisi
+  berada dalam kelompok Belum ditempatkan, bukan pallet tujuan reservasinya.
+- Pencarian mencakup box, part, lokasi fisik dan kode delivery pallet asal.
+  Frasa Pallet 1/Pallet1 dicocokkan dengan posisi tepat (tidak Pallet 10);
+  Pallet cadangan juga didukung. Lokasi/status digabungkan di kedua mode.
+- GET stock dengan Accept JSON hanya merender partial hasil + jumlah box.
+  stock-browser.mjs menerapkan select langsung dan teks setelah debounce
+  250 ms, tanpa tombol Cari stok/reload. AbortController + versi respons
+  mencegah hasil lama menimpa filter terbaru. Reset, pagination dan Back
+  didukung; kegagalan mempertahankan daftar lama dan menawarkan Coba lagi.
+- Sesuai koreksi pengguna, daftar pallet memakai tabel dengan Lihat detail;
+  tidak ada expand/accordion atau box yang langsung tampil pada daftar utama.
+  Klik memuat GET stock/pallets/{ID|unplaced}/boxes secara lazy ke pop-up,
+  dengan identitas pallet/lokasi/delivery dan 20 box/halaman urut FIFO.
+  Pagination isi tetap dalam pop-up dengan filter identik. Detail box memakai
+  dialog yang sama, dilengkapi Kembali ke isi pallet (termasuk halaman semula).
+  Tutup/Escape membatalkan respons tertunda dan mengembalikan fokus ke aksi
+  daftar. HTML/JSON memakai private/no-store dan Vary Accept.
+- ExportStockQueryService menyatukan pencarian/filter daftar, isi, dan Excel.
+  Unduhan memuat semua hasil; mode pallet mengurutkan per pallet lalu FIFO.
+  Kolom posisi asal/tujuan terpisah, ID teks/PCS dan tanggal numerik, header
+  teal/freeze/autofilter tetap. Izin export_stock_input dan dependency existing.
+- Verifikasi pengelompokan sebelumnya: 57 tes backend (705 assertions).
+  Pembaruan pop-up: 31 tes backend terkait lulus (402 assertions), 18 tes
+  frontend dan Vite build lulus. Browser memeriksa daftar tanpa expand,
+  pop-up dua box, detail box/kembali, pagination pallet 70 box, Escape/fokus
+  tanpa backdrop tersisa, desktop/ponsel dan konsol tanpa error. Fixture hanya
+  SQLite preview; tidak ada migration atau perubahan data MySQL/production.
 
 Verifikasi Tinjauan FIFO Wajib dan Tinjau Ulang 30 Oktober 2026:
 - Pop-up hasil finalisasi terkini yang belum diakui hanya mempunyai satu tombol

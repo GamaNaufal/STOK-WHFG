@@ -12,6 +12,7 @@ class ExportFulfillmentBox extends Model
     protected $casts = [
         'box_number' => 'string', 'pcs_quantity' => 'integer',
         'first_received_at' => 'datetime', 'reserved_at' => 'datetime', 'placed_at' => 'datetime',
+        'picking_required' => 'boolean', 'picking_verified_at' => 'datetime', 'picking_verified_revision' => 'integer',
     ];
 
     public function plannedItem() { return $this->belongsTo(ExportPlannedPalletItem::class, 'export_planned_pallet_item_id'); }

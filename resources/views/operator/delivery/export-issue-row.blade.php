@@ -1,0 +1,17 @@
+<tr>
+    <td class="scan-issues-order"><span class="badge text-bg-info mb-2">Ekspor</span><strong>{{ $issue->context['plan_code'] ?? 'Ekspor' }}</strong><small>{{ $issue->context['customer'] ?? '' }}</small><small>Pallet tujuan {{ $issue->context['target_pallet'] ?? '-' }} · {{ $issue->context['target_location'] ?? '-' }}</small><small>Issue #{{ $issue->id }} · {{ $issue->reporter?->name }}</small></td>
+    <td><code class="scan-issues-code">{{ $issue->box_number }}</code><small class="scan-issues-reason">{{ $issue->reason }}</small>@if($issue->return_location_code)<small>Kembalikan: {{ $issue->returnPallet?->display_name ?? 'Pallet cadangan' }} · {{ $issue->return_location_code }}</small>@endif</td>
+    @if($history)
+        <td>{{ $issue->confirmed_at?->format('d M Y H:i') }}</td><td><span class="scan-issues-status is-approved">PENEMPATAN DIKONFIRMASI</span></td><td class="scan-issues-history-notes">{{ $issue->notes }}</td>
+    @else
+        <td><span class="scan-issues-date">{{ $issue->created_at->format('d M Y') }}</span><small class="scan-issues-time">{{ $issue->created_at->format('H:i') }}</small><small class="scan-issues-time">{{ $issue->status === 'pending' ? 'Menunggu approval' : 'Menunggu konfirmasi penempatan operator' }}</small></td>
+        <td>
+            <label class="form-label" for="export-issue-notes-{{ $issue->id }}">Catatan admin</label><input class="form-control mb-2" id="export-issue-notes-{{ $issue->id }}" name="notes" form="approve-export-issue-{{ $issue->id }}" maxlength="500" required value="{{ $issue->notes }}">
+            @if($issue->issue_type === 'unknown_box')<label class="form-label" for="export-issue-part-{{ $issue->id }}">Nomor part ekspor</label><input class="form-control mb-2" id="export-issue-part-{{ $issue->id }}" name="part_number" form="approve-export-issue-{{ $issue->id }}" list="export-approval-parts" maxlength="100" required value="{{ $issue->part?->part_number }}">@endif
+            @if($issue->issue_type !== 'wrong_box')
+                <label class="form-label" for="export-issue-destination-{{ $issue->id }}">Tujuan pengembalian</label><select class="form-select mb-2" id="export-issue-destination-{{ $issue->id }}" name="destination" form="approve-export-issue-{{ $issue->id }}" required><option value="">Pilih lokasi / pallet ekspor</option><optgroup label="Lokasi kosong">@foreach($exportChoices['locations'] as $loc)<option value="location:{{ $loc->id }}" @selected(!$issue->return_pallet_id && (int)$issue->return_location_id===$loc->id)>{{ $loc->code }}</option>@endforeach</optgroup><optgroup label="Pallet existing">@foreach($exportChoices['pallets'] as $physical)<option value="pallet:{{ $physical->id }}" @selected((int)$issue->return_pallet_id===$physical->id)>{{ $physical->display_name }} · {{ $physical->location_code }}</option>@endforeach</optgroup></select>
+            @else<small>Tujuan tetap di pallet/lokasi asal box yang tercatat.</small>@endif
+        </td>
+        <td><form id="approve-export-issue-{{ $issue->id }}" method="POST" action="{{ route('delivery.pick.export-issue.approve', $issue) }}">@csrf<input type="hidden" name="revision" value="{{ $issue->revision }}"><button class="btn scan-issues-approve" type="submit">{{ $issue->status === 'pending' ? 'Setujui pengembalian' : 'Perbarui arahan' }}</button></form><small>Blokir baru dibuka setelah penempatan dikonfirmasi.</small></td>
+    @endif
+</tr>

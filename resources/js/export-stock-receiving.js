@@ -2,10 +2,14 @@ import {scanToken} from './export-stock/scan-token.mjs';
 import {initBoxModal} from './export-stock/box-modal.mjs';
 import {initPlacementGuide} from './export-stock/placement-guide.mjs';
 import {initDestinationLoads} from './export-stock/pallet-load.mjs';
+import {initStockBrowser} from './export-stock/stock-browser.mjs';
+import {initExportPicking} from './export-stock/picking.mjs';
 
 initBoxModal();
 initPlacementGuide();
 initDestinationLoads();
+initStockBrowser();
+initExportPicking();
 document.addEventListener('submit', event => {
     const form = event.target.closest('[data-placement-form], #export-place-form');
     if (!form) return;

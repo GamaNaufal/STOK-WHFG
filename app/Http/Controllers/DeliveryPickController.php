@@ -2307,7 +2307,13 @@ class DeliveryPickController extends Controller
             ->limit(200)
             ->get();
 
-        return view('operator.delivery.scan-issues', compact('issues', 'historyIssues'));
+        $exportIssues = \App\Models\ExportPickingIssue::open()->with(['returnPallet.plannedPallet', 'stockBox', 'reporter', 'part'])->orderByDesc('created_at')->get();
+        $exportHistory = \App\Models\ExportPickingIssue::where('status', 'returned')->with(['approver', 'reporter', 'returnPallet.plannedPallet'])->orderByDesc('confirmed_at')->limit(200)->get();
+        $issues = $issues->concat($exportIssues)->sortByDesc('created_at')->values();
+        $historyIssues = $historyIssues->concat($exportHistory)->sortByDesc(fn ($i) => $i instanceof \App\Models\ExportPickingIssue ? $i->confirmed_at : $i->resolved_at)->take(200)->values();
+        $exportChoices = $exportIssues->isNotEmpty() ? app(\App\Services\ExportStockViewService::class)->choices() : ['pallets' => collect(), 'locations' => collect()];
+        $exportParts = $exportIssues->contains('issue_type', 'unknown_box') ? \App\Models\ExportPartSetting::orderBy('part_number')->get(['part_number', 'qty_box']) : collect();
+        return view('operator.delivery.scan-issues', compact('issues', 'historyIssues', 'exportChoices', 'exportParts'));
     }
 
     public function lockManagement()
