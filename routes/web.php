@@ -90,6 +90,8 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::post('fulfillment/{deliveryPlan}/pallets/{pallet}/reduce', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'reduce'])->name('fulfillment.reduce');
         Route::post('fulfillment/{deliveryPlan}/pallets/{pallet}/reopen', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'reopen'])->name('fulfillment.reopen');
         Route::post('fulfillment/{deliveryPlan}/complete', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'complete'])->whereNumber('deliveryPlan')->name('fulfillment.complete');
+        Route::get('fulfillment/{deliveryPlan}/cancel', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'cancelForm'])->whereNumber('deliveryPlan')->name('fulfillment.cancel-form');
+        Route::post('fulfillment/{deliveryPlan}/cancel', [\App\Http\Controllers\ExportFulfillmentActionController::class, 'cancel'])->whereNumber('deliveryPlan')->name('fulfillment.cancel');
     });
 
     // Master Locations - Admin Warehouse + Admin IT
@@ -254,6 +256,7 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     Route::group([], function () {
         Route::get('/delivery-scan-issues', [DeliveryPickController::class, 'issues'])->name('delivery.pick.issues');
         Route::post('/delivery-scan-issues/export/{issue}/approve', [\App\Http\Controllers\ExportPickingIssueController::class, 'approve'])->whereNumber('issue')->name('delivery.pick.export-issue.approve');
+        Route::post('/delivery-scan-issues/export/{issue}/input-error', [\App\Http\Controllers\ExportPickingIssueController::class, 'resolveInputError'])->whereNumber('issue')->name('delivery.pick.export-issue.input-error');
         Route::post('/delivery-scan-issues/{issue}/approve', [DeliveryPickController::class, 'approveIssue'])->name('delivery.pick.issue.approve');
         Route::get('/delivery-completions/{completion}/redo-options', [DeliveryPickController::class, 'redoOptions'])->name('delivery.pick.redo-options');
         Route::post('/delivery-completions/{completion}/redo', [DeliveryPickController::class, 'redo'])->name('delivery.pick.redo');

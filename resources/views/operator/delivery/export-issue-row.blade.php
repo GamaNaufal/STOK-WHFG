@@ -2,7 +2,7 @@
     <td class="scan-issues-order"><span class="badge text-bg-info mb-2">Ekspor</span><strong>{{ $issue->context['plan_code'] ?? 'Ekspor' }}</strong><small>{{ $issue->context['customer'] ?? '' }}</small><small>Pallet tujuan {{ $issue->context['target_pallet'] ?? '-' }} · {{ $issue->context['target_location'] ?? '-' }}</small><small>Issue #{{ $issue->id }} · {{ $issue->reporter?->name }}</small></td>
     <td><code class="scan-issues-code">{{ $issue->box_number }}</code><small class="scan-issues-reason">{{ $issue->reason }}</small>@if($issue->return_location_code)<small>Kembalikan: {{ $issue->returnPallet?->display_name ?? 'Pallet cadangan' }} · {{ $issue->return_location_code }}</small>@endif</td>
     @if($history)
-        <td>{{ $issue->confirmed_at?->format('d M Y H:i') }}</td><td><span class="scan-issues-status is-approved">PENEMPATAN DIKONFIRMASI</span></td><td class="scan-issues-history-notes">{{ $issue->notes }}</td>
+        <td>{{ ($issue->confirmed_at ?? $issue->approved_at)?->format('d M Y H:i') }}</td><td><span class="scan-issues-status is-approved">{{ $issue->status === 'input_error' ? 'SALAH INPUT · TANPA BOX FISIK' : 'PENEMPATAN DIKONFIRMASI' }}</span></td><td class="scan-issues-history-notes">{{ $issue->notes }}</td>
     @else
         <td><span class="scan-issues-date">{{ $issue->created_at->format('d M Y') }}</span><small class="scan-issues-time">{{ $issue->created_at->format('H:i') }}</small><small class="scan-issues-time">{{ $issue->status === 'pending' ? 'Menunggu approval' : 'Menunggu konfirmasi penempatan operator' }}</small></td>
         <td>
@@ -12,6 +12,16 @@
                 <label class="form-label" for="export-issue-destination-{{ $issue->id }}">Tujuan pengembalian</label><select class="form-select mb-2" id="export-issue-destination-{{ $issue->id }}" name="destination" form="approve-export-issue-{{ $issue->id }}" required><option value="">Pilih lokasi / pallet ekspor</option><optgroup label="Lokasi kosong">@foreach($exportChoices['locations'] as $loc)<option value="location:{{ $loc->id }}" @selected(!$issue->return_pallet_id && (int)$issue->return_location_id===$loc->id)>{{ $loc->code }}</option>@endforeach</optgroup><optgroup label="Pallet existing">@foreach($exportChoices['pallets'] as $physical)<option value="pallet:{{ $physical->id }}" @selected((int)$issue->return_pallet_id===$physical->id)>{{ $physical->display_name }} · {{ $physical->location_code }}</option>@endforeach</optgroup></select>
             @else<small>Tujuan tetap di pallet/lokasi asal box yang tercatat.</small>@endif
         </td>
-        <td><form id="approve-export-issue-{{ $issue->id }}" method="POST" action="{{ route('delivery.pick.export-issue.approve', $issue) }}">@csrf<input type="hidden" name="revision" value="{{ $issue->revision }}"><button class="btn scan-issues-approve" type="submit">{{ $issue->status === 'pending' ? 'Setujui pengembalian' : 'Perbarui arahan' }}</button></form><small>Blokir baru dibuka setelah penempatan dikonfirmasi.</small></td>
+        <td><form id="approve-export-issue-{{ $issue->id }}" method="POST" action="{{ route('delivery.pick.export-issue.approve', $issue) }}">@csrf<input type="hidden" name="revision" value="{{ $issue->revision }}"><button class="btn scan-issues-approve" type="submit">{{ $issue->status === 'pending' ? 'Setujui pengembalian' : 'Perbarui arahan' }}</button></form><small>Blokir baru dibuka setelah penempatan dikonfirmasi.</small>
+        @if(in_array(auth()->user()->role, ['admin', 'admin_warehouse'], true))
+            <details class="mt-3"><summary>Salah input tanpa box fisik</summary>
+                <form method="POST" action="{{ route('delivery.pick.export-issue.input-error', $issue) }}" class="mt-2">@csrf
+                    <input type="hidden" name="revision" value="{{ $issue->revision }}"><input type="hidden" name="request_token" value="{{ (string)\Illuminate\Support\Str::uuid() }}">
+                    <label class="form-label" for="input-error-notes-{{ $issue->id }}">Alasan penutupan</label><textarea class="form-control mb-2" name="notes" id="input-error-notes-{{ $issue->id }}" required maxlength="500" rows="2"></textarea>
+                    <div class="form-check mb-2"><input class="form-check-input" type="checkbox" id="no-physical-{{ $issue->id }}" name="no_physical_box" value="1" required><label class="form-check-label" for="no-physical-{{ $issue->id }}">Saya memastikan tidak ada box fisik yang diambil. Ini hanya kesalahan input nomor.</label></div>
+                    <button class="btn btn-outline-secondary" type="submit">Tutup sebagai salah input</button><small class="d-block mt-1">Alasan dan admin dicatat pada audit. Box yang benar-benar diambil wajib memakai pengembalian.</small>
+                </form>
+            </details>
+        @endif</td>
     @endif
 </tr>

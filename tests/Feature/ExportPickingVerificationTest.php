@@ -83,6 +83,60 @@ class ExportPickingVerificationTest extends TestCase
         $this->postJson(route('export.receiving.place-bulk'), ['placements_json' => json_encode([['id' => $box->id, 'revision' => $box->fresh()->revision, 'request_token' => (string) Str::uuid()]])])->assertUnprocessable();
     }
 
+    public function test_historical_input_error_can_be_closed_by_admin_without_creating_stock(): void
+    {
+        $historical=$this->receive();$historical->update(['state'=>'shipped']);$historical->delete();
+        [$pallet,$first]=$this->mixed();$token=(string)Str::uuid();
+        $this->scan($pallet,$historical->box_number,$token)->assertStatus(423);
+        $issue=ExportPickingIssue::sole();$stockCount=ExportStockBox::withTrashed()->count();$moves=ExportStockMovement::count();
+        $data=['revision'=>$issue->revision,'request_token'=>(string)Str::uuid(),'notes'=>'Salah ketik, tidak ada box fisik yang diambil.','no_physical_box'=>1];
+        $url=route('delivery.pick.export-issue.input-error',$issue);
+        $this->actingAs($this->admin)->post($url,array_replace($data,['no_physical_box'=>0]))->assertSessionHasErrors('no_physical_box');
+        $this->post($url,array_replace($data,['notes'=>'']))->assertSessionHasErrors('notes');
+        $this->post($url,$data)->assertSessionHasNoErrors();$this->post($url,$data)->assertSessionHasNoErrors();
+        $this->post($url,array_replace($data,['notes'=>'Ubah alasan melalui retry']))->assertSessionHasErrors('revision');
+        $this->assertSame('input_error',$issue->fresh()->status);$this->assertSame(0,ExportPickingIssue::open()->count());
+        $this->assertNull($issue->fresh()->confirmed_at);$this->assertSame($stockCount,ExportStockBox::withTrashed()->count());
+        $this->assertSame($moves,ExportStockMovement::count());$this->assertTrue(ExportStockBox::onlyTrashed()->whereKey($historical->id)->exists());
+        $this->get(route('delivery.pick.issues'))->assertSee('SALAH INPUT · TANPA BOX FISIK');
+        $this->actingAs($this->operator);$this->scan($pallet,$historical->box_number,$token)->assertJsonPath('blocked',false);
+        $this->scan($pallet,$first->box_number)->assertOk();$this->place($first);
+        $this->assertSame(1,\App\Models\AuditLog::where('type','export_picking_issue')->where('action','input_error_closed')->count());
+    }
+
+    public function test_operator_cannot_close_unknown_issue_as_input_error_even_with_valid_payload(): void
+    {
+        [$pallet]=$this->mixed();$this->scan($pallet,'99999999')->assertStatus(423);$issue=ExportPickingIssue::sole();
+        $data=['revision'=>$issue->revision,'request_token'=>(string)Str::uuid(),'notes'=>'Typo','no_physical_box'=>1];
+        $this->post(route('delivery.pick.export-issue.input-error',$issue),$data)->assertForbidden();
+        $this->assertSame('pending',$issue->fresh()->status);
+        $this->actingAs($this->admin)->post(route('delivery.pick.export-issue.input-error',$issue),$data)->assertSessionHasNoErrors();
+        $this->assertFalse(ExportStockBox::where('box_number','99999999')->exists());
+    }
+
+    public function test_verified_unplaced_pick_requires_confirmed_return_during_cancellation(): void
+    {
+        [$pallet,$first,,$source]=$this->mixed();$this->scan($pallet,$first->box_number)->assertOk();
+        $service=app(\App\Services\ExportFulfillmentCompletionService::class);$delivery=$pallet->palletPlan->deliveryPlan;
+        $preview=$service->reduction($pallet,[$pallet->items()->sole()->id=>0]);$this->assertCount(1,$preview['returns']);
+        $data=['revision'=>1,'fulfillment_revision'=>1,'request_token'=>(string)Str::uuid(),'quantities'=>$preview['quantities'],
+            'fingerprint'=>$preview['fingerprint'],'destination'=>'pallet:'.$source->id];
+        $this->post(route('export.fulfillment.reduce',[$delivery,$pallet]),$data)->assertSessionHasErrors('return_confirmed');
+        $this->post(route('export.fulfillment.reduce',[$delivery,$pallet]),$data+['return_confirmed'=>1])->assertSessionHasNoErrors();
+        $this->assertSame($source->id,$first->fresh()->current_pallet_id);$this->assertNull($first->fresh()->fulfillment);
+        $this->assertNull(\App\Models\ExportDeliveryPlan::find($delivery->id));
+    }
+
+    public function test_open_wrong_pick_issue_prevents_cancellation_until_real_return_is_confirmed(): void
+    {
+        [$pallet,,$wrong]=$this->mixed();$this->scan($pallet,$wrong->box_number)->assertStatus(423);
+        $issue=ExportPickingIssue::sole();$this->approve($issue)->assertSessionHasNoErrors();
+        $delivery=$pallet->palletPlan->deliveryPlan;
+        $this->get(route('export.fulfillment.cancel-form',$delivery))->assertSessionHasErrors('fulfillment');
+        $this->confirm($issue)->assertSessionHasNoErrors();
+        $this->get(route('export.fulfillment.cancel-form',$delivery))->assertOk();
+    }
+
     public function test_mixed_source_requires_exact_fifo_box_scan_and_helper_cannot_certify_a_pick(): void
     {
         [$pallet, $first, $second] = $this->mixed();

@@ -26,15 +26,24 @@ Revisi pallet menyediakan pembukaan ulang kesiapan untuk koreksi lokasi tanpa
 mengubah jumlah. Pallet harus dikonfirmasi siap lagi sebelum permintaan selesai.
 
 Untuk pengurangan, operator mengisi jumlah box yang tetap diperlukan per part.
-Tahap ini hanya mendukung pengurangan dan menyisakan minimal satu box pada pallet.
-Tinjauan menampilkan nomor box yang harus diambil menurut first_received_at lalu
-ID stok, khusus dari part dan pallet tersebut. Membuka tinjauan tidak mengubah data.
+Tahap ini mendukung pengurangan saat pallet belum penuh, bahkan tanpa box.
+Semua part boleh nol untuk menghapus pallet; menghapus pallet terakhir membatalkan
+permintaan. Nomor pallet lainnya tetap, agar panduan peletakan tidak berganti.
+Tinjauan menampilkan nomor box terbaru yang harus dikembalikan menurut
+first_received_at menurun lalu ID stok terbesar, khusus dari part dan pallet
+tersebut. Box tertua dipertahankan untuk pengiriman FIFO; tanggal penerimaan
+box yang dikembalikan tetap. Membuka tinjauan tidak mengubah data.
 
-Operator wajib memilih satu pallet ekspor existing yang belum siap (selain pallet
+Jika ada box sudah ditempatkan atau sudah diverifikasi diambil, operator wajib
+memilih satu pallet ekspor existing yang belum siap (selain pallet
 asal) atau lokasi ekspor kosong, kemudian mengonfirmasi seluruh box yang ditunjuk
 sudah dikembalikan di sana. Lokasi kosong menjadi pallet cadangan baru. Pilihan
 tersebut diperiksa ulang saat simpan; lokasi terisi/direservasi atau fingerprint
-box/revision yang berubah ditolak atomik.
+box/revision yang berubah ditolak atomik. Reservasi yang belum dipindahkan cukup
+dilepas, posisi dan FIFO tetap; tidak diminta tujuan/konfirmasi pengembalian
+fiktif. Box yang sudah diverifikasi diambil boleh dikonfirmasi kembali ke pallet
+asal meskipun catatan posisi belum berubah. Revisi hanya atas kebutuhan yang
+belum terisi juga tidak memerlukan perpindahan stok.
 
 Setelah konfirmasi, sistem melepas reservasi box terpilih, mencatat movement
 pengembalian, mengurangi kebutuhan part pada pallet dan jumlah rencana delivery,
@@ -43,6 +52,22 @@ kesiapan pallet tersebut. Pallet lain yang siap tetap siap. Box hasil pengembali
 tetap stok cadangan dengan waktu FIFO semula; tidak langsung dialokasikan ulang
 oleh aksi revisi. Part yang habis pada pallet dihapus dari alokasinya; rincian
 delivery bernilai nol tetap menjadi snapshot, tanpa menghapus master part.
+
+## Pembatalan seluruh permintaan
+
+Tombol Batalkan permintaan pada Pemenuhan membuka halaman tinjauan seluruh pallet.
+Alasan wajib; box fisik wajib dikembalikan ke satu pallet cadangan existing di
+luar request atau lokasi kosong, dan penempatannya dikonfirmasi. Reservasi yang
+belum dipindahkan dilepas di asalnya. Seluruh mutasi, pengosongan pallet,
+pembebasan klaim lokasi, pembaruan jumlah dan audit berlangsung atomik.
+
+Delivery menjadi cancelled dan diarsipkan; tidak mengirim box, tidak menandai
+completed_at, dan tidak mengurangi stok fisik. Pallet kosong diretir, nomor box
+dan tanggal FIFO tetap. Retry aman setelah request/pallet tidak lagi aktif.
+Fingerprint seluruh reservasi menolak tinjauan sebelum ada penerimaan baru.
+Issue picking terbuka tetap harus diselesaikan dahulu. Laporan revisi menampilkan
+jumlah pengembalian fisik; pengurangan kebutuhan yang belum terisi tidak dihitung
+sebagai box yang kembali. Audit menyimpan daftar reservasi dilepas secara terpisah.
 
 ## Selesaikan permintaan
 

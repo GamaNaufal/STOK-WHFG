@@ -8,6 +8,14 @@ use Illuminate\Http\Request;
 
 class ExportPickingIssueController extends Controller
 {
+    public function resolveInputError(Request $request, ExportPickingIssue $issue, ExportPickingIssueService $service)
+    {
+        $data = $request->validate(['revision' => 'required|integer|min:1', 'notes' => 'required|string|max:500',
+            'request_token' => 'required|uuid', 'no_physical_box' => 'required|accepted']);
+        $service->resolveInputError($issue->id, $data, $request->user());
+        return redirect()->route('delivery.pick.issues')->with('success', 'Issue ditutup sebagai salah input tanpa box fisik. Blokir dilepas dan alasan tersimpan pada audit.');
+    }
+
     public function approve(Request $request, ExportPickingIssue $issue, ExportPickingIssueService $service)
     {
         $data = $request->validate(['revision' => 'required|integer|min:1', 'notes' => 'required|string|max:500',

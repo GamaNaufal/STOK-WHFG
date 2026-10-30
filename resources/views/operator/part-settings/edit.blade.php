@@ -76,7 +76,7 @@
                 <span class="part-page-eyebrow">Data saat ini</span>
                 <h2 id="part-context-title">{{ $partSetting->part_number }}</h2>
                 <span class="part-quantity"><strong>{{ number_format($partSetting->qty_box, 0, ',', '.') }}</strong> PCS / box</span>
-                <p>{{ $isExport ? "Perubahan ini berlaku untuk kapasitas box ekspor." : "Qty per box tetap dapat diperbarui meskipun nomor part sudah digunakan dalam transaksi atau histori." }}</p>
+                <p>{{ $isExport ? "PCS per box dapat diubah setelah seluruh rencana delivery yang memakai part ini selesai atau dibatalkan, termasuk rencana draft." : "Qty per box tetap dapat diperbarui meskipun nomor part sudah digunakan dalam transaksi atau histori." }}</p>
             </aside>
         </div>
     </div>

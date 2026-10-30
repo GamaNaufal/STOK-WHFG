@@ -128,21 +128,7 @@ class ExportFulfillmentCompletionService
 
     public function reduction(ExportPlannedPallet $pallet, array $quantities): array
     {
-        [$physical, $items, $commitments] = $this->contents($pallet);
-        $known = $items->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all();
-        $sent = array_map('intval', array_keys($quantities)); sort($sent);
-        if ($known !== $sent) $this->fail('Rincian part berubah. Muat ulang revisi.');
-        $selected = collect(); $remaining = 0;
-        foreach ($items as $item) {
-            $quantity = (int) $quantities[$item->id];
-            if ($quantity < 0 || $quantity > $item->box_quantity) $this->fail('Revisi ini hanya untuk mengurangi box, bukan menambah kebutuhan.');
-            $remaining += $quantity;
-            $rows = $commitments->where('export_planned_pallet_item_id', $item->id)->sortBy(fn ($f) => [$f->first_received_at->format('Y-m-d H:i:s.u'), $f->export_stock_box_id]);
-            $selected = $selected->concat($rows->take($item->box_quantity - $quantity));
-        }
-        if (!$remaining || $selected->isEmpty()) $this->fail('Kurangi minimal satu box dan sisakan minimal satu box pada pallet.');
-        $fingerprint = hash('sha256', json_encode($selected->map(fn ($f) => [$f->id, $f->stockBox->revision, $f->stockBox->current_pallet_id])->values()->all(), JSON_THROW_ON_ERROR));
-        return compact('physical', 'items', 'selected', 'fingerprint');
+        return app(ExportFulfillmentRevisionService::class)->preview($pallet, $quantities);
     }
 
     public function reduce(int $deliveryId, int $palletId, array $data, User $actor): void
@@ -151,39 +137,74 @@ class ExportFulfillmentCompletionService
             $preview = $this->reduction($pallet, $data['quantities']);
             if (!hash_equals($preview['fingerprint'], $data['fingerprint'])) $this->fail('Rekomendasi box berubah. Tinjau ulang FIFO sebelum mengembalikan.');
             $before = app(ExportDeliveryPlanService::class)->snapshot($delivery);
-            $dest = explode(':', $data['destination'], 2);
-            if (!in_array($dest[0], ['pallet', 'location'], true) || !ctype_digit($dest[1] ?? '')) $this->fail('Pilih pallet existing atau lokasi kosong untuk pengembalian.');
-            if ($dest[0] === 'pallet' && (int) $dest[1] === $preview['physical']->id) $this->fail('Box yang dikurangi harus dipindahkan dari pallet permintaan ini.');
-            $pallet->update(['ready_at' => null, 'ready_by' => null, 'fulfillment_revision' => $pallet->fulfillment_revision + 1]);
-            $returned = []; $reusable = [];
-            foreach ($preview['selected'] as $f) {
-                $box = $f->stockBox;
-                $returned[] = ['box_number' => $box->box_number, 'part_number' => $box->part_number, 'pcs_quantity' => $box->pcs_quantity,
-                    'first_received_at' => $box->first_received_at->toDateTimeString(), 'from_location' => $pallet->location_code,
-                    'pallet_number' => $pallet->position];
-                $f->delete();
-                $placement = ['revision' => $box->revision, 'request_token' => (string) Str::uuid(), $dest[0].'_id' => (int) $dest[1]];
-                $moved = app(ExportStockReceivingService::class)->place($box->id, $placement, $actor, $reusable);
-                if ($dest[0] === 'location') $reusable[(int) $dest[1]] = $moved->current_pallet_id;
-                $returned[array_key_last($returned)]['warehouse_location'] = $moved->currentPallet->location_code;
-            }
-            foreach ($preview['items'] as $item) {
-                $quantity = (int) $data['quantities'][$item->id];
-                $difference = $item->box_quantity - $quantity;
-                $line = $delivery->items->firstWhere('part_setting_id', $item->part_setting_id);
-                if (!$line || $line->box_quantity < $difference) $this->fail('Jumlah delivery tidak sesuai dengan perencanaan.');
-                $line->update(['box_quantity' => $line->box_quantity - $difference,
-                    'pcs_quantity' => ($line->box_quantity - $difference) * $line->pcs_per_box]);
-                if ($quantity === 0) $item->delete(); else $item->update(['box_quantity' => $quantity]);
-            }
-            $delivery->load('items');
-            $delivery->update(['revision' => $delivery->revision + 1, 'total_boxes' => $delivery->items->sum('box_quantity'),
-                'total_pcs' => $delivery->items->sum('pcs_quantity'), 'updated_by' => $actor->id]);
+            $this->confirmReturns($preview['returns'], $data);
+            $reusable = [];
+            $result = app(ExportFulfillmentRevisionService::class)->apply($delivery, $pallet, $preview, $data['destination'] ?? null, $actor, $reusable);
+            $delivery->update(['revision' => $delivery->revision + 1]);
             $plan->update(['revision' => $plan->revision + 1, 'delivery_revision' => $delivery->revision, 'updated_by' => $actor->id]);
             AuditService::record('export_fulfillment', 'reduced', 'ExportPlannedPallet', $pallet->id, $actor->id, $before,
-                app(ExportDeliveryPlanService::class)->snapshot($delivery) + ['pallet_number' => $pallet->position, 'boxes' => $returned],
-                'Revisi pallet: box FIFO dikembalikan menjadi stok cadangan setelah konfirmasi penempatan; kebutuhan delivery dikurangi.');
+                app(ExportDeliveryPlanService::class)->snapshot($delivery) + ['pallet_number' => $pallet->position] + $result,
+                'Revisi pallet: box terbaru dikembalikan dan reservasi yang belum dipindahkan dilepas; box tertua dipertahankan untuk pengiriman FIFO.');
+            if (!$plan->pallets()->exists()) $this->archiveCancelled($delivery, $plan, $actor, $before, 'Seluruh pallet dihapus melalui revisi.');
         });
+    }
+
+    private function confirmReturns($returns, array $data): void
+    {
+        if ($returns->isNotEmpty() && !in_array($data['return_confirmed'] ?? null, [true, 1, '1', 'yes', 'on'], true)) {
+            throw ValidationException::withMessages(['return_confirmed' => 'Konfirmasikan penempatan seluruh box yang harus dikembalikan.']);
+        }
+    }
+
+    public function cancellation(ExportDeliveryPlan $delivery): array
+    {
+        $previews = $delivery->palletPlan->pallets()->get()->map(function ($pallet) {
+            return ['pallet' => $pallet, 'preview' => $this->reduction($pallet, $pallet->items()->pluck('box_quantity', 'id')->map(fn () => 0)->all())];
+        });
+        if ($previews->isEmpty()) $this->fail('Permintaan tidak memiliki pallet aktif.');
+        $returns = $previews->flatMap(fn ($row) => $row['preview']['returns']);
+        $released = $previews->flatMap(fn ($row) => $row['preview']['released']);
+        $fingerprint = hash('sha256', json_encode($previews->map(fn ($row) => $row['preview']['fingerprint'])->all(), JSON_THROW_ON_ERROR));
+        return compact('previews', 'returns', 'released', 'fingerprint');
+    }
+
+    public function cancel(int $deliveryId, array $data, User $actor): void
+    {
+        $this->run('cancelled', $deliveryId, null, $data, $actor, function ($delivery, $plan) use ($data, $actor) {
+            $preview = $this->cancellation($delivery);
+            if (!hash_equals($preview['fingerprint'], $data['fingerprint'])) $this->fail('Isi permintaan berubah. Tinjau ulang pembatalan.');
+            $this->confirmReturns($preview['returns'], $data);
+            $destination = $data['destination'] ?? null;
+            if ($destination && str_starts_with($destination, 'pallet:')) {
+                $targetId = (int) substr($destination, 7);
+                if ($preview['previews']->contains(fn ($row) => (int) $row['preview']['physical']?->id === $targetId)) {
+                    $this->fail('Tujuan pengembalian tidak boleh pallet dalam permintaan yang dibatalkan.');
+                }
+            }
+            $original = app(ExportDeliveryPlanService::class)->snapshot($delivery);
+            $reusable = [];
+            foreach ($preview['previews'] as $row) {
+                $before = app(ExportDeliveryPlanService::class)->snapshot($delivery);
+                $result = app(ExportFulfillmentRevisionService::class)->apply($delivery, $row['pallet'], $row['preview'], $destination, $actor, $reusable);
+                AuditService::record('export_fulfillment', 'reduced', 'ExportPlannedPallet', $row['pallet']->id, $actor->id,
+                    $before, app(ExportDeliveryPlanService::class)->snapshot($delivery) + ['pallet_number' => $row['pallet']->position] + $result,
+                    'Pembatalan permintaan: pengembalian box dan pelepasan reservasi pallet.');
+            }
+            $delivery->update(['revision' => $delivery->revision + 1]);
+            $plan->update(['revision' => $plan->revision + 1, 'delivery_revision' => $delivery->revision, 'updated_by' => $actor->id]);
+            $this->archiveCancelled($delivery, $plan, $actor, $original, $data['reason']);
+        });
+    }
+
+    private function archiveCancelled($delivery, $plan, User $actor, array $before, string $reason): void
+    {
+        $plan->reservations()->delete();
+        $plan->update(['status' => 'cancelled']);
+        $delivery->update(['status' => 'cancelled', 'updated_by' => $actor->id]);
+        $delivery->delete();
+        AuditService::record('export_fulfillment', 'cancelled', 'ExportDeliveryPlan', $delivery->id, $actor->id, $before,
+            ['plan_code' => $delivery->plan_code, 'customer_name' => $delivery->customer_name, 'status' => 'cancelled', 'reason' => $reason],
+            'Permintaan ekspor dibatalkan setelah pengembalian fisik dan pelepasan reservasi; tidak dicatat sebagai pengiriman.');
     }
 
     public function complete(int $deliveryId, array $data, User $actor): void

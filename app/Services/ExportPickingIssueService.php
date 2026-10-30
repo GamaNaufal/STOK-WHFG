@@ -25,7 +25,7 @@ class ExportPickingIssueService
     {
         return app(ExportInventoryService::class)->transaction(function () use ($id, $data, $actor) {
             $issue = ExportPickingIssue::whereKey($id)->lockForUpdate()->firstOrFail();
-            if ($issue->status === 'returned' || $issue->revision !== (int) $data['revision']) $this->fail('revision', 'Issue sudah berubah atau selesai. Muat ulang halaman approval.');
+            if ($issue->isClosed() || $issue->revision !== (int) $data['revision']) $this->fail('revision', 'Issue sudah berubah atau selesai. Muat ulang halaman approval.');
             $box = ExportStockBox::with('currentPallet.location')->where('box_number', $issue->box_number)->first();
             $source = $box?->currentPallet;
             $knownSource = $source && !$source->retired_at && $source->location;
@@ -47,6 +47,31 @@ class ExportPickingIssueService
             AuditService::record('export_picking_issue', 'approved', 'ExportPickingIssue', $issue->id, $actor->id, $before,
                 $issue->only(['status', 'revision', 'return_pallet_id', 'return_location_id', 'part_setting_id', 'pcs_quantity', 'notes']),
                 'Approval ekspor dicatat. Blokir tetap aktif sampai operator mengonfirmasi penempatan pengembalian.');
+            return $issue->fresh();
+        });
+    }
+
+    public function resolveInputError(int $id, array $data, User $actor): ExportPickingIssue
+    {
+        abort_unless(in_array($actor->role, ['admin', 'admin_warehouse'], true), 403);
+        return app(ExportInventoryService::class)->transaction(function () use ($id, $data, $actor) {
+            $issue = ExportPickingIssue::whereKey($id)->lockForUpdate()->firstOrFail();
+            $hash = hash('sha256', json_encode([$id, $data, $actor->id], JSON_THROW_ON_ERROR));
+            if ($issue->status === 'input_error' && $issue->confirmation_token === $data['request_token']
+                && ($issue->context['input_error_hash'] ?? '') === $hash) return $issue;
+            if ($issue->isClosed() || $issue->revision !== (int) $data['revision']) $this->fail('revision', 'Issue sudah berubah atau selesai. Muat ulang halaman approval.');
+            if (empty($data['no_physical_box']) || !trim($data['notes'] ?? '')) $this->fail('issue', 'Pastikan tidak ada box fisik yang diambil dan isi alasan salah input.');
+            if (ExportPickingIssue::where('confirmation_token', $data['request_token'])->exists()
+                || ExportStockMovement::where('request_token', $data['request_token'])->exists()) $this->fail('request_token', 'Token sudah dipakai untuk tindakan lain. Muat ulang.');
+            $before = $issue->only(['status', 'revision', 'notes']);
+            $issue->update(['status' => 'input_error', 'revision' => $issue->revision + 1,
+                'approved_by' => $actor->id, 'approved_at' => now(), 'notes' => trim($data['notes']),
+                'confirmation_token' => $data['request_token'], 'context' => array_merge($issue->context ?? [], [
+                    'no_physical_box' => true, 'input_error_hash' => $hash,
+                ])]);
+            AuditService::record('export_picking_issue', 'input_error_closed', 'ExportPickingIssue', $issue->id, $actor->id,
+                $before, $issue->only(['status', 'revision', 'notes', 'approved_by', 'approved_at']) + ['no_physical_box' => true],
+                'Admin menutup salah input tanpa box fisik. Tidak ada registrasi stok atau pengembalian box; blokir issue dilepas.');
             return $issue->fresh();
         });
     }

@@ -14,6 +14,7 @@ class AuditLogPresenter
         'pcs_quantity' => 'Jumlah PCS', 'box_quantity' => 'Jumlah box',
         'total_pcs_quantity' => 'Total PCS', 'total_box_quantity' => 'Total box',
         'total_boxes' => 'Total box', 'completed_boxes' => 'Box selesai', 'box_count' => 'Jumlah box',
+        'returned_box_quantity' => 'Box dikembalikan fisik', 'returned_pcs_quantity' => 'PCS dikembalikan fisik',
         'warehouse_location' => 'Lokasi gudang', 'location' => 'Lokasi gudang',
         'pallet' => 'Pallet', 'stored_at' => 'Tanggal masuk', 'withdrawn_at' => 'Tanggal pengambilan',
         'age_months' => 'Umur stok (bulan)', 'handled_at' => 'Tanggal Handle',
@@ -42,6 +43,7 @@ class AuditLogPresenter
             'handled' => 'Box di-Handle',
             'ready' => 'Pallet siap', 'reduced' => 'Pengurangan box pallet', 'reopened' => 'Dibuka untuk revisi',
             'approved' => 'Disetujui', 'rejected' => 'Ditolak',
+            'input_error_closed' => 'Salah input tanpa box fisik ditutup',
             'started' => 'Dimulai', 'cancelled' => 'Dibatalkan',
             'verified' => 'Diverifikasi', 'scanned' => 'Dipindai',
             'terminated' => 'Lock dihentikan', 'timed_out' => 'Waktu habis',
@@ -58,6 +60,7 @@ class AuditLogPresenter
         return match ($type) {
             'stock_input' => 'Input stok', 'stock_withdrawal' => 'Pengambilan stok',
             'export_fulfillment' => 'Pemenuhan permintaan ekspor',
+            'export_picking_issue' => 'Issue scan ekspor',
             'delivery_pickup' => 'Pengiriman', 'delivery_assignment' => 'Assignment delivery',
             'delivery_redo' => 'Redo delivery', 'box_pallet_moved' => 'Pemindahan box',
             'expired_box' => 'Penanganan box expired',
@@ -98,7 +101,7 @@ class AuditLogPresenter
         }
 
         foreach (['old' => $old, 'new' => $new] as $side => $values) {
-            foreach (['boxes', 'items', 'pallets', 'overage_adjustments'] as $key) {
+            foreach (['boxes', 'released_boxes', 'items', 'pallets', 'overage_adjustments'] as $key) {
                 if ($key === 'pallets' && $log->type !== 'export_fulfillment') continue;
                 if (!is_array($values[$key] ?? null) || !$values[$key]) {
                     continue;
@@ -107,7 +110,7 @@ class AuditLogPresenter
                 $columns = $isAdjustment
                     ? ['part_number' => 'Nomor part', 'old_quantity' => 'Sebelum (PCS)', 'new_quantity' => 'Sesudah (PCS)', 'increased_by' => 'Tambahan (PCS)']
                     : ['box_number' => 'Nomor box', 'part_number' => 'Nomor part', 'pcs_quantity' => 'Jumlah PCS', 'warehouse_location' => 'Lokasi gudang'];
-                if ($log->type === 'export_fulfillment' && $key === 'boxes') $columns += ['pallet_number' => 'Nomor pallet', 'first_received_at' => 'Pertama diterima'];
+                if ($log->type === 'export_fulfillment' && in_array($key, ['boxes', 'released_boxes'], true)) $columns += ['pallet_number' => 'Nomor pallet', 'first_received_at' => 'Pertama diterima'];
                 if ($log->type === 'export_fulfillment' && $key === 'items') $columns = ['part_number' => 'Nomor part', 'pcs_per_box' => 'PCS per box', 'box_quantity' => 'Jumlah box', 'pcs_quantity' => 'Total PCS'];
                 if ($log->type === 'export_fulfillment' && $key === 'pallets') $columns = ['pallet_number' => 'Nomor pallet', 'location' => 'Lokasi', 'total_boxes' => 'Jumlah box', 'ready_at' => 'Dikonfirmasi siap', 'ready_by' => 'ID operator'];
                 $rows = [];
@@ -123,7 +126,7 @@ class AuditLogPresenter
                 }
                 if ($rows) {
                     $tables[] = [
-                        'title' => ($isAdjustment ? 'Penyesuaian jumlah delivery' : ($key === 'pallets' ? 'Rincian pallet' : ($log->type === 'export_fulfillment' && $key === 'items' ? 'Rincian kebutuhan' : 'Rincian box'))).($side === 'old' ? ' sebelum aksi' : ' saat aksi'),
+                        'title' => ($key === 'released_boxes' ? 'Reservasi dilepas tanpa perpindahan' : ($isAdjustment ? 'Penyesuaian jumlah delivery' : ($key === 'pallets' ? 'Rincian pallet' : ($log->type === 'export_fulfillment' && $key === 'items' ? 'Rincian kebutuhan' : 'Rincian box')))).($side === 'old' ? ' sebelum aksi' : ' saat aksi'),
                         'columns' => array_values($columns), 'rows' => $rows,
                     ];
                 }
@@ -195,6 +198,7 @@ class AuditLogPresenter
                 'in_progress' => 'Sedang diproses', 'cancelled', 'canceled' => 'Dibatalkan',
                 'reversed' => 'Dikembalikan', 'active' => 'Aktif', 'expired' => 'Kedaluwarsa',
                 'warning' => 'Peringatan', 'approved' => 'Disetujui', 'rejected' => 'Ditolak',
+                'input_error' => 'Salah input tanpa box fisik',
                 'scanning' => 'Sedang dipindai', 'blocked' => 'Diblokir',
                 default => ucfirst(str_replace('_', ' ', (string) $value)),
             };

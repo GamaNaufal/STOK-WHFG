@@ -100,8 +100,18 @@ class PartSettingController extends Controller
             'qty_box' => 'required|integer|min:1|max:4294967295',
         ]);
 
-        $updated = DB::transaction(function () use ($partSetting, $validated, $request, $model) {
+        $work = function () use ($partSetting, $validated, $request, $model) {
             $partSetting = $model::whereKey($partSetting->id)->lockForUpdate()->firstOrFail();
+            if ($partSetting->scope === 'export' && (int) $partSetting->qty_box !== (int) $validated['qty_box']) {
+                $active = DB::table('export_delivery_plan_items as item')
+                    ->join('export_delivery_plans as plan', 'plan.id', '=', 'item.export_delivery_plan_id')
+                    ->where('item.part_setting_id', $partSetting->id)->where('item.box_quantity', '>', 0)
+                    ->whereNull('plan.deleted_at')->whereNotIn('plan.status', ['completed', 'cancelled'])->exists();
+                if ($active) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['qty_box' =>
+                        'PCS per box belum dapat diubah karena part masih dipakai rencana delivery ekspor aktif, termasuk draft. Selesaikan atau batalkan permintaan terkait terlebih dahulu.']);
+                }
+            }
             if ((string) $partSetting->part_number !== $validated['part_number'] && $this->isPartReferenced($partSetting)) {
                 return false;
             }
@@ -112,10 +122,15 @@ class PartSettingController extends Controller
                 "Master part {$partSetting->part_number} ({$partSetting->scope}) diperbarui.");
 
             return true;
-        });
+        };
+        $updated = $model === ExportPartSetting::class
+            ? app(\App\Services\ExportInventoryService::class)->transaction($work)
+            : DB::transaction($work);
         if (! $updated) {
             return redirect()->back()->withInput()
-                ->with('error', 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat diganti. Qty per box tetap dapat diperbarui.');
+                ->with('error', $model === ExportPartSetting::class
+                    ? 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat diganti.'
+                    : 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat diganti. Qty per box tetap dapat diperbarui.');
         }
 
         return redirect()->route($this->context()['routePrefix'].'.index')->with('success', 'No Part berhasil diperbarui.');

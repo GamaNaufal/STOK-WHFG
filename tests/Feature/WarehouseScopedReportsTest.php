@@ -76,7 +76,7 @@ class WarehouseScopedReportsTest extends TestCase
             $this->get(route('reports.records',['scope'=>'export','kind'=>$kind]))->assertOk()->assertDontSee('DOMESTIC-ONLY');
         }
         $row=$service->query($this->filters('fulfillment'))->sole();$this->assertSame('shipped',$row->status);$this->assertSame(2,(int)$row->required_boxes);$this->assertSame(2,(int)$row->fulfilled_boxes);
-        $this->assertSame('00000001',$service->query($this->filters('stock'))->sole()->box_number);
+        $this->assertSame('00000003',$service->query($this->filters('stock'))->sole()->box_number);
         $this->assertSame('RPT-BACK',$service->query($this->filters('returns'))->sole()->location);
         $this->assertSame('RPT-LOC',$service->query($this->filters('receipts',['q'=>'00000001']))->sole()->location);
     }
@@ -109,9 +109,9 @@ class WarehouseScopedReportsTest extends TestCase
     public function test_details_remain_readable_after_archive_and_do_not_require_operator_export_feature_access(): void
     {
         $delivery=$this->fixture();$plan=$delivery->palletPlan()->sole();
-        $this->get(route('reports.records.detail',['record'=>$plan->id,'scope'=>'export','kind'=>'fulfillment']))->assertOk()->assertSee('00000002')->assertSee('00000003')->assertDontSee('00000001');
+        $this->get(route('reports.records.detail',['record'=>$plan->id,'scope'=>'export','kind'=>'fulfillment']))->assertOk()->assertSee('00000001')->assertSee('00000002')->assertDontSee('00000003');
         $audit=AuditLog::where('type','export_fulfillment')->where('action','reduced')->sole();
-        $this->get(route('reports.records.detail',['record'=>$audit->id,'scope'=>'export','kind'=>'returns']))->assertOk()->assertSee('00000001')->assertSee('RPT-BACK');
+        $this->get(route('reports.records.detail',['record'=>$audit->id,'scope'=>'export','kind'=>'returns']))->assertOk()->assertSee('00000003')->assertSee('RPT-BACK');
         $this->get(route('reports.records.detail',['record'=>$audit->id,'scope'=>'domestic','kind'=>'returns']))->assertNotFound();
     }
 

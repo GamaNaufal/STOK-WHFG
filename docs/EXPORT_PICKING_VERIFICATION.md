@@ -50,10 +50,18 @@ verifikasi lama milik box yang salah dibatalkan agar tidak digunakan kembali.
 | `pending` | Admin Warehouse meninjau dan menyetujui arahan | Tetap aktif |
 | `awaiting_return` | Operator pelapor menempatkan box sesuai arahan, lalu mengonfirmasi | Tetap aktif |
 | `returned` | Proses pengambilan dapat dilanjutkan jika tidak ada issue terbuka lain | Issue ini dilepas |
+| `input_error` | Admin menutup salah input tanpa box fisik dengan alasan dan pernyataan wajib | Issue ini dilepas |
 
 Approval memakai halaman **Scan Issues dan Approval** yang sama dengan lokal.
 Setiap baris pending/riwayat memiliki label **Ekspor** atau **Domestik / Lokal**.
 Alur approval domestik tetap seperti sebelumnya.
+Untuk ID historis yang sudah dikirim atau salah ketik delapan digit tanpa box
+fisik yang diambil, Admin/Admin Warehouse dapat memilih **Salah input tanpa box
+fisik**. Alasan dan checkbox pernyataan wajib; bukan pengembalian. Tindakan ini
+tidak membuat stok, movement, atau waktu konfirmasi pengembalian, dan tercatat
+sebagai input_error_closed pada audit. Izin approval saja pada role lain tidak
+memberi hak penutupan khusus ini. Box yang benar-benar diambil tetap memakai
+approval arahan serta konfirmasi penempatan oleh operator pelapor.
 Indikator issue pending pada sidebar dan dashboard Admin Warehouse menghitung
 approval domestik dan ekspor yang masih menunggu keputusan.
 

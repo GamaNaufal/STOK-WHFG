@@ -2,6 +2,56 @@
 
 Terakhir diverifikasi dari source code: 30 Oktober 2026 (pembaruan inkremental).
 
+Perbaikan pengecualian proses bisnis ekspor 30 Oktober 2026:
+- Revisi pada Pemenuhan Permintaan kini boleh saat pallet belum penuh, tanpa
+  reservasi, sampai semua part nol/pallet dihapus, atau membatalkan seluruh
+  permintaan. Jalur revisi planning/delivery umum tetap melindungi komitmen;
+  gunakan jalur pemenuhan untuk pelepasan dan pengembalian secara atomik.
+- ExportFulfillmentRevisionService memeriksa konsistensi reservasi/posisi tanpa
+  mensyaratkan penuh; validasi konfirmasi siap/pengiriman tetap wajib exact.
+  Kebutuhan yang belum terisi dapat dikurangi tanpa pengembalian fiktif.
+  Komitmen terpilih adalah yang terbaru, agar box tertua tetap untuk dikirim.
+- Reservasi belum dipindahkan dilepas di posisi asal; revision box naik untuk
+  menolak instruksi lama. Box sudah ditempatkan atau sudah diverifikasi diambil
+  wajib konfirmasi dan tujuan pengembalian. Pengambilan belum ditempatkan boleh
+  dikembalikan ke pallet asal. Tanggal FIFO tetap; tidak dialokasikan ulang oleh
+  revisi. Seluruh isi/sumber termasuk dalam fingerprint untuk menolak tinjauan
+  lama setelah penerimaan/penempatan berubah.
+- Pallet nol dilepas klaimnya dan dihapus setelah stok kosong, fisiknya diretir;
+  nomor pallet lain tidak diganti. Menghapus pallet terakhir membatalkan request.
+  Pembatalan massal memakai satu tujuan cadangan di luar pallet request dan
+  alasan wajib. Delivery cancelled diarsipkan, tidak ditandai completed/shipped.
+  Retry dapat diproses setelah parent/pallet diarsipkan. Audit kegagalan rollback.
+- Admin/Admin Warehouse dapat menutup issue sebagai input_error hanya dengan
+  alasan dan pernyataan tidak ada box fisik diambil. Tidak membuat stok/movement
+  atau confirmed_at pengembalian. Issue fisik tetap memakai approval dan
+  konfirmasi returned. Scope open, replay scan, indikator dan riwayat mencakup
+  status baru; audit mencatat input_error_closed serta aktor. Izin delivery_issues
+  existing tetap dipakai, dengan pemeriksaan role tambahan untuk penutupan ini.
+- Perubahan qty_box master ekspor ditolak selama part dipakai kebutuhan positif
+  delivery aktif termasuk draft; nilai sama boleh disimpan. Setelah selesai/
+  dibatalkan/arsip boleh diubah, snapshot lama tetap. Update master memakai mutex
+  ekspor sebelum lock part, konsisten dengan pembuatan rencana/penerimaan.
+- Laporan pengembalian menghitung box/PCS yang benar-benar dikembalikan, bukan
+  selisih kebutuhan yang belum terisi; revision tanpa pengembalian ditandai revised.
+  Snapshot audit menampilkan pengembalian dan pelepasan reservasi secara terpisah.
+- Tidak ada migration, dependency, seeder atau perubahan MySQL/production.
+  Detail operasional: docs/EXPORT_BUSINESS_EXCEPTION_FIXES.md.
+- Validasi: regresi penuh 468 backend (4.314 assertions) dan 87 frontend lulus;
+  setelah penambahan penyajian audit, 82 tes terkait lulus (896 assertions).
+  Browser preview SQLite memeriksa revisi parsial memilih box terbaru, formulir
+  pembatalan 1366px/390px tanpa overflow halaman, dan formulir salah input admin
+  dengan alasan/checkbox terpisah. Tidak ada error konsol; scanner/printer fisik
+  dan production remote tidak diuji.
+
+Koreksi FIFO pengurangan pallet 30 Oktober 2026:
+- Pengurangan mengembalikan box terbaru menurut first_received_at menurun,
+  lalu ID stok terbesar. Box tertua tetap pada permintaan untuk pengiriman FIFO.
+  Tanggal pertama diterima tidak diubah ketika kembali menjadi stok cadangan.
+- 15 tes penyelesaian/pengurangan lulus (144 assertions) pada SQLite in-memory,
+  termasuk pallet campuran dan satu part dikurangi sampai nol. Tidak ada
+  perubahan database asli atau migration.
+
 Verifikasi AJAX Filter Laporan 30 Oktober 2026:
 - Laporan domestik/ekspor dan rincian kini memakai public/js/report-browser.js.
   Lingkup/jenis/select/tanggal langsung diterapkan; teks debounce 300 ms. GET
@@ -55,8 +105,8 @@ Verifikasi Kesiapan Pallet dan Penyelesaian Permintaan Ekspor 30 Oktober 2026:
   jika seluruh pallet berpindah, tanpa mengganti tanggal FIFO.
 - Pallet siap dikunci pada backend dari penempatan/penambahan dan alokasi.
   Revisi membuka ulang kesiapan untuk koreksi lokasi, atau mengurangi kebutuhan
-  per part (minimal satu box tetap pada pallet). Tinjauan menentukan box tertua
-  menurut first_received_at/ID; wajib tujuan pallet existing belum siap selain
+  per part (boleh nol, termasuk pallet belum penuh). Tinjauan menentukan box terbaru
+  menurut first_received_at/ID menurun; wajib tujuan pallet existing belum siap selain
   asal atau lokasi kosong serta konfirmasi pengembalian. Setelahnya reservasi
   box dilepas, stok cadangan/FIFO tetap, kebutuhan delivery dan pallet/total/
   revision disesuaikan atomik. Kesiapan pallet lain dipertahankan.
@@ -101,11 +151,13 @@ Verifikasi Picking Verification Ekspor dan Approval Pengembalian 30 Oktober 2026
   diketahui tetap asalnya; lokasi hilang wajib dipilih admin; box baru juga
   wajib part master ekspor dengan PCS default. Data lokal tidak dipakai.
   Indikator pending sidebar/dashboard Admin Warehouse juga menghitung kedua lingkup.
-- Hanya konfirmasi penempatan oleh operator pelapor yang menjadi returned dan
+- Konfirmasi penempatan oleh operator pelapor menjadi returned dan
   melepas issue. Box baru dibuat pada tahap ini, dengan waktu pertama terdeteksi;
   return ke asal existing tidak menambah stok/mengubah FIFO. Tujuan/kapasitas
   berubah memerlukan pembaruan approval. Retry dilindungi token/revision,
   alokasi mengabaikan box ditahan dan revisi rencana ditolak selama issue aktif.
+  Pengecualian salah input tanpa box fisik: penutupan input_error oleh admin
+  dengan alasan/pernyataan wajib, tanpa pembuatan stok atau pengembalian fiktif.
 - Migration 2026_10_30_000002 menambah metadata pada fulfillment dan tabel
   export_picking_issues/scans. Diterapkan ke MySQL lokal stock setelah backup
   storage/app/backups/stock_export_picking_20261030_173847_0c056a.json. Hash kolom
@@ -418,9 +470,9 @@ Verifikasi Penerimaan Box Ekspor 29 Oktober 2026:
   sebelum lock lain agar FIFO/finalisasi/receipt tidak berlomba. Token unik
   mencegah double submit; revision dan tujuan server menolak instruksi stale.
   Mutasi dan audit satu transaksi. Guard master mencakup histori stok ekspor.
-- Pengembalian/perubahan kebutuhan dengan komitmen belum tersedia. Guard revisi
-  juga melindungi box cadangan fisik pada pallet rencana, selain komitmen aktif.
-  Withdrawal, pelepasan reservasi dan alih lingkup tetap tahap berikutnya.
+- Pengembalian/perubahan kebutuhan dengan komitmen tersedia melalui Pemenuhan
+  Permintaan (lihat perbaikan 30 Oktober di atas). Guard revisi umum tetap
+  melindungi komitmen dan stok fisik. Alih lingkup tetap belum diterapkan.
 - Migration 2026_10_29_000002 membuat empat tabel dan FK komitmen nullable serta
   memperbarui izin saved role. Existing monitoring tidak dibackfill menjadi
   stok fiktif. Regresi 353 backend (2.954 assertions), 55 frontend, dan build
@@ -450,9 +502,9 @@ Verifikasi Pemenuhan Permintaan Ekspor 29 Oktober 2026:
   ditandai; kekurangan/progres dihitung per item agar kelebihan part lain tidak
   menutupi kebutuhan. Daftar box urut penerimaan pertama lalu nomor box.
 - Selama ada komitmen, perubahan delivery/pembagian, buka revisi, dan pembatalan
-  ditolak agar penempatan tidak hilang. Revisi dengan pengembalian masih tahap
-  berikutnya; pelepasan harus terhubung ke transaksi/audit/FIFO sebelum guard
-  diganti. Transaksi delivery rollback seluruh perubahan jika guard gagal.
+  melalui editor umum ditolak agar penempatan tidak hilang. Revisi/pembatalan
+  dengan pengembalian memakai jalur pemenuhan atomik yang dijelaskan di atas.
+  Transaksi delivery rollback seluruh perubahan jika guard gagal.
 - Regresi 338 tes backend lulus (2.806 assertions); pemeriksaan terakhir 13 tes
   pemenuhan (110 assertions) lulus. Browser Chromium: desktop 1440x900, simulasi
   390x844, pencarian/status/reset/hasil kosong, rincian keyboard, tanpa error.

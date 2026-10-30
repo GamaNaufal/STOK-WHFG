@@ -35,8 +35,10 @@
                     @if($pallet->ready_at)<span class="fulfillment-status fulfillment-status-complete">Siap · {{ $pallet->ready_at->format('d/m/Y H:i') }} · Lokasi {{ $pallet->location_code }}</span>@endif
                     @if($overview->fulfillment_status !== 'paused' && $pm['required'] > 0 && $pm['fulfilled'] === $pm['required'] && !$pm['invalid'] && !$pm['excess'])
                         @unless($pallet->ready_at)<button type="button" class="btn btn-primary" data-ready-url="{{ route('export.fulfillment.ready-form', [$delivery, $pallet]) }}">Konfirmasi Pallet {{ $pallet->position }} siap</button>@endunless
-                        <a class="btn btn-outline-secondary" href="{{ route('export.fulfillment.revise', [$delivery, $pallet]) }}">Revisi pallet {{ $pallet->position }}</a>
                     @else<span class="plan-help">Konfirmasi tersedia setelah seluruh kebutuhan pallet ditempatkan.</span>@endif
+                    @if($overview->fulfillment_status !== 'paused' && $pm['required'] > 0)
+                        <a class="btn btn-outline-secondary" href="{{ route('export.fulfillment.revise', [$delivery, $pallet]) }}">Revisi pallet {{ $pallet->position }}</a>
+                    @endif
                 </div>
             </details>
         @endforeach
@@ -69,6 +71,7 @@
     @php($readyCount = $pallets->filter(fn ($entry) => (bool) $entry['pallet']->ready_at)->count())
     <section class="plan-panel"><div class="plan-panel-heading"><h2>Kesiapan pengiriman</h2><span>{{ $readyCount }} / {{ $pallets->count() }} pallet siap</span></div><div class="plan-panel-body">
         <p>Setiap pallet harus dikonfirmasi siap beserta lokasi fisiknya. Selesaikan permintaan hanya setelah seluruh box keluar gudang.</p>
+        @if($overview->fulfillment_status !== 'paused')<a class="btn btn-outline-danger me-2" href="{{ route('export.fulfillment.cancel-form', $delivery) }}">Batalkan permintaan</a>@endif
         @if($overview->fulfillment_status === 'complete' && $readyCount === $pallets->count() && $readyCount > 0)
             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#complete-request-modal">Selesaikan permintaan</button>
         @else<button type="button" class="btn btn-secondary" disabled>Selesaikan permintaan</button>@endif

@@ -22,6 +22,35 @@ class ExportMasterDataTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_export_capacity_change_is_blocked_by_draft_delivery_but_not_an_unchanged_save(): void
+    {
+        $operator=User::factory()->create(['role'=>'export_operator']);$this->actingAs($operator);
+        $part=ExportPartSetting::create(['part_number'=>'CAPACITY-LOCK','qty_box'=>10]);
+        $delivery=app(\App\Services\ExportDeliveryPlanService::class)->save(['customer_name'=>'Customer Capacity','delivery_deadline'=>'2026-11-20','source_type'=>'manual',
+            'items'=>[['part_number'=>$part->part_number,'pcs_quantity'=>20]]],$operator);
+        $url=route('export.part-settings.update',$part);
+        $this->put($url,['part_number'=>$part->part_number,'qty_box'=>20])->assertSessionHasErrors('qty_box');
+        $this->assertSame(10,$part->fresh()->qty_box);$this->assertSame(10,$delivery->items()->sole()->pcs_per_box);
+        $this->put($url,['part_number'=>$part->part_number,'qty_box'=>10])->assertSessionHasNoErrors();
+        $delivery->update(['status'=>'cancelled']);$delivery->delete();
+        $this->put($url,['part_number'=>$part->part_number,'qty_box'=>20])->assertSessionHasNoErrors();
+        $this->assertSame(20,$part->fresh()->qty_box);$this->assertSame(10,$delivery->items()->sole()->pcs_per_box);
+    }
+
+    public function test_completed_history_allows_capacity_change_and_domestic_capacity_stays_independent(): void
+    {
+        $admin=User::factory()->create(['role'=>'admin']);$this->actingAs($admin);
+        $part=ExportPartSetting::create(['part_number'=>'SAME-CAPACITY','qty_box'=>10]);
+        $local=PartSetting::create(['part_number'=>$part->part_number,'qty_box'=>100]);
+        $delivery=app(\App\Services\ExportDeliveryPlanService::class)->save(['customer_name'=>'Capacity History','delivery_deadline'=>'2026-11-20','source_type'=>'manual',
+            'items'=>[['part_number'=>$part->part_number,'pcs_quantity'=>20]]],$admin);
+        $this->put(route('part-settings.update',$local),['part_number'=>$local->part_number,'qty_box'=>200])->assertSessionHasNoErrors();
+        $this->assertSame(10,$part->fresh()->qty_box);
+        $delivery->update(['status'=>'completed']);$delivery->delete();
+        $this->put(route('export.part-settings.update',$part),['part_number'=>$part->part_number,'qty_box'=>20])->assertSessionHasNoErrors();
+        $this->assertSame(200,$local->fresh()->qty_box);$this->assertSame(10,$delivery->items()->sole()->pcs_per_box);
+    }
+
     public function test_export_masters_start_empty_and_domestic_rows_remain_visible_only_domestically(): void
     {
         $part = PartSetting::create(['part_number' => 'LOCAL-ONLY', 'qty_box' => 20]);

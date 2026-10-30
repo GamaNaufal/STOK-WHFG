@@ -16,7 +16,8 @@ class ExportPickingIssue extends Model
     public function part() { return $this->belongsTo(ExportPartSetting::class, 'part_setting_id'); }
     public function reporter() { return $this->belongsTo(User::class, 'reported_by'); }
     public function approver() { return $this->belongsTo(User::class, 'approved_by'); }
-    public function scopeOpen($q) { return $q->where('status', '<>', 'returned'); }
+    public function isClosed(): bool { return in_array($this->status, ['returned', 'input_error'], true); }
+    public function scopeOpen($q) { return $q->whereNotIn('status', ['returned', 'input_error']); }
     public function getReasonAttribute(): string
     {
         return match ($this->issue_type) {

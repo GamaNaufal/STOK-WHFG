@@ -121,7 +121,7 @@ class ExportPickingService
             $replay = ExportPickingScan::where('request_token', $data['request_token'])->first();
             if ($replay) {
                 if ((int) $replay->created_by !== $actor->id || (int) $replay->export_planned_pallet_id !== $palletId || $replay->box_number !== $data['box_number']) $this->fail('Token scan sudah dipakai untuk permintaan lain.');
-                return ['success' => $replay->outcome !== 'wrong', 'blocked' => $replay->issue && $replay->issue->status !== 'returned', 'message' => 'Permintaan scan sebelumnya sudah tercatat.', 'replay' => true];
+                return ['success' => $replay->outcome !== 'wrong', 'blocked' => $replay->issue && !$replay->issue->isClosed(), 'message' => 'Permintaan scan sebelumnya sudah tercatat.', 'replay' => true];
             }
             $pallet = ExportPlannedPallet::findOrFail($palletId); $this->assertTarget($pallet);
             if ($issue = $this->block($actor, $palletId)) return ['success' => false, 'blocked' => true, 'message' => 'Proses diblokir oleh issue #'.$issue->id.'. Selesaikan approval dan konfirmasi pengembalian.'];

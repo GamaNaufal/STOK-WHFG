@@ -56,6 +56,119 @@ class ExportFulfillmentCompletionTest extends TestCase
         return ['revision' => $pallet->palletPlan->revision, 'fulfillment_revision' => $pallet->fulfillment_revision, 'request_token' => (string) Str::uuid()];
     }
 
+    public function test_partially_filled_pallet_can_reduce_below_current_stock_and_returns_newest_only(): void
+    {
+        $delivery=$this->plan([10],false);$pallet=$delivery->palletPlan->pallets->sole();
+        for($i=0;$i<4;$i++)$this->place($this->receive());
+        $this->get(route('export.fulfillment.show',$delivery))->assertSee('Revisi pallet 1');
+        $this->get(route('export.fulfillment.revise',[$delivery,$pallet]))->assertOk();
+        $data=$this->reduction($pallet,2);
+        $this->post(route('export.fulfillment.reduce',[$delivery,$pallet]),$data)->assertSessionHasNoErrors();
+        $this->assertSame(2,$delivery->fresh()->total_boxes);$this->assertSame(4,ExportStockBox::count());
+        $this->assertSame(['00000001','00000002'],$pallet->fulfillmentBoxes()->orderBy('box_number')->pluck('box_number')->all());
+        $audit=AuditLog::where('type','export_fulfillment')->where('action','reduced')->sole()->getNewValuesArray();
+        $this->assertSame(2,$audit['returned_box_quantity']);$this->assertSame(20,$audit['returned_pcs_quantity']);
+        $filters=app(\App\Services\WarehouseReportService::class)->filters(\Illuminate\Http\Request::create('/','GET',['scope'=>'export','kind'=>'returns']));
+        $report=app(\App\Services\WarehouseReportService::class)->query($filters)->first();
+        $this->assertSame(2,(int)$report->box_quantity);$this->assertSame(20,(int)$report->pcs_quantity);
+    }
+
+    public function test_unfilled_quantity_can_be_reduced_without_destination_or_fictitious_return(): void
+    {
+        $delivery=$this->plan([10],false);$pallet=$delivery->palletPlan->pallets->sole();
+        $this->place($this->receive());$data=$this->reduction($pallet,6);unset($data['destination'],$data['return_confirmed']);
+        $this->post(route('export.fulfillment.revise',[$delivery,$pallet]),$data)->assertOk()->assertSee('Tidak ada pengembalian fisik');
+        $this->post(route('export.fulfillment.reduce',[$delivery,$pallet]),$data)->assertSessionHasNoErrors();
+        $this->assertSame(6,$delivery->fresh()->total_boxes);$this->assertSame(1,$pallet->fulfillmentBoxes()->count());
+        $this->assertSame(1,\App\Models\ExportStockMovement::count());
+        $reports=app(\App\Services\WarehouseReportService::class);
+        $row=$reports->query($reports->filters(\Illuminate\Http\Request::create('/','GET',['scope'=>'export','kind'=>'returns'])))->sole();
+        $this->assertSame(0,(int)$row->box_quantity);$this->assertSame('revised',$row->status);
+    }
+
+    public function test_untouched_reservations_release_in_place_preserve_fifo_and_invalidate_old_placement(): void
+    {
+        $box=$this->receive();$location=ExportMasterLocation::create(['code'=>'SPARE-RELEASE']);$this->place($box,['location_id'=>$location->id]);
+        $date=$box->first_received_at;$source=$box->fresh()->current_pallet_id;
+        $delivery=$this->plan([2],false);$pallet=$delivery->palletPlan->pallets->sole();$stale=$box->fresh()->revision;
+        $data=$this->reduction($pallet,0);unset($data['destination'],$data['return_confirmed']);$url=route('export.fulfillment.reduce',[$delivery,$pallet]);
+        $this->post($url,$data)->assertSessionHasNoErrors();$this->post($url,$data)->assertSessionHasNoErrors();
+        $this->assertSame('cancelled',ExportDeliveryPlan::withTrashed()->find($delivery->id)->status);
+        $this->assertNull($box->fresh()->fulfillment);$this->assertSame($source,$box->fresh()->current_pallet_id);
+        $this->assertTrue($date->equalTo($box->fresh()->first_received_at));$this->assertTrue($location->fresh()->is_occupied);
+        $this->postJson(route('export.receiving.place',$box),['revision'=>$stale,'request_token'=>(string)Str::uuid(),'pallet_id'=>$source])->assertUnprocessable();
+        $this->assertDatabaseCount('export_pallet_location_reservations',0);
+        $log=AuditLog::where('type','export_fulfillment')->where('action','reduced')->sole();
+        $presented=\App\Support\AuditLogPresenter::present($log);
+        $released=collect($presented['tables'])->first(fn($table)=>str_starts_with($table['title'],'Reservasi dilepas'));
+        $this->assertNotNull($released);$this->assertSame($box->box_number,$released['rows'][0][0]);
+    }
+
+    public function test_removing_one_whole_pallet_preserves_other_ready_pallet_and_its_number(): void
+    {
+        $delivery=$this->plan([1,2]);$a=$delivery->palletPlan->pallets[0];$b=$delivery->palletPlan->pallets[1];$this->ready($delivery,$b)->assertSessionHasNoErrors();
+        $this->post(route('export.fulfillment.reduce',[$delivery,$a]),$this->reduction($a,0))->assertSessionHasNoErrors();
+        $this->assertDatabaseMissing('export_planned_pallets',['id'=>$a->id]);$this->assertSame(2,$b->fresh()->position);
+        $this->assertNotNull($b->fresh()->ready_at);$this->assertSame(2,$delivery->fresh()->total_boxes);
+        $this->assertFalse(ExportMasterLocation::find($a->master_location_id)->is_occupied);
+    }
+
+    private function cancellationData($delivery): array
+    {
+        $preview=app(ExportFulfillmentCompletionService::class)->cancellation($delivery->fresh());
+        return ['revision'=>$delivery->palletPlan->revision,'request_token'=>(string)Str::uuid(),'fingerprint'=>$preview['fingerprint'],
+            'reason'=>'Customer membatalkan permintaan.','return_confirmed'=>1,
+            'destination'=>'location:'.ExportMasterLocation::create(['code'=>'CANCEL-RETURN-'.$this->sequence])->id];
+    }
+
+    public function test_cancellation_returns_multiple_pallets_to_one_spare_releases_all_and_is_idempotent(): void
+    {
+        $delivery=$this->plan([2,2]);$dates=ExportStockBox::pluck('first_received_at','id')->map->toDateTimeString()->all();
+        $this->get(route('export.fulfillment.cancel-form',$delivery))->assertOk()->assertSee('Konfirmasi pembatalan permintaan');
+        $data=$this->cancellationData($delivery);$url=route('export.fulfillment.cancel',$delivery->id);
+        $this->post($url,array_replace($data,['return_confirmed'=>0]))->assertSessionHasErrors('return_confirmed');
+        $this->post($url,$data)->assertSessionHasNoErrors();$this->post($url,$data)->assertSessionHasNoErrors();
+        $this->assertSame(4,ExportStockBox::count());$this->assertSame(0,\App\Models\ExportFulfillmentBox::count());
+        $this->assertDatabaseCount('export_pallet_location_reservations',0);$this->assertDatabaseCount('export_planned_pallets',0);
+        $this->assertSame(1,ExportStockPallet::whereNull('retired_at')->count());
+        $this->assertSame($dates,ExportStockBox::pluck('first_received_at','id')->map->toDateTimeString()->all());
+        $this->assertSame('cancelled',ExportDeliveryPlan::withTrashed()->find($delivery->id)->status);
+        $this->assertNull($delivery->palletPlan->fresh()->completed_at);
+        $this->assertSame(1,AuditLog::where('type','export_fulfillment')->where('action','cancelled')->count());
+    }
+
+    public function test_cancellation_without_stock_needs_no_return_and_new_receipt_invalidates_old_preview(): void
+    {
+        $delivery=$this->plan([3],false);$data=$this->cancellationData($delivery);unset($data['destination'],$data['return_confirmed']);
+        $this->receive();$url=route('export.fulfillment.cancel',$delivery->id);
+        $this->post($url,$data)->assertSessionHasErrors('fulfillment');
+        $this->assertNotNull($delivery->fresh());$this->assertSame(1,\App\Models\ExportFulfillmentBox::count());
+        $data=$this->cancellationData($delivery);unset($data['destination'],$data['return_confirmed']);
+        $this->post($url,$data)->assertSessionHasNoErrors();$this->assertNull(ExportDeliveryPlan::find($delivery->id));
+        $this->assertSame(1,ExportStockBox::count());$this->assertSame(0,\App\Models\ExportStockMovement::count());
+    }
+
+    public function test_cancellation_cannot_return_to_its_own_pallet_or_bypass_permissions(): void
+    {
+        $delivery=$this->plan();$data=$this->cancellationData($delivery);$physical=ExportStockPallet::whereNull('retired_at')->sole();
+        $url=route('export.fulfillment.cancel',$delivery->id);
+        $this->post($url,array_replace($data,['destination'=>'pallet:'.$physical->id]))->assertSessionHasErrors('fulfillment');
+        $this->assertSame(3,\App\Models\ExportFulfillmentBox::count());
+        $this->actingAs(User::factory()->create(['role'=>'warehouse_operator']))->post($url,$data)->assertForbidden();
+        $this->assertNotNull($delivery->fresh());
+    }
+
+    public function test_cancellation_audit_failure_rolls_back_every_return_and_reservation_release(): void
+    {
+        $delivery=$this->plan([1,1]);$data=$this->cancellationData($delivery);
+        AuditLog::creating(function($log){if($log->type==='export_fulfillment'&&$log->action==='cancelled')throw new \RuntimeException('Cancel audit failed');});
+        try {app(ExportFulfillmentCompletionService::class)->cancel($delivery->id,$data,$this->operator);$this->fail('Audit must persist.');}
+        catch(\RuntimeException $e){$this->assertSame('Cancel audit failed',$e->getMessage());}
+        $this->assertNotNull($delivery->fresh());$this->assertSame(2,\App\Models\ExportFulfillmentBox::count());
+        $this->assertDatabaseCount('export_pallet_location_reservations',2);$this->assertDatabaseCount('export_planned_pallets',2);
+        $this->assertDatabaseCount('export_fulfillment_actions',0);
+    }
+
     private function ready($delivery,$pallet,array $extra=[])
     {
         return $this->post(route('export.fulfillment.ready',[$delivery,$pallet]), $extra + $this->versions($pallet) + ['location_id'=>$pallet->master_location_id,'placement_confirmed'=>1]);
@@ -123,19 +236,21 @@ class ExportFulfillmentCompletionTest extends TestCase
         $this->assertSame(3,$physical->boxes()->count());
     }
 
-    public function test_revision_preview_and_confirmation_return_oldest_fifo_box_to_spare_and_reduce_delivery(): void
+    public function test_revision_returns_newest_box_to_spare_and_keeps_oldest_for_fifo_shipment(): void
     {
         $delivery=$this->plan();$pallet=$delivery->palletPlan->pallets->first();$this->ready($delivery,$pallet)->assertSessionHasNoErrors();
-        $oldest=ExportStockBox::orderBy('first_received_at')->first();$date=$oldest->first_received_at;
+        $newest=ExportStockBox::orderByDesc('first_received_at')->first();$date=$newest->first_received_at;
+        $oldest=ExportStockBox::orderBy('first_received_at')->first();
         $data=$this->reduction($pallet);
-        $this->post(route('export.fulfillment.revise',[$delivery,$pallet]),$data)->assertOk()->assertSee($oldest->box_number)->assertSee('Pilih pallet existing atau lokasi kosong');
+        $this->post(route('export.fulfillment.revise',[$delivery,$pallet]),$data)->assertOk()->assertSee($newest->box_number)->assertSee('Pilih pallet existing atau lokasi kosong');
         $this->assertSame(3,$delivery->fresh()->total_boxes);
         $url=route('export.fulfillment.reduce',[$delivery,$pallet]);
         $this->post($url,$data)->assertSessionHasNoErrors();$this->post($url,$data)->assertSessionHasNoErrors();
         $this->assertNull($pallet->fresh()->ready_at);
-        $this->assertNull($oldest->fresh()->fulfillment);
-        $this->assertTrue($date->equalTo($oldest->fresh()->first_received_at));
-        $this->assertStringStartsWith('RETURN-',$oldest->fresh()->currentPallet->location_code);
+        $this->assertNull($newest->fresh()->fulfillment);
+        $this->assertNotNull($oldest->fresh()->fulfillment);
+        $this->assertTrue($date->equalTo($newest->fresh()->first_received_at));
+        $this->assertStringStartsWith('RETURN-',$newest->fresh()->currentPallet->location_code);
         $this->assertSame(2,$delivery->fresh()->total_boxes);$this->assertSame(20,$delivery->fresh()->total_pcs);
         $this->assertSame(2,$pallet->items()->sole()->box_quantity);$this->assertSame(3,ExportStockBox::count());
         $this->assertSame(1,AuditLog::where('type','export_fulfillment')->where('action','reduced')->count());
@@ -265,7 +380,7 @@ class ExportFulfillmentCompletionTest extends TestCase
         foreach([$this->part,$this->part,$this->part,$b,$b] as $part)$this->place($this->receive($part));
         $pallet=$plan->pallets()->sole();$quantities=$pallet->items()->get()->mapWithKeys(fn($i)=>[$i->id=>$i->part_setting_id===$b->id?0:2])->all();
         $preview=app(ExportFulfillmentCompletionService::class)->reduction($pallet,$quantities);
-        $this->assertSame(['00000001','00000004','00000005'],$preview['selected']->pluck('box_number')->all());
+        $this->assertSame(['00000003','00000005','00000004'],$preview['selected']->pluck('box_number')->all());
         $target=ExportMasterLocation::create(['code'=>'MIXED-RETURN']);
         $this->post(route('export.fulfillment.reduce',[$delivery,$pallet]),$this->versions($pallet)+['quantities'=>$quantities,'fingerprint'=>$preview['fingerprint'],
             'destination'=>'location:'.$target->id,'return_confirmed'=>1])->assertSessionHasNoErrors();

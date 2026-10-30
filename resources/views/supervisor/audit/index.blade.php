@@ -100,6 +100,7 @@
                     <option value="delivery_assignment" {{ $filters['type'] === 'delivery_assignment' ? 'selected' : '' }}>Assignment Delivery</option>
                     <option value="delivery_pickup" {{ $filters['type'] === 'delivery_pickup' ? 'selected' : '' }}>Pengiriman</option>
                     <option value="export_fulfillment" {{ $filters['type'] === 'export_fulfillment' ? 'selected' : '' }}>Pemenuhan Permintaan Ekspor</option>
+                    <option value="export_picking_issue" {{ $filters['type'] === 'export_picking_issue' ? 'selected' : '' }}>Issue Scan Ekspor</option>
                     <option value="delivery_redo" {{ $filters['type'] === 'delivery_redo' ? 'selected' : '' }}>Redo Delivery</option>
                     <option value="pallet_location_moved" {{ $filters['type'] === 'pallet_location_moved' ? 'selected' : '' }}>Pemindahan Lokasi Pallet</option>
                     <option value="box_pallet_moved" {{ $filters['type'] === 'box_pallet_moved' ? 'selected' : '' }}>Pemindahan Box</option>
@@ -123,7 +124,7 @@
                     @foreach(['created', 'updated', 'completed', 'ready', 'reduced', 'reopened', 'reversed', 'redo', 'moved', 'merged', 'handled'] as $action)
                         <option value="{{ $action }}" {{ $filters['action'] === $action ? 'selected' : '' }}>{{ \App\Support\AuditLogPresenter::actionLabel($action) }}</option>
                     @endforeach
-                    @foreach(['approved', 'rejected', 'started', 'cancelled', 'verified', 'scanned', 'terminated', 'timed_out', 'deleted', 'deactivated'] as $action)
+                    @foreach(['approved', 'input_error_closed', 'rejected', 'started', 'cancelled', 'verified', 'scanned', 'terminated', 'timed_out', 'deleted', 'deactivated'] as $action)
                         <option value="{{ $action }}" {{ $filters['action'] === $action ? 'selected' : '' }}>{{ \App\Support\AuditLogPresenter::actionLabel($action) }}</option>
                     @endforeach
                     <option value="box_updated_by_admin_warehouse" {{ $filters['action'] === 'box_updated_by_admin_warehouse' ? 'selected' : '' }}>Edit Box (Admin Warehouse)</option>

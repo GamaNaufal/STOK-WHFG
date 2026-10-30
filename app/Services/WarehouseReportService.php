@@ -103,9 +103,12 @@ class WarehouseReportService
             ->where('audit_logs.type','export_fulfillment')->where('audit_logs.action','reduced')
             ->selectRaw("audit_logs.id AS record_id, audit_logs.created_at AS occurred_at, {$new('plan_code')} AS reference,
                 {$new('customer_name')} AS customer_name, '' AS box_number, '' AS part_number,
-                ({$old('total_pcs')} - {$new('total_pcs')}) AS pcs_quantity, ({$old('total_boxes')} - {$new('total_boxes')}) AS box_quantity,
+                COALESCE({$new('returned_pcs_quantity')}, ({$old('total_pcs')} - {$new('total_pcs')})) AS pcs_quantity,
+                COALESCE({$new('returned_box_quantity')}, ({$old('total_boxes')} - {$new('total_boxes')})) AS box_quantity,
                 {$new('pallet_number')} AS pallet_number, {$new('boxes[0].warehouse_location')} AS location,
-                audit_logs.user_id AS actor_id, actor.name AS operator_name, 'returned' AS status");
+                audit_logs.user_id AS actor_id, actor.name AS operator_name,
+                CASE WHEN COALESCE({$new('returned_box_quantity')}, ({$old('total_boxes')} - {$new('total_boxes')})) > 0
+                    THEN 'returned' ELSE 'revised' END AS status");
     }
 
     private function domesticStock(): Builder
@@ -206,7 +209,7 @@ class WarehouseReportService
 
     public static function statusLabel(string $status): string
     {
-        return ['received'=>'Diterima','shipped'=>'Sudah dikirim','completed'=>'Selesai','returned'=>'Kembali stok cadangan','reversed'=>'Dikembalikan / Redo',
+        return ['received'=>'Diterima','shipped'=>'Sudah dikirim','completed'=>'Selesai','returned'=>'Kembali stok cadangan','revised'=>'Revisi tanpa pengembalian fisik','reversed'=>'Dikembalikan / Redo',
             'spare'=>'Stok cadangan','pending'=>'Menunggu','reserved'=>'Direservasi','fulfilled'=>'Terpenuhi','ready'=>'Pallet siap',
             'waiting'=>'Belum dimulai','partial'=>'Dalam pemenuhan','complete'=>'Terpenuhi','paused'=>'Perlu revisi','attention'=>'Perlu diperiksa',
             'archived'=>'Diarsipkan','approved'=>'Disetujui','cancelled'=>'Dibatalkan','rejected'=>'Ditolak'][$status]??$status;
