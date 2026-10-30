@@ -1,6 +1,87 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 30 Oktober 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 31 Oktober 2026 (pembaruan inkremental).
+
+Dashboard Admin Utama dan Supervisi lintas lingkup 31 Oktober 2026:
+- Kedua role memakai shared.operational-dashboard melalui
+  OperationalDashboardService dan OperationalDashboardSources. Default Semua;
+  filter Semua/Domestik/Ekspor, periode/tanggal, pengelompokan grafik, status
+  pemenuhan dan audit memakai AJAX report-browser.js existing. Role lain tetap
+  pada dashboard masing-masing. Izin reports existing mengendalikan tautan
+  rincian dan Excel; tidak memberi Supervisi akses mutasi operasi ekspor.
+- Grafik domestik memakai PCS; grafik ekspor memakai box, selalu terpisah.
+  Masuk ekspor memakai first_received_at, keluar hanya completed_at permintaan.
+  Reservasi/pemindahan/pengembalian cadangan tidak dihitung sebagai barang baru
+  masuk atau barang keluar. Arsip pengiriman tetap masuk histori.
+- KPI pemenuhan adalah persentase jumlah permintaan penuh, tidak menjumlahkan
+  kebutuhan PCS dengan box. Ekspor memakai overview/itemMetrics existing:
+  hanya konfirmasi penempatan valid yang terpenuhi, bukan reservasi. Draft belum
+  pernah final serta cancelled dikecualikan. Pallet siap tetap stok sampai
+  Selesaikan permintaan. Tenggat menjadi dasar periode kebutuhan/pemenuhan.
+- Stok dan pallet aktif adalah posisi saat ini, tidak dibatasi periode. Total
+  mencakup semua data walaupun rincian dibatasi 200 baris. Identitas domestik/
+  ekspor tetap terpisah. Domestik mempertahankan guard expiry/legacy; box dengan
+  tautan dua pallet dihitung sekali pada KPI dan diberi peringatan posisi ganda,
+  sedangkan daftar pallet menampilkan kedua tautan untuk pemeriksaan. Parent
+  delivery split tidak menggandakan kebutuhan leaf delivery aktif.
+- Issue scan dihitung per created_at pada periode, termasuk histori input_error
+  yang sudah ditutup. Audit diberi label Domestik/Ekspor/Umum; lingkup dikenali
+  dari type/model/snapshot scope. Audit global hanya tampil pada Semua. JSON
+  lama yang tidak valid tidak menggagalkan dashboard. Audit 20 baris/halaman,
+  issue 50 terbaru, tabel lain 200; Excel memuat seluruh hasil sesuai filter.
+- Durasi domestik tetap picking/sesi scan, ekspor finalisasi terakhir sampai
+  permintaan selesai; fase ditulis terpisah, tidak dirata-rata atau membuat
+  durasi scan ekspor fiktif. Nilai nol dan menit:detik tetap terbaca.
+- Excel memakai OperationalDashboardExport dan native PhpSpreadsheet charts,
+  satuan terpisah, header/filter/freeze baris, nomor box nol awal sebagai teks.
+  Grafik browser SVG lokal dengan rincian tabel; tidak memakai CDN/generator
+  gambar grafik eksternal. Jalur Excel legacy tanpa scope tetap tersedia.
+- AJAX hanya membaca dan melewati kalkulasi statistik/expiry lama. Load HTML
+  Admin tetap mempertahankan sinkronisasi expiry existing. Dashboard ini tidak
+  menambah migration, seeder atau dependency. Query MySQL lokal dijalankan dalam
+  transaksi READ ONLY; production remote tidak diubah. Preview memakai SQLite
+  khusus operational-dashboard-preview.sqlite.
+- Verifikasi: 501 backend (4.609 assertions) pada regresi penuh; setelah rapikan
+  label/grafik/Excel, 58 tes terkait (607 assertions) lulus. 87 frontend lulus.
+  Browser desktop 1366px dan ponsel 390px memeriksa filter, audit/pagination,
+  Back, tanggal 422/pemulihan, unduh Excel, keyboard, rincian grafik dan laporan.
+  Tidak ada overflow halaman/error konsol. Bukan stress test production.
+  Definisi dan file utama: docs/OPERATIONAL_DASHBOARD_SCOPES.md.
+
+Pencegahan duplikasi rencana delivery ekspor 30 Oktober 2026:
+- Simpan manual/hasil Excel dan edit diperiksa terhadap rencana aktif serta
+  completed (termasuk soft-deleted karena sudah dikirim). Cancelled dan draft
+  yang diarsipkan diabaikan; edit mengecualikan dirinya sendiri. Duplikat berarti
+  customer/kode/tenggat dan pasangan part/PCS sama, tanpa membedakan huruf besar,
+  whitespace atau urutan baris. Nama file tidak menentukan identitas dokumen.
+- ExportDeliveryPlanDuplicateService membaca data lama langsung, tidak memakai
+  backfill atau mengubah histori. Calon pembanding dibatasi tanggal/total PCS dan
+  dibaca per 100 header. Semua mutasi memakai mutex inventory ekspor existing.
+- Deteksi menghentikan penyimpanan tanpa membuat header/item/token/audit baru.
+  Form menampilkan pembanding, alasan wajib dan checkbox tinjauan. Konfirmasi
+  HMAC terikat ke aktor, token form, target edit, isi dan daftar/revisi pembanding.
+  Jika isian atau pembanding berubah, tinjauan ulang wajib. Rencana identik tetap
+  boleh disimpan dengan alasan, yang dicatat pada audit bersama ID pembanding.
+  Kode rencana tidak dijadikan unik global. API menerima 422 + duplicate_review.
+- Create/update web wajib UUID request_token. Tabel export_delivery_plan_requests
+  menyimpan hash isi/aktor/target dan ID hasil secara atomik dengan data/audit.
+  Retry identik mengembalikan ID lama sebelum validasi master/revisi terkini,
+  termasuk setelah arsip; token sama dengan isi/aktor/aksi lain ditolak.
+  Token hanya dikonsumsi saat sukses. Form lama dengan isian berbeda mendapat
+  token baru dan mempertahankan input, tetapi memerlukan submit/tinjauan lagi.
+- Submit ganda dicegah pada JS dan backend; pageshow memulihkan tombol setelah
+  Back. Perubahan input/impor/undo menghapus persetujuan duplikasi lama.
+  Rincian penanganan: docs/EXPORT_DELIVERY_DUPLICATE_PROTECTION.md.
+- Migration 2026_10_30_000004 hanya membuat tabel token baru. Diterapkan ke MySQL
+  lokal stock/127.0.0.1 setelah backup
+  storage/app/backups/stock_export_delivery_dedup_20261030_231757_59e689.json.
+  Data 12 tabel lama dibandingkan identik, 4 rencana/8 stok ekspor tetap, token
+  lokal 0. Query pembanding MySQL diuji baca saja. Production remote tidak diubah.
+- Regresi akhir: 488 backend (4.489 assertions), 87 frontend dan Vite build lulus.
+  Browser SQLite khusus memeriksa perbedaan huruf/spasi/urutan, peringatan sebelum
+  simpan, perubahan input membatalkan review, alasan/checkbox wajib, satu override
+  berhasil dan audit. Desktop 1366px/ponsel 390px tanpa overflow halaman atau
+  error konsol. Belum merupakan stress test konkurensi MySQL production.
 
 Perbaikan pengecualian proses bisnis ekspor 30 Oktober 2026:
 - Revisi pada Pemenuhan Permintaan kini boleh saat pallet belum penuh, tanpa
@@ -745,10 +826,12 @@ tidak boleh dihapus melalui Hapus Jadwal; gunakan Restore Split. Parent dengan
 child split aktif juga tidak boleh dihapus sebelum semua child dipulihkan.
 
 Verifikasi tambahan 16 Oktober 2026 (presentasi dashboard): role `admin` (Admin Utama)
-dan `supervisi` menggunakan dashboard laporan operasional yang sama melalui
-`OperationalReportService` dan `operator.reports.operational`. Role lain tetap
-menggunakan `shared.dashboard`. Statistik stok serta sinkronisasi expiry Admin
-Utama tetap dijalankan; hak akses dan proses transaksi tidak berubah.
+dan `supervisi` mulai menggunakan dashboard laporan operasional yang sama.
+Pada 31 Oktober 2026 jalur dashboard diganti dengan OperationalDashboardService
+dan shared.operational-dashboard untuk lingkup domestik/ekspor; lihat catatan
+di awal memo. OperationalReportService/operator.reports.operational tetap untuk
+laporan operasional legacy. Statistik stok serta sinkronisasi expiry pada load
+HTML Admin Utama tetap dijalankan; hak akses dan proses transaksi tidak berubah.
 
 Verifikasi tambahan 15 Oktober 2026: pengaturan hak akses fitur per role oleh Admin Utama, pembatasan server dan navigasi dinamis.
 
@@ -1421,6 +1504,9 @@ File utama:
 - `app/Http/Controllers/ReportController.php`
 - `app/Http/Controllers/AuditController.php`
 - `app/Services/OperationalReportService.php`
+- `app/Services/OperationalDashboardService.php`
+- `app/Services/OperationalDashboardSources.php`
+- `app/Exports/OperationalDashboardExport.php`
 - `app/Services/AuditService.php`
 
 ## Audio Scan (diverifikasi 13 Oktober 2026)

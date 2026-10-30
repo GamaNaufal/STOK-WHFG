@@ -8,6 +8,13 @@ if(page) {
     const planCode=byId('plan-code'),customer=byId('plan-customer'),deadline=byId('plan-deadline'),sourceType=byId('plan-source-type'),sourceName=byId('plan-source-name');
     const reviewed=byId('plan-reviewed'),reviewPanel=byId('plan-review'),save=byId('plan-save');
     const status=byId('plan-import-status');
+    const duplicateReview=byId('plan-duplicate-review'),duplicateReason=byId('plan-duplicate-reason'),duplicateConfirmed=byId('plan-duplicate-confirmed');
+    const resetDuplicateReview=()=>{
+        if(!duplicateReview || duplicateReview.hidden)return;
+        duplicateReview.hidden=true;
+        duplicateReview.querySelectorAll('input,textarea').forEach(field=>{field.disabled=true;field.required=false;});
+        duplicateConfirmed.checked=false;
+    };
     const format=n=>Number(n).toLocaleString('id-ID');
     let busy=false,undo=null,dirty=false,submitting=false;
     const rows=()=>[...body.querySelectorAll('tr')].map(tr=>({
@@ -41,7 +48,9 @@ if(page) {
         byId('plan-total-pcs').textContent=data.valid ? format(data.totalPcs) : '—';
         byId('plan-total-boxes').textContent=data.valid ? format(data.totalBoxes) : '—';
         reviewPanel.hidden=sourceType.value==='manual';reviewed.required=sourceType.value!=='manual';
-        save.disabled=busy || !data.valid || (reviewed.required && !reviewed.checked);
+        const duplicateValid=!duplicateReview || duplicateReview.hidden || (duplicateConfirmed.checked && duplicateReason.value.trim().length>0);
+        save.disabled=submitting || busy || !data.valid || !duplicateValid || (reviewed.required && !reviewed.checked);
+        if(!submitting)save.textContent=duplicateReview && !duplicateReview.hidden ? 'Tetap simpan dengan alasan' : 'Simpan rencana';
         byId('plan-add-item').disabled=busy || data.rows.length>=500;
     };
     const addRow=(row={},touched=false)=>{
@@ -59,6 +68,7 @@ if(page) {
     };
     const capture=()=>({plan_code:planCode.value,customer_name:customer.value,delivery_deadline:deadline.value,items:rows(),source_type:sourceType.value,source_name:sourceName.value,reviewed:reviewed.checked,warnings:[...importWarnings]});
     const apply=(data,type,name)=>{
+        resetDuplicateReview();
         undo=capture();
         planCode.value=data.plan_code ?? '';
         if(data.customer_name) customer.value=data.customer_name;
@@ -72,22 +82,26 @@ if(page) {
     };
     body.addEventListener('input',event=>{
         const tr=event.target.closest('tr');if(!tr)return;
-        tr.dataset.touched='1';dirty=true;
+        resetDuplicateReview();tr.dataset.touched='1';dirty=true;
         if(sourceType.value!=='manual')reviewed.checked=false;
         refresh();
     });
     body.addEventListener('click',event=>{
         const button=event.target.closest('.plan-remove');if(!button || busy)return;
+        resetDuplicateReview();
         button.closest('tr').remove();if(!body.children.length)addRow();
         dirty=true;if(sourceType.value!=='manual')reviewed.checked=false;refresh();
     });
     byId('plan-add-item').addEventListener('click',()=>{
         if(body.children.length>=500)return;
+        resetDuplicateReview();
         addRow();dirty=true;reviewed.checked=false;refresh();body.lastElementChild.querySelector('.plan-part').focus();
     });
-    [planCode,customer,deadline].forEach(input=>input.addEventListener('input',()=>{dirty=true;if(sourceType.value!=='manual')reviewed.checked=false;refresh();}));
+    [planCode,customer,deadline].forEach(input=>input.addEventListener('input',()=>{resetDuplicateReview();dirty=true;if(sourceType.value!=='manual')reviewed.checked=false;refresh();}));
+    duplicateReason?.addEventListener('input',refresh);duplicateConfirmed?.addEventListener('change',refresh);
     reviewed.addEventListener('change',refresh);
     byId('plan-undo-import').addEventListener('click',()=>{
+        resetDuplicateReview();
         if(!undo)return;planCode.value=undo.plan_code;customer.value=undo.customer_name;deadline.value=undo.delivery_deadline;
         body.replaceChildren();undo.items.forEach(row=>addRow(row,true));
         sourceType.value=undo.source_type;sourceName.value=undo.source_name;reviewed.checked=undo.reviewed;
@@ -118,9 +132,11 @@ if(page) {
         finally{setBusy(false);}
     });
     form.addEventListener('submit',event=>{
+        if(submitting){event.preventDefault();return;}
         refresh();if(save.disabled || !form.reportValidity()){event.preventDefault();return;}
-        submitting=true;save.disabled=true;save.textContent='Menyimpan…';
+        submitting=true;save.disabled=true;save.textContent='Menyimpan…';form.setAttribute('aria-busy','true');
     });
+    window.addEventListener('pageshow',()=>{submitting=false;save.textContent='Simpan rencana';form.setAttribute('aria-busy',String(busy));refresh();});
     window.addEventListener('beforeunload',event=>{if(dirty&&!submitting){event.preventDefault();event.returnValue='';}});
     initial.rows.forEach(row=>addRow(row,Boolean(row.part_number)));refresh();
 }

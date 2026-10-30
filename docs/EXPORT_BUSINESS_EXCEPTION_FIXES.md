@@ -54,6 +54,8 @@ Perubahan kode tidak menambah migration, dependency, seeder atau konfigurasi PC.
 Pengujian memakai SQLite in-memory dan browser memakai database SQLite preview
 khusus. MySQL lokal dan production tidak dimutasi. Tidak mencakup poin review
 duplikasi impor maupun cutover migration QA, yang berada di luar perbaikan 1–3.
+Pencegahan duplikasi kemudian diimplementasikan secara terpisah, lihat
+docs/EXPORT_DELIVERY_DUPLICATE_PROTECTION.md. Persiapan cutover QA tetap terpisah.
 
 Regresi penuh: 468 backend lulus (4.314 assertions), 87 frontend lulus.
 Verifikasi akhir penyajian audit dan alur terkait: 82 tes lulus (896 assertions).

@@ -7,7 +7,7 @@ use App\Models\StockLocation;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryPickSession;
-use App\Services\OperationalReportService;
+use App\Services\OperationalDashboardService;
 use App\Services\ExpiredBoxService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +15,16 @@ use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
+    private function operational(Request $request, array $extra = [])
+    {
+        $data = array_merge(app(OperationalDashboardService::class)->build($request), $extra);
+        $response = $request->expectsJson()
+            ? response()->json(['html' => view('shared.partials.operational-dashboard-content', $data)->render(),
+                'title' => 'Dashboard Operasional - Warehouse FG', 'url' => $request->fullUrl()])
+            : response()->view('shared.operational-dashboard', $data);
+        return $response->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
+    }
+
     private function applyStoredLocationExistsFilter($query)
     {
         return $query->whereExists(function ($sub) {
@@ -111,6 +121,9 @@ class DashboardController extends Controller
         if ($userRole === 'export_operator') {
             return view('export.dashboard');
         }
+        if ($userRole === 'supervisi' || ($userRole === 'admin' && $request->expectsJson())) {
+            return $this->operational($request, compact('userRole'));
+        }
 
         $stats = [];
         $stockSummaryTotals = $this->buildStockSummaryTotals();
@@ -149,11 +162,6 @@ class DashboardController extends Controller
                 'total_stok_pcs' => $stockSummaryTotals['total_pcs'],
                 'total_stok_items' => $stockSummaryTotals['total_items'],
             ];
-        }
-        // SUPERVISI
-        elseif ($userRole === 'supervisi') {
-            $data = app(OperationalReportService::class)->build($request);
-            return view('operator.reports.operational', $data);
         }
         // ADMIN WAREHOUSE
         elseif ($userRole === 'admin_warehouse') {
@@ -206,9 +214,7 @@ class DashboardController extends Controller
 
             // Admin Utama uses the same operational dashboard as Supervisi.
             // Retain existing stock statistics and expiry synchronization above.
-            $data = app(OperationalReportService::class)->build($request);
-
-            return view('operator.reports.operational', array_merge($data, compact('stats', 'userRole')));
+            return $this->operational($request, compact('stats', 'userRole'));
         }
 
         return view('shared.dashboard', compact('stats', 'userRole'));

@@ -33,6 +33,7 @@ class ExportDeliveryPlanTest extends TestCase
     private function payload(array $changes = []): array
     {
         return array_replace([
+            'request_token' => (string) \Illuminate\Support\Str::uuid(),
             'customer_name' => 'Customer Ekspor', 'delivery_deadline' => '2026-11-15',
             'source_type' => 'manual', 'items' => [['part_number' => 'EXP-001', 'pcs_quantity' => 100]],
         ], $changes);
@@ -49,6 +50,93 @@ class ExportDeliveryPlanTest extends TestCase
         $book->disconnectWorksheets();
 
         return UploadedFile::fake()->createWithContent('rencana.xlsx', $bytes);
+    }
+
+    public function test_repeated_save_with_same_token_creates_one_plan_and_one_audit(): void
+    {
+        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
+        $data=$this->payload(['plan_code'=>'RETRY-RD']);$url=route('export.delivery-plans.store');
+        $first=$this->post($url,$data)->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
+        $second=$this->post($url,$data)->assertSessionHasNoErrors();
+        $first->assertRedirect(route('export.delivery-plans.show',$plan));$second->assertRedirect(route('export.delivery-plans.show',$plan));
+        $this->assertDatabaseCount('export_delivery_plans',1);$this->assertDatabaseCount('export_delivery_plan_requests',1);
+        $this->assertSame(1,AuditLog::where('type','export_delivery_plan')->count());
+    }
+
+    public function test_token_cannot_be_reused_for_changed_content_another_actor_or_an_update(): void
+    {
+        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$actor=$this->operator();$this->actingAs($actor);
+        $data=$this->payload();$this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
+        $this->postJson(route('export.delivery-plans.store'),array_replace($data,['customer_name'=>'Another customer']))->assertUnprocessable()->assertJsonValidationErrors('request_token');
+        $this->putJson(route('export.delivery-plans.update',$plan),$data+['revision'=>1])->assertUnprocessable()->assertJsonValidationErrors('request_token');
+        $this->actingAs($this->operator())->postJson(route('export.delivery-plans.store'),$data)->assertUnprocessable()->assertJsonValidationErrors('request_token');
+        $this->assertDatabaseCount('export_delivery_plans',1);$this->assertSame(1,$plan->fresh()->revision);
+    }
+
+    public function test_failed_validation_does_not_consume_save_token(): void
+    {
+        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
+        $data=$this->payload(['items'=>[['part_number'=>'EXP-001','pcs_quantity'=>101]]]);
+        $this->postJson(route('export.delivery-plans.store'),$data)->assertUnprocessable()->assertJsonValidationErrors('items.0.pcs_quantity');
+        $this->assertDatabaseCount('export_delivery_plan_requests',0);
+        $data['items'][0]['pcs_quantity']=100;
+        $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('export_delivery_plans',1);$this->assertDatabaseCount('export_delivery_plan_requests',1);
+    }
+
+    public function test_restored_form_with_changed_content_preserves_edits_and_gets_fresh_token_without_saving(): void
+    {
+        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
+        $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors();
+        $changed=array_replace($data,['customer_name'=>'New intended customer']);$create=route('export.delivery-plans.create');
+        $this->from($create)->post(route('export.delivery-plans.store'),$changed)->assertRedirect($create)->assertSessionHasErrors('request_token')
+            ->assertSessionHasInput('customer_name','New intended customer');
+        $fresh=session()->getOldInput('request_token');$this->assertNotSame($data['request_token'],$fresh);$this->assertTrue(\Illuminate\Support\Str::isUuid($fresh));
+        $this->assertDatabaseCount('export_delivery_plans',1);
+        $this->post(route('export.delivery-plans.store'),array_replace($changed,['request_token'=>$fresh]))->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('export_delivery_plans',2);
+    }
+
+    public function test_successful_update_retry_does_not_increment_revision_twice_even_after_archive(): void
+    {
+        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
+        $this->post(route('export.delivery-plans.store'),$this->payload())->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
+        $data=$this->payload(['revision'=>1,'items'=>[['part_number'=>'EXP-001','pcs_quantity'=>120]]]);$url=route('export.delivery-plans.update',$plan);
+        $this->put($url,$data)->assertSessionHasNoErrors();$this->put($url,$data)->assertSessionHasNoErrors();
+        $this->assertSame(2,$plan->fresh()->revision);$this->assertSame(120,$plan->fresh()->total_pcs);
+        $this->delete(route('export.delivery-plans.destroy',$plan),['revision'=>2])->assertSessionHasNoErrors();
+        $this->put($url,$data)->assertSessionHasNoErrors()->assertRedirect(route('export.delivery-plans.index'));
+        $this->assertDatabaseCount('export_delivery_plan_requests',2);
+        $this->assertSame(1,AuditLog::where('type','export_delivery_plan')->where('action','updated')->count());
+    }
+
+    public function test_create_retry_resolves_archived_plan_before_rechecking_changed_master_capacity(): void
+    {
+        $part=ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
+        $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
+        $this->delete(route('export.delivery-plans.destroy',$plan),['revision'=>1])->assertSessionHasNoErrors();
+        $this->put(route('export.part-settings.update',$part),['part_number'=>$part->part_number,'qty_box'=>30])->assertSessionHasNoErrors();
+        $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors()->assertRedirect(route('export.delivery-plans.index'));
+        $this->assertSame(1,ExportDeliveryPlan::withTrashed()->count());$this->assertSame(0,ExportDeliveryPlan::count());
+    }
+
+    public function test_web_save_requires_a_valid_request_token(): void
+    {
+        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
+        unset($data['request_token']);$this->postJson(route('export.delivery-plans.store'),$data)->assertUnprocessable()->assertJsonValidationErrors('request_token');
+        $this->postJson(route('export.delivery-plans.store'),$data+['request_token'=>'bad-token'])->assertUnprocessable()->assertJsonValidationErrors('request_token');
+        $this->assertDatabaseCount('export_delivery_plans',0);
+    }
+
+    public function test_audit_failure_rolls_back_plan_and_token_and_allows_retry(): void
+    {
+        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$actor=$this->operator();$data=$this->payload();$fail=true;
+        AuditLog::creating(function($log)use(&$fail){if($fail&&$log->type==='export_delivery_plan')throw new \RuntimeException('Audit unavailable');});
+        try{app(\App\Services\ExportDeliveryPlanService::class)->save($data,$actor);$this->fail('Audit must persist.');}
+        catch(\RuntimeException $e){$this->assertSame('Audit unavailable',$e->getMessage());}
+        $this->assertDatabaseCount('export_delivery_plans',0);$this->assertDatabaseCount('export_delivery_plan_requests',0);
+        $fail=false;app(\App\Services\ExportDeliveryPlanService::class)->save($data,$actor);
+        $this->assertDatabaseCount('export_delivery_plans',1);$this->assertDatabaseCount('export_delivery_plan_requests',1);
     }
 
     public function test_default_access_and_revocation_cover_pages_import_and_template(): void

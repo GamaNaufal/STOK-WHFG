@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportPartSetting;
+use App\Exceptions\DuplicateExportDeliveryPlan;
 use App\Services\AuditService;
 use App\Services\ExportDeliveryPlanImportService;
 use App\Services\ExportDeliveryPlanService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use App\Services\ExportInventoryService;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -64,6 +66,9 @@ class ExportDeliveryPlanController extends Controller
         }
 
         return $request->validate([
+            'request_token' => 'required|uuid',
+            'duplicate_review_token' => 'nullable|string|size:64',
+            'duplicate_confirmed' => 'nullable|in:1', 'duplicate_reason' => 'nullable|string|max:500',
             'plan_code' => 'nullable|string|max:100',
             'customer_name' => 'required|string|max:255',
             'delivery_deadline' => 'required|date_format:Y-m-d',
@@ -75,6 +80,7 @@ class ExportDeliveryPlanController extends Controller
             'items.*.part_number' => 'required|string|max:100|distinct:strict',
             'items.*.pcs_quantity' => 'required|integer|min:1|max:4294967295',
         ], [
+            'request_token.required' => 'Muat ulang formulir rencana sebelum menyimpan. Isian yang belum tersimpan dapat diperiksa kembali.',
             'items.*.part_number.distinct' => 'Nomor part tidak boleh berulang dalam satu rencana.',
             'reviewed.accepted' => 'Periksa dan konfirmasi hasil impor sebelum menyimpan.',
         ]);
@@ -82,16 +88,39 @@ class ExportDeliveryPlanController extends Controller
 
     public function store(Request $request, ExportDeliveryPlanService $service)
     {
-        $plan = $service->save($this->validated($request), $request->user());
+        try { $plan = $service->save($this->validated($request), $request->user()); }
+        catch (DuplicateExportDeliveryPlan $error) { return $this->duplicateResponse($request, $error); }
+        catch (ValidationException $error) { return $this->validationResponse($request, $error); }
 
-        return redirect()->route('export.delivery-plans.show', $plan)->with('success', 'Rencana delivery berhasil disimpan.');
+        return ($plan->trashed() ? redirect()->route('export.delivery-plans.index') : redirect()->route('export.delivery-plans.show', $plan))
+            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat; rencana tersebut sudah diarsipkan.' : 'Rencana delivery berhasil disimpan.');
     }
 
-    public function update(Request $request, ExportDeliveryPlan $deliveryPlan, ExportDeliveryPlanService $service)
+    public function update(Request $request, int $deliveryPlan, ExportDeliveryPlanService $service)
     {
-        $plan = $service->save($this->validated($request, $deliveryPlan), $request->user(), $deliveryPlan->id);
+        $existing = ExportDeliveryPlan::withTrashed()->findOrFail($deliveryPlan);
+        try { $plan = $service->save($this->validated($request, $existing), $request->user(), $deliveryPlan); }
+        catch (DuplicateExportDeliveryPlan $error) { return $this->duplicateResponse($request, $error); }
+        catch (ValidationException $error) { return $this->validationResponse($request, $error); }
 
-        return redirect()->route('export.delivery-plans.show', $plan)->with('success', 'Rencana delivery berhasil diperbarui.');
+        return ($plan->trashed() ? redirect()->route('export.delivery-plans.index') : redirect()->route('export.delivery-plans.show', $plan))
+            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat; rencana tersebut sudah diarsipkan.' : 'Rencana delivery berhasil diperbarui.');
+    }
+
+    private function duplicateResponse(Request $request, DuplicateExportDeliveryPlan $error)
+    {
+        $errors = ['duplicate' => [$error->getMessage()]];
+        if ($request->expectsJson()) return response()->json(['message' => $error->getMessage(), 'errors' => $errors, 'duplicate_review' => $error->review], 422);
+        return redirect()->back()->withInput()->withErrors($errors)->with('delivery_duplicate_review', $error->review);
+    }
+
+    private function validationResponse(Request $request, ValidationException $error)
+    {
+        if ($request->expectsJson() || !isset($error->errors()['request_token'])) throw $error;
+        // A Back/restored form may carry an already-used token. Preserve the operator's edits,
+        // but require another deliberate submit with a fresh token and the normal duplicate review.
+        return redirect()->back()->withInput(array_replace($request->except('_token'), ['request_token' => (string) \Illuminate\Support\Str::uuid()]))
+            ->withErrors(array_replace($error->errors(), ['request_token' => 'Formulir sebelumnya tidak dapat dipakai untuk isian ini. Isian tetap dipertahankan; periksa lalu simpan kembali.']));
     }
 
     public function destroy(Request $request, ExportDeliveryPlan $deliveryPlan, ExportDeliveryPlanService $service)

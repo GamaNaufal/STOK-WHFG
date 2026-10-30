@@ -18,7 +18,7 @@
             <p>Isi kebutuhan pengiriman. Kapasitas box mengikuti master part ekspor.</p>
         </div>
     </header>
-    @if($errors->any())
+    @if($errors->any() && !$errors->has('duplicate'))
         <div class="alert alert-danger" role="alert">
             <strong>Periksa kembali rencana sebelum menyimpan.</strong>
             <ul class="mb-0 mt-2">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
@@ -50,6 +50,7 @@
 
     <form method="POST" action="{{ $plan ? route('export.delivery-plans.update', $plan) : route('export.delivery-plans.store') }}" id="delivery-plan-form">
         @csrf
+        <input type="hidden" name="request_token" value="{{ old('request_token', (string)\Illuminate\Support\Str::uuid()) }}">
         @if($plan) @method('PUT') @endif
         <input type="hidden" name="revision" value="{{ old('revision', $plan?->revision ?? 1) }}">
         <input type="hidden" name="source_type" id="plan-source-type" value="{{ $initialSource }}">
@@ -89,6 +90,20 @@
         <section class="plan-review" id="plan-review" @if($initialSource === 'manual') hidden @endif>
             <label for="plan-reviewed"><input class="form-check-input" type="checkbox" name="reviewed" id="plan-reviewed" value="1" @checked(old('reviewed', $plan ? '1' : '') === '1')> Saya sudah mencocokkan kode rencana, customer, tanggal, nomor part, dan jumlah PCS dengan dokumen sumber.</label>
         </section>
+        @if($duplicateReview = session('delivery_duplicate_review'))
+            <section class="plan-panel border-warning" id="plan-duplicate-review" aria-labelledby="duplicate-review-title">
+                <div class="plan-panel-heading"><div><h2 id="duplicate-review-title">Rencana identik sudah tercatat</h2><p>Customer, kode, tanggal pengiriman, nomor part dan jumlahnya sama dengan rencana berikut. Isian ini belum disimpan.</p></div></div>
+                <div class="plan-table-scroll" role="region" aria-label="Rencana pembanding duplikasi" tabindex="0"><table class="table plan-table"><thead><tr><th>Rencana</th><th>Customer</th><th>Tenggat</th><th>Status</th><th>Total box</th></tr></thead><tbody>
+                    @foreach($duplicateReview['matches'] as $match)<tr><th>@unless($match['archived'])<a href="{{ route('export.delivery-plans.show', $match['id']) }}" target="_blank" rel="noopener">{{ $match['plan_code'] ?: 'RD-'.$match['id'] }} · #{{ $match['id'] }}</a>@else{{ $match['plan_code'] ?: 'RD-'.$match['id'] }} · #{{ $match['id'] }}@endunless</th><td>{{ $match['customer_name'] }}</td><td>{{ \Carbon\Carbon::parse($match['delivery_deadline'])->format('d/m/Y') }}</td><td>{{ $match['status'] }}</td><td>{{ number_format($match['total_boxes'], 0, ',', '.') }}</td></tr>@endforeach
+                </tbody></table></div>
+                <div class="plan-panel-body">
+                    <input type="hidden" name="duplicate_review_token" value="{{ $duplicateReview['token'] }}">
+                    <label class="form-label" for="plan-duplicate-reason">Alasan membuat rencana identik (wajib)</label><textarea class="form-control mb-3" id="plan-duplicate-reason" name="duplicate_reason" maxlength="500" required rows="3" autofocus>{{ old('duplicate_reason') }}</textarea>
+                    <div class="form-check"><input class="form-check-input" type="checkbox" name="duplicate_confirmed" value="1" id="plan-duplicate-confirmed" required><label class="form-check-label" for="plan-duplicate-confirmed">Saya sudah meninjau rencana pembanding. Permintaan identik ini memang diperlukan dan bukan unggahan atau klik simpan yang terulang.</label></div>
+                    <p class="plan-help mt-2">Alasan dan rencana pembanding dicatat pada audit. Jika isian rencana diubah, pemeriksaan duplikasi dilakukan kembali.</p>
+                </div>
+            </section>
+        @endif
         <div class="plan-save-bar">
             <div><strong>Periksa rencana sebelum menyimpan</strong><p id="plan-save-help">Rencana disimpan sebagai draft. Jumlah box dihitung otomatis.</p></div>
             <div class="plan-inline-actions"><a class="btn btn-outline-secondary" href="{{ route('export.delivery-plans.index') }}">Kembali</a><button type="submit" class="btn btn-primary" id="plan-save" disabled>Simpan rencana</button></div>

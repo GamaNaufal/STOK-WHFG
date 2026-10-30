@@ -60,16 +60,16 @@ class UiReviewPreviewTest extends TestCase
             $response = $this->actingAs($user)->get(route('dashboard'));
             $response->assertOk();
             if (in_array($role, ['supervisi', 'admin'], true)) {
-                $response->assertViewIs('operator.reports.operational');
+                $response->assertViewIs('shared.operational-dashboard');
                 foreach (['#fulfillment-report', '#current-handling', '#active-pallets', '#scan-issues'] as $target) {
                     $response->assertSee('href="'.$target.'"', false);
                 }
-                $response->assertSee('class="dashboard-stock dashboard-issues" id="scan-issues"', false);
-                $response->assertSee('class="dashboard-stock dashboard-processing" id="processing-time"', false);
+                $response->assertSee('id="scan-issues"', false);
+                $response->assertSee('id="processing-time"', false);
                 $this->assertSame(1, substr_count($response->getContent(), 'id="scan-issues"'));
-                $response->assertSee('Fulfillment Rate (Order Full)');
+                $response->assertSee('Permintaan terpenuhi penuh')->assertSee('Lingkup');
                 $this->get(route('dashboard', ['fulfillment_filter' => 'partial']))
-                    ->assertOk()->assertSee('Fulfillment Rate (Order Partial)');
+                    ->assertOk()->assertSee('value="partial" selected',false)->assertSee('Belum penuh');
             } else {
                 $response->assertViewIs('shared.dashboard')->assertSee('Akses cepat');
             }
@@ -100,7 +100,7 @@ class UiReviewPreviewTest extends TestCase
             ->assertSee('Sesi #'.$session->id)
             ->assertSee('Nama customer')
             ->assertSee('Customer Processing')
-            ->assertSee('Operator sesi')
+            ->assertSee('Petugas')
             ->assertSee('Operator Picking A')
             ->assertSee('dashboard-processing-duration">00:00', false)
             ->assertSee('Data belum tersedia');
@@ -215,8 +215,8 @@ class UiReviewPreviewTest extends TestCase
 
         $response->assertOk()
             ->assertSee('3 filter aktif')
-            ->assertSee('Jenis: Input Stok')
-            ->assertSee('Aksi: created')
+            ->assertSee('Jenis: Input stok')
+            ->assertSee('Aksi: Dibuat')
             ->assertSee('Petugas: Admin Audit');
         foreach (['period', 'start_date', 'end_date', 'group_by', 'fulfillment_filter'] as $key) {
             $response->assertSee('name="'.$key.'" value="'.$query[$key].'"', false);
@@ -225,7 +225,7 @@ class UiReviewPreviewTest extends TestCase
         $this->assertSame(1, preg_match('/href="([^"]+)"[^>]*id="audit-filter-reset"/', $response->getContent(), $match));
         $resetUrl = html_entity_decode($match[1]);
         parse_str(parse_url($resetUrl, PHP_URL_QUERY), $resetQuery);
-        $this->assertSame(array_intersect_key($query, array_flip(['period', 'start_date', 'end_date', 'group_by', 'fulfillment_filter'])), $resetQuery);
+        $this->assertEquals(['scope'=>'all']+array_intersect_key($query, array_flip(['period', 'start_date', 'end_date', 'group_by', 'fulfillment_filter'])), $resetQuery);
     }
 
     public function test_master_location_pages_show_the_occupied_guard_and_keep_invalid_code_input(): void

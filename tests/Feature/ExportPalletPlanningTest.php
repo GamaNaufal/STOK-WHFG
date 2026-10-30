@@ -37,7 +37,7 @@ class ExportPalletPlanningTest extends TestCase
     private function delivery(): ExportDeliveryPlan
     {
         return app(ExportDeliveryPlanService::class)->save([
-            'plan_code' => 'RDPAL-001', 'customer_name' => 'Customer Ekspor', 'delivery_deadline' => '2026-11-20',
+            'plan_code' => 'RDPAL-001'.(ExportDeliveryPlan::withTrashed()->count() ? '-'.(ExportDeliveryPlan::withTrashed()->count()+1) : ''), 'customer_name' => 'Customer Ekspor', 'delivery_deadline' => '2026-11-20',
             'source_type' => 'manual', 'items' => [
                 ['part_number' => $this->a->part_number, 'pcs_quantity' => 100],
                 ['part_number' => $this->b->part_number, 'pcs_quantity' => 80],

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AuditLog, ExportMasterLocation, ExportPartSetting, RoleFeatureAccess, User};
+use App\Models\{AuditLog, ExportDeliveryPlan, ExportMasterLocation, ExportPartSetting, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -25,7 +25,7 @@ class ExportPlanPrintTest extends TestCase
 
     private function delivery()
     {
-        return app(ExportDeliveryPlanService::class)->save(['plan_code' => 'RD-PRINT-001','customer_name' => 'Customer Print & Export',
+        return app(ExportDeliveryPlanService::class)->save(['plan_code' => 'RD-PRINT-001'.(ExportDeliveryPlan::withTrashed()->count() ? '-'.(ExportDeliveryPlan::withTrashed()->count()+1) : ''),'customer_name' => 'Customer Print & Export',
             'delivery_deadline' => '2026-11-20','source_type' => 'manual','items' => [
                 ['part_number' => $this->a->part_number,'pcs_quantity' => 200], ['part_number' => $this->b->part_number,'pcs_quantity' => 200],
             ]],$this->operator);

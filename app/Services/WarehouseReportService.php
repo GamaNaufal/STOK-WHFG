@@ -210,8 +210,8 @@ class WarehouseReportService
     public static function statusLabel(string $status): string
     {
         return ['received'=>'Diterima','shipped'=>'Sudah dikirim','completed'=>'Selesai','returned'=>'Kembali stok cadangan','revised'=>'Revisi tanpa pengembalian fisik','reversed'=>'Dikembalikan / Redo',
-            'spare'=>'Stok cadangan','pending'=>'Menunggu','reserved'=>'Direservasi','fulfilled'=>'Terpenuhi','ready'=>'Pallet siap',
-            'waiting'=>'Belum dimulai','partial'=>'Dalam pemenuhan','complete'=>'Terpenuhi','paused'=>'Perlu revisi','attention'=>'Perlu diperiksa',
+            'spare'=>'Stok cadangan','pending'=>'Menunggu','reserved'=>'Direservasi','fulfilled'=>'Terpenuhi','ready'=>'Pallet siap','multiple_locations'=>'Periksa posisi ganda',
+            'waiting'=>'Belum dimulai','partial'=>'Dalam pemenuhan','processing'=>'Dalam proses','complete'=>'Terpenuhi','paused'=>'Perlu revisi','attention'=>'Perlu diperiksa',
             'archived'=>'Diarsipkan','approved'=>'Disetujui','cancelled'=>'Dibatalkan','rejected'=>'Ditolak'][$status]??$status;
     }
 }

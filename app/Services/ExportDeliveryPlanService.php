@@ -5,10 +5,25 @@ namespace App\Services;
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportPartSetting;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class ExportDeliveryPlanService
 {
+    private function requestHash(array $data, User $actor, ?int $id): string
+    {
+        return hash('sha256', json_encode([
+            'actor' => $actor->id, 'target' => $id, 'revision' => $id ? (int) $data['revision'] : null,
+            'plan_code' => trim((string) ($data['plan_code'] ?? '')),
+            'customer_name' => trim($data['customer_name']), 'delivery_deadline' => $data['delivery_deadline'],
+            'source_type' => $data['source_type'], 'source_name' => $data['source_name'] ?? null,
+            'duplicate_reason' => trim($data['duplicate_reason'] ?? ''),
+            'duplicate_confirmed' => in_array($data['duplicate_confirmed'] ?? null, [true, 1, '1', 'yes', 'on'], true),
+            'duplicate_review_token' => $data['duplicate_review_token'] ?? '',
+            'items' => array_map(fn ($row) => ['part_number' => $row['part_number'], 'pcs_quantity' => (int) $row['pcs_quantity']], $data['items']),
+        ], JSON_THROW_ON_ERROR));
+    }
+
     public function snapshot(ExportDeliveryPlan $plan): array
     {
         return [
@@ -26,6 +41,15 @@ class ExportDeliveryPlanService
     public function save(array $data, User $actor, ?int $id = null): ExportDeliveryPlan
     {
         return app(ExportInventoryService::class)->transaction(function () use ($data, $actor, $id) {
+            $token = $data['request_token'] ?? null;
+            $hash = $token ? $this->requestHash($data, $actor, $id) : null;
+            if ($token && ($previous = DB::table('export_delivery_plan_requests')->where('request_token', $token)->first())) {
+                if (!hash_equals($previous->request_hash, $hash)) {
+                    throw ValidationException::withMessages(['request_token' => 'Formulir ini sudah dipakai untuk penyimpanan lain. Muat ulang formulir sebelum menyimpan perubahan.']);
+                }
+                // Resolve successful retries before checking current revision, master capacity or archive status.
+                return ExportDeliveryPlan::withTrashed()->with('items')->findOrFail($previous->export_delivery_plan_id);
+            }
             $plan = $id ? ExportDeliveryPlan::with('items')->lockForUpdate()->findOrFail($id) : new ExportDeliveryPlan;
             if ($id && ($plan->status !== 'draft' || $plan->revision !== (int) $data['revision'])) {
                 throw ValidationException::withMessages(['revision' => 'Rencana sudah berubah. Muat ulang halaman sebelum menyimpan.']);
@@ -57,6 +81,8 @@ class ExportDeliveryPlanService
                 throw ValidationException::withMessages($errors);
             }
             $code = trim((string) (array_key_exists('plan_code', $data) ? $data['plan_code'] : $plan->plan_code));
+            $duplicate = app(ExportDeliveryPlanDuplicateService::class)->review(
+                array_merge($data, ['plan_code' => $code]), $items, $actor, $id);
             $plan->fill([
                 'plan_code' => $code !== '' ? $code : null,
                 'customer_name' => trim($data['customer_name']), 'delivery_deadline' => $data['delivery_deadline'],
@@ -73,7 +99,13 @@ class ExportDeliveryPlanService
             $plan->load('items');
             if ($id) app(ExportPalletPlanningService::class)->invalidateForDeliveryRevision($plan, $actor);
             AuditService::record('export_delivery_plan', $id ? 'updated' : 'created', 'ExportDeliveryPlan',
-                $plan->id, $actor->id, $before, $this->snapshot($plan), 'Rencana delivery ekspor disimpan.');
+                $plan->id, $actor->id, $before, $this->snapshot($plan) + ($duplicate ?? []),
+                $duplicate ? 'Rencana delivery ekspor disimpan setelah konfirmasi duplikasi dengan alasan.' : 'Rencana delivery ekspor disimpan.');
+            if ($token) {
+                DB::table('export_delivery_plan_requests')->insert(['request_token' => $token, 'request_hash' => $hash,
+                    'export_delivery_plan_id' => $plan->id, 'created_by' => $actor->id,
+                    'action' => $id ? 'update' : 'create', 'created_at' => now()]);
+            }
 
             return $plan;
         });

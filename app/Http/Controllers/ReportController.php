@@ -24,6 +24,11 @@ class ReportController extends Controller
 
     public function exportOperationalExcel(Request $request)
     {
+        if ($request->has('scope')) {
+            $data = app(\App\Services\OperationalDashboardService::class)->build($request, true);
+            return Excel::download(new \App\Exports\OperationalDashboardExport($data),
+                'dashboard_'.$data['filters']['scope'].'_'.now()->format('Ymd_His').'.xlsx', ExcelFormat::XLSX);
+        }
         $data = (object) app(OperationalReportService::class)->build($request, true);
         $start = $data->start;
         $end = $data->end;

@@ -219,6 +219,7 @@ class ExportFulfillmentTest extends TestCase
         foreach (['reopen', 'cancel'] as $action) $this->postJson(route('export.pallet-plans.transition', $delivery),
             ['revision' => 1, 'action' => $action])->assertUnprocessable()->assertJsonValidationErrors('fulfillment');
         $this->putJson(route('export.delivery-plans.update', $delivery), [
+            'request_token' => (string) \Illuminate\Support\Str::uuid(),
             'revision' => 1, 'plan_code' => 'CHANGED', 'customer_name' => 'Changed', 'delivery_deadline' => '2026-12-01',
             'source_type' => 'manual', 'items' => [['part_number' => $this->a->part_number, 'pcs_quantity' => 20]],
         ])->assertUnprocessable()->assertJsonValidationErrors('fulfillment');
