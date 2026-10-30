@@ -44,6 +44,11 @@ Verifikasi 30 Oktober 2026 pada branch aktif Export-plan.
   Penempatan boleh bertahap per kelompok. Transaksi keluar antrean bila semua
   selesai, dan dapat kembali bila stok cadangannya perlu dipindahkan karena
   reservasi baru. Header tetap processed; progres dihitung dari box.
+- Untuk reservasi stok existing dari finalisasi baru, pop-up tinjauan pada
+  perencanaan harus diakui lewat Oke sebelum tugas aktif di antrean. Box tetap
+  di sumber dan belum terpenuhi. Reservasi lama tidak ditahan; penerimaan baru
+  tetap mengikuti alur existing. Detail dan migration:
+  docs/EXPORT_FIFO_STOCK_REVIEW.md.
 - Penerimaan lama tanpa batch tetap tersedia sebagai transaksi satu box, tanpa
   menggabungkan histori berdasarkan tanggal atau mengubah data existing.
 - Halaman Stok Ekspor (/export/stock) terpisah dari penerimaan. Memuat stok,

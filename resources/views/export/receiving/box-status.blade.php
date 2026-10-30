@@ -1,5 +1,7 @@
 @if($box->fulfillment?->placed_at)
     <span class="fulfillment-status fulfillment-status-complete">Terpenuhi</span>
+@elseif($box->fulfillment?->awaitsQueueAcknowledgment())
+    <span class="fulfillment-status fulfillment-status-paused">Direservasi · menunggu Oke FIFO</span>
 @elseif($box->fulfillment)
     <span class="fulfillment-status fulfillment-status-partial">Direservasi · menunggu penempatan</span>
 @elseif($box->state === 'stored')

@@ -14,6 +14,12 @@ class ExportPalletPlan extends Model
     public function reservations() { return $this->hasMany(ExportPalletLocationReservation::class); }
     public function finalizedBy() { return $this->belongsTo(User::class, 'finalized_by'); }
 
+    public function isFinalFor(ExportDeliveryPlan $delivery): bool
+    {
+        return $this->status === 'final' && $this->delivery_revision === $delivery->revision
+            && (int) $this->export_delivery_plan_id === $delivery->id;
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return match ($this->status) { 'final' => 'Final', 'cancelled' => 'Dibatalkan', default => 'Draft' };

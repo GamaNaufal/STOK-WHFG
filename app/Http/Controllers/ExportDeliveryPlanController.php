@@ -51,7 +51,8 @@ class ExportDeliveryPlanController extends Controller
     {
         $deliveryPlan->load(['items', 'creator', 'palletPlan']);
 
-        return view('export.delivery-plans.show', ['plan' => $deliveryPlan]);
+        return view('export.delivery-plans.show', ['plan' => $deliveryPlan,
+            'printReady' => $deliveryPlan->palletPlan?->isFinalFor($deliveryPlan) ?? false]);
     }
 
     private function validated(Request $request, ?ExportDeliveryPlan $plan = null): array

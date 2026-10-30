@@ -102,6 +102,9 @@ class ExportReceivingTransactionsTest extends TestCase
         $target = ExportMasterLocation::create(['code' => 'TX-TARGET']);
         app(ExportPalletPlanningService::class)->save($delivery->id, ['revision' => 0, 'delivery_revision' => 1, 'action' => 'finalize',
             'pallets' => [['master_location_id' => $target->id, 'items' => [['part_setting_id' => $this->part->id, 'box_quantity' => 1]]]]], $this->operator);
+        $this->get(route('export.receiving.index'))->assertViewHas('transactions', fn ($p) => $p->isEmpty());
+        $this->post(route('export.pallet-plans.acknowledge-stock', ['deliveryPlan' => $delivery->id,
+            'notice' => $box->fresh()->fulfillment->allocation_notice_id]), ['revision' => $delivery->palletPlan->revision])->assertRedirect();
         $this->get(route('export.receiving.index'))->assertViewHas('transactions', fn ($p) =>
             $p->total() === 1 && (int) $p[0]->transaction_id === $batch->id && (int) $p[0]->pending_boxes === 1);
         $this->get(route('export.receiving.transactions.show', $batch))->assertSee('Pallet cadangan · TX-SOURCE')->assertSee('Pallet 1 · TX-TARGET');

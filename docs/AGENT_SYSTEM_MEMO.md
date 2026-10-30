@@ -2,6 +2,77 @@
 
 Terakhir diverifikasi dari source code: 30 Oktober 2026 (pembaruan inkremental).
 
+Verifikasi Tinjauan FIFO Wajib dan Tinjau Ulang 30 Oktober 2026:
+- Pop-up hasil finalisasi terkini yang belum diakui hanya mempunyai satu tombol
+  Oke, masukkan ke antrean (Oke bila hasil kosong). Tinjau nanti dan tombol X
+  dihapus; backdrop static dan keyboard false menahan klik luar/Escape.
+  Reservasi otomatis dan pengaktifan antrean melalui POST tetap seperti sebelumnya.
+- Tinjau alokasi FIFO tetap tersedia setelah pengakuan. Parameter review_stock=1
+  membuka hasil finalisasi terakhir sebagai tampilan baca saja, dengan kondisi
+  posisi fisik dan status penempatan saat ini. Hanya tombol Tutup; tidak ada
+  formulir ACK/reservasi ulang. Pengakuan tidak menghilangkan akses tinjauan.
+- Halaman biasa setelah ACK hanya memuat header hasil; daftar 100 baris/paging
+  dimuat ketika tinjauan dibuka. Riwayat revisi terakhir juga bisa dibaca saat
+  planning sudah draft/revisi tanpa memaksa ACK atas revisi lama.
+- 35 tes backend terkait lulus (424 assertions), termasuk ketiadaan penundaan,
+  flag modal wajib, tinjauan setelah pemindahan fisik dan pagination baca saja.
+  Browser Chromium memeriksa satu tombol, Escape/klik luar tetap terbuka, Oke
+  menghasilkan satu transaksi antrean, lalu Tinjau alokasi FIFO/Tutup tanpa
+  tombol aktivasi ulang atau error konsol. Contoh hanya SQLite preview.
+  Tidak ada migration/dependency baru atau perubahan data MySQL pada pembaruan ini.
+
+Verifikasi Pop-up Stok FIFO dan Pengakuan Antrean 30 Oktober 2026:
+- Finalisasi tetap mengalokasikan stok ekspor sesuai part/PCS, tenggat/pallet
+  dan first_received_at/ID. Reservasi baru untuk plan yang baru final menunggu
+  tinjauan, dengan header export_stock_allocation_notices per plan/revision dan
+  FK nullable allocation_notice_id pada komitmen. Detail: docs/EXPORT_FIFO_STOCK_REVIEW.md.
+- Pop-up otomatis menampilkan box/part/PCS, tanggal pertama, posisi asal dan
+  tujuan. Daftar 100 baris/halaman; refresh/pagination tidak mengakui hasil.
+  Konfirmasi bersifat wajib dengan satu tombol; hasil tetap dapat ditinjau ulang
+  setelah tugas diaktifkan, sesuai pembaruan di atas.
+- Oke mengaktifkan antrean lewat POST pallet-plans.acknowledge-stock, izin
+  export_pallet_plans existing; ACK diaudit atomik/idempotent pada mutex ekspor
+  dengan pemeriksaan parent/final/revision. Redirect ke antrean hanya jika juga
+  berizin export_stock_input. Box tetap di lokasi asal sampai konfirmasi fisik.
+- Queue SQL dan scope queueReady mengecualikan reservasi belum diakui. Batch
+  campuran memisahkan pending/waiting/placed; detail dan cetak memberi status
+  Menunggu Oke FIFO. POST penempatan langsung ditolak sebelum Oke. Sesudahnya
+  tugas tetap dikelompokkan menurut transaksi penerimaan asal dan FIFO.
+- Hasil kosong juga ditampilkan; penerimaan baru sesudah final mengikuti alur
+  existing tanpa ditahan tinjauan kosong. Reservasi lama dengan FK NULL tidak
+  ditahan/backfill; guard revisi/pengembalian existing dipertahankan.
+- 107 tes backend terkait lulus (1.125 assertions). Browser memeriksa finalisasi,
+  tiga box tertua/dari empat, kembali/refresh sebelum Oke, belum ada antrean,
+  Oke lalu satu transaksi dengan tiga tugas/dua pallet, tanpa error konsol.
+  Contoh mutasi hanya SQLite preview.
+- Migration 2026_10_30_000001 diterapkan pada MySQL lokal stock (APP_ENV local,
+  host 127.0.0.1). Jumlah data dan isi 8 baris fulfillment existing tetap utuh;
+  tabel tinjauan baru 0, reservasi lama ditahan 0; SQL MySQL antrean valid.
+  Backup storage/app/backups/stock_allocation_notice_20261030_140820_3df0d6.json.
+  Tidak ada contoh stok di MySQL atau perubahan production remote.
+
+Verifikasi Cetak Rencana Final 30 Oktober 2026:
+- Sesuai jawaban pengguna, rencana delivery dan rincian pallet hanya dapat
+  dicetak setelah planning final yang sesuai revision delivery terbaru.
+  ExportPalletPlan::isFinalFor dipakai untuk visibilitas dan guard server.
+  Draft/reopen/cancel atau revision stale ditolak 409, arsip 404.
+- ExportPlanPrintController menyediakan delivery-plans/{deliveryPlan}/print,
+  pallet-plans/{deliveryPlan}/print dan
+  pallet-plans/{deliveryPlan}/pallets/{pallet}/print. Key izin existing delivery
+  dan pallet independen, pallet asing ditolak, respons private/no-store.
+- Cetak delivery memakai snapshot kapasitas/PCS/box dan total. Cetak semua atau
+  satu pallet memakai kartu berisi nomor/lokasi besar, customer/kode/tenggat/
+  revisi, part dan jumlah box, termasuk teks peringatan 36/72. A4 portrait,
+  margin 10 mm, tinggi otomatis sesuai rincian; beberapa kartu berbagi kertas.
+  Thead mengulang identitas/judul pada daftar panjang. Cetak tidak memutasi data.
+- View standalone export/print dan export-plan-print.css; tanpa migration,
+  dependency/konfigurasi PC atau izin baru. Detail di docs/EXPORT_PLAN_PRINTING.md.
+- 44 tes backend terkait lulus (509 assertions). Browser memeriksa cetak final,
+  semua/satu pallet, delivery dan tidak ada tombol pada draft, tanpa error
+  konsol. Lima contoh PDF QA Dompdf diperiksa seluruh halamannya, termasuk
+  20 kartu dengan beberapa pallet/A4 dan satu pallet 80 part. Bukan uji printer
+  fisik/mesin cetak Chrome. Semua fixture hanya SQLite preview.
+
 Verifikasi Nama Transfer dan Peringatan Muatan Pallet 30 Oktober 2026:
 - Nama fitur sekarang Penerimaan Transfer Box Ekspor pada menu/hak akses,
   dashboard, judul halaman dan tautan stok. Key export_stock_input, URL,

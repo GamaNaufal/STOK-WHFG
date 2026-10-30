@@ -202,3 +202,27 @@ per pallet (kuning mulai 36, merah mulai 72) memerlukan App\Support\ExportPallet
 komponen Blade export-pallet-load, view/CSS terbaru dan public/build hasil build.
 Tidak ada migration, seeder atau konfigurasi PC tambahan. Threshold hanya
 peringatan; validasi dan izin existing tetap digunakan.
+
+Cetak rencana delivery dan rincian pallet (30 Oktober 2026) memakai controller
+ExportPlanPrintController, method ExportPalletPlan::isFinalFor, rute/view terbaru,
+dan public/css/pages/export-plan-print.css. Sertakan seluruh file saat deploy;
+bangun ulang route cache jika digunakan. Tidak ada migration, seeder atau
+layanan PDF/konfigurasi PC tambahan. Cetak melalui browser setelah planning
+final; kartu pallet tersusun otomatis pada A4. Rincian:
+docs/EXPORT_PLAN_PRINTING.md.
+
+## Tinjauan Stok FIFO setelah Finalisasi (30 Oktober 2026)
+
+Sesudah migration penerimaan/batch tersedia, jalankan secara terarah:
+
+```powershell
+php artisan migrate --path=database/migrations/2026_10_30_000001_create_export_stock_allocation_notices.php
+```
+
+Migration menambah header tinjauan dan FK nullable pada komitmen. Data lama
+mempertahankan antrean existing; tidak perlu seeder atau izin baru. Sudah
+diterapkan pada MySQL lokal stock dengan backup dan verifikasi data tetap.
+Sertakan seluruh perubahan model/service/controller/rute/view dan rebuild route
+cache jika digunakan. Pop-up memakai Bootstrap existing; tidak ada dependency,
+build JS baru atau konfigurasi PC tambahan. Detail alur Oke dan pengujian:
+docs/EXPORT_FIFO_STOCK_REVIEW.md.

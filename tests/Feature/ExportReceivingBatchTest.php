@@ -91,7 +91,7 @@ class ExportReceivingBatchTest extends TestCase
         $this->assertDatabaseCount('export_stock_boxes',3); $this->assertDatabaseCount('export_fulfillment_boxes',2);
         $this->assertSame($scannedAt,ExportStockBox::first()->first_received_at->toDateTimeString());
         $this->assertSame(10,ExportStockBox::first()->pcs_quantity);
-        $this->get(route('export.receiving.transactions.show',$batch))->assertOk()->assertSee('Transaksi penerimaan ekspor')
+        $this->get(route('export.receiving.transactions.show',$batch))->assertOk()->assertSee('Penerimaan Transfer Box Ekspor')
             ->assertViewHas('groups',fn($g)=>$g->count()===2);
         $audits=AuditLog::count(); $this->process($batch)->assertRedirect();
         $this->assertSame($audits,AuditLog::count()); $this->assertDatabaseCount('export_stock_boxes',3);
@@ -159,7 +159,7 @@ class ExportReceivingBatchTest extends TestCase
     public function test_batch_results_include_older_fifo_tasks_and_new_surplus_remains_spare(): void
     {
         $old=app(ExportStockReceivingService::class)->receive(['box_number'=>'00000999','part_number'=>'BULK-A','receive_token'=>(string)Str::uuid()],$this->operator);
-        $this->plan(); $batch=$this->batch();
+        $delivery=$this->plan(); $batch=$this->batch();
         $this->scan($batch,'00000001')->assertOk(); $this->scan($batch,'00000002')->assertOk();
         $this->get(route('export.receiving.index'))->assertDontSee('BULK-PLAN');
         $this->process($batch)->assertRedirect();
@@ -168,6 +168,8 @@ class ExportReceivingBatchTest extends TestCase
         $this->get(route('export.receiving.transactions.show',$batch))->assertOk()
             ->assertViewHas('groups',fn($groups)=>$groups->sum(fn($group)=>$group['boxes']->count())===2
                 && !$groups->contains(fn($group)=>$group['boxes']->contains('id',$old->id)));
+        $this->post(route('export.pallet-plans.acknowledge-stock',['deliveryPlan'=>$delivery->id,
+            'notice'=>$old->fresh()->fulfillment->allocation_notice_id]),['revision'=>$delivery->palletPlan->revision])->assertRedirect();
         $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn($p)=>$p->first()->kind==='legacy' && (int)$p->first()->transaction_id===$old->id);
     }
     public function test_draft_limit_accepts_large_delivery_batches_and_rejects_more_than_one_thousand(): void

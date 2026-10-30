@@ -95,9 +95,12 @@ class ExportStockReceivingService
                 if ($replay->request_hash !== $hash || (int) $replay->placed_by !== $actor->id) $this->fail('request_token', 'Konfirmasi ini sudah dipakai untuk data lain.');
                 return ExportStockBox::findOrFail($boxId);
             }
-            $box = ExportStockBox::with(['currentPallet', 'fulfillment.plannedItem.pallet'])->findOrFail($boxId);
+            $box = ExportStockBox::with(['currentPallet', 'fulfillment.allocationNotice', 'fulfillment.plannedItem.pallet'])->findOrFail($boxId);
             $commitment = $box->fulfillment;
             $planned = $commitment?->plannedItem->pallet;
+            if ($commitment?->awaitsQueueAcknowledgment()) {
+                $this->fail('allocation', 'Tinjau hasil stok FIFO pada perencanaan pallet dan klik Oke sebelum menempatkan box ini.');
+            }
             if ($planned) {
                 $plan = ExportPalletPlan::findOrFail($planned->export_pallet_plan_id);
                 $delivery = ExportDeliveryPlan::whereKey($plan->export_delivery_plan_id)->lockForUpdate()->first();

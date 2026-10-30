@@ -15,12 +15,12 @@ class ExportStockController extends Controller
             'status' => ['nullable', Rule::in(['stored', 'pending', 'spare', 'reserved'])]]);
         $search = trim($data['q'] ?? ''); $status = $data['status'] ?? '';
         $selected = !empty($data['box']) ? ExportStockBox::with($view::RELATIONS)->findOrFail($data['box']) : null;
-        $listRelations = ['currentPallet.plannedPallet', 'fulfillment.plannedItem.pallet'];
+        $listRelations = ['currentPallet.plannedPallet', 'fulfillment.allocationNotice', 'fulfillment.plannedItem.pallet'];
         $pendingCount = $view->pendingQuery()->count();
         $boxes = ExportStockBox::with($listRelations)->when($search !== '', fn ($q) => $q->where(fn ($s) =>
             $s->where('box_number', 'like', '%'.$search.'%')->orWhere('part_number', 'like', '%'.$search.'%')))
             ->when($status === 'stored', fn ($q) => $q->where('state', 'stored'))
-            ->when($status === 'pending', fn ($q) => $q->where(fn ($s) => $s->where('state', 'received')->orWhereHas('fulfillment', fn ($f) => $f->whereNull('placed_at'))))
+            ->when($status === 'pending', fn ($q) => $q->where(fn ($s) => $s->where('state', 'received')->orWhereHas('fulfillment', fn ($f) => $f->whereNull('placed_at')))->queueReady())
             ->when($status === 'spare', fn ($q) => $q->where('state', 'stored')->whereDoesntHave('fulfillment'))
             ->when($status === 'reserved', fn ($q) => $q->whereHas('fulfillment'))
             ->orderBy('first_received_at')->orderBy('id')->paginate(20, ['*'], 'stock_page')->withQueryString();

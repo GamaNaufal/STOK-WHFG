@@ -83,6 +83,12 @@ dengan part campuran. Data contoh hanya pada SQLite preview.
 
 ## Kesepakatan untuk tahap Pemenuhan Permintaan
 
+Pembaruan 30 Oktober: setelah finalisasi, hasil pencarian stok FIFO tampil di
+pop-up untuk ditinjau. Box direservasi, tetapi tugas pemindahan baru aktif pada
+antrean setelah operator menekan Oke. Tanggal FIFO/lokasi fisik tidak diubah
+oleh Oke. Hasil kosong dan penerimaan baru mengikuti ketentuan di
+docs/EXPORT_FIFO_STOCK_REVIEW.md; memerlukan migration tinjauan tambahan.
+
 Pemantauan serta penerimaan/reservasi FIFO tersedia sejak 29 Oktober 2026; lihat
 docs/EXPORT_FULFILLMENT.md dan docs/EXPORT_STOCK_RECEIVING.md. Finalisasi memasukkan
 rencana ke pemantauan dan mereservasi stok ekspor tersedia. Revisi tetap terlihat
@@ -107,6 +113,12 @@ Kesepakatan penerimaan dan tahap berikutnya:
   label lokasi) dibahas saat tahap penerimaan dibuat.
 
 ## Deployment dan verifikasi
+
+Cetak delivery dan rincian setiap pallet tersedia hanya setelah perencanaan
+final sesuai revisi delivery terbaru. Cetak semua pallet menyusun beberapa kartu
+per A4 dengan tinggi mengikuti jumlah part; tiap pallet juga dapat dicetak
+sendiri. Detail guard, layout, deployment dan verifikasi ada di
+docs/EXPORT_PLAN_PRINTING.md. Tidak ada perubahan alokasi/izin atau migration.
 
 Implementasi utama: app/Services/ExportPalletPlanningService.php,
 app/Http/Controllers/ExportPalletPlanController.php, model ExportPalletPlan /

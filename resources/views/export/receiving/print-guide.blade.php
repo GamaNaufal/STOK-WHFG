@@ -27,7 +27,7 @@
                 </thead>
                 <tbody>
                     @foreach($destination['rows'] as $row)
-                        <tr><td>{{ $loop->iteration }}</td><td><strong class="guide-box">{{ $row['box']->box_number }}</strong></td><td>{{ $row['box']->part_number }}</td><td class="number">{{ $row['box']->pcs_quantity }}</td><td>{{ $row['box']->currentPallet ? $row['box']->currentPallet->display_name.' · '.$row['box']->currentPallet->location_code : 'Belum ditempatkan' }}</td><td class="check-cell">@if($row['pending'])<span class="paper-check" aria-label="Belum ditempatkan"></span>@else<strong>Sudah</strong>@endif</td></tr>
+                        <tr><td>{{ $loop->iteration }}</td><td><strong class="guide-box">{{ $row['box']->box_number }}</strong></td><td>{{ $row['box']->part_number }}</td><td class="number">{{ $row['box']->pcs_quantity }}</td><td>{{ $row['box']->currentPallet ? $row['box']->currentPallet->display_name.' · '.$row['box']->currentPallet->location_code : 'Belum ditempatkan' }}</td><td class="check-cell">@if($row['waiting_for_review'])<strong>Menunggu Oke FIFO</strong>@elseif($row['pending'])<span class="paper-check" aria-label="Belum ditempatkan"></span>@else<strong>Sudah</strong>@endif</td></tr>
                     @endforeach
                 </tbody>
             </table>

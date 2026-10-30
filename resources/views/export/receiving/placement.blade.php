@@ -6,6 +6,7 @@
             $delivery = $planned?->palletPlan->deliveryPlan;
             $needsPlacement = $selected->state === 'received' || ($commitment && !$commitment->placed_at);
             $canMoveSpare = $selected->state === 'stored' && !$commitment;
+            $waitingForReview = $commitment?->awaitsQueueAcknowledgment() ?? false;
         @endphp
         <div class="receiving-box-heading"><div><span class="plan-eyebrow">Box ekspor</span><h3>{{ $selected->box_number }}</h3><p>{{ $selected->part_number }} · {{ number_format($selected->pcs_quantity, 0, ',', '.') }} PCS</p></div>@include('export.receiving.box-status', ['box' => $selected])</div>
         @if($selected->currentPallet)<p class="plan-help mb-3">Posisi saat ini: {{ $selected->currentPallet->display_name }} · lokasi {{ $selected->currentPallet->location_code }}.</p>@endif
@@ -18,7 +19,8 @@
         @else
             <p class="receiving-complete">Penempatan sudah dikonfirmasi.</p>
         @endif
-        @if($needsPlacement || $canMoveSpare)
+        @if($waitingForReview)<p class="alert alert-info">Tinjau hasil stok FIFO dan klik Oke sebelum penempatan.@if(auth()->user()->canAccess('export_pallet_plans')) <a href="{{ route('export.pallet-plans.show', $delivery) }}">Buka tinjauan perencanaan</a>.@endif</p>@endif
+        @if(($needsPlacement || $canMoveSpare) && !$waitingForReview)
             @if($canMoveSpare)<details class="receiving-relocate"><summary>Ubah penempatan stok cadangan</summary>@endif
             <form method="POST" action="{{ route('export.receiving.place', $selected) }}" id="export-place-form">
                 @csrf<input type="hidden" name="revision" value="{{ $selected->revision }}"><input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">

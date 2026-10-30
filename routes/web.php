@@ -46,12 +46,16 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     Route::prefix('export')->name('export.')->group(function () {
         Route::get('delivery-plans/template', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'template'])->name('delivery-plans.template');
         Route::post('delivery-plans/import-excel', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'importExcel'])->name('delivery-plans.import-excel');
+        Route::get('delivery-plans/{deliveryPlan}/print', [\App\Http\Controllers\ExportPlanPrintController::class, 'delivery'])->whereNumber('deliveryPlan')->name('delivery-plans.print');
         Route::resource('delivery-plans', \App\Http\Controllers\ExportDeliveryPlanController::class);
         Route::get('pallet-plans', [\App\Http\Controllers\ExportPalletPlanController::class, 'index'])->name('pallet-plans.index');
         Route::get('pallet-plans/{deliveryPlan}', [\App\Http\Controllers\ExportPalletPlanController::class, 'show'])->name('pallet-plans.show');
         Route::get('pallet-plans/{deliveryPlan}/edit', [\App\Http\Controllers\ExportPalletPlanController::class, 'edit'])->name('pallet-plans.edit');
+        Route::get('pallet-plans/{deliveryPlan}/print', [\App\Http\Controllers\ExportPlanPrintController::class, 'pallets'])->whereNumber('deliveryPlan')->name('pallet-plans.print');
+        Route::get('pallet-plans/{deliveryPlan}/pallets/{pallet}/print', [\App\Http\Controllers\ExportPlanPrintController::class, 'pallets'])->whereNumber('deliveryPlan')->whereNumber('pallet')->name('pallet-plans.print-pallet');
         Route::put('pallet-plans/{deliveryPlan}', [\App\Http\Controllers\ExportPalletPlanController::class, 'update'])->name('pallet-plans.update');
         Route::post('pallet-plans/{deliveryPlan}/transition', [\App\Http\Controllers\ExportPalletPlanController::class, 'transition'])->name('pallet-plans.transition');
+        Route::post('pallet-plans/{deliveryPlan}/stock-allocation/{notice}/acknowledge', [\App\Http\Controllers\ExportPalletPlanController::class, 'acknowledgeStock'])->whereNumber('notice')->name('pallet-plans.acknowledge-stock');
         Route::get('fulfillment', [\App\Http\Controllers\ExportFulfillmentController::class, 'index'])->name('fulfillment.index');
         Route::get('receiving', [\App\Http\Controllers\ExportStockReceivingController::class, 'index'])->name('receiving.index');
         Route::get('receiving/transactions/{batch}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'show'])->whereNumber('batch')->name('receiving.transactions.show');

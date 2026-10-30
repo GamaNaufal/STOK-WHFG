@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportMasterLocation;
 use App\Services\ExportPalletPlanningService;
+use App\Services\ExportStockAllocationNoticeService;
+use App\Models\ExportStockAllocationNotice;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -45,13 +47,33 @@ class ExportPalletPlanController extends Controller
                 || ($loc->reservation && $loc->reservation->export_pallet_plan_id !== $planning?->id),
             'reserved' => (bool) $loc->reservation,
         ])->all();
-        return compact('delivery', 'planning', 'rows', 'summary', 'locations') + ['catalog' => $catalog->values()->all()];
+        return compact('delivery', 'planning', 'rows', 'summary', 'locations') + ['catalog' => $catalog->values()->all(),
+            'printReady' => $planning?->isFinalFor($delivery) ?? false];
     }
 
     public function show(ExportDeliveryPlan $deliveryPlan, ExportPalletPlanningService $service)
     {
         if (!$deliveryPlan->palletPlan()->exists()) return redirect()->route('export.pallet-plans.edit', $deliveryPlan);
-        return view('export.pallet-plans.show', $this->context($deliveryPlan, $service));
+        $data = $this->context($deliveryPlan, $service);
+        $stockNotice = ExportStockAllocationNotice::where('export_pallet_plan_id', $data['planning']->id)
+            ->orderByDesc('plan_revision')->first();
+        $stockReviewRequired = $stockNotice && $data['printReady']
+            && $stockNotice->plan_revision === $data['planning']->revision && !$stockNotice->acknowledged_at;
+        $stockReviewOpen = $stockNotice && ($stockReviewRequired || request()->boolean('review_stock') || request()->has('stock_page'));
+        $stockAssignments = $stockReviewOpen ? $stockNotice->boxes()->with(['stockBox.currentPallet.plannedPallet', 'plannedItem.pallet'])
+            ->orderBy('first_received_at')->orderBy('export_stock_box_id')->paginate(100, ['*'], 'stock_page')
+            ->withQueryString()->fragment('stock-allocation-modal') : null;
+        return view('export.pallet-plans.show', $data + compact('stockNotice', 'stockAssignments', 'stockReviewRequired', 'stockReviewOpen'));
+    }
+
+    public function acknowledgeStock(Request $request, ExportDeliveryPlan $deliveryPlan, ExportStockAllocationNotice $notice, ExportStockAllocationNoticeService $service)
+    {
+        $data = $request->validate(['revision' => 'required|integer|min:1']);
+        $service->acknowledge($deliveryPlan->id, $notice->id, (int) $data['revision'], $request->user());
+        $redirect = $request->user()->canAccess('export_stock_input')
+            ? redirect()->to(route('export.receiving.index').'#receiving-pending-queue')
+            : redirect()->route('export.pallet-plans.show', $deliveryPlan);
+        return $redirect->with('success', 'Tinjauan stok FIFO selesai. Tugas yang ditemukan sudah aktif di antrean penempatan/pemindahan.');
     }
 
     public function edit(ExportDeliveryPlan $deliveryPlan, ExportPalletPlanningService $service)

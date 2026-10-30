@@ -166,7 +166,10 @@ class ExportPalletPlanningService
             }
             AuditService::record('export_pallet_plan', $final ? 'finalized' : 'saved', 'ExportPalletPlan', $plan->id,
                 $actor->id, $before, $this->snapshot($plan), $final ? 'Perencanaan pallet difinalisasi dan lokasi direservasi.' : 'Draft perencanaan pallet disimpan.');
-            if ($final) app(ExportStockAllocationService::class)->allocate($actor);
+            if ($final) {
+                $notice = app(ExportStockAllocationNoticeService::class)->create($plan, $actor);
+                app(ExportStockAllocationService::class)->allocate($actor, notice: $notice);
+            }
             return $plan;
         });
     }

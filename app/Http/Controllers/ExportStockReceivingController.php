@@ -29,7 +29,7 @@ class ExportStockReceivingController extends Controller
         foreach ($transactions as $transaction) {
             $transaction->code = $transactionsService::code($transaction->kind, (int) $transaction->transaction_id);
             $transaction->received_at = \Illuminate\Support\Carbon::parse($transaction->received_at);
-            $transaction->placed_boxes = (int) $transaction->total_boxes - (int) $transaction->pending_boxes;
+            $transaction->placed_boxes = (int) $transaction->total_boxes - (int) $transaction->pending_boxes - (int) $transaction->waiting_boxes;
         }
         return view('export.receiving.index', compact('batch', 'state', 'transactions'));
     }

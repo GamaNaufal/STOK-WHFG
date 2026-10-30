@@ -6,13 +6,14 @@ use App\Models\ExportDeliveryPlan;
 use App\Models\ExportFulfillmentBox;
 use App\Models\ExportPalletPlan;
 use App\Models\ExportStockBox;
+use App\Models\ExportStockAllocationNotice;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 class ExportStockAllocationService
 {
     /** Caller holds ExportInventoryService's lock. Existing commitments are retained. */
-    public function allocate(User $actor, ?array $partIds = null): int
+    public function allocate(User $actor, ?array $partIds = null, ?ExportStockAllocationNotice $notice = null): int
     {
         $deliveries = ExportDeliveryPlan::whereHas('palletPlan', fn ($q) => $q->where('status', 'final'))
             ->orderBy('id')->lockForUpdate()->get();
@@ -46,6 +47,7 @@ class ExportStockAllocationService
                         && (int) $box->currentPallet->export_planned_pallet_id === $pallet->id
                         && (int) $box->currentPallet->master_location_id === $pallet->master_location_id;
                     $commitment = ExportFulfillmentBox::create([
+                        'allocation_notice_id' => !$alreadyThere && $notice && (int) $notice->export_pallet_plan_id === $plan->id ? $notice->id : null,
                         'export_stock_box_id' => $box->id, 'box_number' => $box->box_number,
                         'export_planned_pallet_item_id' => $item->id, 'part_setting_id' => $box->part_setting_id,
                         'pcs_quantity' => $box->pcs_quantity, 'first_received_at' => $box->first_received_at,

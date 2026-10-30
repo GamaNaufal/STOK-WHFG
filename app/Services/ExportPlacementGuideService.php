@@ -34,7 +34,8 @@ class ExportPlacementGuideService
                     $place = ['pallet' => $box->currentPallet?->display_name ?? 'Pallet cadangan', 'location' => $box->currentPallet?->location_code];
                 }
                 $segments[$key] ??= $place + ['load' => null, 'delivery' => $group['delivery'], 'rows' => []];
-                $segments[$key]['rows'][] = ['box' => $box, 'pending' => $pending];
+                $segments[$key]['rows'][] = ['box' => $box, 'pending' => $pending,
+                    'waiting_for_review' => $box->fulfillment?->awaitsQueueAcknowledgment() ?? false];
             }
         }
         return ['printGroups' => array_values($segments), 'guideWarning' => $warning, 'printedAt' => now()];

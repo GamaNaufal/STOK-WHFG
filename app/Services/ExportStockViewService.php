@@ -8,12 +8,12 @@ use Illuminate\Support\Collection;
 
 class ExportStockViewService
 {
-    public const RELATIONS = ['currentPallet.plannedPallet', 'fulfillment.plannedItem.pallet.palletPlan.deliveryPlan'];
+    public const RELATIONS = ['currentPallet.plannedPallet', 'fulfillment.allocationNotice', 'fulfillment.plannedItem.pallet.palletPlan.deliveryPlan'];
 
     public function pendingQuery(): Builder
     {
         return ExportStockBox::where(fn ($query) => $query->where('state', 'received')
-            ->orWhereHas('fulfillment', fn ($fulfillment) => $fulfillment->whereNull('placed_at')));
+            ->orWhereHas('fulfillment', fn ($fulfillment) => $fulfillment->whereNull('placed_at')))->queueReady();
     }
 
     public function choices(): array
@@ -35,13 +35,15 @@ class ExportStockViewService
             ->map(function ($rows, $key) use ($targets) {
                 $planned = $rows->first()->fulfillment?->plannedItem->pallet;
                 $pending = $rows->filter(fn ($box) => $box->state === 'received' || ($box->fulfillment && !$box->fulfillment->placed_at))->values();
+                $waiting = $pending->filter(fn ($box) => $box->fulfillment?->awaitsQueueAcknowledgment())->values();
+                $actionable = $pending->reject(fn ($box) => $box->fulfillment?->awaitsQueueAcknowledgment())->values();
                 $target = $planned ? $targets->get($planned->id) : null;
                 $current = (int) ($target?->boxes_count ?? 0);
                 $incoming = $pending->filter(fn ($box) => !$target || (int) $box->current_pallet_id !== (int) $target->id)->count();
                 return ['key' => $key, 'planned' => $planned, 'delivery' => $planned?->palletPlan->deliveryPlan,
                     'load' => $planned ? ['current' => $current, 'incoming' => $incoming, 'total' => $current + $incoming] : null,
-                    'boxes' => $rows->values(), 'pending' => $pending,
-                    'placements' => $pending->map(fn ($box) => ['id' => $box->id, 'revision' => $box->revision,
+                    'boxes' => $rows->values(), 'pending' => $pending, 'waiting' => $waiting, 'actionable' => $actionable,
+                    'placements' => $actionable->map(fn ($box) => ['id' => $box->id, 'revision' => $box->revision,
                         'request_token' => (string) \Illuminate\Support\Str::uuid()])->all()];
             })->values();
     }

@@ -13,6 +13,11 @@ class ExportStockBox extends Model
     public function part() { return $this->belongsTo(ExportPartSetting::class, 'part_setting_id'); }
     public function currentPallet() { return $this->belongsTo(ExportStockPallet::class, 'current_pallet_id'); }
     public function fulfillment() { return $this->hasOne(ExportFulfillmentBox::class); }
+    public function scopeQueueReady($query)
+    {
+        return $query->whereDoesntHave('fulfillment', fn ($q) => $q->whereNotNull('allocation_notice_id')
+            ->whereDoesntHave('allocationNotice', fn ($n) => $n->whereNotNull('acknowledged_at')));
+    }
     public function receiver() { return $this->belongsTo(User::class, 'received_by'); }
     public function movements() { return $this->hasMany(ExportStockMovement::class); }
 }
