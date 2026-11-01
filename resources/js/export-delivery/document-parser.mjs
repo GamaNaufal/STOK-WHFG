@@ -22,10 +22,10 @@ export function checkRows(rows, catalog, snapshots=[]) {
         else if(counts.get(row.part_number)>1) error='Part berulang. Gabungkan jumlah PCS dalam satu baris.';
         else if(quantity===null) error='Isi jumlah PCS bulat lebih dari nol.';
         else if(!Number.isSafeInteger(capacity) || capacity<1) error='Kapasitas box tidak valid.';
-        else if(quantity%capacity!==0) error='Jumlah PCS harus kelipatan '+capacity+'. Box tidak penuh belum didukung.';
-        const boxes=error ? null : quantity/capacity;
+        const boxes=error ? null : Math.ceil(quantity/capacity);
+        const notFullPcs=error ? 0 : quantity%capacity;
         if(!error) {totalPcs+=quantity;totalBoxes+=boxes;}
-        return {...row,quantity,capacity,boxes,error};
+        return {...row,quantity,capacity,boxes,error,notFullPcs};
     });
     return {rows:results,valid:rows.length>0 && rows.length<=500 && results.every(row=>!row.error),totalPcs,totalBoxes};
 }

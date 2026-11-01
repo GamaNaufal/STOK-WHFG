@@ -21,29 +21,28 @@ class ExportPalletPlanningService
         $plan?->loadMissing('pallets.items');
         return $plan?->pallets->map(fn ($pallet) => [
             'id' => $pallet->id, 'master_location_id' => $pallet->master_location_id,
-            'items' => $pallet->items->map(fn ($item) => $item->only(['part_setting_id', 'box_quantity']))->all(),
+            'items' => $pallet->items->map(fn ($item) => $item->only(['part_setting_id', 'pcs_per_box', 'box_quantity']))->all(),
         ])->all() ?? [];
     }
 
     public function requirements(ExportDeliveryPlan $delivery, array $rows): array
     {
         $allocated = [];
+        $catalog = ExportBoxRequirements::catalog($delivery);
         foreach ($rows as $pallet) {
             foreach ($pallet['items'] ?? [] as $item) {
                 $id = (int) $item['part_setting_id'];
-                $allocated[$id] = ($allocated[$id] ?? 0) + (int) $item['box_quantity'];
+                $pcs = (int) ($item['pcs_per_box'] ?? $delivery->items->firstWhere('part_setting_id', $id)?->pcs_per_box);
+                $key = ExportBoxRequirements::key($id, $pcs);
+                $allocated[$key] = ($allocated[$key] ?? 0) + (int) $item['box_quantity'];
             }
         }
-        $result = $delivery->items->map(fn ($item) => [
-            'part_setting_id' => $item->part_setting_id, 'part_number' => $item->part_number,
-            'pcs_per_box' => $item->pcs_per_box, 'required' => $item->box_quantity,
-            'allocated' => $allocated[$item->part_setting_id] ?? 0,
-            'remaining' => $item->box_quantity - ($allocated[$item->part_setting_id] ?? 0),
-        ])->all();
-        $known = $delivery->items->pluck('part_setting_id')->all();
-        foreach ($allocated as $id => $quantity) {
-            if (! in_array($id, $known)) {
-                $result[] = ['part_setting_id' => $id, 'part_number' => '', 'pcs_per_box' => 0,
+        $result = $catalog->map(fn ($r, $key) => $r + ['allocated' => $allocated[$key] ?? 0,
+            'remaining' => $r['required'] - ($allocated[$key] ?? 0)])->values()->all();
+        foreach ($allocated as $key => $quantity) {
+            if (!$catalog->has($key)) {
+                [$id, $pcs] = array_map('intval', explode(':', $key));
+                $result[] = ['key' => $key, 'part_setting_id' => $id, 'part_number' => '', 'pcs_per_box' => $pcs,
                     'required' => 0, 'allocated' => $quantity, 'remaining' => -$quantity];
             }
         }
@@ -79,8 +78,8 @@ class ExportPalletPlanningService
             if ($plan) app(ExportFulfillmentService::class)->assertNoCommittedBoxes($plan);
             $before = $plan ? $this->snapshot($plan) : [];
             $existing = $plan?->pallets->keyBy('id') ?? collect();
-            $catalog = $delivery->items->keyBy('part_setting_id');
-            $historical = $plan?->pallets->flatMap->items->keyBy('part_setting_id') ?? collect();
+            $catalog = ExportBoxRequirements::catalog($delivery);
+            $historical = $plan?->pallets->flatMap->items->keyBy(fn ($i) => ExportBoxRequirements::key($i->part_setting_id, $i->pcs_per_box)) ?? collect();
             $rows = $data['pallets'];
             $final = $data['action'] === 'finalize';
             $locationIds = array_values(array_filter(array_map(fn ($row) => $row['master_location_id'] ?? null, $rows)));
@@ -95,7 +94,7 @@ class ExportPalletPlanningService
                 ->lockForUpdate()->get()->keyBy('master_location_id');
             $seenIds = [];
             $itemCount = 0;
-            foreach ($rows as $i => $row) {
+            foreach ($rows as $i => &$row) {
                 $palletId = $row['id'] ?? null;
                 if ($palletId && (! $existing->has($palletId) || in_array($palletId, $seenIds))) {
                     $this->fail("pallets.$i.id", 'Identitas pallet tidak sesuai dengan perencanaan ini.');
@@ -117,16 +116,21 @@ class ExportPalletPlanningService
                 }
                 if ($final && empty($row['items'])) $this->fail("pallets.$i.items", 'Pallet kosong tidak dapat difinalisasi.');
                 $seenParts = [];
-                foreach ($row['items'] as $j => $item) {
+                foreach ($row['items'] as $j => &$item) {
                     $itemCount++;
                     $partId = (int) $item['part_setting_id'];
-                    if (in_array($partId, $seenParts)) $this->fail("pallets.$i.items.$j", 'Gabungkan part yang sama dalam satu baris pallet.');
-                    $seenParts[] = $partId;
-                    if (! $catalog->has($partId) && (! $historical->has($partId) || $final)) {
+                    $pcs = (int) ($item['pcs_per_box'] ?? $delivery->items->firstWhere('part_setting_id', $partId)?->pcs_per_box);
+                    $item['pcs_per_box'] = $pcs;
+                    $key = ExportBoxRequirements::key($partId, $pcs);
+                    if (in_array($key, $seenParts)) $this->fail("pallets.$i.items.$j", 'Gabungkan part dan kapasitas box yang sama dalam satu baris pallet.');
+                    $seenParts[] = $key;
+                    if (!$catalog->has($key) && (!$historical->has($key) || $final)) {
                         $this->fail("pallets.$i.items.$j", 'Part tidak terdapat pada rencana delivery terkini. Hapus alokasi lamanya.');
                     }
                 }
+                unset($item);
             }
+            unset($row);
             if ($itemCount > 5000) $this->fail('pallets', 'Maksimal 5.000 baris alokasi dalam satu perencanaan.');
             if ($final) {
                 foreach ($this->requirements($delivery, $rows) as $requirement) {
@@ -149,15 +153,17 @@ class ExportPalletPlanningService
                 $pallet = !empty($row['id']) ? $plan->pallets()->findOrFail($row['id']) : $plan->pallets()->make();
                 $pallet->fill(['position' => $i + 1, 'master_location_id' => $locationId,
                     'location_code' => $locationId ? $locations->get($locationId)->code : null])->save();
-                $partIds = array_column($row['items'], 'part_setting_id');
-                $pallet->items()->whereNotIn('part_setting_id', $partIds)->delete();
+                $kept = [];
                 foreach ($row['items'] as $item) {
-                    $part = $catalog->get($item['part_setting_id']) ?? $historical->get($item['part_setting_id']);
-                    $pallet->items()->updateOrCreate(['part_setting_id' => $item['part_setting_id']], [
-                        'part_number' => $part->part_number, 'pcs_per_box' => $part->pcs_per_box,
+                    $key = ExportBoxRequirements::key((int) $item['part_setting_id'], $item['pcs_per_box']);
+                    $part = $catalog->get($key) ?? $historical->get($key)->toArray();
+                    $saved = $pallet->items()->updateOrCreate(['part_setting_id' => $item['part_setting_id'], 'pcs_per_box' => $item['pcs_per_box']], [
+                        'part_number' => $part['part_number'],
                         'box_quantity' => $item['box_quantity'],
                     ]);
+                    $kept[] = $saved->id;
                 }
+                $pallet->items()->whereNotIn('id', $kept)->delete();
                 // Retain previously finalized locations during revisions; new ones claim only on finalization.
                 if ($locationId && ($final || in_array($locationId, $held))) {
                     $plan->reservations()->create(['master_location_id' => $locationId,

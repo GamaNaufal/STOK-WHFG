@@ -117,6 +117,7 @@ class NotFullBoxRequestController extends Controller
 
     public function create()
     {
+        if (request('scope') === 'export') return app(ExportNotFullController::class)->index(request());
         MasterLocation::query()
             ->where('is_occupied', true)
             ->whereNull('current_pallet_id')
@@ -267,6 +268,7 @@ class NotFullBoxRequestController extends Controller
 
     public function approvals()
     {
+        if (request('scope') === 'export') return app(ExportNotFullController::class)->index(request(), true);
         $requests = NotFullBoxRequest::with(['deliveryOrder', 'requester', 'targetPallet', 'targetLocation'])
             ->where('status', 'pending')
             ->orderBy('created_at', 'asc')

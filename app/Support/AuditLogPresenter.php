@@ -11,6 +11,9 @@ class AuditLogPresenter
         'box_number' => 'Nomor box', 'pallet_number' => 'Nomor pallet',
         'plan_code' => 'Kode rencana delivery', 'customer_name' => 'Customer', 'completed_at' => 'Waktu selesai',
         'duplicate_reason' => 'Alasan membuat rencana identik', 'duplicate_plan_ids' => 'ID rencana pembanding duplikasi',
+        'fixed_qty' => 'Standar PCS per box', 'not_full_pcs' => 'Kebutuhan Not Full (PCS)',
+        'source_box_number' => 'Nomor box sumber', 'source_box_id' => 'ID stok sumber', 'new_box_number' => 'Nomor box hasil',
+        'split_pcs' => 'PCS yang dipecah', 'origin' => 'Asal box', 'preparation_mode' => 'Cara penyiapan',
         'delivery_order_id' => 'Delivery order', 'part_number' => 'Nomor part',
         'pcs_quantity' => 'Jumlah PCS', 'box_quantity' => 'Jumlah box',
         'total_pcs_quantity' => 'Total PCS', 'total_box_quantity' => 'Total box',
@@ -47,6 +50,7 @@ class AuditLogPresenter
             'input_error_closed' => 'Salah input tanpa box fisik ditutup',
             'started' => 'Dimulai', 'cancelled' => 'Dibatalkan',
             'verified' => 'Diverifikasi', 'scanned' => 'Dipindai',
+            'prepared' => 'Data disiapkan', 'split' => 'Box dipecah', 'stock_reused' => 'Stok yang sesuai digunakan',
             'finalized' => 'Perencanaan difinalkan', 'saved' => 'Draft disimpan', 'delivery_revised' => 'Rencana delivery direvisi',
             'received' => 'Box diterima', 'placed' => 'Penempatan dikonfirmasi', 'reserved' => 'Box direservasi',
             'processed' => 'Transaksi diproses', 'acknowledged' => 'Rekomendasi dimasukkan ke antrean',
@@ -66,6 +70,7 @@ class AuditLogPresenter
             'stock_input' => 'Input stok', 'stock_withdrawal' => 'Pengambilan stok',
             'export_fulfillment' => 'Pemenuhan permintaan ekspor',
             'export_picking_issue' => 'Issue scan ekspor',
+            'export_not_full' => 'Box Not Full ekspor',
             'export_delivery_plan' => 'Rencana delivery ekspor', 'export_pallet_plan' => 'Perencanaan pallet ekspor',
             'export_picking' => 'Verifikasi picking ekspor', 'export_allocation_notice' => 'Rekomendasi stok ekspor',
             'export_stock_receipt' => 'Penerimaan transfer box ekspor', 'export_stock_reservation' => 'Reservasi stok ekspor',
@@ -160,6 +165,12 @@ class AuditLogPresenter
         if (!is_array($values)) {
             return [];
         }
+        if (is_array($values['preparation'] ?? null)) {
+            $preparation = $values['preparation'];
+            foreach (['box_number'=>'box_number', 'source_box_number'=>'source_box_number', 'location_code'=>'warehouse_location', 'mode'=>'preparation_mode'] as $key=>$field) {
+                if (array_key_exists($key,$preparation) && !array_key_exists($field,$values)) $values[$field]=$preparation[$key];
+            }
+        }
         if (!isset($values['part_number']) && is_array($values['part_numbers'] ?? null)) {
             $values['part_number'] = implode(', ', array_filter($values['part_numbers'], 'is_scalar'));
         }
@@ -181,6 +192,7 @@ class AuditLogPresenter
         if ($value === null || $value === '') {
             return 'Belum diisi';
         }
+        if (in_array($key,['origin','preparation_mode'],true) && is_string($value)) return ['external'=>'Datang sudah dikemas', 'split'=>'Pemecahan stok penuh'][$value] ?? $value;
         if (in_array($key, ['pallets', 'auto_deleted_pallets'], true) && is_array($value)) {
             $numbers = array_filter(array_map(fn ($item) => is_array($item) ? ($item['pallet_number'] ?? null) : null, $value), 'is_scalar');
             return $numbers ? implode(', ', $numbers) : (count($value) ? count($value).' pallet (nomor tidak tercatat)' : 'Tidak ada');

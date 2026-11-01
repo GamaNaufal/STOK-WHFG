@@ -48,8 +48,9 @@ class WarehouseReportService
             ->leftJoin('export_receiving_batch_items as batch_item','batch_item.export_stock_box_id','=','box.id')
             ->leftJoinSub($first,'first_move',fn($j)=>$j->on('first_move.export_stock_box_id','=','box.id'))
             ->leftJoin('export_stock_movements as movement','movement.id','=','first_move.first_id')
+            ->where('box.origin', 'external')
             ->selectRaw("box.id AS record_id, box.first_received_at AS occurred_at, batch_item.export_receiving_batch_id AS batch_id,
-                box.box_number, box.part_number, box.pcs_quantity, 1 AS box_quantity, $reference AS reference, '' AS customer_name, '' AS pallet_number,
+                box.box_number, box.part_number, COALESCE(box.receipt_pcs_quantity,box.pcs_quantity) AS pcs_quantity, 1 AS box_quantity, $reference AS reference, '' AS customer_name, '' AS pallet_number,
                 movement.to_location_code AS location, box.received_by AS actor_id, actor.name AS operator_name,
                 CASE WHEN box.state='shipped' THEN 'shipped' ELSE 'received' END AS status");
     }

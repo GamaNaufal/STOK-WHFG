@@ -19,6 +19,7 @@
                                     'delivery_schedule' => $pendingDeliveryCount ?? 0,
                                     'delivery_approval' => $pendingApprovalCount ?? 0,
                                     'delivery_issues' => $pendingScanIssueCount ?? 0,
+                                    'not_full_request', 'not_full_approval' => $exportNotFullPending ?? 0,
                                     default => 0,
                                 };
                             @endphp

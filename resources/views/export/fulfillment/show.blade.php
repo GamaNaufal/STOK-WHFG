@@ -6,6 +6,7 @@
 @endsection
 @section('content')
 <div class="delivery-plan-page fulfillment-page">
+    @include('export.not-full.requirements',['notFullDelivery'=>$delivery])
     @if($errors->any())<div class="alert alert-danger" role="alert">@foreach($errors->all() as $error)<p class="mb-1">{{ $error }}</p>@endforeach</div>@endif
     <header class="plan-header"><div><a class="plan-back" href="{{ route('export.fulfillment.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Pemenuhan permintaan</a><span class="plan-eyebrow">Pengiriman ekspor</span><h1>{{ $delivery->plan_code ?? 'Rencana tanpa kode' }}</h1><p>{{ $delivery->customer_name }} · Batas pengiriman {{ $delivery->delivery_deadline->format('d/m/Y') }} · {{ $overview->pallet_count }} pallet</p></div>
         <div class="plan-inline-actions">@if(auth()->user()->canAccess('export_pallet_plans'))<a class="btn btn-outline-secondary" href="{{ route('export.pallet-plans.show', $delivery) }}">Lihat perencanaan</a>@endif<a class="btn btn-outline-primary" href="{{ request()->fullUrl() }}">Perbarui tampilan</a></div>

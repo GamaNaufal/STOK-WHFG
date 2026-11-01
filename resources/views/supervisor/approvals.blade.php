@@ -9,6 +9,7 @@
 @section('content')
 <div class="not-full-page">
 @include('shared.not-full-feedback')
+@include('shared.not-full-scope', ['approval'=>true])
 <!-- Page Header Component -->
 <x-page-header 
     title="Persetujuan Box Not Full" 

@@ -72,7 +72,7 @@
         </section>
         <section class="plan-panel" aria-labelledby="plan-items-title">
             <div class="plan-panel-heading">
-                <div><h2 id="plan-items-title">Nomor part dan kebutuhan</h2><p>Jumlah PCS wajib kelipatan kapasitas box. Box tidak penuh belum didukung.</p></div>
+                <div><h2 id="plan-items-title">Nomor part dan kebutuhan</h2><p>Sisa PCS otomatis menjadi kebutuhan 1 box Not Full. Setelah simpan, hubungi admin untuk menyiapkannya setelah perencanaan pallet final.</p></div>
                 <button type="button" class="btn btn-outline-primary" id="plan-add-item"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tambah part</button>
             </div>
             <div class="plan-table-scroll" role="region" aria-label="Daftar part rencana delivery, geser untuk melihat semua kolom" tabindex="0">

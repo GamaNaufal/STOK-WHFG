@@ -26,20 +26,18 @@ class ExportPalletPlanController extends Controller
         $delivery->load('items', 'palletPlan.pallets.items', 'palletPlan.reservations', 'palletPlan.finalizedBy');
         $planning = $delivery->palletPlan;
         $rows = $service->rows($planning);
-        $catalog = $delivery->items->map(fn ($item) => [
-            'part_setting_id' => $item->part_setting_id, 'part_number' => $item->part_number,
-            'pcs_per_box' => $item->pcs_per_box, 'required' => $item->box_quantity,
-        ])->keyBy('part_setting_id');
+        $catalog = \App\Services\ExportBoxRequirements::catalog($delivery);
         foreach ($planning?->pallets ?? [] as $pallet) {
             foreach ($pallet->items as $item) {
-                if (!$catalog->has($item->part_setting_id)) $catalog->put($item->part_setting_id, [
+                $key = \App\Services\ExportBoxRequirements::key($item->part_setting_id, $item->pcs_per_box);
+                if (!$catalog->has($key)) $catalog->put($key, ['key' => $key,
                     'part_setting_id' => $item->part_setting_id, 'part_number' => $item->part_number,
                     'pcs_per_box' => $item->pcs_per_box, 'required' => 0,
                 ]);
             }
         }
         $summary = $service->requirements($delivery, $rows);
-        foreach ($summary as &$row) $row['part_number'] = $catalog->get($row['part_setting_id'])['part_number'] ?? $row['part_number'];
+        foreach ($summary as &$row) $row['part_number'] = $catalog->get($row['key'])['part_number'] ?? $row['part_number'];
         unset($row);
         $locations = ExportMasterLocation::with('reservation')->withExists(['stockLocations', 'stockPallet'])->orderBy('code')->get()->map(fn ($loc) => [
             'id' => $loc->id, 'code' => $loc->code,
@@ -96,6 +94,7 @@ class ExportPalletPlanController extends Controller
             'pallets.*.id' => 'nullable|integer|min:1', 'pallets.*.master_location_id' => 'nullable|integer|min:1',
             'pallets.*.items' => 'present|array|list|max:500',
             'pallets.*.items.*.part_setting_id' => 'required|integer|min:1',
+            'pallets.*.items.*.pcs_per_box' => 'nullable|integer|min:1|max:4294967295',
             'pallets.*.items.*.box_quantity' => 'required|integer|min:1|max:4294967295',
         ]);
         $service->save($deliveryPlan->id, $data, $request->user());

@@ -93,7 +93,7 @@ class ExportDeliveryPlanController extends Controller
         catch (ValidationException $error) { return $this->validationResponse($request, $error); }
 
         return ($plan->trashed() ? redirect()->route('export.delivery-plans.index') : redirect()->route('export.delivery-plans.show', $plan))
-            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat; rencana tersebut sudah diarsipkan.' : 'Rencana delivery berhasil disimpan.');
+            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat; rencana tersebut sudah diarsipkan.' : $this->savedMessage($plan));
     }
 
     public function update(Request $request, int $deliveryPlan, ExportDeliveryPlanService $service)
@@ -104,7 +104,14 @@ class ExportDeliveryPlanController extends Controller
         catch (ValidationException $error) { return $this->validationResponse($request, $error); }
 
         return ($plan->trashed() ? redirect()->route('export.delivery-plans.index') : redirect()->route('export.delivery-plans.show', $plan))
-            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat; rencana tersebut sudah diarsipkan.' : 'Rencana delivery berhasil diperbarui.');
+            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat; rencana tersebut sudah diarsipkan.' : $this->savedMessage($plan));
+    }
+
+    private function savedMessage(ExportDeliveryPlan $plan): string
+    {
+        $needs = $plan->items->where('not_full_pcs', '>', 0);
+        return 'Rencana delivery berhasil disimpan.'.($needs->isNotEmpty()
+            ? ' Terdapat '.$needs->count().' part membutuhkan Box Not Full. Request wajib sudah dicatat otomatis. Hubungi Admin Warehouse/Admin Utama untuk penyiapan setelah perencanaan pallet final, lalu approval Admin Utama/Supervisi. Kebutuhan ini harus terpenuhi sebelum pallet siap dan permintaan selesai.' : '');
     }
 
     private function duplicateResponse(Request $request, DuplicateExportDeliveryPlan $error)
@@ -136,6 +143,7 @@ class ExportDeliveryPlanController extends Controller
                 ]);
             }
             $locked->delete();
+            app(\App\Services\ExportNotFullService::class)->sync($locked, $request->user());
             AuditService::record('export_delivery_plan', 'deleted', 'ExportDeliveryPlan', $locked->id,
                 $request->user()->id, $before, [], 'Rencana delivery ekspor diarsipkan.');
         });

@@ -37,7 +37,8 @@ if(page) {
             part.setAttribute('aria-label','Nomor part baris '+(i+1));qty.setAttribute('aria-label','Jumlah PCS baris '+(i+1));
             tr.querySelector('.plan-row-number').textContent=i+1;
             tr.querySelector('.plan-capacity').textContent=result.capacity ? format(result.capacity) : '—';
-            tr.querySelector('.plan-boxes').textContent=result.boxes===null ? '—' : format(result.boxes);
+            tr.querySelector('.plan-boxes').textContent=result.boxes===null ? '—' : format(result.boxes)+(result.notFullPcs ? ' · termasuk 1 Not Full '+format(result.notFullPcs)+' PCS' : '');
+            tr.querySelector('.plan-boxes').classList.toggle('text-warning-emphasis',Boolean(result.notFullPcs));
             const error=tr.querySelector('.plan-row-error');error.id='plan-row-error-'+i;
             error.textContent=tr.dataset.touched==='1' ? result.error : '';
             part.setAttribute('aria-describedby',error.id);qty.setAttribute('aria-describedby',error.id);

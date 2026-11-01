@@ -30,8 +30,8 @@
                 <div class="pallet-parts-scroll" tabindex="0" role="region" aria-label="Kebutuhan part dan sisa box">
                     <table class="pallet-demand-table"><thead><tr><th scope="col">Nomor part</th><th scope="col">Butuh</th><th scope="col">Alokasi</th><th scope="col">Sisa</th></tr></thead><tbody id="allocation-summary">
                         @foreach($summary as $row)
-                            <tr data-part-id="{{ $row['part_setting_id'] }}" data-part-number="{{ $row['part_number'] }}">
-                                <th scope="row"><button type="button" class="allocation-pick" data-part-id="{{ $row['part_setting_id'] }}"><i class="bi bi-plus-circle" aria-hidden="true"></i><span>{{ $row['part_number'] }}</span></button><small>{{ number_format($row['pcs_per_box'], 0, ',', '.') }} PCS / box</small></th>
+                            <tr data-part-id="{{ $row['key'] }}" data-part-number="{{ $row['part_number'] }}">
+                                <th scope="row"><button type="button" class="allocation-pick" data-part-id="{{ $row['key'] }}"><i class="bi bi-plus-circle" aria-hidden="true"></i><span>{{ $row['part_number'] }}{{ ($row['is_not_full'] ?? false) ? ' · Not Full' : '' }}</span></button><small>{{ number_format($row['pcs_per_box'], 0, ',', '.') }} PCS / box</small></th>
                                 <td>{{ number_format($row['required'], 0, ',', '.') }}</td><td class="allocation-allocated">{{ number_format($row['allocated'], 0, ',', '.') }}</td>
                                 <td class="allocation-remaining">{{ $row['remaining'] < 0 ? 'Lebih ' : '' }}{{ number_format(abs($row['remaining']), 0, ',', '.') }}</td>
                             </tr>

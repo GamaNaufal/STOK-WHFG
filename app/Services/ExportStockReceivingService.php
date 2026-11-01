@@ -37,6 +37,9 @@ class ExportStockReceivingService
                 return $replay;
             }
             app(ExportPickingService::class)->assertReceiptAllowed($data['box_number']);
+            if (\App\Models\ExportNotFullRequest::where('status', 'prepared')->where('preparation->box_number', $data['box_number'])->exists()) {
+                $this->fail('box_number', 'ID ini sedang disiapkan untuk Box Not Full. Selesaikan approval; box hasil tidak perlu diterima ulang.');
+            }
             if (ExportStockBox::withTrashed()->where('box_number', $data['box_number'])->exists()
                 || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
                 $this->fail('box_number', 'Nomor box ini sudah tercatat pada ekspor. Periksa daftar penerimaan/penempatannya.');
@@ -47,7 +50,7 @@ class ExportStockReceivingService
             }
             $box = ExportStockBox::create([
                 'box_number' => $data['box_number'], 'part_setting_id' => $part->id, 'part_number' => $part->part_number,
-                'pcs_quantity' => $part->qty_box, 'state' => 'received', 'revision' => 1,
+                'pcs_quantity' => $part->qty_box, 'standard_pcs_quantity' => $part->qty_box, 'receipt_pcs_quantity' => $part->qty_box, 'state' => 'received', 'revision' => 1,
                 'receive_token' => $data['receive_token'], 'first_received_at' => $receivedAt ?? now(), 'received_by' => $actor->id,
             ]);
             AuditService::record('export_stock_receipt', 'received', 'ExportStockBox', $box->id, $actor->id,

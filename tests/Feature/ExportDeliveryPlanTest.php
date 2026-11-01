@@ -76,7 +76,7 @@ class ExportDeliveryPlanTest extends TestCase
     public function test_failed_validation_does_not_consume_save_token(): void
     {
         ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
-        $data=$this->payload(['items'=>[['part_number'=>'EXP-001','pcs_quantity'=>101]]]);
+        $data=$this->payload(['items'=>[['part_number'=>'EXP-001','pcs_quantity'=>101.5]]]);
         $this->postJson(route('export.delivery-plans.store'),$data)->assertUnprocessable()->assertJsonValidationErrors('items.0.pcs_quantity');
         $this->assertDatabaseCount('export_delivery_plan_requests',0);
         $data['items'][0]['pcs_quantity']=100;
@@ -183,13 +183,11 @@ class ExportDeliveryPlanTest extends TestCase
         $this->get(route('export.delivery-plans.show', $plan))->assertOk()->assertSee('Customer Ekspor');
     }
 
-    public function test_partial_boxes_unknown_domestic_only_parts_and_duplicates_cannot_be_saved(): void
+    public function test_unknown_domestic_only_parts_and_duplicates_cannot_be_saved(): void
     {
         ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 30]);
         PartSetting::create(['part_number' => 'LOCAL-ONLY', 'qty_box' => 10]);
         $this->actingAs($this->operator());
-        $this->postJson(route('export.delivery-plans.store'), $this->payload())
-            ->assertUnprocessable()->assertJsonValidationErrors('items.0.pcs_quantity');
         $this->postJson(route('export.delivery-plans.store'), $this->payload([
             'items' => [['part_number' => 'LOCAL-ONLY', 'pcs_quantity' => 100]],
         ]))->assertUnprocessable()->assertJsonValidationErrors('items.0.part_number');
@@ -283,8 +281,9 @@ class ExportDeliveryPlanTest extends TestCase
         $this->actingAs($this->operator())->get(route('export.delivery-plans.create'))->assertOk();
         $part->update(['qty_box' => 30]);
         $this->postJson(route('export.delivery-plans.store'), $this->payload())
-            ->assertUnprocessable()->assertJsonValidationErrors('items.0.pcs_quantity');
-        $this->assertDatabaseCount('export_delivery_plans', 0);
+            ->assertRedirect();
+        $this->assertDatabaseHas('export_delivery_plan_items',['pcs_per_box'=>30,'not_full_pcs'=>10,'box_quantity'=>4]);
+        $this->assertDatabaseHas('export_not_full_requests',['pcs_quantity'=>10,'fixed_qty'=>30]);
     }
 
     public function test_archive_keeps_history_and_prevents_master_identity_change_or_delete(): void

@@ -121,8 +121,10 @@ class ExportFulfillmentRevisionService
             $difference = $item->box_quantity - $quantity;
             $line = $delivery->items()->where('part_setting_id', $item->part_setting_id)->lockForUpdate()->first();
             if (!$line || $line->box_quantity < $difference) $this->fail('Jumlah delivery tidak sesuai dengan perencanaan.');
-            $next = $line->box_quantity - $difference;
-            $line->update(['box_quantity' => $next, 'pcs_quantity' => $next * $line->pcs_per_box]);
+            $pcs = $line->pcs_quantity - $difference * $item->pcs_per_box;
+            if ($pcs < 0) $this->fail('Jumlah PCS delivery tidak sesuai dengan revisi pallet.');
+            $line->update(['box_quantity' => (int) ceil($pcs / $line->pcs_per_box), 'pcs_quantity' => $pcs,
+                'not_full_pcs' => $pcs % $line->pcs_per_box]);
             if ($quantity === 0) $item->delete(); else $item->update(['box_quantity' => $quantity]);
         }
         if (!$pallet->items()->exists()) {
@@ -137,6 +139,7 @@ class ExportFulfillmentRevisionService
         }
         $delivery->load('items');
         $delivery->update(['total_boxes' => $delivery->items->sum('box_quantity'), 'total_pcs' => $delivery->items->sum('pcs_quantity'), 'updated_by' => $actor->id]);
+        app(ExportNotFullService::class)->sync($delivery, $actor);
         return ['boxes' => $returned, 'released_boxes' => $released,
             'returned_box_quantity' => count($returned), 'returned_pcs_quantity' => array_sum(array_column($returned, 'pcs_quantity'))];
     }

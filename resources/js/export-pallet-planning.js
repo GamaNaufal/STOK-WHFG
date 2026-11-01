@@ -10,7 +10,7 @@ if (page) {
     const draft = byId('pallet-save-draft'), finalize = byId('pallet-finalize');
     const navigation = byId('pallet-active'), status = byId('pallet-editor-status');
     const search = byId('pallet-part-search'), incomplete = byId('pallet-incomplete-only');
-    const parts = new Map(initial.catalog.map(part => [String(part.part_setting_id), part]));
+    const parts = new Map(initial.catalog.map(part => [String(part.key ?? part.part_setting_id), part]));
     const places = new Map(initial.locations.map(place => [String(place.id), place]));
     const summaryRows = new Map([...byId('allocation-summary').children].map(row => [row.dataset.partId, row]));
     const format = value => Number(value).toLocaleString('id-ID');
@@ -21,7 +21,8 @@ if (page) {
         id: card.dataset.id ? Number(card.dataset.id) : null,
         master_location_id: card.querySelector('.pallet-location').value ? Number(card.querySelector('.pallet-location').value) : null,
         items: itemRows(card).map(row => ({
-            part_setting_id: row.querySelector('.pallet-part').value ? Number(row.querySelector('.pallet-part').value) : '',
+            part_setting_id: parts.get(row.querySelector('.pallet-part').value)?.part_setting_id ?? '',
+            pcs_per_box: parts.get(row.querySelector('.pallet-part').value)?.pcs_per_box ?? null,
             box_quantity: row.querySelector('.pallet-quantity').value,
         })).filter(item => item.part_setting_id || item.box_quantity !== ''),
     }));
@@ -34,11 +35,11 @@ if (page) {
         const row = fragment.querySelector('.pallet-item'), select = row.querySelector('.pallet-part');
         initial.catalog.forEach(part => {
             const option = document.createElement('option');
-            option.value = part.part_setting_id;
-            option.textContent = part.part_number + (part.required === 0 ? ' (tidak ada di revisi delivery)' : '');
+            option.value = part.key ?? part.part_setting_id;
+            option.textContent = part.part_number + (part.is_not_full ? ' · Not Full ' : ' · ') + part.pcs_per_box + ' PCS/box' + (part.required === 0 ? ' (tidak ada di revisi delivery)' : '');
             select.append(option);
         });
-        select.value = item.part_setting_id ?? '';
+        select.value = item.part_setting_id ? (item.pcs_per_box ? item.part_setting_id+':'+item.pcs_per_box : initial.catalog.find(p=>String(p.part_setting_id)===String(item.part_setting_id))?.key ?? item.part_setting_id) : '';
         row.querySelector('.pallet-quantity').value = item.box_quantity ?? '';
         card.querySelector('.pallet-items').append(fragment);
         return row;
@@ -63,7 +64,7 @@ if (page) {
         const query = search.value.trim().toLocaleLowerCase('id-ID');
         let visible = 0;
         latestAnalysis.summary.forEach(part => {
-            const row = summaryRows.get(String(part.part_setting_id));
+            const row = summaryRows.get(String(part.key ?? part.part_setting_id));
             if (!row) return;
             row.hidden = !part.part_number.toLocaleLowerCase('id-ID').includes(query) || (incomplete.checked && part.remaining === 0);
             if (!row.hidden) visible++;
@@ -71,13 +72,13 @@ if (page) {
         byId('pallet-parts-empty').hidden = visible > 0;
         const required = latestAnalysis.summary.filter(part => part.required > 0);
         const complete = required.filter(part => part.remaining === 0).length;
-        byId('pallet-part-progress').textContent = format(complete) + ' dari ' + format(required.length) + ' part sesuai · ' + format(visible) + ' ditampilkan';
+        byId('pallet-part-progress').textContent = format(complete) + ' dari ' + format(required.length) + ' kebutuhan sesuai · ' + format(visible) + ' ditampilkan';
     };
     const refresh = () => {
         const rows = collect(), analysis = analyzePallets(rows, initial.catalog, initial.locations);
         latestAnalysis = analysis;
         activeIndex = Math.max(0, Math.min(activeIndex, rows.length - 1));
-        const progress = new Map(analysis.summary.map(part => [String(part.part_setting_id), part]));
+        const progress = new Map(analysis.summary.map(part => [String(part.key ?? part.part_setting_id), part]));
         while (navigation.options.length > rows.length) navigation.remove(navigation.options.length - 1);
         while (navigation.options.length < rows.length) navigation.add(new Option('', navigation.options.length));
         [...container.children].forEach((card, i) => {
@@ -128,14 +129,14 @@ if (page) {
         byId('pallet-next').disabled = activeIndex === rows.length - 1;
         const activeParts = new Set(itemRows(container.children[activeIndex]).map(row => row.querySelector('.pallet-part').value));
         analysis.summary.forEach(part => {
-            const row = summaryRows.get(String(part.part_setting_id));
+            const row = summaryRows.get(String(part.key ?? part.part_setting_id));
             if (!row) return;
             row.querySelector('.allocation-allocated').textContent = format(part.allocated);
             const cell = row.querySelector('.allocation-remaining');
             cell.textContent = part.remaining === 0 ? 'Sesuai' : (part.remaining > 0 ? 'Kurang ' : 'Lebih ') + format(Math.abs(part.remaining));
             cell.classList.toggle('text-danger', part.remaining < 0);
             cell.classList.toggle('text-success', part.remaining === 0);
-            const inActive = activeParts.has(String(part.part_setting_id));
+            const inActive = activeParts.has(String(part.key ?? part.part_setting_id));
             row.classList.toggle('is-active-part', inActive);
             const pick = row.querySelector('.allocation-pick');
             pick.disabled = submitting || part.required === 0 || (!inActive && part.remaining <= 0);

@@ -120,6 +120,10 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     });
 
     // Box Not Full Request (Warehouse Operator/Admin Warehouse/Admin)
+    Route::get('/box-not-full/export/{exportRequest}', [\App\Http\Controllers\ExportNotFullController::class, 'show'])->name('box-not-full.export.show');
+    Route::post('/box-not-full/export/{exportRequest}/prepare', [\App\Http\Controllers\ExportNotFullController::class, 'prepare'])->name('box-not-full.export.prepare');
+    Route::post('/box-not-full/export/{exportRequest}/approve', [\App\Http\Controllers\ExportNotFullController::class, 'approve'])->name('box-not-full.export.approve');
+    Route::post('/box-not-full/export/{exportRequest}/reject', [\App\Http\Controllers\ExportNotFullController::class, 'reject'])->name('box-not-full.export.reject');
     Route::group([], function () {
         Route::get('/box-not-full', [\App\Http\Controllers\NotFullBoxRequestController::class, 'create'])->name('box-not-full.create');
         Route::post('/box-not-full', [\App\Http\Controllers\NotFullBoxRequestController::class, 'store'])->name('box-not-full.store');

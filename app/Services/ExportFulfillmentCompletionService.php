@@ -202,6 +202,7 @@ class ExportFulfillmentCompletionService
         $plan->update(['status' => 'cancelled']);
         $delivery->update(['status' => 'cancelled', 'updated_by' => $actor->id]);
         $delivery->delete();
+        app(ExportNotFullService::class)->sync($delivery, $actor);
         AuditService::record('export_fulfillment', 'cancelled', 'ExportDeliveryPlan', $delivery->id, $actor->id, $before,
             ['plan_code' => $delivery->plan_code, 'customer_name' => $delivery->customer_name, 'status' => 'cancelled', 'reason' => $reason],
             'Permintaan ekspor dibatalkan setelah pengembalian fisik dan pelepasan reservasi; tidak dicatat sebagai pengiriman.');

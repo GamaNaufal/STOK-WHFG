@@ -35,7 +35,7 @@
         <section aria-label="Grafik {{ $domain['label'] }}"><div class="od-domain-title"><h2>{{ $domain['label'] }} · grafik dalam {{ $domain['unit'] }}</h2><span class="od-muted">Masuk {{ number_format($domain['inbound']->boxes,0,',','.') }} box / {{ number_format($domain['inbound']->pcs,0,',','.') }} PCS · Keluar {{ number_format($domain['outbound']->boxes,0,',','.') }} box / {{ number_format($domain['outbound']->pcs,0,',','.') }} PCS</span></div>
             <p class="od-muted">
                 @if($domain['scope']==='export')
-                    Pemenuhan berasal dari penempatan yang dikonfirmasi. Pallet siap belum dihitung keluar; pengiriman baru tercatat setelah permintaan diselesaikan.
+                    Pemenuhan berasal dari penempatan yang dikonfirmasi. Pallet siap belum dihitung keluar; pengiriman baru tercatat setelah permintaan diselesaikan. Pemecahan Not Full dicatat sebagai penambahan kemasan internal.
                 @else
                     Pemenuhan mengikuti realisasi order domestik. Arus keluar berasal dari pengambilan stok yang selesai.
                 @endif

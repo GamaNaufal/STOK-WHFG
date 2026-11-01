@@ -2,6 +2,7 @@
 @section('title', 'Hasil Perencanaan Pallet')
 @section('styles')<link rel="stylesheet" href="{{ asset('css/pages/export-delivery-plans.css') }}">@endsection
 @section('content')
+@include('export.not-full.requirements',['notFullDelivery'=>$delivery])
 <div class="delivery-plan-page">
     @include('export.pallet-plans.header')
     @include('export.pallet-plans.stock-allocation-modal')

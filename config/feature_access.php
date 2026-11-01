@@ -15,8 +15,8 @@ return [
     // Order matters: specific actions must precede wildcard routes.
     'features' => [
         'stock_input' => ['label' => 'Input Stok', 'group' => 'Warehouse', 'icon' => 'plus-circle', 'route' => 'stock-input.index', 'routes' => ['stock-input.*'], 'roles' => $warehouse],
-        'not_full_request' => ['label' => 'Request Box Not Full', 'group' => 'Warehouse', 'icon' => 'exclamation-circle', 'route' => 'box-not-full.create', 'routes' => ['box-not-full.create', 'box-not-full.store'], 'roles' => $warehouse],
-        'not_full_approval' => ['label' => 'Approval Box Not Full', 'group' => 'Warehouse', 'icon' => 'clipboard-check', 'route' => 'box-not-full.approvals', 'routes' => ['box-not-full.approvals', 'box-not-full.approve', 'box-not-full.reject'], 'roles' => $supervisor],
+        'not_full_request' => ['label' => 'Request Box Not Full', 'group' => 'Warehouse', 'icon' => 'exclamation-circle', 'route' => 'box-not-full.create', 'routes' => ['box-not-full.create', 'box-not-full.store', 'box-not-full.export.prepare'], 'roles' => $warehouse],
+        'not_full_approval' => ['label' => 'Approval Box Not Full', 'group' => 'Warehouse', 'icon' => 'clipboard-check', 'route' => 'box-not-full.approvals', 'routes' => ['box-not-full.approvals', 'box-not-full.approve', 'box-not-full.reject', 'box-not-full.export.approve', 'box-not-full.export.reject'], 'roles' => $supervisor],
         'merge_pallet' => ['label' => 'Merge Palet', 'group' => 'Warehouse', 'icon' => 'box-seam', 'route' => 'merge-pallet.index', 'routes' => ['merge-pallet.*'], 'roles' => $warehouse],
         'move_pallet' => ['label' => 'Pemindahan Pallet', 'group' => 'Warehouse', 'icon' => 'arrow-left-right', 'route' => 'move-pallet.index', 'routes' => ['move-pallet.*'], 'roles' => $warehouse],
         'stock_edit' => ['label' => 'Edit Box', 'group' => 'Warehouse', 'routes' => ['stock-view.box-update'], 'roles' => ['admin_warehouse'], 'requires' => ['stock_view']],
@@ -49,6 +49,7 @@ return [
     ],
     // Shared read-only lookups are available only to features that consume them.
     'lookups' => [
+        'box-not-full.export.show' => ['not_full_request', 'not_full_approval'],
         'api.stock.by-part' => ['stock_view', 'delivery_order', 'delivery_approval', 'delivery_pick', 'delivery_assign'],
         'api.locations.search' => ['locations', 'stock_input', 'not_full_request', 'not_full_approval', 'delivery_assign', 'merge_pallet', 'move_pallet', 'expired_box', 'delivery_redo'],
         'part-settings.search' => ['parts', 'stock_input', 'not_full_request', 'delivery_order', 'delivery_assign', 'stock_edit'],

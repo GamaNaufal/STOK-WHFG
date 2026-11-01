@@ -33,7 +33,7 @@ class ExportDeliveryPlanService
             'revision' => $plan->revision, 'total_pcs' => $plan->total_pcs, 'total_boxes' => $plan->total_boxes,
             'source_type' => $plan->source_type, 'source_name' => $plan->source_name,
             'items' => $plan->items->map(fn ($item) => $item->only([
-                'part_setting_id', 'part_number', 'pcs_quantity', 'pcs_per_box', 'box_quantity',
+                'part_setting_id', 'part_number', 'pcs_quantity', 'pcs_per_box', 'box_quantity', 'not_full_pcs',
             ]))->all(),
         ];
     }
@@ -69,13 +69,13 @@ class ExportDeliveryPlanService
                 // Existing rows keep their capacity snapshot when the master changes.
                 $capacity = (int) ($existing->get($part->id)?->pcs_per_box ?? $part->qty_box);
                 $quantity = (int) $row['pcs_quantity'];
-                if ($capacity < 1 || $quantity % $capacity !== 0) {
-                    $errors["items.{$index}.pcs_quantity"] = "Jumlah PCS harus kelipatan {$capacity}. Box tidak penuh belum didukung.";
+                if ($capacity < 1) {
+                    $errors["items.{$index}.pcs_quantity"] = 'Kapasitas box pada master ekspor belum valid.';
                     continue;
                 }
                 $items[] = ['part_setting_id' => $part->id, 'part_number' => $part->part_number,
                     'position' => $index + 1, 'pcs_quantity' => $quantity,
-                    'pcs_per_box' => $capacity, 'box_quantity' => intdiv($quantity, $capacity)];
+                    'pcs_per_box' => $capacity, 'box_quantity' => (int) ceil($quantity / $capacity), 'not_full_pcs' => $quantity % $capacity];
             }
             if ($errors) {
                 throw ValidationException::withMessages($errors);
@@ -98,6 +98,7 @@ class ExportDeliveryPlanService
             }
             $plan->load('items');
             if ($id) app(ExportPalletPlanningService::class)->invalidateForDeliveryRevision($plan, $actor);
+            app(ExportNotFullService::class)->sync($plan, $actor);
             AuditService::record('export_delivery_plan', $id ? 'updated' : 'created', 'ExportDeliveryPlan',
                 $plan->id, $actor->id, $before, $this->snapshot($plan) + ($duplicate ?? []),
                 $duplicate ? 'Rencana delivery ekspor disimpan setelah konfirmasi duplikasi dengan alasan.' : 'Rencana delivery ekspor disimpan.');

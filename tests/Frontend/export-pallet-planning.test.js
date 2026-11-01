@@ -6,6 +6,18 @@ const catalog=[{part_setting_id:1,part_number:'P-A',pcs_per_box:10,required:10},
 const locations=[{id:1,code:'A1',blocked:false},{id:2,code:'A2',blocked:false},{id:3,code:'A3',blocked:true}];
 const row=(location,items)=>({master_location_id:location,items:items.map(([id,qty])=>({part_setting_id:id,box_quantity:qty}))});
 
+test('one part has separate full and not-full requirements on the same pallet',()=>{
+    const variants=[{key:'1:80',part_setting_id:1,part_number:'99',pcs_per_box:80,required:1},
+        {key:'1:20',part_setting_id:1,part_number:'99',pcs_per_box:20,required:1,is_not_full:true}];
+    const plan=[{master_location_id:1,items:[{part_setting_id:1,pcs_per_box:80,box_quantity:1},{part_setting_id:1,pcs_per_box:20,box_quantity:1}]}];
+    const result=analyzePallets(plan,variants,locations);
+    assert.equal(result.finalValid,true);assert.equal(result.totalBoxes,2);
+    assert.equal(availableForRow(result.summary,'1:20',1),1);
+    plan[0].items=[{part_setting_id:1,pcs_per_box:80,box_quantity:2}];
+    const wrong=analyzePallets(plan,variants,locations);
+    assert.equal(wrong.finalValid,false);assert.deepEqual(wrong.summary.map(p=>p.remaining),[-1,1]);
+});
+
 test('fill remaining replaces this row without taking allocations from other pallets',()=>{
     const result=analyzePallets([row(1,[[1,3]]),row(2,[[1,4]])],catalog,locations);
     assert.equal(availableForRow(result.summary,1,3),6);

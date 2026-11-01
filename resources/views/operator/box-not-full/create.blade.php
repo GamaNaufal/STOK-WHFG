@@ -10,6 +10,7 @@
 @section('content')
 <div class="container-fluid not-full-page">
     @include('shared.not-full-feedback')
+    @if(in_array(auth()->user()->role,['admin','admin_warehouse']))@include('shared.not-full-scope', ['approval'=>false])@endif
     @if($errors->any())
         <div class="alert alert-dismissible fade show shadow-sm" role="alert" style="background: #FEF2F2; border: none; border-left: 4px solid #EF4444; color: #991B1B; border-radius: 8px;">
             <strong><i class="bi bi-exclamation-triangle"></i> Gagal mengirim request:</strong>

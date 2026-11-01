@@ -1,0 +1,1440 @@
+{
+    "namespace": "UAT26",
+    "password": "UatWHFG!2026",
+    "base_time": "tanggal impor, Asia/Jakarta",
+    "accounts": [
+        {
+            "email": "uat26.admin@whfg.test",
+            "role": "admin",
+            "active": true
+        },
+        {
+            "email": "uat26.supervisi@whfg.test",
+            "role": "supervisi",
+            "active": true
+        },
+        {
+            "email": "uat26.admin_warehouse@whfg.test",
+            "role": "admin_warehouse",
+            "active": true
+        },
+        {
+            "email": "uat26.warehouse_operator@whfg.test",
+            "role": "warehouse_operator",
+            "active": true
+        },
+        {
+            "email": "uat26.export_operator@whfg.test",
+            "role": "export_operator",
+            "active": true
+        },
+        {
+            "email": "uat26.sales@whfg.test",
+            "role": "sales",
+            "active": true
+        },
+        {
+            "email": "uat26.ppc@whfg.test",
+            "role": "ppc",
+            "active": true
+        },
+        {
+            "email": "uat26.warehouse_operator2@whfg.test",
+            "role": "warehouse_operator",
+            "active": true
+        },
+        {
+            "email": "uat26.inactive@whfg.test",
+            "role": "sales",
+            "active": false
+        }
+    ],
+    "domestic": {
+        "stock": [
+            {
+                "part": "UAT26-D-EXPIRED",
+                "pcs_per_box": 10,
+                "boxes": [
+                    "98000606"
+                ],
+                "pallet": "UAT26-DP-1X",
+                "location": "UAT26-D15",
+                "age_days": 400
+            },
+            {
+                "part": "UAT26-D-FIFO",
+                "pcs_per_box": 80,
+                "boxes": [
+                    "98000101",
+                    "98000102",
+                    "98000103"
+                ],
+                "pallet": "UAT26-DP-2X",
+                "location": "UAT26-D01",
+                "age_days": 5
+            },
+            {
+                "part": "UAT26-D-ISSUE",
+                "pcs_per_box": 40,
+                "boxes": [
+                    "98000201",
+                    "98000202",
+                    "98000203"
+                ],
+                "pallet": "UAT26-DP-3X",
+                "location": "UAT26-D02",
+                "age_days": 4
+            },
+            {
+                "part": "UAT26-D-LOCK",
+                "pcs_per_box": 20,
+                "boxes": [
+                    "98000301",
+                    "98000302"
+                ],
+                "pallet": "UAT26-DP-4X",
+                "location": "UAT26-D03",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-SPLIT",
+                "pcs_per_box": 20,
+                "boxes": [
+                    "98000401",
+                    "98000402",
+                    "98000403",
+                    "98000404"
+                ],
+                "pallet": "UAT26-DP-5X",
+                "location": "UAT26-D04",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-NF",
+                "pcs_per_box": 80,
+                "boxes": [
+                    "98000501"
+                ],
+                "pallet": "UAT26-DP-6X",
+                "location": "UAT26-D05",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-NF-ADD",
+                "pcs_per_box": 80,
+                "boxes": [
+                    "98000502"
+                ],
+                "pallet": "UAT26-DP-7X",
+                "location": "UAT26-D06",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-MOVE",
+                "pcs_per_box": 25,
+                "boxes": [
+                    "98000701",
+                    "98000702"
+                ],
+                "pallet": "UAT26-DP-8X",
+                "location": "UAT26-D07",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-MERGE",
+                "pcs_per_box": 10,
+                "boxes": [
+                    "98000801",
+                    "98000802"
+                ],
+                "pallet": "UAT26-DP-9X",
+                "location": "UAT26-D08",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-MERGE",
+                "pcs_per_box": 10,
+                "boxes": [
+                    "98000803",
+                    "98000804"
+                ],
+                "pallet": "UAT26-DP-10X",
+                "location": "UAT26-D09",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-EDIT",
+                "pcs_per_box": 30,
+                "boxes": [
+                    "98000901",
+                    "98000902"
+                ],
+                "pallet": "UAT26-DP-11X",
+                "location": "UAT26-D10",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-PRIORITY",
+                "pcs_per_box": 10,
+                "boxes": [
+                    "98001001",
+                    "98001002",
+                    "98001003",
+                    "98001004",
+                    "98001005"
+                ],
+                "pallet": "UAT26-DP-12X",
+                "location": "UAT26-D11",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-SHARED",
+                "pcs_per_box": 100,
+                "boxes": [
+                    "98009999"
+                ],
+                "pallet": "UAT26-DP-13X",
+                "location": "UAT26-D12",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-D-EXPIRED",
+                "pcs_per_box": 10,
+                "boxes": [
+                    "98000601",
+                    "98000602",
+                    "98000603",
+                    "98000604"
+                ],
+                "pallet": "UAT26-DP-14X",
+                "location": "UAT26-D13",
+                "age_days": 400
+            },
+            {
+                "part": "UAT26-D-WARNING",
+                "pcs_per_box": 10,
+                "boxes": [
+                    "98000611",
+                    "98000612"
+                ],
+                "pallet": "UAT26-DP-15X",
+                "location": "UAT26-D14",
+                "age_days": 305
+            },
+            {
+                "part": "UAT26-D-REDO",
+                "pcs_per_box": 50,
+                "boxes": [
+                    "98001101",
+                    "98001102"
+                ],
+                "pallet": "UAT26-DP-16X",
+                "location": "UAT26-D16",
+                "age_days": 4
+            }
+        ],
+        "orders": [
+            {
+                "customer": "UAT26 DOM FIFO",
+                "part": "UAT26-D-FIFO",
+                "pcs": 160,
+                "status": "approved",
+                "deadline_offset_days": 3,
+                "current_status": "approved"
+            },
+            {
+                "customer": "UAT26 DOM DIRECT",
+                "part": "UAT26-D-DIRECT",
+                "pcs": 60,
+                "status": "approved",
+                "deadline_offset_days": 3,
+                "current_status": "approved"
+            },
+            {
+                "customer": "UAT26 DOM ISSUE",
+                "part": "UAT26-D-ISSUE",
+                "pcs": 80,
+                "status": "approved",
+                "deadline_offset_days": 3,
+                "current_status": "approved"
+            },
+            {
+                "customer": "UAT26 DOM LOCK",
+                "part": "UAT26-D-LOCK",
+                "pcs": 40,
+                "status": "approved",
+                "deadline_offset_days": 3,
+                "current_status": "approved"
+            },
+            {
+                "customer": "UAT26 DOM SPLIT",
+                "part": "UAT26-D-SPLIT",
+                "pcs": 80,
+                "status": "approved",
+                "deadline_offset_days": 3,
+                "current_status": "approved"
+            },
+            {
+                "customer": "UAT26 DOM NF-SUPPLEMENT",
+                "part": "UAT26-D-NF",
+                "pcs": 100,
+                "status": "approved",
+                "deadline_offset_days": 3,
+                "current_status": "approved"
+            },
+            {
+                "customer": "UAT26 DOM NF-ADDITIONAL",
+                "part": "UAT26-D-NF-ADD",
+                "pcs": 80,
+                "status": "approved",
+                "deadline_offset_days": 3,
+                "current_status": "approved"
+            },
+            {
+                "customer": "UAT26 DOM CORRECTION",
+                "part": "UAT26-D-CORRECTION",
+                "pcs": 20,
+                "status": "pending",
+                "deadline_offset_days": 3,
+                "current_status": "pending"
+            },
+            {
+                "customer": "UAT26 DOM REJECT",
+                "part": "UAT26-D-CORRECTION",
+                "pcs": 10,
+                "status": "pending",
+                "deadline_offset_days": 3,
+                "current_status": "pending"
+            },
+            {
+                "customer": "UAT26 DOM PRIORITY-FIRST",
+                "part": "UAT26-D-PRIORITY",
+                "pcs": 40,
+                "status": "approved",
+                "deadline_offset_days": 1,
+                "current_status": "approved"
+            },
+            {
+                "customer": "UAT26 DOM PRIORITY-LATER",
+                "part": "UAT26-D-PRIORITY",
+                "pcs": 40,
+                "status": "pending",
+                "deadline_offset_days": 2,
+                "current_status": "pending"
+            },
+            {
+                "customer": "UAT26 DOM HISTORY-REDO",
+                "part": "UAT26-D-REDO",
+                "pcs": 100,
+                "status": "approved",
+                "deadline_offset_days": 0,
+                "current_status": "completed"
+            }
+        ]
+    },
+    "export": {
+        "stock": [
+            {
+                "part": "UAT26-E-MIX-A",
+                "pcs_per_box": 80,
+                "boxes": [
+                    "98002101",
+                    "98002102"
+                ],
+                "location": "UAT26-E01",
+                "age_days": 5
+            },
+            {
+                "part": "UAT26-E-MIX-B",
+                "pcs_per_box": 40,
+                "boxes": [
+                    "98002103"
+                ],
+                "location": "UAT26-E01",
+                "age_days": 4
+            },
+            {
+                "part": "UAT26-E-MIX-A",
+                "pcs_per_box": 80,
+                "boxes": [
+                    "98002104"
+                ],
+                "location": "UAT26-E02",
+                "age_days": 2
+            },
+            {
+                "part": "UAT26-E-MONO",
+                "pcs_per_box": 20,
+                "boxes": [
+                    "98002001",
+                    "98002002",
+                    "98002003",
+                    "98002004",
+                    "98002005",
+                    "98002006",
+                    "98002007",
+                    "98002008",
+                    "98002009",
+                    "98002010",
+                    "98002011",
+                    "98002012",
+                    "98002013",
+                    "98002014",
+                    "98002015",
+                    "98002016",
+                    "98002017",
+                    "98002018",
+                    "98002019",
+                    "98002020",
+                    "98002021",
+                    "98002022",
+                    "98002023",
+                    "98002024",
+                    "98002025",
+                    "98002026",
+                    "98002027",
+                    "98002028",
+                    "98002029",
+                    "98002030",
+                    "98002031",
+                    "98002032",
+                    "98002033",
+                    "98002034",
+                    "98002035",
+                    "98002036",
+                    "98002037",
+                    "98002038",
+                    "98002039",
+                    "98002040",
+                    "98002041",
+                    "98002042",
+                    "98002043",
+                    "98002044",
+                    "98002045",
+                    "98002046",
+                    "98002047",
+                    "98002048",
+                    "98002049",
+                    "98002050",
+                    "98002051",
+                    "98002052",
+                    "98002053",
+                    "98002054",
+                    "98002055",
+                    "98002056",
+                    "98002057",
+                    "98002058",
+                    "98002059",
+                    "98002060",
+                    "98002061",
+                    "98002062",
+                    "98002063",
+                    "98002064",
+                    "98002065",
+                    "98002066",
+                    "98002067",
+                    "98002068",
+                    "98002069",
+                    "98002070",
+                    "98002071"
+                ],
+                "location": "UAT26-E03",
+                "age_days": 4
+            },
+            {
+                "part": "UAT26-E-LOAD36",
+                "pcs_per_box": 40,
+                "boxes": [
+                    "98002201",
+                    "98002202",
+                    "98002203",
+                    "98002204",
+                    "98002205",
+                    "98002206",
+                    "98002207",
+                    "98002208",
+                    "98002209",
+                    "98002210",
+                    "98002211",
+                    "98002212",
+                    "98002213",
+                    "98002214",
+                    "98002215",
+                    "98002216",
+                    "98002217",
+                    "98002218",
+                    "98002219",
+                    "98002220",
+                    "98002221",
+                    "98002222",
+                    "98002223",
+                    "98002224",
+                    "98002225",
+                    "98002226",
+                    "98002227",
+                    "98002228",
+                    "98002229",
+                    "98002230",
+                    "98002231",
+                    "98002232",
+                    "98002233",
+                    "98002234",
+                    "98002235"
+                ],
+                "location": "UAT26-E04",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-E-SPARE",
+                "pcs_per_box": 40,
+                "boxes": [
+                    "98002251",
+                    "98002252"
+                ],
+                "location": "UAT26-E05",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-E-NF-SPLIT",
+                "pcs_per_box": 80,
+                "boxes": [
+                    "98002261",
+                    "98002262",
+                    "98002263"
+                ],
+                "location": "UAT26-E06",
+                "age_days": 6
+            },
+            {
+                "part": "UAT26-E-NF-SHORT",
+                "pcs_per_box": 80,
+                "boxes": [
+                    "98002271"
+                ],
+                "location": "UAT26-E07",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-E-REV",
+                "pcs_per_box": 50,
+                "boxes": [
+                    "98002301",
+                    "98002302",
+                    "98002303"
+                ],
+                "location": "UAT26-E09",
+                "age_days": 6
+            },
+            {
+                "part": "UAT26-E-CANCEL",
+                "pcs_per_box": 80,
+                "boxes": [
+                    "98002311",
+                    "98002312"
+                ],
+                "location": "UAT26-E10",
+                "age_days": 3
+            },
+            {
+                "part": "UAT26-E-HIST",
+                "pcs_per_box": 20,
+                "boxes": [
+                    "98002901",
+                    "98002902",
+                    "98002903",
+                    "98002904"
+                ],
+                "location": "UAT26-E15",
+                "age_days": 5
+            }
+        ],
+        "plans": [
+            {
+                "code": "UAT26-EX-MIX",
+                "customer": "UAT26 EXP MIX",
+                "items": {
+                    "E-MIX-A": 160,
+                    "E-MIX-B": 40
+                },
+                "final": false,
+                "location": null,
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-MONO",
+                "customer": "UAT26 EXP MONO",
+                "items": {
+                    "E-MONO": 720
+                },
+                "final": false,
+                "location": null,
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-RECEIVE",
+                "customer": "UAT26 EXP RECEIVE",
+                "items": {
+                    "E-RECEIVE": 240
+                },
+                "final": false,
+                "location": null,
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-EARLY",
+                "customer": "UAT26 EXP EARLY",
+                "items": {
+                    "E-DEADLINE": 80
+                },
+                "final": true,
+                "location": "UAT26-E13",
+                "deadline_offset_days": 2,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-LATER",
+                "customer": "UAT26 EXP LATER",
+                "items": {
+                    "E-DEADLINE": 80
+                },
+                "final": true,
+                "location": "UAT26-E14",
+                "deadline_offset_days": 3,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-NF-EXT",
+                "customer": "UAT26 EXP NF-EXT",
+                "items": {
+                    "E-NF-EXT": 100
+                },
+                "final": true,
+                "location": "UAT26-E31",
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-NF-DRAFT",
+                "customer": "UAT26 EXP NF-DRAFT",
+                "items": {
+                    "E-NF-DRAFT": 100
+                },
+                "final": false,
+                "location": null,
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-NF-SPLIT",
+                "customer": "UAT26 EXP NF-SPLIT",
+                "items": {
+                    "E-NF-SPLIT": 100
+                },
+                "final": true,
+                "location": "UAT26-E32",
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-NF-SHORT",
+                "customer": "UAT26 EXP NF-SHORT",
+                "items": {
+                    "E-NF-SHORT": 100
+                },
+                "final": true,
+                "location": "UAT26-E33",
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-NF-EXIST",
+                "customer": "UAT26 EXP NF-EXIST",
+                "items": {
+                    "E-NF-EXIST": 100
+                },
+                "final": false,
+                "location": null,
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-REV",
+                "customer": "UAT26 EXP REV",
+                "items": {
+                    "E-REV": 200
+                },
+                "final": true,
+                "location": "UAT26-E35",
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-CANCEL",
+                "customer": "UAT26 EXP CANCEL",
+                "items": {
+                    "E-CANCEL": 160
+                },
+                "final": true,
+                "location": "UAT26-E37",
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-WARN",
+                "customer": "UAT26 EXP WARN",
+                "items": {
+                    "E-WARN": 720
+                },
+                "final": false,
+                "location": null,
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-DUP",
+                "customer": "UAT26 EXP DUP",
+                "items": {
+                    "E-DUP": 80
+                },
+                "final": false,
+                "location": null,
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": false
+            },
+            {
+                "code": "UAT26-EX-ARCHIVE",
+                "customer": "UAT26 EXP ARCHIVE",
+                "items": {
+                    "E-DUP": 80
+                },
+                "final": false,
+                "location": null,
+                "deadline_offset_days": 5,
+                "current_status": "draft",
+                "archived": true
+            },
+            {
+                "code": "UAT26-EX-NF-STOCK-3",
+                "customer": "UAT26 EXP NF-STOCK-3",
+                "items": {
+                    "E-NF-EXIST": 20
+                },
+                "final": true,
+                "location": "UAT26-E08",
+                "deadline_offset_days": 5,
+                "current_status": "cancelled",
+                "archived": true
+            },
+            {
+                "code": "UAT26-EX-HISTORY",
+                "customer": "UAT26 EXP HISTORY",
+                "items": {
+                    "E-HIST": 80
+                },
+                "final": true,
+                "location": "UAT26-E16",
+                "deadline_offset_days": 0,
+                "current_status": "completed",
+                "archived": true
+            }
+        ]
+    },
+    "masters": {
+        "parts": [
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-CORRECTION",
+                "qty_box": 10
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-DIRECT",
+                "qty_box": 30
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-EDIT",
+                "qty_box": 30
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-EXPIRED",
+                "qty_box": 10
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-FIFO",
+                "qty_box": 80
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-FREE",
+                "qty_box": 10
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-ISSUE",
+                "qty_box": 40
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-LOCK",
+                "qty_box": 20
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-MERGE",
+                "qty_box": 10
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-MOVE",
+                "qty_box": 25
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-NF",
+                "qty_box": 80
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-NF-ADD",
+                "qty_box": 80
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-PRIORITY",
+                "qty_box": 10
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-REDO",
+                "qty_box": 50
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-SPLIT",
+                "qty_box": 20
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-D-WARNING",
+                "qty_box": 10
+            },
+            {
+                "scope": "domestic",
+                "part_number": "UAT26-SHARED",
+                "qty_box": 100
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-CANCEL",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-DEADLINE",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-DUP",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-HIST",
+                "qty_box": 20
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-LOAD36",
+                "qty_box": 40
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-MIX-A",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-MIX-B",
+                "qty_box": 40
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-MONO",
+                "qty_box": 20
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-NF-DRAFT",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-NF-EXIST",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-NF-EXT",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-NF-SHORT",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-NF-SPLIT",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-RECEIVE",
+                "qty_box": 80
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-REV",
+                "qty_box": 50
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-SPARE",
+                "qty_box": 40
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-E-WARN",
+                "qty_box": 10
+            },
+            {
+                "scope": "export",
+                "part_number": "UAT26-SHARED",
+                "qty_box": 80
+            }
+        ],
+        "locations": [
+            {
+                "scope": "domestic",
+                "code": "UAT26-D01",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D02",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D03",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D04",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D05",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D06",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D07",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D08",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D09",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D10",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D11",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D12",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D13",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D14",
+                "is_occupied": 1
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D15",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D16",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D17",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D18",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D19",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D20",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D21",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D22",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D23",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D24",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D25",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D26",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D27",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D28",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D29",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D30",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D31",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D32",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D33",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D34",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D35",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D36",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D37",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D38",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D39",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D40",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D41",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D42",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D43",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D44",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D45",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D46",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D47",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D48",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D49",
+                "is_occupied": 0
+            },
+            {
+                "scope": "domestic",
+                "code": "UAT26-D50",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E01",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E02",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E03",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E04",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E05",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E06",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E07",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E08",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E09",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E10",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E11",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E12",
+                "is_occupied": 1
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E13",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E14",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E15",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E16",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E17",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E18",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E19",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E20",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E21",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E22",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E23",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E24",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E25",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E26",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E27",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E28",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E29",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E30",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E31",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E32",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E33",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E34",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E35",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E36",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E37",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E38",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E39",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E40",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E41",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E42",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E43",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E44",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E45",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E46",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E47",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E48",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E49",
+                "is_occupied": 0
+            },
+            {
+                "scope": "export",
+                "code": "UAT26-E50",
+                "is_occupied": 0
+            }
+        ]
+    }
+}

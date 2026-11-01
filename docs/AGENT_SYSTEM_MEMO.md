@@ -2,6 +2,100 @@
 
 Terakhir diverifikasi dari source code: 31 Oktober 2026 (pembaruan inkremental).
 
+Panduan manual ekspor 1 November 2026:
+- Pengguna mengklarifikasi bahwa pengujian dilakukan sendiri lewat aplikasi,
+  dengan data pendukung dan panduan kasus dari buat delivery, planning,
+  penerimaan/picking sampai selesai; fokus seluruh fitur ekspor.
+- Pemeriksaan PDO transaksi READ ONLY pada MySQL lokal stock memastikan impor
+  UAT26 ada: 18 part ekspor, 50 lokasi, 123 box aktif + 4 histori. Stok MIX/MONO
+  dan NF20 existing masih bebas; beberapa full milik NF/REV/CANCEL sudah reserved.
+  Tidak ada mutasi, pelepasan reservasi atau impor tambahan.
+- docs/EXPORT_MANUAL_TEST_GUIDE.md menyajikan 14 rangkaian kasus. Kasus dasar
+  membuat delivery baru TES-EXP-xx sendiri, ID input 9811xxxx (belum tercatat
+  saat diperiksa); kasus lanjutan memakai rencana contoh final agar stok tidak
+  berebut. Mencakup warning, FIFO, scan blocking/return, NF dua asal/existing,
+  revisi/pembatalan, prioritas, Excel/duplikasi, master, stok/laporan/dashboard.
+- Panduan disertakan dalam ZIP existing oleh scripts/uat/package.py.
+  Checklist manual belum dijalankan agent; pengecekan ini hanya memastikan
+  data pendukung tersedia. Tidak perlu impor ulang untuk mengikuti panduan baru.
+
+Paket UAT bisnis 31 Oktober 2026:
+- SQL aditif development di database/uat/01_seed_business_uat.sql; 9 akun uji,
+  35 part, 100 lokasi, 37 box domestik, 127 box ekspor, 12 delivery domestik
+  dan 17 rencana ekspor (termasuk histori/arsip). Namespace UAT26, nomor box
+  9800xxxx baseline dan 9801xxxx untuk langkah input; tanggal relatif impor.
+- Dibangun melalui model/service pada SQLite baru, lalu diekspor beserta ledger
+  box_identities, pivot, ringkasan, reservasi, Not Full dan audit. Bukan contoh
+  raw insert Box untuk operasi biasa. ID/FK/snapshot dipetakan ke offset target.
+- Import procedure atomik, guard database/hostname/InnoDB/namespace/picking;
+  tidak menimpa role permissions atau master/data existing, impor ulang ditolak.
+- MySQL 8.4.3 sementara memverifikasi rollback gagal di tengah impor, penolakan
+  impor ulang, data existing tetap, 22 query baca/integritas, dan runtime service
+  FIFO picking/pengiriman domestik/ekspor, issue approval + konfirmasi return,
+  split NF menjaga PCS, redo histori, serta penerimaan packing label kedaluwarsa.
+  DB sementara dihapus; database aplikasi hanya dibaca skemanya, tidak diisi.
+- Panduan manual semua fitur: docs/UAT_BUSINESS_GUIDE.md; peta cakupan,
+  manifest dan bukti validasi di database/uat. Checklist UI belum dianggap lulus
+  hanya karena fixture/service tervalidasi. Regenerasi: scripts/uat/build.php;
+  validasi ulang: scripts/uat/validate-mysql.php. Tidak ada perubahan proses bisnis.
+- Paket akhir memuat 116 kasus manual untuk 32 fitur dan lembar hasil terpisah
+  docs/UAT_RESULT_TEMPLATE.md (semua Belum diuji). scripts/uat/package.py membuat
+  storage/app/uat/STOK-WHFG-UAT26.zip tanpa koneksi DB, dengan checksum dan
+  pemeriksaan isi arsip. Panduan memperjelas kapasitas/nama part dan scan 8 digit.
+
+Box Not Full ekspor 31 Oktober 2026:
+- Input manual/Excel kini menerima sisa PCS: 100 PCS pada standar 80 berarti
+  1 full 80 + 1 Not Full 20, total 2 box. Master tetap 80; item delivery menyimpan
+  not_full_pcs. Pratinjau hanya mendeteksi/menandai, save membuat satu request
+  wajib per item delivery. Retry/edit tidak menggandakan request yang sama;
+  rencana berbeda tetap punya request terpisah. Alert sesudah simpan menjelaskan
+  kebutuhan dan mengarahkan operator menghubungi admin.
+- ExportBoxRequirements membuat varian part+PCS untuk planning. Part sama boleh
+  muncul sebagai full dan Not Full pada satu pallet; keduanya harus tepat.
+  Unique planned item menjadi pallet+part+PCS. Selector, sisa alokasi, total box,
+  cetak dan revisi membedakan kapasitas. Not Full tetap satu box pada warning 36/72.
+- ExportNotFullService/ExportNotFullRequest menambah antrean ekspor pada fitur
+  Box Not Full existing, dengan filter Domestik/Ekspor, badge kebutuhan belum
+  terpenuhi untuk Admin Warehouse/Admin Utama/Supervisi, rincian dan audit.
+  Admin Warehouse/Admin Utama boleh menyiapkan; hanya Admin Utama/Supervisi
+  boleh approve/reject. Hak fitur existing tetap diperiksa, termasuk guard role
+  eksplisit. Operator ekspor melihat kebutuhan/status di delivery/planning/
+  pemenuhan dan tidak diberi hak approval.
+- Penyiapan/pembuatan menunggu pallet FINAL yang valid. Dua opsi baru: datang
+  sudah dikemas Not Full, atau pecah box PENUH dari stok. Alokasi FIFO existing
+  tetap mendahulukan kebutuhan penuh. Varian PCS cocok (mis. stok 20) dapat
+  direservasi seperti stok biasa; tidak membuat box baru dan mengikuti antrean
+  penempatan/verifikasi existing. Reservasi belum dihitung terpenuhi.
+- Pemecahan hanya memilih full box part/kapasitas cocok, stored, lokasi valid,
+  bebas reservasi dan issue, pallet belum ready, urut FIFO. Penyiapan tidak
+  menahan full box dari permintaan penuh yang datang kemudian. Approval
+  memeriksa ulang sumber FIFO/revision/tujuan; sumber terpakai/berubah wajib
+  disiapkan ulang. Box hasil memakai ID baru 8 digit khusus lingkup ekspor.
+- Approval mewajibkan konfirmasi fisik dan langsung membuat stok serta konfirmasi
+  penempatan di pallet rencana, tanpa penerimaan/scan ulang box hasil. Internal
+  split 80 -> 20 + 60 menjaga total PCS: sisa 60 memakai ID/lokasi asal, kedua
+  box mewarisi first_received_at sumber. Semua mutasi memakai mutex inventory,
+  transaksi atomik dan versi request. Retry approval tidak mengurangi dua kali.
+- ExportStockBox menambah is_not_full, standard_pcs_quantity, receipt_pcs_quantity,
+  origin dan source_box_id. Origin split tidak dihitung sebagai inbound baru;
+  receipt snapshot sumber menjaga histori penerimaan awal 80 meski kini sisa 60.
+  Box baru datang Not Full tetap inbound eksternal. ID yang masih disiapkan
+  Not Full ditolak oleh penerimaan normal agar tidak salah menjadi box penuh.
+- Revisi mengurangi PCS sesuai varian yang dihapus, bukan mengalikan seluruh
+  box dengan kapasitas master. Pengembalian mempertahankan FIFO, request yang
+  tidak dibutuhkan dibatalkan, rejection tetap menyisakan kebutuhan wajib.
+  Pallet belum dapat ready/permintaan selesai sebelum isi exact sesuai rencana.
+- Migration 2026_10_31_000001 diterapkan hanya ke MySQL lokal stock/127.0.0.1
+  setelah backup storage/app/backups/stock_export_not_full_20261031_191724_0955cd.json.
+  Seluruh kolom/data lama pada 15 tabel dibandingkan identik; 4 header delivery
+  dan 8 stok ekspor tetap, request baru lokal 0. Production remote tidak diubah.
+- Regresi penuh 518 backend (4.731 assertions), setelah guard sumber/audit akhir
+  25 tes terkait (173 assertions) lulus; 88 frontend dan Vite build lulus.
+  Preview SQLite terpisah memeriksa impor Excel 100/80, alert, planning full/NF
+  satu pallet, reservasi full tertua, role penyiapan/approval, stok langsung,
+  sisa 60 di asal, desktop 1366px/ponsel 390px dan overflow/error konsol.
+  Detail: docs/EXPORT_NOT_FULL_WORKFLOW.md. Bukan stress test production.
+
 Dashboard Admin Utama dan Supervisi lintas lingkup 31 Oktober 2026:
 - Kedua role memakai shared.operational-dashboard melalui
   OperationalDashboardService dan OperationalDashboardSources. Default Semua;
@@ -683,8 +777,9 @@ Verifikasi tambahan 28 Oktober 2026 (Rencana Delivery Ekspor):
 - Input kode rencana (opsional untuk kompatibilitas data lama), customer,
   batas tanggal pengiriman, nomor part dan jumlah PCS.
   Kapasitas diambil hanya dari master ekspor; box dan total dihitung ulang di
-  server. Jumlah wajib kelipatan kapasitas, tidak boleh part duplikat atau box
-  tidak penuh. Tidak ada input jumlah pallet.
+  server. Part duplikat tetap ditolak. Sejak 31 Oktober 2026 jumlah tidak wajib
+  kelipatan: sisa PCS menjadi kebutuhan Not Full melalui request/approval ekspor
+  sebagaimana catatan di awal memo. Tidak ada input jumlah pallet.
 - Rencana delivery disimpan sebagai draft, bisa diubah dan diarsipkan (soft
   delete). Perencanaan pallet tersedia sebagai modul tersendiri; finalisasi dan
   reservasi lokasi dijelaskan di atas. Belum ada mutasi inventory fisik.

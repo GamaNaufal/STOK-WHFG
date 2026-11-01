@@ -8,6 +8,7 @@
         <div class="plan-inline-actions">@if($printReady)<a class="btn btn-outline-primary" href="{{ route('export.delivery-plans.print', $plan) }}" target="_blank" rel="noopener">Cetak rencana delivery</a>@endif<a class="btn btn-primary" href="{{ route('export.delivery-plans.edit', $plan) }}"><i class="bi bi-pencil" aria-hidden="true"></i> Ubah rencana</a></div>
     </header>
     @unless($printReady)<p class="plan-help mb-3">Cetak rencana delivery tersedia setelah perencanaan pallet final.</p>@endunless
+    @include('export.not-full.requirements',['notFullDelivery'=>$plan])
     <section class="plan-panel">
         @if(auth()->user()->canAccess('export_pallet_plans'))
             <div class="plan-panel-body"><a class="btn btn-outline-primary" href="{{ route('export.pallet-plans.show', $plan) }}">Perencanaan Pallet</a></div>
@@ -16,7 +17,7 @@
         <div class="plan-table-scroll" tabindex="0" role="region" aria-label="Kebutuhan part rencana delivery">
             <table class="table plan-table"><thead><tr><th scope="col">No</th><th scope="col">Nomor part</th><th scope="col">Jumlah PCS</th><th scope="col">PCS / box</th><th scope="col">Jumlah box</th></tr></thead>
                 <tbody>@foreach($plan->items as $item)
-                    <tr><td>{{ $loop->iteration }}</td><th scope="row">{{ $item->part_number }}</th><td>{{ number_format($item->pcs_quantity, 0, ',', '.') }}</td><td>{{ number_format($item->pcs_per_box, 0, ',', '.') }}</td><td><strong>{{ number_format($item->box_quantity, 0, ',', '.') }}</strong></td></tr>
+                    <tr><td>{{ $loop->iteration }}</td><th scope="row">{{ $item->part_number }}</th><td>{{ number_format($item->pcs_quantity, 0, ',', '.') }}</td><td>{{ number_format($item->pcs_per_box, 0, ',', '.') }}</td><td><strong>{{ number_format($item->box_quantity, 0, ',', '.') }}</strong>@if($item->not_full_pcs)<small class="d-block text-warning-emphasis">Termasuk 1 Not Full {{ $item->not_full_pcs }} PCS</small>@endif</td></tr>
                 @endforeach</tbody>
             </table>
         </div>

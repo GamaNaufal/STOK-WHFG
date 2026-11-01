@@ -8,7 +8,8 @@ class ExportStockBox extends Model
 {
     use \Illuminate\Database\Eloquent\SoftDeletes;
     protected $guarded = ['id'];
-    protected $casts = ['box_number' => 'string', 'pcs_quantity' => 'integer', 'revision' => 'integer',
+    protected $casts = ['box_number' => 'string', 'pcs_quantity' => 'integer', 'revision' => 'integer', 'is_not_full' => 'boolean',
+        'standard_pcs_quantity' => 'integer', 'receipt_pcs_quantity' => 'integer',
         'first_received_at' => 'datetime', 'stored_at' => 'datetime'];
 
     public function part() { return $this->belongsTo(ExportPartSetting::class, 'part_setting_id'); }

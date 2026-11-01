@@ -11,7 +11,7 @@
         <form method="POST" action="{{ route('export.fulfillment.revise', [$delivery,$pallet]) }}" class="plan-panel">@csrf<input type="hidden" name="revision" value="{{ $delivery->palletPlan->revision }}"><input type="hidden" name="fulfillment_revision" value="{{ $pallet->fulfillment_revision }}">
             <div class="plan-panel-heading"><h2>Jumlah box setelah revisi</h2></div><div class="plan-panel-body">
                 <p>Masukkan jumlah yang tetap diperlukan, termasuk saat pallet belum penuh. Box terbaru dikembalikan agar box tertua tetap diprioritaskan untuk pengiriman FIFO. Isi semua part dengan 0 untuk menghapus pallet ini; jika tidak ada pallet tersisa, permintaan dibatalkan.</p>
-                @foreach($items as $item)<div class="mb-3"><label class="form-label" for="quantity-{{ $item->id }}">{{ $item->part_number }} · saat ini {{ $item->box_quantity }} box</label><input id="quantity-{{ $item->id }}" class="form-control" type="number" name="quantities[{{ $item->id }}]" min="0" max="{{ $item->box_quantity }}" required value="{{ old('quantities.'.$item->id,$quantities[$item->id]) }}"></div>@endforeach
+                @foreach($items as $item)<div class="mb-3"><label class="form-label" for="quantity-{{ $item->id }}">{{ $item->part_number }} · {{ $item->pcs_per_box }} PCS/box · saat ini {{ $item->box_quantity }} box</label><input id="quantity-{{ $item->id }}" class="form-control" type="number" name="quantities[{{ $item->id }}]" min="0" max="{{ $item->box_quantity }}" required value="{{ old('quantities.'.$item->id,$quantities[$item->id]) }}"></div>@endforeach
                 <button class="btn btn-primary" type="submit">Tinjau revisi dan pengembalian</button>
             </div>
         </form>

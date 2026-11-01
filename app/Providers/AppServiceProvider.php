@@ -72,6 +72,10 @@ class AppServiceProvider extends ServiceProvider
                     'route' => route($item['route']), 'keywords' => $item['label'].' '.$item['group'],
                 ], $featureNavigation));
                 $cacheTtlSeconds = 30;
+                if (in_array(Auth::user()->role, ['admin','admin_warehouse','supervisi'], true)
+                    && (Auth::user()->canAccess('not_full_request') || Auth::user()->canAccess('not_full_approval'))) {
+                    $view->with('exportNotFullPending', app(\App\Services\ExportNotFullService::class)->pending()->count());
+                }
 
                 // Delivery count for Warehouse Operator
                 if (Auth::user()->canAccess('delivery_schedule')) {
