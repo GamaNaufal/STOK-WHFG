@@ -19,19 +19,20 @@ class ExportStockReceivingController extends Controller
     public function index(Request $request, ExportReceivingBatchService $service, ExportReceivingTransactionService $transactionsService)
     {
         $data = $request->validate(['batch' => 'nullable|integer|min:1', 'box' => 'nullable|integer|min:1']);
+        $sort = $request->query('sort') === 'newest' ? 'newest' : 'oldest';
         if (!empty($data['box'])) return redirect()->route('export.stock.index', ['box' => $data['box']]);
         $batch = !empty($data['batch']) ? $service->owned((int) $data['batch'], $request->user())
             : ExportReceivingBatch::where('created_by', $request->user()->id)->where('status', 'draft')->orderByDesc('id')->first();
         if ($batch?->status === 'processed') return redirect()->route('export.receiving.transactions.show', $batch);
         $state = $batch ? $service->state($batch) : ['id' => null, 'status' => 'draft', 'revision' => 0, 'items' => []];
-        $transactions = $transactionsService->queue()->paginate(20, ['*'], 'pending_page')
+        $transactions = $transactionsService->queue($sort)->paginate(20, ['*'], 'pending_page')
             ->withQueryString()->fragment('receiving-pending-queue');
         foreach ($transactions as $transaction) {
             $transaction->code = $transactionsService::code($transaction->kind, (int) $transaction->transaction_id);
             $transaction->received_at = \Illuminate\Support\Carbon::parse($transaction->received_at);
             $transaction->placed_boxes = (int) $transaction->total_boxes - (int) $transaction->pending_boxes - (int) $transaction->waiting_boxes;
         }
-        return view('export.receiving.index', compact('batch', 'state', 'transactions'));
+        return view('export.receiving.index', compact('batch', 'state', 'transactions', 'sort'));
     }
 
     public function checkBox(Request $request)

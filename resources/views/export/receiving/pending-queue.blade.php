@@ -1,6 +1,6 @@
 <section class="plan-panel" id="receiving-pending-queue" aria-labelledby="receiving-pending-title">
-    <div class="plan-panel-heading"><h2 id="receiving-pending-title">Antrean penempatan / pemindahan</h2><span>{{ $transactions->total() }} transaksi</span></div>
-    <p class="plan-help receiving-table-note">Satu baris mewakili satu transaksi penerimaan. Urutan mengikuti box yang paling awal diterima dan masih menunggu penempatan.</p>
+    <div class="plan-panel-heading"><div><h2 id="receiving-pending-title">Antrean penempatan / pemindahan</h2><p class="plan-help">Satu baris mewakili satu transaksi penerimaan.</p></div><div class="plan-inline-actions"><label class="visually-hidden" for="receiving-sort">Urutan transaksi</label><select class="form-select" id="receiving-sort"><option value="newest" @selected($sort === 'newest')>Terbaru</option><option value="oldest" @selected($sort === 'oldest')>Terlama (FIFO)</option></select><span>{{ $transactions->total() }} transaksi</span></div></div>
+    <p class="plan-help receiving-table-note">Urutan default mengikuti FIFO box paling awal. Pilih Terbaru untuk melihat transaksi terakhir, tanpa mengubah FIFO di dalam transaksi.</p>
     <div class="plan-table-scroll" role="region" tabindex="0" aria-label="Antrean transaksi penerimaan ekspor">
         <table class="table plan-table"><thead><tr><th>Transaksi</th><th>Waktu penerimaan</th><th>Operator</th><th>Total box</th><th>Sudah ditempatkan</th><th>Menunggu</th><th>Aksi</th></tr></thead><tbody>
         @forelse($transactions as $transaction)
@@ -13,3 +13,11 @@
     </div>
     @if($transactions->hasPages())<div class="plan-panel-body">{{ $transactions->links('pagination::bootstrap-5') }}</div>@endif
 </section>
+<script>
+document.getElementById('receiving-sort')?.addEventListener('change', event => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('sort', event.target.value);
+    url.hash = 'receiving-pending-queue';
+    window.location.assign(url);
+});
+</script>

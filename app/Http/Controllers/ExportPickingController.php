@@ -51,7 +51,7 @@ class ExportPickingController extends Controller
     {
         $data = $this->number($request) + $request->validate(['request_token' => 'required|uuid']);
         $result = $service->scan($pallet->id, $data, $request->user());
-        $result['html'] = view('export.picking.workbench', $this->data($pallet, $service, $request, false))->render();
+        $result['html'] = view('export.picking.workbench', $this->data($pallet, $service, $request, false) + ['compact' => true])->render();
         return response()->json($result, $result['blocked'] ? 423 : 200)->header('Cache-Control', 'private, no-store');
     }
 

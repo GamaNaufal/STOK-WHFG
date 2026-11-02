@@ -13,7 +13,7 @@ class ExportReceivingTransactionService
         return ($kind === 'batch' ? 'TRX-' : 'BOX-').str_pad((string) $id, 6, '0', STR_PAD_LEFT);
     }
 
-    public function queue(): Builder
+    public function queue(string $sort = 'newest'): Builder
     {
         $physicalPending = "(box.state = 'received' OR (fulfillment.id IS NOT NULL AND fulfillment.placed_at IS NULL))";
         $queueReady = '(fulfillment.allocation_notice_id IS NULL OR EXISTS (SELECT 1 FROM export_stock_allocation_notices notice WHERE notice.id = fulfillment.allocation_notice_id AND notice.acknowledged_at IS NOT NULL))';
@@ -36,7 +36,9 @@ class ExportReceivingTransactionService
             ->selectRaw('1 as total_boxes, 1 as pending_boxes, 0 as waiting_boxes, box.first_received_at as fifo_at, box.id as fifo_id');
         return DB::query()->fromSub($batches->unionAll($legacy), 'receipt')
             ->leftJoin('users as actor', 'actor.id', '=', 'receipt.actor_id')
-            ->select('receipt.*', 'actor.name as operator_name')->orderBy('receipt.fifo_at')->orderBy('receipt.fifo_id');
+            ->select('receipt.*', 'actor.name as operator_name')
+            ->when($sort === 'oldest', fn ($query) => $query->orderBy('receipt.fifo_at')->orderBy('receipt.fifo_id'),
+                fn ($query) => $query->orderByDesc('receipt.received_at')->orderByDesc('receipt.transaction_id'));
     }
 
     public function batchBoxes(ExportReceivingBatch $batch)

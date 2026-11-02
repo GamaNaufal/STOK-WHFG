@@ -1,4 +1,6 @@
 .fulfillment-page { font-variant-numeric:tabular-nums; }
+.export-picking-page .plan-header h1 { display:flex; align-items:center; gap:.55rem; }
+.export-picking-page .plan-header h1 i { color:var(--ui-accent,#0b7072); font-size:.9em; }
 .fulfillment-page .plan-header .btn { white-space:nowrap; }
 .fulfillment-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; margin-bottom:1.25rem; }
 .fulfillment-summary>div { padding:1rem 1.25rem; background:var(--ui-surface,#fff); border:1px solid var(--ui-border,#dfe1e5); border-radius:var(--ui-radius,.875rem); }

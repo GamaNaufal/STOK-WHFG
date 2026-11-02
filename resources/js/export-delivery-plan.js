@@ -61,6 +61,32 @@ if(page) {
         tr.querySelector('.plan-quantity').value=quantity ?? (row.pcs_quantity ?? '');
         tr.dataset.touched=touched ? '1':'0';body.append(fragment);
     };
+    const closeMenus=except=>{
+        body.querySelectorAll('.plan-autocomplete-menu:not([hidden])').forEach(menu=>{
+            if(menu!==except){menu.hidden=true;menu.previousElementSibling.setAttribute('aria-expanded','false');}
+        });
+    };
+    const showPartMenu=input=>{
+        const menu=input.nextElementSibling;
+        const query=input.value.trim().toLocaleLowerCase('id-ID');
+        const matches=initial.parts.filter(part=>String(part.part_number).toLocaleLowerCase('id-ID').includes(query)).slice(0,50);
+        menu.replaceChildren();
+        matches.forEach((part,index)=>{
+            const option=document.createElement('button');
+            option.type='button';option.className='plan-autocomplete-option';option.setAttribute('role','option');
+            option.innerHTML='<strong></strong><small></small>';
+            option.firstElementChild.textContent=part.part_number;
+            option.lastElementChild.textContent=Number(part.qty_box).toLocaleString('id-ID')+' PCS / box';
+            option.addEventListener('mousedown',event=>event.preventDefault());
+            option.addEventListener('click',()=>{
+                input.value=part.part_number;input.dataset.selected='true';menu.hidden=true;input.setAttribute('aria-expanded','false');
+                input.dispatchEvent(new Event('input',{bubbles:true}));input.focus();
+            });
+            if(index===0)option.classList.add('is-highlighted');
+            menu.append(option);
+        });
+        menu.hidden=matches.length===0;input.setAttribute('aria-expanded',String(!menu.hidden));
+    };
     const setBusy=value=>{
         busy=value;
         for(const id of ['plan-read-excel','plan-excel-file']) byId(id).disabled=value;
@@ -83,10 +109,19 @@ if(page) {
     };
     body.addEventListener('input',event=>{
         const tr=event.target.closest('tr');if(!tr)return;
+        if(event.target.matches('.plan-part')){event.target.dataset.selected=initial.parts.some(part=>part.part_number===event.target.value.trim())?'true':'false';showPartMenu(event.target);}
         resetDuplicateReview();tr.dataset.touched='1';dirty=true;
         if(sourceType.value!=='manual')reviewed.checked=false;
         refresh();
     });
+    body.addEventListener('focusin',event=>{if(event.target.matches('.plan-part'))showPartMenu(event.target);});
+    body.addEventListener('keydown',event=>{
+        if(!event.target.matches('.plan-part'))return;
+        const menu=event.target.nextElementSibling,options=[...menu.querySelectorAll('.plan-autocomplete-option')];
+        if(event.key==='Escape'){menu.hidden=true;event.target.setAttribute('aria-expanded','false');return;}
+        if(event.key==='Enter' && !menu.hidden && options.length){event.preventDefault();options[0].click();}
+    });
+    document.addEventListener('click',event=>{if(!event.target.closest('.plan-autocomplete'))closeMenus();});
     body.addEventListener('click',event=>{
         const button=event.target.closest('.plan-remove');if(!button || busy)return;
         resetDuplicateReview();

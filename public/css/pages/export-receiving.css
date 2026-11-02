@@ -65,4 +65,12 @@
 .receiving-detail-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; padding:1rem; background:#f7f8fa; border:1px solid var(--ui-border,#dfe1e5); border-radius:.6rem; }
 .receiving-detail-facts dt { font-size:.8rem; font-weight:500; color:var(--ui-muted,#595d65); }
 .receiving-detail-facts dd { font-size:.9rem; margin:.4rem 0 0; overflow-wrap:anywhere; }
+#deliveryVerificationPage.export-picking-verification-page .plan-panel { margin:0; border:0; box-shadow:none; border-radius:0; }
+#deliveryVerificationPage.export-picking-verification-page #export-pick-workbench .plan-panel-body { padding:0; }
+#deliveryVerificationPage.export-picking-verification-page #export-pick-workbench .plan-panel-heading { padding:0 0 .75rem; border:0; }
+#deliveryVerificationPage.export-picking-verification-page #export-pick-workbench .receiving-field-action { margin-top:.75rem; }
+#deliveryVerificationPage.export-picking-verification-page .verification-list { overflow:hidden; border:1px solid var(--ui-border,#dfe1e5); border-radius:var(--ui-radius,.875rem); background:var(--ui-surface,#fff); box-shadow:var(--ui-shadow,0 1px 3px rgb(20 25 32 / 5%)); }
+#deliveryVerificationPage.export-picking-verification-page .export-pick-reference-panel { border:0; border-radius:0; box-shadow:none; }
+#deliveryVerificationPage.export-picking-verification-page .export-pick-reference-panel .plan-table-scroll { max-height:min(70vh,45rem); }
+#deliveryVerificationPage.export-picking-verification-page .export-pick-reference-panel .plan-table tbody tr.table-success > :first-child { background:#dff0e7 !important; color:#22603f !important; }
 @media(max-width:991.98px) { .receiving-workspace { grid-template-columns:1fr; } .receiving-workspace.has-placement #receiving-instruction { order:-1; } }

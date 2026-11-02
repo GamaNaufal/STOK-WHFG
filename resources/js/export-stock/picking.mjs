@@ -25,6 +25,10 @@ export function initExportPicking({documentRef = globalThis.document, fetcher = 
             const data = await response.json();
             if (!response.ok && !data.blocked) throw new Error(Object.values(data.errors ?? {}).flat()[0] ?? data.message ?? 'Scan belum dapat diproses. Coba lagi.');
             if (typeof data.html === 'string') root.innerHTML = data.html;
+            if (data.success === true && form.dataset?.helperScan !== 'true') {
+                const row = documentRef.querySelector?.(`#export-pick-reference tr[data-box-number="${number}"]`);
+                row?.classList.add('table-success');
+            }
             report(data.success === true, data.message ?? 'Scan selesai.');
             const next = root.querySelector('[name="box_number"]');
             if (next) { next.value = ''; next.focus({preventScroll: true}); }

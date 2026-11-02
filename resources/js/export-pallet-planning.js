@@ -56,9 +56,39 @@ if (page) {
             select.append(option);
         });
         select.value = row.master_location_id ?? '';
+        card.querySelector('.pallet-location-search').value = places.get(String(select.value))?.code ?? '';
         const items = Array.isArray(row.items) && row.items.length ? row.items : [{}];
         items.forEach(item => addPart(card, item));
         container.append(fragment);
+    };
+    const renderLocationOptions = (card, query = '') => {
+        const input = card.querySelector('.pallet-location-search'), menu = card.querySelector('.pallet-location-options');
+        const selected = card.querySelector('.pallet-location').value;
+        const matches = [...places.values()].filter(location => !location.blocked
+            && location.code.toLocaleLowerCase('id-ID').includes(query.trim().toLocaleLowerCase('id-ID')))
+            .filter(location => String(location.id) === selected || ![...container.children].some(other => other !== card && other.querySelector('.pallet-location')?.value === String(location.id)))
+            .slice(0, 50);
+        menu.replaceChildren();
+        matches.forEach((location, index) => {
+            const option = document.createElement('button');
+            option.type = 'button'; option.className = 'pallet-location-option'; option.setAttribute('role', 'option');
+            option.innerHTML = '<strong></strong><small>Lokasi tersedia</small>';
+            option.firstElementChild.textContent = location.code;
+            option.addEventListener('mousedown', event => event.preventDefault());
+            option.addEventListener('click', () => {
+                card.querySelector('.pallet-location').value = location.id;
+                input.value = location.code; menu.hidden = true; input.setAttribute('aria-expanded', 'false');
+                input.setCustomValidity(''); input.dispatchEvent(new Event('change', {bubbles:true})); refresh();
+            });
+            if (index === 0) option.classList.add('is-highlighted');
+            menu.append(option);
+        });
+        if (!matches.length) {
+            const empty = document.createElement('p');
+            empty.className = 'pallet-location-empty'; empty.textContent = query ? 'Lokasi tidak ditemukan.' : 'Tidak ada lokasi yang tersedia.';
+            menu.append(empty);
+        }
+        menu.hidden = false; input.setAttribute('aria-expanded', 'true');
     };
     const filterParts = () => {
         const query = search.value.trim().toLocaleLowerCase('id-ID');
@@ -89,6 +119,7 @@ if (page) {
             location.id = 'pallet-location-' + i;
             card.querySelector('.pallet-location-label').htmlFor = location.id;
             card.querySelector('.pallet-location-label').textContent = 'Lokasi pallet ' + (i + 1);
+            card.querySelector('.pallet-location-search').setCustomValidity(location.value ? '' : 'Pilih lokasi dari rekomendasi yang tersedia.');
             const entries = itemRows(card);
             entries.forEach((entry, j) => {
                 const part = entry.querySelector('.pallet-part'), quantity = entry.querySelector('.pallet-quantity');
@@ -152,6 +183,25 @@ if (page) {
         byId('pallet-save-help').textContent = analysis.finalValid ? 'Seluruh alokasi sesuai. Perencanaan siap difinalisasi.' : !analysis.draftValid ? 'Periksa isian part, jumlah box, atau lokasi sebelum menyimpan draft.' : 'Draft boleh belum lengkap. Lengkapi lokasi dan seluruh alokasi untuk finalisasi.';
         return analysis;
     };
+    container.addEventListener('focusin', event => {
+        if (event.target.matches('.pallet-location-search')) renderLocationOptions(event.target.closest('.planned-pallet'), event.target.value);
+    });
+    container.addEventListener('input', event => {
+        if (!event.target.matches('.pallet-location-search')) return;
+        const card = event.target.closest('.planned-pallet');
+        card.querySelector('.pallet-location').value = '';
+        event.target.setCustomValidity('Pilih lokasi dari rekomendasi yang tersedia.');
+        renderLocationOptions(card, event.target.value); dirty = true; refresh();
+    });
+    container.addEventListener('keydown', event => {
+        if (!event.target.matches('.pallet-location-search')) return;
+        const menu = event.target.nextElementSibling, option = menu.querySelector('.pallet-location-option');
+        if (event.key === 'Escape') { menu.hidden = true; event.target.setAttribute('aria-expanded', 'false'); }
+        if (event.key === 'Enter' && option && !menu.hidden) { event.preventDefault(); option.click(); }
+    });
+    document.addEventListener('click', event => {
+        if (!event.target.closest('.pallet-location-autocomplete')) container.querySelectorAll('.pallet-location-options').forEach(menu => menu.hidden = true);
+    });
     const activate = index => {
         activeIndex = index;
         status.textContent = '';
