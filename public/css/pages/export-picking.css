@@ -1,0 +1,14 @@
+/* Reuse the domestic verification layout, with export destination and issue controls. */
+#deliveryVerificationPage .export-picking-input { min-height:48px; margin:.35rem 0 .75rem; font-size:1.1rem; letter-spacing:.04em; font-variant-numeric:tabular-nums; }
+#deliveryVerificationPage .verification-metrics { margin-bottom:.8rem; }
+#deliveryVerificationPage .verification-table th small { display:block; font-size:.75rem; color:var(--ui-muted,#595d65); margin-top:.25rem; }
+#deliveryVerificationPage .verification-table th .export-pick-scanned { color:#175236; font-weight:650; }
+#deliveryVerificationPage .verification-table th .export-pick-scanned[hidden] { display:none; }
+#deliveryVerificationPage .verification-table tr.table-success > :is(th,td) { background-color:#e9f5ef; --bs-table-bg:#e9f5ef; }
+#deliveryVerificationPage #export-pick-feedback { margin-bottom:1rem; padding:1rem 1.25rem; border-radius:.65rem; font-weight:700; border:1px solid var(--ui-border,#dfe1e5); }
+#deliveryVerificationPage #export-pick-feedback.is-ok { color:#175236; background:#edf8f1; border-color:#b8dac7; }
+#deliveryVerificationPage #export-pick-feedback.is-ng { color:#922a25; background:#fff1f0; border-color:#e5b9b5; }
+#deliveryVerificationPage .verification-controls>.plan-panel { margin:0; border-color:#e5b9b5; }
+#deliveryVerificationPage .receiving-destination { margin:1rem 0; }
+#deliveryVerificationPage .verification-controls .plan-panel-heading { flex-wrap:wrap; }
+@media(max-width:575.98px) { #deliveryVerificationPage .verification-controls .plan-panel-body { padding:1rem; } }

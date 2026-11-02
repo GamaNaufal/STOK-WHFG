@@ -142,6 +142,11 @@ class ExportPickingVerificationTest extends TestCase
         [$pallet, $first, $second] = $this->mixed();
         $this->assertTrue($first->fulfillment->picking_required);
         $this->get(route('export.picking.index'))->assertOk()->assertSee('PICK-PLAN');
+        $helper = $this->get(route('export.picking.show', ['pallet' => $pallet->id]))->assertOk()
+            ->assertSee('data-ok="'.asset('audio/OK.mp3').'"', false)
+            ->assertSee('data-ng="'.asset('audio/NG.mp3').'"', false)
+            ->assertSee('data-export-pick-scan data-scan-feedback', false);
+        $this->assertMatchesRegularExpression('/<tr data-pick-box-number="'.$first->box_number.'" class="">/', $helper->getContent());
         $this->postJson(route('export.picking.seek', ['pallet' => $pallet->id]), ['box_number' => $second->box_number])->assertOk()->assertJsonPath('success', false)->assertJsonPath('blocked', false);
         $this->postJson(route('export.picking.seek', ['pallet' => $pallet->id]), ['box_number' => $first->box_number])->assertOk()->assertJsonPath('success', true);
         $this->assertDatabaseCount('export_picking_issues', 0);
@@ -149,6 +154,9 @@ class ExportPickingVerificationTest extends TestCase
         $this->blockedPlacement($first);
         $this->scan($pallet, $first->box_number)->assertOk()->assertJsonPath('success', true)->assertJsonPath('blocked', false);
         $this->assertNotNull($first->fresh()->fulfillment->picking_verified_at);
+        $page = $this->get(route('export.receiving.picking.show', ['pallet' => $pallet->id]))->assertOk();
+        $this->assertMatchesRegularExpression('/<tr data-pick-box-number="'.$first->box_number.'" class="table-success">/', $page->getContent());
+        $this->assertMatchesRegularExpression('/data-pick-scanned\s*><i[^>]+><\/i> Sudah di-scan/', $page->getContent());
         $this->place($first);
         $this->assertNotNull($first->fresh()->fulfillment->placed_at);
         $html = $this->getJson(route('export.stock.show', $first))->assertOk()->json('html');

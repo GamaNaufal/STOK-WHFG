@@ -1,3 +1,10 @@
+@php
+    $mandatoryRows = $rows->where('requires_scan', true);
+    $verifiedCount = $mandatoryRows->where('picking_ready', true)->count();
+    $remainingCount = $mandatoryRows->count() - $verifiedCount;
+@endphp
+<div class="verification-grid">
+<div class="verification-controls">
 @if($issue)
     <section class="plan-panel"><div class="plan-panel-heading"><h2>Pengambilan diblokir · issue ekspor #{{ $issue->id }}</h2><span>{{ $issue->status === 'pending' ? 'Menunggu approval admin' : 'Menunggu konfirmasi penempatan' }}</span></div><div class="plan-panel-body">
         <p>Box salah: <strong>{{ $issue->box_number }}</strong> · {{ $issue->reason }}</p>
@@ -10,15 +17,28 @@
         @else<p class="plan-help">Menunggu operator pelapor {{ $issue->reporter?->name }} mengonfirmasi pengembalian.</p>@endif
     </div></section>
 @else
-    <section class="plan-panel"><div class="plan-panel-body">
-        <form method="POST" action="{{ route($helper ? 'export.picking.seek' : 'export.receiving.picking.scan', ['pallet'=>$pallet->id]) }}" data-export-pick-scan novalidate>
+    <section class="card verification-card"><div class="card-body">
+        <span class="verification-section-label">{{ $helper ? 'Pencarian box' : 'Pengambilan wajib' }}</span><h2>Scan nomor box</h2><p class="verification-supporting">{{ $helper ? 'Periksa apakah box sesuai daftar rekomendasi.' : 'Cocokkan setiap box dari pallet campuran sebelum dipindahkan.' }}</p>
+        <form method="POST" action="{{ route($helper ? 'export.picking.seek' : 'export.receiving.picking.scan', ['pallet'=>$pallet->id]) }}" data-export-pick-scan data-scan-feedback novalidate>
             @csrf<input type="hidden" name="request_token" value="{{ (string)\Illuminate\Support\Str::uuid() }}">
-            <label class="form-label" for="export-pick-box">Scan nomor box (8 angka)</label><div class="receiving-field-action"><input class="form-control" id="export-pick-box" name="box_number" inputmode="numeric" pattern="[0-9]{8}" maxlength="64" autocomplete="off" autofocus required aria-describedby="export-pick-hint"><button class="btn btn-primary" type="submit">{{ $helper ? 'Cari box' : 'Verifikasi box' }}</button></div><p class="plan-help mt-2 mb-0" id="export-pick-hint">Scan label box yang utuh. Nomor pendek seperti 123 ditolak tanpa membuat approval.</p>
+            <label class="form-label" for="export-pick-box">Scan nomor box (8 angka)</label><div class="verification-field"><input class="form-control export-picking-input" id="export-pick-box" name="box_number" inputmode="numeric" pattern="[0-9]{8}" maxlength="64" autocomplete="off" autofocus required aria-describedby="export-pick-hint"><button class="btn verification-submit" type="submit"><i class="bi bi-upc-scan" aria-hidden="true"></i> {{ $helper ? 'Cari box' : 'Verifikasi box' }}</button></div><p class="verification-field-hint" id="export-pick-hint">Scan label box yang utuh. Nomor pendek seperti 123 ditolak tanpa membuat approval.</p>
         </form>
     </div></section>
 @endif
-<section class="plan-panel"><div class="plan-panel-heading"><h2>Rekomendasi box untuk diambil</h2><span>{{ $rows->count() }} box</span></div>
-    <div class="plan-table-scroll" role="region" tabindex="0" aria-label="Rekomendasi pengambilan FIFO"><table class="table plan-table"><thead><tr><th>Nomor box / part</th><th>Ambil dari</th><th>Pertama diterima</th><th>Verifikasi pengambilan</th></tr></thead><tbody>
-        @forelse($rows as $row)<tr><th scope="row">{{ $row->box_number }}<small class="fulfillment-customer">{{ $row->stockBox->part_number }} · {{ $row->pcs_quantity }} PCS</small></th><td>{{ $row->stockBox->currentPallet?->display_name }} · {{ $row->stockBox->currentPallet?->location_code }}</td><td>{{ $row->first_received_at->format('d/m/Y H:i') }}</td><td><span class="fulfillment-status {{ $row->requires_scan && !$row->picking_ready ? 'fulfillment-status-paused' : 'fulfillment-status-complete' }}">{{ $row->allocation_notice_id === null ? 'Alokasi saat penerimaan · tanpa scan tambahan' : (!$row->requires_scan ? 'Satu jenis part · tanpa scan satuan' : ($row->picking_ready ? 'Sudah diverifikasi' : 'Wajib scan · pallet campuran')) }}</span></td></tr>@empty<tr><td colspan="4" class="plan-empty"><strong>Tidak ada pengambilan stok tersimpan</strong><span>Periksa antrean penempatan dan revisi rencana terbaru.</span></td></tr>@endforelse
+    <section class="card verification-card"><div class="card-body"><span class="verification-section-label">Progres pengambilan wajib</span><div class="verification-metrics"><div class="verification-metric"><span>Sudah diverifikasi</span><strong>{{ $verifiedCount }} <small>box</small></strong></div><div class="verification-metric"><span>Belum diverifikasi</span><strong>{{ $remainingCount }} <small>box</small></strong></div></div><p class="verification-supporting mb-0">{{ $helper ? 'Mode pencarian tidak mengubah progres verifikasi wajib.' : 'Verifikasi bukan konfirmasi penempatan. Lanjutkan penempatan setelah pengambilan sesuai.' }}</p>@if($helper)<div class="verification-actions"><a class="btn btn-primary" href="{{ route('export.receiving.picking.show', ['pallet'=>$pallet->id]) }}">Buka verifikasi wajib</a></div>@endif</div></section>
+</div>
+<section class="card verification-card"><div class="verification-list-heading"><div><span class="verification-section-label">Daftar rekomendasi</span><h2>Box untuk diambil</h2></div><span class="verification-total">{{ $rows->count() }} box</span></div>
+    <div class="verification-table-scroll" role="region" tabindex="0" aria-label="Rekomendasi pengambilan FIFO"><table class="table verification-table align-middle mb-0"><thead><tr><th>Nomor box / part</th><th>Ambil dari</th><th>Pertama diterima</th><th>Verifikasi pengambilan</th></tr></thead><tbody>
+        @forelse($rows as $row)
+            @php($scanned = $row->requires_scan && $row->picking_ready)
+            <tr data-pick-box-number="{{ $row->box_number }}" @class(['table-success' => $scanned])>
+                <th scope="row">{{ $row->box_number }}<small class="fulfillment-customer">{{ $row->stockBox->part_number }} · {{ $row->pcs_quantity }} PCS</small><small class="export-pick-scanned" data-pick-scanned @if(!$scanned) hidden @endif><i class="bi bi-check-circle-fill" aria-hidden="true"></i> Sudah di-scan</small></th>
+                <td>{{ $row->stockBox->currentPallet?->display_name }} · {{ $row->stockBox->currentPallet?->location_code }}</td>
+                <td>{{ $row->first_received_at->format('d/m/Y H:i') }}</td>
+                <td><span class="fulfillment-status {{ $row->requires_scan && !$row->picking_ready ? 'fulfillment-status-paused' : 'fulfillment-status-complete' }}">{{ $row->allocation_notice_id === null ? 'Alokasi saat penerimaan · tanpa scan tambahan' : (!$row->requires_scan ? 'Satu jenis part · tanpa scan satuan' : ($row->picking_ready ? 'Sudah diverifikasi' : 'Wajib scan · pallet campuran')) }}</span></td>
+            </tr>
+        @empty<tr><td colspan="4" class="plan-empty"><strong>Tidak ada pengambilan stok tersimpan</strong><span>Periksa antrean penempatan dan revisi rencana terbaru.</span></td></tr>@endforelse
     </tbody></table></div>
 </section>
+
+</div>

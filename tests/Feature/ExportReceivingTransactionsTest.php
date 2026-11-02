@@ -52,7 +52,7 @@ class ExportReceivingTransactionsTest extends TestCase
         $first = $this->batch(10); $second = $this->batch(2);
         app(ExportReceivingBatchService::class)->start($this->operator);
         $this->get(route('export.receiving.index'))->assertOk()->assertViewHas('transactions', fn ($p) =>
-            $p->total() === 2 && (int) $p[0]->transaction_id === $first->id && (int) $p[0]->total_boxes === 10 && (int) $p[0]->pending_boxes === 10);
+            $p->total() === 2 && (int) $p[0]->transaction_id === $second->id && (int) $p[0]->total_boxes === 2 && (int) $p[0]->pending_boxes === 2);
         $this->get(route('export.receiving.transactions.show', $first))->assertOk()
             ->assertViewHas('receipt', fn ($r) => $r['total'] === 10 && $r['pending'] === 10)
             ->assertViewHas('groups', fn ($g) => $g->sum(fn ($group) => $group['boxes']->count()) === 10)
@@ -76,12 +76,14 @@ class ExportReceivingTransactionsTest extends TestCase
         $this->assertDatabaseCount('export_stock_movements', 3);
     }
 
-    public function test_legacy_receipts_stay_visible_and_keep_global_fifo_with_batch_receipts(): void
+    public function test_legacy_receipts_stay_visible_with_newest_and_oldest_batch_sorting(): void
     {
         $this->travelTo(now()->subDay());
         $old = app(ExportStockReceivingService::class)->receive(['box_number' => $this->number(), 'part_number' => $this->part->part_number, 'receive_token' => (string) Str::uuid()], $this->operator);
         $this->travelBack(); $batch = $this->batch(2);
         $this->get(route('export.receiving.index'))->assertViewHas('transactions', fn ($p) =>
+            $p->total() === 2 && $p[0]->kind === 'batch' && (int) $p[0]->transaction_id === $batch->id);
+        $this->get(route('export.receiving.index', ['pending_sort' => 'oldest']))->assertViewHas('transactions', fn ($p) =>
             $p->total() === 2 && $p[0]->kind === 'legacy' && (int) $p[0]->transaction_id === $old->id && (int) $p[0]->total_boxes === 1);
         $this->get(route('export.receiving.transactions.legacy', $old))->assertOk()->assertViewHas('receipt', fn ($r) => $r['total'] === 1);
         $location = ExportMasterLocation::create(['code' => 'TX-OLD']);
@@ -134,7 +136,7 @@ class ExportReceivingTransactionsTest extends TestCase
         for ($i = 0; $i < 21; $i++) $last = $this->batch(1);
         $this->get(route('export.receiving.index'))->assertOk()->assertViewHas('transactions', fn ($p) =>
             $p->total() === 21 && $p->count() === 20 && str_contains($p->url(2), '#receiving-pending-queue'));
-        $this->get(route('export.receiving.index', ['pending_page' => 2]))->assertOk()
+        $this->get(route('export.receiving.index', ['pending_page' => 2, 'pending_sort' => 'oldest']))->assertOk()
             ->assertViewHas('transactions', fn ($p) => $p->count() === 1 && (int) $p[0]->transaction_id === $last->id);
     }
 }

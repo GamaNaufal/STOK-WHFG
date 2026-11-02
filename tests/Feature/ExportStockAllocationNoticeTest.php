@@ -69,7 +69,7 @@ class ExportStockAllocationNoticeTest extends TestCase
             'placements_json' => json_encode($rows(collect([$boxes[1]])))])->assertUnprocessable()->assertJsonValidationErrors('allocation');
         $this->assertDatabaseCount('export_stock_movements',3);
         $audits = AuditLog::count();
-        $this->post($this->ackUrl($delivery,$notice),['revision' => $plan->revision])->assertRedirect(route('export.receiving.index').'#receiving-pending-queue');
+        $this->post($this->ackUrl($delivery,$notice),['revision' => $plan->revision])->assertRedirect(route('export.pallet-plans.show',$delivery));
         $this->assertNotNull($notice->fresh()->acknowledged_at);
         $this->assertSame($sourceId,$boxes[1]->fresh()->current_pallet_id);
         $this->assertDatabaseCount('export_stock_movements',3); $this->assertSame($audits+1,AuditLog::count());
@@ -84,7 +84,8 @@ class ExportStockAllocationNoticeTest extends TestCase
         $audits = AuditLog::count();
         $this->get(route('export.pallet-plans.show',$delivery))->assertOk()->assertSee('Tinjau alokasi FIFO')
             ->assertViewHas('stockNotice',fn ($n) => $n->id === $notice->id && $n->acknowledged_at !== null)
-            ->assertViewHas('stockReviewOpen',false)->assertViewHas('stockAssignments',null);
+            ->assertViewHas('stockReviewOpen',false)->assertViewHas('stockAssignments',fn ($p) => $p->total() === 2);
+        $this->postJson($this->ackUrl($delivery,$notice),['revision' => $plan->revision])->assertOk()->assertJsonStructure(['message']);
         $this->get(route('export.pallet-plans.show',['deliveryPlan' => $delivery->id,'review_stock' => 1]))->assertOk()
             ->assertSee('Sudah ditempatkan')->assertSee('Tutup')->assertDontSee('action="'.$this->ackUrl($delivery,$notice).'"',false)
             ->assertViewHas('stockReviewRequired',false)->assertViewHas('stockAssignments',fn ($p) => $p->total() === 2);

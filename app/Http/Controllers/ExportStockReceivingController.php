@@ -24,14 +24,15 @@ class ExportStockReceivingController extends Controller
             : ExportReceivingBatch::where('created_by', $request->user()->id)->where('status', 'draft')->orderByDesc('id')->first();
         if ($batch?->status === 'processed') return redirect()->route('export.receiving.transactions.show', $batch);
         $state = $batch ? $service->state($batch) : ['id' => null, 'status' => 'draft', 'revision' => 0, 'items' => []];
-        $transactions = $transactionsService->queue()->paginate(20, ['*'], 'pending_page')
+        $sort = in_array($request->query('pending_sort'), ['newest', 'oldest'], true) ? $request->query('pending_sort') : 'newest';
+        $transactions = $transactionsService->queue($sort)->paginate(20, ['*'], 'pending_page')
             ->withQueryString()->fragment('receiving-pending-queue');
         foreach ($transactions as $transaction) {
             $transaction->code = $transactionsService::code($transaction->kind, (int) $transaction->transaction_id);
             $transaction->received_at = \Illuminate\Support\Carbon::parse($transaction->received_at);
             $transaction->placed_boxes = (int) $transaction->total_boxes - (int) $transaction->pending_boxes - (int) $transaction->waiting_boxes;
         }
-        return view('export.receiving.index', compact('batch', 'state', 'transactions'));
+        return view('export.receiving.index', compact('batch', 'state', 'transactions', 'sort'));
     }
 
     public function checkBox(Request $request)

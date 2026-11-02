@@ -58,3 +58,19 @@
  .plan-input-methods .btn { font-size:.75rem; padding:.5rem .4rem; }
  .plan-totals { justify-content:flex-start; }
 }
+
+/* In-flow search suggestions keep nearby operator inputs visible. */
+.search-field { min-width:0; }
+.search-suggestions { margin-top:.4rem; max-height:13rem; overflow:auto; border:1px solid var(--ui-border,#dfe1e5); border-radius:.65rem; background:#fff; }
+.search-suggestions[hidden] { display:none; }
+.search-suggestions button { display:flex; flex-direction:column; width:100%; gap:.15rem; padding:.65rem .8rem; border:0; border-bottom:1px solid var(--ui-border,#dfe1e5); background:#fff; text-align:left; min-height:44px; color:var(--ui-ink,#202124); }
+.search-suggestions button:last-child { border-bottom:0; }
+.search-suggestions button small { color:var(--ui-muted,#595d65); font-size:.75rem; }
+.search-suggestions button:is(:hover,.is-active) { background:#eaf6f4; box-shadow:inset 3px 0 var(--ui-accent,#0b7072); }
+.search-suggestions button:disabled { background:#f6f7f8; color:#71757d; cursor:not-allowed; }
+.search-no-results { margin:0; padding:.8rem; color:var(--ui-muted,#595d65); }
+#plan-items td { vertical-align:top; }
+.plan-list-filters { display:grid; grid-template-columns:minmax(0,1fr) minmax(12rem,.35fr); align-items:end; gap:1rem; }
+.pallet-section-heading { background:#edf7f5; border-left:5px solid var(--ui-accent,#0b7072); }
+.pallet-section-heading .pallet-number { display:flex; align-items:center; gap:.6rem; font-size:1.35rem; font-weight:750; color:var(--ui-accent,#0b7072); }
+@media(max-width:575.98px) { .plan-list-filters { grid-template-columns:1fr; } }

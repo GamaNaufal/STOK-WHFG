@@ -1,4 +1,5 @@
 import { parseCount, checkRows } from './export-delivery/document-parser.mjs';
+import {attachSuggestions} from './components/search-suggestions.mjs';
 
 const page=document.getElementById('delivery-plan-editor');
 if(page) {
@@ -60,6 +61,9 @@ if(page) {
         const quantity=parseCount(row.pcs_quantity);
         tr.querySelector('.plan-quantity').value=quantity ?? (row.pcs_quantity ?? '');
         tr.dataset.touched=touched ? '1':'0';body.append(fragment);
+        attachSuggestions(tr.querySelector('.plan-part'), {options: initial.parts.map(part => ({
+            value: part.part_number, label: part.part_number, detail: Number(part.qty_box).toLocaleString('id-ID') + ' PCS / box',
+        }))});
     };
     const setBusy=value=>{
         busy=value;

@@ -1,6 +1,56 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 31 Oktober 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 2 November 2026 (pembaruan inkremental).
+
+Feedback scan picking ekspor 2 November 2026:
+- Halaman pencarian dan verifikasi wajib memakai shared.partials.scan-feedback,
+  dengan aset public/audio/OK.mp3 dan NG.mp3. Form diberi data-scan-feedback
+  agar audio disiapkan saat interaksi scanner/keyboard, mengikuti pola domestik.
+- Scan yang berhasil mencocokkan rekomendasi menandai baris hijau dan teks
+  "Sudah di-scan". NG/input tidak valid/gagal jaringan tidak menandai box lain.
+  Tanda pencarian hanya pada halaman yang terbuka, tidak mengesahkan picking.
+  Scan wajib memakai picking_ready untuk mempertahankan tanda saat HTML AJAX
+  diganti atau halaman dimuat ulang; FIFO/approval/return tidak berubah.
+- Verifikasi: 23 tes backend terkait (252 assertions), 93 frontend, Vite build
+  dan diff --check lulus. Preview SQLite terpisah membuktikan scan OK/NG,
+  tanda kumulatif pencarian, progres wajib tidak berubah oleh pencarian,
+  serta tanda verifikasi wajib setelah reload. Kedua MP3 dimuat browser,
+  console error kosong; bukan pengujian speaker/scanner fisik.
+  Bukti: storage/app/previews/export-picking-feedback-20261102/scan-ok-highlight.png.
+
+Revisi UI ekspor 2 November 2026:
+- Rencana delivery memakai rekomendasi part kustom, case-insensitive, semua part
+  jika kosong. Pilihan berada pada alur dokumen (tidak menutupi field lain),
+  mendukung keyboard panah/Enter/Escape. Modul search-suggestions.mjs dipakai
+  bersama pemilihan lokasi planning; lokasi kosong menampilkan semua lokasi,
+  yang occupied/reserved atau dipilih pallet lain dinonaktifkan dengan alasan.
+- Lokasi planning lebih menonjol dan tetap menyimpan master_location_id valid;
+  mengetik teks yang belum dipilih tidak mengirim ID lama. Header nomor pallet
+  ditonjolkan di editor maupun hasil draft/final. Varian full/NF tetap terpisah.
+- Daftar planning default created_at delivery terbaru; sort=oldest membalik
+  urutan, dengan id sebagai tie-breaker. Antrean penempatan default waktu
+  transaksi dibuat terbaru, pending_sort=oldest untuk terlama. Batch memakai
+  created_at batch, legacy memakai created_at box; tidak mengubah FIFO alokasi.
+- Modal FIFO dipersiapkan saat halaman hasil dimuat (100 box/halaman), tombol
+  tinjau hanya membuka modal lokal. Konfirmasi wajib dikirim AJAX; saat berhasil
+  menutup modal, mengaktifkan antrean dan tetap pada halaman planning. Gagal
+  tidak menutup modal, tombol dapat dicoba lagi. Fallback POST juga kembali ke
+  planning. Kewajiban acknowledgment dan guard revision/otorisasi tetap berlaku.
+- Sidebar menandai semua subroute delivery/planning dan halaman picking/receiving
+  sesuai kelompoknya, dengan aria-current. Logika izin FeatureAccess tidak diubah.
+- Daftar serta layar scan Picking Verification ekspor memakai fondasi CSS
+  domestik: header/konteks, kartu scan/progres, tabel rekomendasi. Backend seek,
+  scan blocking, approval dan return tidak berubah. Lookup NG tetap nonblocking;
+  scan wajib salah tetap blocked sampai penempatan return dikonfirmasi.
+- Verifikasi: 106 tes backend terkait (1.204 assertions; 61 + 45), 90 frontend,
+  Vite build dan diff --check lulus. IAB preview memakai salinan SQLite terpisah
+  export-ui-preview-20261102.sqlite, cookie sendiri, bukan MySQL development.
+  Browser menguji part kosong/ketikan/keyboard, 50 lokasi termasuk18 disabled,
+  draft/final, Oke/tinjau ulang tanpa pindah halaman, sidebar, dua sort, lookup
+  NG dan scan wajib OK/NG serta viewport390px tanpa overflow horizontal halaman.
+  Bukti gambar di storage/app/previews/export-ui-20261102/. Bukan uji scanner fisik.
+- Skill apple-design tidak ditemukan di folder skill yang tersedia; mengikuti
+  docs/DESIGN_PREFERENCES.md, token teal dan komponen Bootstrap/CSS domestik.
 
 Panduan manual ekspor 1 November 2026:
 - Pengguna mengklarifikasi bahwa pengujian dilakukan sendiri lewat aplikasi,

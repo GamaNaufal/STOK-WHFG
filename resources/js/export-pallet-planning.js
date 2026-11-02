@@ -1,6 +1,10 @@
 import {parseCount} from './export-delivery/document-parser.mjs';
 import {analyzePallets, availableForRow} from './export-delivery/pallet-planning.mjs';
 import {updatePalletLoad} from './export-stock/pallet-load.mjs';
+import {attachSuggestions} from './components/search-suggestions.mjs';
+import {initStockReview} from './export-delivery/stock-review.mjs';
+
+initStockReview();
 
 const page = document.getElementById('pallet-planning-editor');
 if (page) {
@@ -47,18 +51,22 @@ if (page) {
     const addPallet = (row = {}) => {
         const fragment = byId('planned-pallet-template').content.cloneNode(true);
         const card = fragment.querySelector('.planned-pallet'), select = card.querySelector('.pallet-location');
+        const searchInput = card.querySelector('.pallet-location-search');
         if (row.id) card.dataset.id = row.id;
-        initial.locations.forEach(location => {
-            const option = document.createElement('option');
-            option.value = location.id;
-            option.disabled = Boolean(location.blocked);
-            option.textContent = location.code + (location.blocked ? ' (tidak tersedia)' : location.reserved ? ' (direservasi untuk rencana ini)' : '');
-            select.append(option);
-        });
         select.value = row.master_location_id ?? '';
+        searchInput.value = places.get(String(select.value))?.code ?? '';
         const items = Array.isArray(row.items) && row.items.length ? row.items : [{}];
         items.forEach(item => addPart(card, item));
         container.append(fragment);
+        const options = () => initial.locations.map(location => {
+            const used = [...container.children].some(other => other !== card && other.querySelector('.pallet-location').value === String(location.id));
+            return {value: location.id, label: location.code, disabled: Boolean(location.blocked || used),
+                detail: used ? 'Dipakai pallet lain dalam susunan ini' : location.blocked ? 'Tidak tersedia · terisi atau direservasi rencana lain' : location.reserved ? 'Direservasi untuk rencana ini' : 'Tersedia'};
+        });
+        attachSuggestions(searchInput, {options,
+            onSelect: option => { select.value = option.value; },
+            onEdit: value => { select.value = options().find(option => option.label === value && !option.disabled)?.value ?? ''; },
+        });
     };
     const filterParts = () => {
         const query = search.value.trim().toLocaleLowerCase('id-ID');
@@ -86,9 +94,14 @@ if (page) {
             card.querySelector('.pallet-title').textContent = 'Pallet ' + (i + 1);
             card.querySelector('.pallet-remove').setAttribute('aria-label', 'Hapus pallet ' + (i + 1));
             const location = card.querySelector('.pallet-location');
-            location.id = 'pallet-location-' + i;
-            card.querySelector('.pallet-location-label').htmlFor = location.id;
+            const locationSearch = card.querySelector('.pallet-location-search');
+            location.id = 'pallet-location-value-' + i;
+            locationSearch.id = 'pallet-location-' + i;
+            card.querySelector('.pallet-location-label').htmlFor = locationSearch.id;
             card.querySelector('.pallet-location-label').textContent = 'Lokasi pallet ' + (i + 1);
+            const selectedPlace = places.get(String(location.value));
+            card.querySelector('.pallet-location-field').classList.toggle('has-location', Boolean(selectedPlace));
+            card.querySelector('.pallet-location-choice').textContent = selectedPlace ? 'Tujuan dipilih: ' + selectedPlace.code : 'Pilih tujuan dengan mengetik atau memilih rekomendasi di bawah.';
             const entries = itemRows(card);
             entries.forEach((entry, j) => {
                 const part = entry.querySelector('.pallet-part'), quantity = entry.querySelector('.pallet-quantity');

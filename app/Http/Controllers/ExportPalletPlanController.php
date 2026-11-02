@@ -15,10 +15,12 @@ class ExportPalletPlanController extends Controller
     public function index(Request $request)
     {
         $search = trim(mb_substr((string) $request->query('q', ''), 0, 100));
+        $sort = in_array($request->query('sort'), ['newest', 'oldest'], true) ? $request->query('sort') : 'newest';
+        $direction = $sort === 'oldest' ? 'asc' : 'desc';
         $deliveries = ExportDeliveryPlan::with('palletPlan')->when($search !== '', fn ($query) => $query
             ->where(fn ($q) => $q->where('customer_name', 'like', '%'.$search.'%')->orWhere('plan_code', 'like', '%'.$search.'%')))
-            ->orderBy('delivery_deadline')->orderBy('id')->paginate(15)->withQueryString();
-        return view('export.pallet-plans.index', compact('deliveries', 'search'));
+            ->orderBy('created_at', $direction)->orderBy('id', $direction)->paginate(15)->withQueryString();
+        return view('export.pallet-plans.index', compact('deliveries', 'search', 'sort'));
     }
 
     private function context(ExportDeliveryPlan $delivery, ExportPalletPlanningService $service): array
@@ -58,7 +60,8 @@ class ExportPalletPlanController extends Controller
         $stockReviewRequired = $stockNotice && $data['printReady']
             && $stockNotice->plan_revision === $data['planning']->revision && !$stockNotice->acknowledged_at;
         $stockReviewOpen = $stockNotice && ($stockReviewRequired || request()->boolean('review_stock') || request()->has('stock_page'));
-        $stockAssignments = $stockReviewOpen ? $stockNotice->boxes()->with(['stockBox.currentPallet.plannedPallet', 'plannedItem.pallet'])
+        // Preload the modal so reviewing allocations requires no request/navigation.
+        $stockAssignments = $stockNotice ? $stockNotice->boxes()->with(['stockBox.currentPallet.plannedPallet', 'plannedItem.pallet'])
             ->orderBy('first_received_at')->orderBy('export_stock_box_id')->paginate(100, ['*'], 'stock_page')
             ->withQueryString()->fragment('stock-allocation-modal') : null;
         return view('export.pallet-plans.show', $data + compact('stockNotice', 'stockAssignments', 'stockReviewRequired', 'stockReviewOpen'));
@@ -68,10 +71,9 @@ class ExportPalletPlanController extends Controller
     {
         $data = $request->validate(['revision' => 'required|integer|min:1']);
         $service->acknowledge($deliveryPlan->id, $notice->id, (int) $data['revision'], $request->user());
-        $redirect = $request->user()->canAccess('export_stock_input')
-            ? redirect()->to(route('export.receiving.index').'#receiving-pending-queue')
-            : redirect()->route('export.pallet-plans.show', $deliveryPlan);
-        return $redirect->with('success', 'Tinjauan stok FIFO selesai. Tugas yang ditemukan sudah aktif di antrean penempatan/pemindahan.');
+        $message = 'Tinjauan stok FIFO selesai. Tugas yang ditemukan sudah aktif di antrean penempatan/pemindahan.';
+        if ($request->expectsJson()) return response()->json(['message' => $message]);
+        return redirect()->route('export.pallet-plans.show', $deliveryPlan)->with('success', $message);
     }
 
     public function edit(ExportDeliveryPlan $deliveryPlan, ExportPalletPlanningService $service)

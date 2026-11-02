@@ -21,7 +21,7 @@
     @if($planning->status === 'cancelled')<p class="alert alert-info">Perencanaan dibatalkan. Pembagian tersimpan sebagai riwayat, seluruh reservasi lokasi sudah dilepas.</p>@endif
     @include('export.pallet-plans.summary')
     @foreach($planning->pallets as $pallet)
-        <section class="plan-panel"><div class="plan-panel-heading"><h2>Pallet {{ $pallet->position }}</h2><div class="plan-inline-actions"><span>Lokasi {{ $pallet->location_code ?? 'belum ditentukan' }}</span><x-export-pallet-load :boxes="$pallet->items->sum('box_quantity')" />@if($printReady)<a class="btn btn-sm btn-outline-primary" href="{{ route('export.pallet-plans.print-pallet', ['deliveryPlan' => $delivery->id, 'pallet' => $pallet->id]) }}" target="_blank" rel="noopener" aria-label="Cetak pallet {{ $pallet->position }}">Cetak pallet</a>@endif</div></div>
+        <section class="plan-panel"><div class="plan-panel-heading pallet-section-heading"><h2 class="pallet-number"><i class="bi bi-box-seam" aria-hidden="true"></i> Pallet {{ $pallet->position }}</h2><div class="plan-inline-actions"><strong>Lokasi {{ $pallet->location_code ?? 'belum ditentukan' }}</strong><x-export-pallet-load :boxes="$pallet->items->sum('box_quantity')" />@if($printReady)<a class="btn btn-sm btn-outline-primary" href="{{ route('export.pallet-plans.print-pallet', ['deliveryPlan' => $delivery->id, 'pallet' => $pallet->id]) }}" target="_blank" rel="noopener" aria-label="Cetak pallet {{ $pallet->position }}">Cetak pallet</a>@endif</div></div>
             <div class="plan-table-scroll" tabindex="0" role="region" aria-label="Isi pallet {{ $pallet->position }}"><table class="table plan-table"><thead><tr><th>Nomor part</th><th>Jumlah box</th><th>PCS / box</th></tr></thead><tbody>@forelse($pallet->items as $item)<tr><th scope="row">{{ $item->part_number }}</th><td>{{ number_format($item->box_quantity, 0, ',', '.') }}</td><td>{{ number_format($item->pcs_per_box, 0, ',', '.') }}</td></tr>@empty<tr><td colspan="3">Pallet belum diisi.</td></tr>@endforelse</tbody></table></div>
         </section>
     @endforeach
@@ -29,15 +29,6 @@
 @endsection
 @section('scripts')
 <script>
-const stockReview = document.getElementById('stock-allocation-modal');
-if (stockReview) bootstrap.Modal.getOrCreateInstance(stockReview).show();
-document.querySelector('[data-stock-ack-form]')?.addEventListener('submit', function (event) {
-    if (this.dataset.submitting) { event.preventDefault(); return; }
-    this.dataset.submitting = 'true'; this.setAttribute('aria-busy', 'true');
-});
-window.addEventListener('pageshow', () => document.querySelectorAll('[data-stock-ack-form]').forEach(form => {
-    delete form.dataset.submitting; form.removeAttribute('aria-busy');
-}));
 document.querySelectorAll('.pallet-transition').forEach(button=>button.addEventListener('click',()=>{
     const cancel=button.dataset.action==='cancel';
     WarehouseAlert.confirm({title:cancel?'Batalkan perencanaan pallet?':'Buka revisi perencanaan?',
@@ -45,4 +36,5 @@ document.querySelectorAll('.pallet-transition').forEach(button=>button.addEventL
         confirmText:cancel?'Batalkan perencanaan':'Buka revisi',onConfirm:()=>button.closest('form').submit()});
 }));
 </script>
+@vite('resources/js/export-pallet-planning.js')
 @endsection

@@ -1,6 +1,6 @@
 <section class="plan-panel" id="receiving-pending-queue" aria-labelledby="receiving-pending-title">
-    <div class="plan-panel-heading"><h2 id="receiving-pending-title">Antrean penempatan / pemindahan</h2><span>{{ $transactions->total() }} transaksi</span></div>
-    <p class="plan-help receiving-table-note">Satu baris mewakili satu transaksi penerimaan. Urutan mengikuti box yang paling awal diterima dan masih menunggu penempatan.</p>
+    <div class="plan-panel-heading"><div><h2 id="receiving-pending-title">Antrean penempatan / pemindahan</h2><span>{{ $transactions->total() }} transaksi</span></div><form method="GET" action="{{ route('export.receiving.index') }}#receiving-pending-queue"><label class="form-label" for="pending-sort">Urutan waktu transaksi dibuat</label>@if($batch)<input type="hidden" name="batch" value="{{ $batch->id }}">@endif<select class="form-select" id="pending-sort" name="pending_sort" onchange="this.form.requestSubmit()"><option value="newest" @selected($sort === 'newest')>Terbaru dahulu</option><option value="oldest" @selected($sort === 'oldest')>Terlama dahulu</option></select></form></div>
+    <p class="plan-help receiving-table-note">Satu baris mewakili satu transaksi penerimaan. Urutan tampilan tidak mengubah prioritas FIFO box.</p>
     <div class="plan-table-scroll" role="region" tabindex="0" aria-label="Antrean transaksi penerimaan ekspor">
         <table class="table plan-table"><thead><tr><th>Transaksi</th><th>Waktu penerimaan</th><th>Operator</th><th>Total box</th><th>Sudah ditempatkan</th><th>Menunggu</th><th>Aksi</th></tr></thead><tbody>
         @forelse($transactions as $transaction)

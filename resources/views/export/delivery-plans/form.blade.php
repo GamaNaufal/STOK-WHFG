@@ -109,9 +109,8 @@
             <div class="plan-inline-actions"><a class="btn btn-outline-secondary" href="{{ route('export.delivery-plans.index') }}">Kembali</a><button type="submit" class="btn btn-primary" id="plan-save" disabled>Simpan rencana</button></div>
         </div>
     </form>
-    <datalist id="plan-part-options">@foreach($parts as $part)<option value="{{ $part->part_number }}">{{ $part->qty_box }} PCS / box</option>@endforeach</datalist>
     <template id="plan-row-template">
-        <tr><td class="plan-row-number"></td><td><input type="text" class="form-control plan-part" maxlength="100" list="plan-part-options" autocomplete="off" required><p class="plan-row-error" aria-live="polite"></p></td>
+        <tr><td class="plan-row-number"></td><td><input type="search" class="form-control plan-part" maxlength="100" placeholder="Ketik atau pilih nomor part" autocomplete="off" required><p class="plan-row-error" aria-live="polite"></p></td>
             <td><input type="number" class="form-control plan-quantity" min="1" max="4294967295" step="1" inputmode="numeric" required></td>
             <td class="plan-capacity">—</td><td class="plan-boxes">—</td><td><button type="button" class="btn btn-sm btn-outline-danger plan-remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="visually-hidden">Hapus baris</span></button></td>
         </tr>
