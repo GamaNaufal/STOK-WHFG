@@ -63,13 +63,15 @@ class AppServiceProvider extends ServiceProvider
                 $lastInitial = isset($nameParts[count($nameParts) - 1]) ? strtoupper(substr($nameParts[count($nameParts) - 1], 0, 1)) : $firstInitial;
                 $avatarInitials = $firstInitial.$lastInitial;
 
-                $featureNavigation = app(\App\Services\FeatureAccessService::class)->navigation(Auth::user());
+                $navigationContext = app(\App\Services\NavigationContextService::class)->build(Auth::user(), request()->route()?->getName());
+                $featureNavigation = $navigationContext['items'];
+                $view->with('navigationContext', $navigationContext);
                 $view->with('featureNavigation', $featureNavigation);
                 $globalSearchFeatures = array_merge([
-                    ['label' => 'Dashboard', 'group' => 'General', 'icon' => 'house', 'route' => route('dashboard'), 'keywords' => 'dashboard beranda'],
+                    ['label' => 'Dashboard', 'group' => 'Umum', 'icon' => 'house', 'route' => route('dashboard'), 'keywords' => 'dashboard beranda'],
                 ], array_map(fn ($item) => [
-                    'label' => $item['label'], 'group' => $item['group'], 'icon' => $item['icon'],
-                    'route' => route($item['route']), 'keywords' => $item['label'].' '.$item['group'],
+                    'label' => $item['label'], 'group' => $item['group_label'], 'icon' => $item['icon'],
+                    'route' => route($item['route']), 'keywords' => $item['keywords'],
                 ], $featureNavigation));
                 $cacheTtlSeconds = 30;
                 if (in_array(Auth::user()->role, ['admin','admin_warehouse','supervisi'], true)

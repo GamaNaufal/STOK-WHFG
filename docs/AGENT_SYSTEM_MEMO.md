@@ -1,6 +1,64 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 2 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 3 November 2026 (pembaruan inkremental).
+
+Animasi sidebar 3 November 2026:
+- Atas permintaan pengguna, sidebar desktop bergeser 240 ms sambil mengubah
+  ruang konten melalui margin sidebar; isi tidak diberi animasi terpisah.
+  visibility ditunda sampai transisi tutup selesai, sedangkan inert dan status
+  tombol langsung mengikuti tujuan. Toggle berulang membalik transisi CSS.
+- navigation-motion hanya aktif setelah klik desktop, dilepas saat pageshow/
+  resize agar pemulihan preferensi tidak dianimasikan. Drawer mobile memakai
+  transisi transform 240 ms dan tetap mengikuti event/fokus Bootstrap existing.
+  prefers-reduced-motion:reduce menonaktifkan transisi; tidak ada library baru.
+- 101 tes frontend dan diff --check lulus. IAB preview SQLite terpisah memeriksa
+  buka/tutup, toggle berulang, Tab melewati sidebar inert, lebar konten, 390px,
+  pencarian setelah drawer tertutup, Escape/resize, tanpa overflow/console error.
+  Bukti: storage/app/previews/sidebar-motion-20261103/open.png dan closed.png.
+
+Navbar dan sidebar bersama 3 November 2026 (8 usulan UI/UX disetujui pengguna):
+- NavigationContextService menambahkan presentasi pada daftar yang sudah diizinkan
+  FeatureAccessService: satu menu aktif berdasarkan destination route, breadcrumb,
+  label pendek dan alias pencarian. Tidak mengubah permissions, middleware atau
+  route operasi. Receiving/stock dan dua laporan dipisahkan walaupun key izin sama.
+  Halaman turunan memilih induk; picking wajib memakai menu picking bila tersedia,
+  dengan fallback receiving bagi akun yang hanya memiliki izin penerimaan.
+- Kelompok operasional lebih dulu, lalu master, laporan, administrasi. Label
+  ekspor diringkas di sidebar, label lengkap tetap pada title/aria-label/pencarian.
+  Navbar memuat jejak halaman dan parent link sesuai izin. Dashboard/profile
+  memiliki konteks tersendiri. Menu akun menampilkan nama+role, Profil Saya/Keluar;
+  identitas berulang di footer sidebar dilepas.
+- public/js/layout-shell.js kini ES module (script type=module, tetap filemtime).
+  Preferensi disimpan pada whfg.navigation.v2.<id>-<role>: collapsed/groups/recent
+  di localStorage, scroll per tab di sessionStorage. Storage gagal/rusak memakai
+  default. Group aktif dibuka saat masuk halaman; group lain mengikuti pilihan
+  terakhir. Scroll dipulihkan dan disesuaikan hanya di wadah sidebar. Desktop
+  tersembunyi memakai inert, toggle aria-expanded/label sesuai keadaan, submenu
+  memakai button native untuk Enter/Space.
+- Pencarian mencocokkan setiap kata/alias (stock/stok, export/ekspor, lokal/
+  domestik, palet/pallet), mendahulukan kecocokan label; default 8 hasil dengan
+  hitungan dan Lihat semua yang dapat diakses lewat Tab. Ada tombol hapus,
+  ArrowUp dari posisi awal memilih hasil terakhir, Enter/Escape/fokus luar
+  konsisten. Render memakai textContent; riwayat 5 route difilter terhadap izin
+  saat ini. Navigasi native mempertahankan guard unsaved-change editor existing.
+- Drawer mobile, pencarian dan akun bergantian aktif. Permintaan header menunggu
+  drawer benar-benar tertutup sebelum membuka panel/fokus baru. Escape/close/
+  backdrop mengembalikan fokus; resize ke desktop membersihkan backdrop dan
+  aria-hidden. Navbar memakai dua baris di layar kecil, konteks tidak menekan input.
+  CSS khusus public/css/navigation.css dimuat setelah fondasi Apple; sertakan
+  aset ini dan shell module saat deploy. Tidak ada migration/dependency baru.
+- Verifikasi akhir: 528 tes backend (4.852 assertions), 100 frontend, Vite build,
+  PHP lint dan diff --check lulus. Dua tes penerimaan lama diperbaiki agar mengecek
+  keberadaan tugas legacy FIFO, bukan menganggap transaksi terlama selalu baris
+  pertama; default antrean terbaru yang sudah disetujui tetap dipertahankan.
+- IAB dengan salinan navigation-ui-preview-20261103.sqlite/cookie terpisah menguji
+  Admin Utama dan Operator Ekspor: keyword multi kata/alias, semua hasil lewat
+  keyboard, clear/Escape/reopen, fokus sidebar tersembunyi, menu aktif tunggal,
+  breadcrumb tambah/back, scroll/menu setelah reload, preferensi antar akun,
+  profil/logout, drawer/search/akun, backdrop, dan resize 390/768/1024px. Tidak ada
+  overflow halaman atau console error. MySQL development/production tidak diubah.
+  Bukti: storage/app/previews/navigation-ui-20261103/. Skill apple-design tetap
+  tidak tersedia; mengikuti docs/DESIGN_PREFERENCES.md dan token UI existing.
 
 Feedback scan picking ekspor 2 November 2026:
 - Halaman pencarian dan verifikasi wajib memakai shared.partials.scan-feedback,

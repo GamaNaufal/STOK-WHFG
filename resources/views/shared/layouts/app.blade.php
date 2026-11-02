@@ -16,6 +16,7 @@
     @yield('styles')
     <link rel="stylesheet" href="{{ asset('css/application-ui.css') }}">
     <link rel="stylesheet" href="{{ asset('css/apple-design.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/navigation.css') }}?v={{ filemtime(public_path('css/navigation.css')) }}">
 </head>
 <body class="warehouse-app">
     <a href="#main-content" class="skip-to-content">Lewati navigasi</a>
