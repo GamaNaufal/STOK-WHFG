@@ -84,6 +84,12 @@ class ExportStockAllocationService
             }
         }
 
+        if ($notice) {
+            // Keep the requirement even if another destination is revised after allocation.
+            $requiredIds = $notice->boxes()->whereNull('placed_at')->requiresPickingScan()->pluck('id');
+            ExportFulfillmentBox::whereKey($requiredIds->all())->update(['picking_required' => true]);
+        }
+
         return $allocated;
     }
 }

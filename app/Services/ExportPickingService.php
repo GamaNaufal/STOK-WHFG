@@ -30,8 +30,7 @@ class ExportPickingService
 
     public function required(): Builder
     {
-        return $this->pending()->whereNotNull('allocation_notice_id')
-            ->where(fn ($q) => $q->where('picking_required', true)->orWhereHas('stockBox.currentPallet', fn ($p) => $p->mixed()));
+        return $this->pending()->requiresPickingScan();
     }
 
     public function tasks(): Builder
@@ -50,21 +49,20 @@ class ExportPickingService
             ->orderBy('picking_delivery.delivery_deadline')->orderBy('picking_delivery.id')->orderBy('export_planned_pallets.position')->orderBy('picking_group.notice_id');
     }
 
-    public function rows(int $palletId, ?int $noticeId = null): Collection
+    public function rows(int $palletId, ?int $noticeId = null, bool $recommendationsOnly = false): Collection
     {
         return $this->enrich($this->pending()->whereHas('plannedItem', fn ($i) => $i->where('export_planned_pallet_id', $palletId))
             ->when($noticeId !== null, fn ($query) => $query->where('allocation_notice_id', $noticeId))
+            ->when($recommendationsOnly, fn ($query) => $query->whereNotNull('allocation_notice_id'))
             ->with(['stockBox.currentPallet.plannedPallet', 'plannedItem.pallet'])->orderBy('first_received_at')->orderBy('id')->get());
     }
 
     public function enrich(Collection $rows): Collection
     {
         (new \Illuminate\Database\Eloquent\Collection($rows->all()))->loadMissing('stockBox.currentPallet.plannedPallet');
-        $sources = $rows->map(fn ($f) => $f->stockBox?->current_pallet_id)->filter()->unique();
-        $mixed = $sources->isEmpty() ? [] : ExportStockPallet::whereIn('id', $sources)->mixed()->pluck('id')->all();
+        $required = ExportFulfillmentBox::whereKey($rows->pluck('id')->all())->requiresPickingScan()->pluck('id')->flip();
         foreach ($rows as $f) {
-            $f->setAttribute('requires_scan', $f->allocation_notice_id !== null && $f->stockBox?->current_pallet_id
-                && ($f->picking_required || in_array($f->stockBox->current_pallet_id, $mixed)));
+            $f->setAttribute('requires_scan', $required->has($f->id));
             $f->setAttribute('picking_ready', $this->verified($f));
             $f->syncOriginalAttributes(['requires_scan', 'picking_ready']);
         }
@@ -110,10 +108,9 @@ class ExportPickingService
         if (! $f || $f->allocation_notice_id === null || ! $box->current_pallet_id) {
             return;
         }
-        $required = $f->picking_required || ExportStockPallet::whereKey($box->current_pallet_id)->mixed()->exists();
         $f->setRelation('stockBox', $box);
-        if ($required && ! $this->verified($f)) {
-            $this->fail('Scan verifikasi pengambilan box '.$box->box_number.' dari pallet campuran sebelum konfirmasi penempatan.');
+        if (! $this->verified($f) && ExportFulfillmentBox::whereKey($f->id)->requiresPickingScan()->exists()) {
+            $this->fail('Scan verifikasi pengambilan box '.$box->box_number.' sebelum konfirmasi penempatan.');
         }
     }
 
@@ -140,7 +137,11 @@ class ExportPickingService
     {
         $pallet = ExportPlannedPallet::findOrFail($palletId);
         $this->assertTarget($pallet);
-        $row = $this->rows($palletId, $noticeId)->firstWhere('box_number', $number);
+        $rows = $this->rows($palletId, $noticeId, recommendationsOnly: true);
+        if ($rows->isEmpty()) {
+            return ['success' => false, 'blocked' => false, 'message' => 'Sesi Cari Box sudah tidak aktif. Buka antrean rekomendasi yang masih menunggu penempatan.'];
+        }
+        $row = $rows->firstWhere('box_number', $number);
         if (! $row) {
             return ['success' => false, 'blocked' => false, 'message' => 'NG · Box tidak termasuk rekomendasi pengambilan ini. Silakan scan ulang.'];
         }
@@ -172,7 +173,7 @@ class ExportPickingService
             }
             $rows = $this->rows($palletId, $noticeId);
             if (! $rows->contains('requires_scan', true)) {
-                $this->fail('Tidak ada pengambilan pallet campuran yang perlu diverifikasi pada tujuan ini.');
+                $this->fail('Tidak ada pengambilan yang perlu diverifikasi pada tujuan ini.');
             }
             $row = $rows->firstWhere('box_number', $data['box_number']);
             if ($row) {

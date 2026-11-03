@@ -24,7 +24,7 @@ class ExportPickingController extends Controller
         $pallet->load('palletPlan.deliveryPlan');
         abort_unless($pallet->palletPlan?->deliveryPlan, 404);
         $notice = $this->notice($request, $pallet);
-        $rows = $service->rows($pallet->id, $notice?->id);
+        $rows = $service->rows($pallet->id, $notice?->id, recommendationsOnly: $helper);
         $issue = $helper ? null : $service->block($request->user(), $pallet->id);
         $issue?->load(['returnPallet.plannedPallet', 'reporter', 'part']);
         $pickParameters = ['pallet' => $pallet->id] + ($notice ? ['notice' => $notice->id] : []);

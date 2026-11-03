@@ -24,7 +24,7 @@
     @if($group['picking_issue'])
         <div class="alert alert-danger mx-3"><strong>Pengambilan diblokir oleh issue ekspor #{{ $group['picking_issue']->id }}.</strong><p>Approval admin dan konfirmasi penempatan pengembalian harus diselesaikan dahulu.</p><a class="btn btn-outline-primary" href="{{ route('export.receiving.picking.show', array_filter(['pallet'=>$group['picking_issue']->export_planned_pallet_id, 'notice'=>data_get($group['picking_issue']->context, 'allocation_notice_id')])) }}">Lihat arahan pengembalian</a></div>
     @elseif($group['picking_remaining'] > 0)
-        <div class="alert alert-warning mx-3"><strong>{{ $group['picking_remaining'] }} box dari pallet campuran wajib diverifikasi.</strong><p>Scan ID Box rekomendasi sebelum konfirmasi penempatan.</p><a class="btn btn-primary" href="{{ route('export.receiving.picking.show', $pickParameters) }}">Verifikasi pengambilan</a></div>
+        <div class="alert alert-warning mx-3"><strong>{{ $group['picking_remaining'] }} box wajib diverifikasi.</strong><p>Scan ID Box rekomendasi sebelum konfirmasi penempatan.</p><a class="btn btn-primary" href="{{ route('export.receiving.picking.show', $pickParameters) }}">Verifikasi pengambilan</a></div>
     @endif
     @if($group['actionable']->isNotEmpty() && !$group['picking_issue'] && $group['picking_remaining'] === 0)
         <form method="POST" action="{{ route('export.receiving.place-bulk') }}" class="plan-panel-body receiving-group-form" data-placement-form>
@@ -32,8 +32,8 @@
             @if(!empty($receipt['notice_id']))<input type="hidden" name="return_notice" value="{{ $receipt['notice_id'] }}"><input type="hidden" name="return_pallet" value="{{ $receipt['pallet_id'] }}">@elseif($batch)<input type="hidden" name="return_batch" value="{{ $batch->id }}">@elseif($returnBox)<input type="hidden" name="return_box" value="{{ $returnBox }}">@endif
             <input type="hidden" name="placements_json" value="{{ json_encode($group['placements'], JSON_THROW_ON_ERROR) }}">
             @unless($group['planned']) @include('export.receiving.spare-placement') @endunless
-            @if($group['picking_required'] > 0)<p class="receiving-complete">Verifikasi pengambilan pallet campuran sudah lengkap.</p>@endif
-            <p class="plan-help mb-2">Konfirmasikan hanya setelah semua box pada kelompok ini sudah ditempatkan. Penerimaan box baru tidak memerlukan verifikasi pengambilan tambahan. Pengambilan stok rekomendasi dari pallet satu jenis part juga tidak memerlukan scan satuan.</p><button class="btn btn-primary" type="submit">Konfirmasi {{ $group['actionable']->count() }} box sudah ditempatkan</button>
+            @if($group['picking_required'] > 0)<p class="receiving-complete">Verifikasi pengambilan sudah lengkap.</p>@endif
+            <p class="plan-help mb-2">Konfirmasikan hanya setelah semua box pada kelompok ini sudah ditempatkan. Penerimaan box baru tidak memerlukan verifikasi pengambilan tambahan.</p><button class="btn btn-primary" type="submit">Konfirmasi {{ $group['actionable']->count() }} box sudah ditempatkan</button>
         </form>
     @elseif($group['pending']->isEmpty() && $group['redirected']->isEmpty())<p class="plan-help receiving-table-note">Penempatan kelompok ini sudah dikonfirmasi.</p>@endif
 </section>

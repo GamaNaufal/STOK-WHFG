@@ -2,6 +2,21 @@
 
 Terakhir diverifikasi dari source code: 4 November 2026 (pembaruan inkremental).
 
+Picking Verification Ekspor 4 November 2026:
+- Kewajiban scan dinilai per part dalam gelombang rekomendasi. Jika seluruh
+  stok Part B yang cocok masuk satu tujuan dari sumber satu jenis part,
+  kekurangan Part B dan keberadaan Part A pada rencana tidak mewajibkan scan.
+  Sumber campuran dan part yang dibagi ke beberapa tujuan tetap wajib scan.
+- ExportFulfillmentBox::requiresPickingScan dipakai oleh daftar tugas, detail
+  picking, penempatan, dan merge. Alokasi menyimpan tanda wajib untuk rekomendasi
+  baru. Rekomendasi lama yang masih terbagi tetap dikenali dari datanya.
+- Cari Box tersedia setelah Oke FIFO untuk transaksi yang masih menunggu
+  penempatan dari stok tersimpan, termasuk transaksi tanpa scan wajib.
+  Setelah antrean habis, form Cari Box ditutup dan pencarian dari halaman lama
+  mengembalikan status sesi tidak aktif.
+- Verifikasi: 83 tes picking, transaksi rekomendasi, merge, tinjauan FIFO,
+  dan penyelesaian pallet lulus (797 assertions).
+
 Navigasi Merge Pallet 4 November 2026:
 - Warehouse menampilkan satu menu Merge Pallet. Akun yang memiliki kedua izin
   masuk ke Domestik dari halaman lain dan bisa memilih Ekspor lewat tombol geser.

@@ -21,7 +21,7 @@
             <p class="receiving-complete">Penempatan sudah dikonfirmasi.</p>
         @endif
         @if($waitingForReview)<p class="alert alert-info">Tinjau hasil stok FIFO dan klik Oke sebelum penempatan.@if(auth()->user()->canAccess('export_pallet_plans')) <a href="{{ route('export.pallet-plans.show', $delivery) }}">Buka tinjauan perencanaan</a>.@endif</p>@endif
-        @if($needsPicking && !$waitingForReview)<p class="alert alert-warning">Box dari pallet campuran wajib diverifikasi sebelum penempatan. <a href="{{ route('export.receiving.picking.show', ['pallet'=>$planned->id]) }}">Buka verifikasi pengambilan</a>.</p>@endif
+        @if($needsPicking && !$waitingForReview)<p class="alert alert-warning">ID Box ini wajib diverifikasi sebelum penempatan. <a href="{{ route('export.receiving.picking.show', ['pallet'=>$planned->id]) }}">Buka verifikasi pengambilan</a>.</p>@endif
         @if(($needsPlacement || $canMoveSpare) && !$waitingForReview && !$needsPicking)
             @if($canMoveSpare)<details class="receiving-relocate"><summary>Ubah penempatan stok cadangan</summary>@endif
             <form method="POST" action="{{ route('export.receiving.place', $selected) }}" id="export-place-form">

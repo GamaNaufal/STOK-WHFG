@@ -205,6 +205,12 @@ class ExportPalletMergeService
             $target = $c['survivor'];
             $location = $c['location'];
 
+            // Preserve scan requirements before the merge rewrites sources and destinations.
+            $requiredIds = ExportFulfillmentBox::whereKey($c['commitments']->pluck('id')->all())
+                ->whereNull('placed_at')->requiresPickingScan()->pluck('id');
+            ExportFulfillmentBox::whereKey($requiredIds->all())->update(['picking_required' => true]);
+            $required = $requiredIds->flip();
+
             // Retain physical sources for movement history; release unique links before creating the result.
             $sourceLocations = $c['sources']->pluck('master_location_id')->all();
             foreach ($c['sources'] as $source) {
@@ -254,13 +260,8 @@ class ExportPalletMergeService
                         'pcs_quantity' => $box->pcs_quantity, 'first_received_at' => $box->first_received_at,
                         'reserved_at' => now(), 'reserved_by' => $actor->id]);
                 }
-                $wasMixed = $source->boxes->pluck('part_setting_id')->unique()->count() > 1;
-                if ($f && ! $f->placed_at && $f->allocation_notice_id && $wasMixed) {
-                    $f->update(['picking_required' => true]);
-                }
                 if ($target && $f) {
-                    $mustScan = ! $f->placed_at && $f->allocation_notice_id && ($f->picking_required || $wasMixed);
-                    if ($mustScan) {
+                    if ($required->has($f->id)) {
                         $f->update(['merge_pending_verification' => true]);
                     } else {
                         $f->update(['placed_at' => now(), 'placed_by' => $actor->id, 'placed_location_id' => $location->id]);

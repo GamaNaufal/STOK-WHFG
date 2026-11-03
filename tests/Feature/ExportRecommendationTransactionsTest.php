@@ -285,6 +285,56 @@ class ExportRecommendationTransactionsTest extends TestCase
         $this->assertNotNull($newBox->fresh()->fulfillment->placed_at);
     }
 
+    public function test_short_stock_for_one_part_can_be_placed_without_scans_and_searched_while_pending(): void
+    {
+        $partA = $this->receive();
+        $partB = collect(range(1, 5))->map(fn () => $this->receive($this->b));
+        $this->store([$partA]);
+        $this->store($partB->take(2));
+        $this->store($partB->skip(2));
+        [$delivery, $plan, $notice, $pallets] = $this->demand([[$this->a->id => 5, $this->b->id => 10]]);
+        $pallet = $pallets[0];
+        $scope = ['pallet' => $pallet->id, 'notice' => $notice->id];
+        $helper = route('export.picking.show', $scope);
+        $this->get($helper)->assertConflict();
+        $this->acknowledge($delivery, $plan, $notice);
+
+        $this->get(route('export.picking.index'))->assertOk()->assertViewHas('tasks',
+            fn ($tasks) => (int) $tasks->first()->pending_box_count === 6 && (int) $tasks->first()->required_scan_count === 0);
+        $this->get($helper)->assertOk()->assertSee('id="export-pick-box"', false);
+        $this->postJson(route('export.picking.seek', $scope), ['box_number' => $partB[0]->box_number])
+            ->assertOk()->assertJsonPath('success', true);
+        $this->postJson(route('export.receiving.place-bulk'), $this->placements($partB->prepend($partA), $notice, $pallet))
+            ->assertRedirect($this->url($notice, $pallet));
+
+        $this->get($helper)->assertOk()->assertSee('Sesi Cari Box tidak aktif')->assertDontSee('id="export-pick-box"', false);
+        $this->postJson(route('export.picking.seek', $scope), ['box_number' => $partB[0]->box_number])
+            ->assertOk()->assertJsonPath('success', false)->assertJsonPath('blocked', false);
+        $this->assertDatabaseCount('export_picking_scans', 0);
+    }
+
+    public function test_same_part_split_across_destinations_requires_each_id_even_on_single_part_source(): void
+    {
+        $first = $this->receive();
+        $second = $this->receive();
+        $this->store([$first, $second]);
+        [$delivery, $plan, $notice, $pallets] = $this->demand([[$this->a->id => 1], [$this->a->id => 2]]);
+        $this->acknowledge($delivery, $plan, $notice);
+        $this->assertSame(2, $notice->boxes()->where('picking_required', true)->count());
+        // Existing recommendations may have been allocated before the split rule.
+        $notice->boxes()->update(['picking_required' => false]);
+        $this->get(route('export.picking.index'))->assertOk()->assertViewHas('tasks',
+            fn ($tasks) => $tasks->total() === 2 && $tasks->every(fn ($task) => (int) $task->required_scan_count === 1));
+
+        $this->postJson(route('export.receiving.place-bulk'), $this->placements([$first], $notice, $pallets[0]))->assertUnprocessable();
+        $scope = ['pallet' => $pallets[0]->id, 'notice' => $notice->id];
+        $this->postJson(route('export.receiving.picking.scan', $scope), [
+            'box_number' => $first->box_number, 'request_token' => (string) Str::uuid(),
+        ])->assertOk()->assertJsonPath('success', true);
+        $this->postJson(route('export.receiving.place-bulk'), $this->placements([$first], $notice, $pallets[0]))->assertRedirect();
+        $this->postJson(route('export.receiving.place-bulk'), $this->placements([$second], $notice, $pallets[1]))->assertUnprocessable();
+    }
+
     public function test_pagination_counts_destination_transactions_not_individual_boxes(): void
     {
         $batch = $this->batch(42);
