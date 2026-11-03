@@ -161,6 +161,7 @@ class ExportStockReceivingController extends Controller
         $request->merge(['placements' => $rows]);
         $data = $request->validate(['placements' => 'required|array|list|min:1|max:1000',
             'placements.*.id' => 'required|integer|min:1|distinct', 'placements.*.revision' => 'required|integer|min:1',
+            'placements.*.destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/'],
             'placements.*.request_token' => 'required|uuid|distinct', 'return_batch' => 'nullable|integer|min:1', 'return_box' => 'nullable|integer|min:1',
             'return_notice' => 'nullable|required_with:return_pallet|integer|min:1', 'return_pallet' => 'nullable|required_with:return_notice|integer|min:1',
             'destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/']]);
@@ -183,9 +184,11 @@ class ExportStockReceivingController extends Controller
             ->whereNotNull('allocation_notice_id')->whereHas('allocationNotice', fn ($q) => $q->whereNotNull('acknowledged_at'))->exists()) {
             throw ValidationException::withMessages(['placements' => 'Box rekomendasi harus diproses melalui transaksi FIFO per pallet tujuan.']);
         }
-        $destination = $this->destination($data['destination'] ?? null);
+        if (! empty($data['destination']) && collect($data['placements'])->contains(fn ($row) => ! empty($row['destination']))) {
+            throw ValidationException::withMessages(['placements' => 'Gunakan tujuan umum atau pembagian tujuan per box, bukan keduanya.']);
+        }
         $place = fn () => $service->placeMany(array_map(fn ($row) => ['id' => (int) $row['id'], 'revision' => (int) $row['revision'],
-            'request_token' => $row['request_token']] + $destination, $data['placements']), $request->user());
+            'request_token' => $row['request_token']] + $this->destination($row['destination'] ?? $data['destination'] ?? null), $data['placements']), $request->user());
         if (! empty($data['return_notice'])) {
             app(\App\Services\ExportInventoryService::class)->transaction(function () use ($data, $ids, $place) {
                 $notice = \App\Models\ExportStockAllocationNotice::findOrFail($data['return_notice']);

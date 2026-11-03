@@ -2,6 +2,48 @@
 
 Terakhir diverifikasi dari source code: 3 November 2026 (pembaruan inkremental).
 
+Penempatan cadangan per part pada penerimaan ekspor 3 November 2026:
+- Transaksi penerimaan tetap satu batch. ExportStockViewService mengelompokkan
+  box tanpa fulfillment berdasarkan part_setting_id (spare-<id>); kelompok
+  teralokasi tetap mengikuti pallet rencana. Status seluruh box cadangan pada
+  tiap part dapat dibuka lewat details agar pilihan tujuan langsung terjangkau.
+- Default satu lokasi kosong/pallet existing untuk semua box part tersebut.
+  Opsi Bagi ke beberapa tujuan menerima jumlah bulat minimal satu, total harus
+  tepat sebanyak box pending. Identitas box dibagi mengikuti urutan FIFO yang
+  sudah diberikan server; rincian pilihan menampilkan box mana menuju ke mana.
+  Tujuan hanya pilihan penerimaan ini, tidak disimpan sebagai default master.
+- Konfirmasi dapat per part atau seluruh kelompok cadangan sekaligus. JS
+  spare-placement.mjs menyusun destination per baris placements_json; controller
+  memvalidasi format serta menolak campuran tujuan umum dan tujuan per baris.
+  placeMany existing tetap atomik, mengunci inventory, memeriksa revisi/reservasi/
+  lokasi/picking dan memakai token replay. Penempatan baru tidak mengubah tanggal
+  first_received_at. Box teralokasi tidak dapat dialihkan ke tujuan cadangan.
+- Peringatan 36/72 box menjumlahkan box masuk dari semua kelompok yang menunjuk
+  tujuan sama, ditambah incoming kelompok rencana jika pallet fisiknya sama.
+  Label tetap peringatan, bukan batas keras. Pilihan bebas ke beberapa lokasi
+  tetap memakai master ekspor dan guard ketersediaan existing.
+- Panduan cetak mengikuti pilihan per box/part/tujuan sebelum konfirmasi.
+  GET print lama dengan spare_destination tetap kompatibel; route bernama print
+  batch/legacy kini menerima GET+POST dengan izin sama dan CSRF existing. POST
+  membawa spare_placements_json agar 1.000 box tidak menjadi URL sangat panjang.
+  Cetak memeriksa membership box cadangan pending pada transaksi, tidak menerima
+  box asing/teralokasi, tidak mengubah stok/audit. Target kosong/tidak tersedia
+  diberi peringatan, bukan dibuatkan tujuan fiktif. Hasil yang sudah ditempatkan
+  memakai lokasi aktual. ExportPlacementGuideService juga menjumlah kapasitas
+  lintas kelompok. Tidak ada schema, permission atau dependency baru.
+- Verifikasi: 541 backend (5.009 assertions), 110 frontend, Vite build, Pint dan
+  diff --check lulus. Enam tes fitur baru mencakup pemisahan part satu transaksi,
+  beberapa tujuan/part, replay/FIFO, cetak identik, rollback, transaksi asing,
+  target tidak tersedia, box reserved dan revokasi izin POST print.
+- IAB SQLite/cookie spare-placement-preview-20261103 terpisah dari MySQL menguji
+  5 box Part A dibagi 3+2 dan 3 box Part B ke tujuan ketiga, input qty 4/5 ditolak,
+  tambah/hapus tujuan, satu/split, preview ID, total 77 merah dari dua kelompok,
+  POST cetak 3/2/3, konfirmasi 8 box dan antrean selesai. Penerimaan berikutnya
+  melalui scan tiga box membuktikan tujuan awal kosong. Lebar DOM preview desktop
+  1265px; override ponsel tidak terkonfirmasi pada pemeriksaan form ini. CSS
+  menyediakan susunan satu kolom di 575px dan target 44px. Bukti:
+  storage/app/previews/spare-placement-20261103/. Database pengguna tidak diubah.
+
 Dashboard analitik Admin Utama/Supervisi 3 November 2026:
 - Atas permintaan pengguna, shared.operational-dashboard kini menonjolkan KPI,
   arus stok, komposisi stok dan tiga tautan perhatian. Filter lingkup/periode

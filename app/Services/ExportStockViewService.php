@@ -38,7 +38,7 @@ class ExportStockViewService
         $targets = $plannedIds->isEmpty() ? collect() : ExportStockPallet::whereNull('retired_at')
             ->whereIn('export_planned_pallet_id', $plannedIds)->withCount('boxes')->get()->keyBy('export_planned_pallet_id');
 
-        return $boxes->groupBy(fn ($box) => $box->fulfillment ? 'planned-'.$box->fulfillment->plannedItem->pallet->id : 'spare')
+        return $boxes->groupBy(fn ($box) => $box->fulfillment ? 'planned-'.$box->fulfillment->plannedItem->pallet->id : 'spare-'.$box->part_setting_id)
             ->map(function ($rows, $key) use ($targets, $pickIssues, $receiptOnly) {
                 $planned = $rows->first()->fulfillment?->plannedItem->pallet;
                 $pending = $rows->filter(fn ($box) => $box->state === 'received' || ($box->fulfillment && ! $box->fulfillment->placed_at))->values();
@@ -54,7 +54,8 @@ class ExportStockViewService
                 $needsPicking = $requiresPicking->filter(fn ($b) => ! $b->fulfillment->picking_ready);
                 $pickingIssue = $pickIssues->first(fn ($issue) => (int) $issue->reported_by === auth()->id() || ($planned && (int) $issue->export_planned_pallet_id === $planned->id) || $rows->contains('box_number', $issue->box_number));
 
-                return ['key' => $key, 'planned' => $planned, 'delivery' => $planned?->palletPlan->deliveryPlan,
+                return ['key' => $key, 'part_number' => $planned ? null : $rows->first()->part_number,
+                    'physical_pallet_id' => $target?->id, 'planned' => $planned, 'delivery' => $planned?->palletPlan->deliveryPlan,
                     'picking_required' => $requiresPicking->count(), 'picking_remaining' => $needsPicking->count(), 'picking_issue' => $pickingIssue,
                     'load' => $planned ? ['current' => $current, 'incoming' => $incoming, 'total' => $current + $incoming] : null,
                     'boxes' => $rows->values(), 'pending' => $pending, 'waiting' => $waiting, 'actionable' => $actionable, 'redirected' => $redirected,

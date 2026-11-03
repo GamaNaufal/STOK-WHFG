@@ -4,29 +4,43 @@ namespace App\Services;
 
 class ExportPlacementGuideService
 {
-    public function prepare(array $data, ?string $destination): array
+    public function prepare(array $data, ?string $destination, array $assignments = []): array
     {
-        $target = null;
-        $warning = null;
-        $hasPendingSpare = $data['groups']->contains(fn ($group) => ! $group['planned'] && $group['pending']->isNotEmpty());
-        if ($hasPendingSpare && $destination) {
-            [$type, $id] = explode(':', $destination, 2);
+        $warnings = [];
+        $assigned = collect($assignments)->keyBy('id');
+        $resolve = function (?string $value) use ($data): ?array {
+            if (! $value) {
+                return null;
+            }
+            [$type, $id] = explode(':', $value, 2);
             $choice = $data[$type === 'pallet' ? 'pallets' : 'locations']->firstWhere('id', (int) $id);
-            if ($choice) {
-                $target = ['pallet' => $type === 'pallet' ? $choice->display_name : 'Pallet cadangan',
-                    'location' => $type === 'pallet' ? $choice->location_code : $choice->code,
-                    'current' => $type === 'pallet' ? (int) $choice->boxes_count : 0];
-            } else {
-                $warning = 'Tujuan cadangan tidak lagi tersedia. Buka halaman transaksi dan pilih kembali.';
+            if (! $choice) {
+                return null;
+            }
+
+            return ['pallet' => $type === 'pallet' ? $choice->display_name : 'Pallet cadangan',
+                'location' => $type === 'pallet' ? $choice->location_code : $choice->code,
+                'current' => $type === 'pallet' ? (int) $choice->boxes_count : 0];
+        };
+        $incoming = [];
+        foreach ($data['groups'] as $group) {
+            if ($group['planned']) {
+                if ($id = $group['physical_pallet_id'] ?? null) {
+                    $incoming['pallet:'.$id] = ($incoming['pallet:'.$id] ?? 0) + $group['load']['incoming'];
+                }
+
+                continue;
+            }
+            foreach ($group['pending'] as $box) {
+                $value = $assigned->has($box->id) ? $assigned->get($box->id)['destination'] : $destination;
+                if ($value) {
+                    $incoming[$value] = ($incoming[$value] ?? 0) + 1;
+                }
             }
         }
-        if ($hasPendingSpare && ! $target) {
-            $warning ??= 'Tujuan stok cadangan belum dipilih. Tentukan lokasi di halaman transaksi agar panduan menunjukkan tujuan yang lengkap.';
-        }
-
         $segments = [];
         if (($data['receipt']['redirected'] ?? 0) > 0) {
-            $warning = ($warning ? $warning.' ' : '').$data['receipt']['redirected'].' box mempunyai panduan tersendiri pada transaksi rekomendasi FIFO. Buka transaksi rekomendasi dari halaman penerimaan.';
+            $warnings[] = $data['receipt']['redirected'].' box mempunyai panduan tersendiri pada transaksi rekomendasi FIFO. Buka transaksi rekomendasi dari halaman penerimaan.';
         }
         foreach ($data['groups'] as $group) {
             foreach ($group['boxes'] as $box) {
@@ -36,12 +50,19 @@ class ExportPlacementGuideService
                 $pending = $group['pending']->contains('id', $box->id);
                 if ($group['planned']) {
                     $key = $group['key'];
-                    $place = ['pallet' => 'Pallet '.$group['planned']->position, 'location' => $group['planned']->location_code, 'load' => $group['load']['total']];
+                    $targetId = $group['physical_pallet_id'] ?? null;
+                    $load = $targetId ? $group['load']['current'] + ($incoming['pallet:'.$targetId] ?? 0) : $group['load']['total'];
+                    $place = ['pallet' => 'Pallet '.$group['planned']->position, 'location' => $group['planned']->location_code, 'load' => $load];
                 } elseif ($pending) {
-                    $key = 'pending-spare';
-                    $place = $target
-                        ? $target + ['load' => $target['current'] + $group['pending']->count()]
-                        : ['pallet' => 'Pallet cadangan', 'location' => null];
+                    $value = $assigned->has($box->id) ? $assigned->get($box->id)['destination'] : $destination;
+                    $target = $resolve($value);
+                    $key = 'pending-'.$group['key'].'-'.($value ?: 'unassigned');
+                    $place = $target ? $target + ['load' => $target['current'] + ($incoming[$value] ?? 0)] : ['pallet' => 'Pallet cadangan', 'location' => null];
+                    if (! $target) {
+                        $warnings[] = $value
+                            ? 'Tujuan cadangan tidak lagi tersedia. Buka halaman transaksi dan pilih kembali.'
+                            : 'Tujuan stok cadangan belum dipilih. Tentukan lokasi di halaman transaksi agar panduan menunjukkan tujuan yang lengkap.';
+                    }
                 } else {
                     $key = 'stored-'.($box->current_pallet_id ?? 'unknown');
                     $place = ['pallet' => $box->currentPallet?->display_name ?? 'Pallet cadangan', 'location' => $box->currentPallet?->location_code];
@@ -52,6 +73,6 @@ class ExportPlacementGuideService
             }
         }
 
-        return ['printGroups' => array_values($segments), 'guideWarning' => $warning, 'printedAt' => now()];
+        return ['printGroups' => array_values($segments), 'guideWarning' => $warnings ? implode(' ', array_unique($warnings)) : null, 'printedAt' => now()];
     }
 }

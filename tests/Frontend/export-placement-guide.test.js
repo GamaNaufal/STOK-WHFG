@@ -8,8 +8,8 @@ function setup(withSelect = true) {
     const pallet = {}, location = {}, banner = {classList: {toggle(name, active) { banner.unassigned = active; }},
         querySelector(selector) { return selector === '[data-guide-pallet]' ? pallet : location; }};
     const windowRef = {events: {}, addEventListener(name, fn) { this.events[name] = fn; }};
-    const documentRef = {baseURI: 'https://warehouse.test/export/receiving/transactions/1', querySelectorAll: () => links,
-        getElementById: () => withSelect ? select : null, querySelector: () => withSelect ? banner : null};
+    const documentRef = {baseURI: 'https://warehouse.test/export/receiving/transactions/1', querySelectorAll: selector => selector === '[data-placement-guide-link]' ? links : [],
+        getElementById: () => withSelect ? select : null, querySelector: selector => selector === '[data-spare-guide-destination]' && withSelect ? banner : null};
     initPlacementGuide({documentRef, windowRef});
     return {links, select, pallet, location, banner, windowRef};
 }

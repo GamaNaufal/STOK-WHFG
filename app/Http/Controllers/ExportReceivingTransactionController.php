@@ -88,9 +88,27 @@ class ExportReceivingTransactionController extends Controller
 
     private function printGuide(Request $request, array $data, ExportPlacementGuideService $guide)
     {
-        $input = $request->validate(['spare_destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/']]);
+        $input = $request->validate(['spare_destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/'],
+            'spare_placements_json' => 'nullable|string|max:1048576']);
+        $assignments = [];
+        if (isset($input['spare_placements_json'])) {
+            try {
+                $rows = json_decode($input['spare_placements_json'], true, 8, JSON_THROW_ON_ERROR);
+            } catch (\JsonException $exception) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['spare_placements' => 'Pembagian tujuan cetak tidak dapat dibaca.']);
+            }
+            $validated = validator(['spare_placements' => $rows], [
+                'spare_placements' => 'required|array|list|max:1000', 'spare_placements.*.id' => 'required|integer|min:1|distinct',
+                'spare_placements.*.destination' => ['present', 'nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/'],
+            ])->validate();
+            $assignments = $validated['spare_placements'];
+            $allowed = $data['groups']->filter(fn ($group) => ! $group['planned'])->flatMap(fn ($group) => $group['pending'])->pluck('id');
+            if (collect($assignments)->contains(fn ($row) => ! $allowed->contains((int) $row['id']))) {
+                throw \Illuminate\Validation\ValidationException::withMessages(['spare_placements' => 'Pembagian cetak hanya boleh memuat box cadangan yang masih menunggu pada transaksi ini. Muat ulang instruksi terbaru.']);
+            }
+        }
 
-        return response()->view('export.receiving.print-guide', $data + $guide->prepare($data, $input['spare_destination'] ?? null))
+        return response()->view('export.receiving.print-guide', $data + $guide->prepare($data, $input['spare_destination'] ?? null, $assignments))
             ->header('Cache-Control', 'private, no-store');
     }
 }
