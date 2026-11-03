@@ -699,7 +699,7 @@ class StockInputController extends Controller
             ->all();
 
         if (empty($rows)) {
-            throw new \RuntimeException('Tidak ada ID box valid untuk disimpan ke transaksi input stok.');
+            throw new \RuntimeException('Tidak ada ID Box valid untuk disimpan ke transaksi input stok.');
         }
 
         DB::table('stock_input_boxes')->insert($rows);

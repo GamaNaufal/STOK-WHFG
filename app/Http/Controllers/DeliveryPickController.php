@@ -1024,7 +1024,7 @@ class DeliveryPickController extends Controller
                     'success' => false,
                     'message' => $isUnavailable
                         ? $this->unavailableBoxScanMessage($box, false)
-                        : 'Box tidak sesuai daftar picking. Periksa ID box dan coba lagi.',
+                        : 'Box tidak sesuai daftar picking. Periksa ID Box dan coba lagi.',
                     'status' => 422,
                 ];
             }

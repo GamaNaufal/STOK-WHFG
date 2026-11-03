@@ -199,10 +199,10 @@ class StockViewController extends Controller
     {
         return match ($viewMode) {
             'box_id' => [
-                'box_id_asc' => 'ID Box A-Z',
-                'box_id_desc' => 'ID Box Z-A',
-                'box_number_asc' => 'No Box A-Z',
-                'box_number_desc' => 'No Box Z-A',
+                'box_id_asc' => 'ID stok A-Z',
+                'box_id_desc' => 'ID stok Z-A',
+                'box_number_asc' => 'ID Box A-Z',
+                'box_number_desc' => 'ID Box Z-A',
                 'part_asc' => 'Part A-Z',
                 'part_desc' => 'Part Z-A',
                 'pallet_asc' => 'Pallet A-Z',
@@ -231,8 +231,8 @@ class StockViewController extends Controller
                 'updated_newest' => 'Terakhir di-update',
             ],
             'not_full' => [
-                'box_number_asc' => 'No Box A-Z',
-                'box_number_desc' => 'No Box Z-A',
+                'box_number_asc' => 'ID Box A-Z',
+                'box_number_desc' => 'ID Box Z-A',
                 'part_asc' => 'Part A-Z',
                 'part_desc' => 'Part Z-A',
                 'pallet_asc' => 'Pallet A-Z',
@@ -930,7 +930,7 @@ class StockViewController extends Controller
                     ];
                 });
         } else {
-            // Priority 2: Fallback using PalletItem (Legacy / No Box Data)
+            // Priority 2: Fallback using PalletItem (Legacy without box records)
             $items = $pallet->items->where(function ($q) {
                 return $q->pcs_quantity > 0 || $q->box_quantity > 0;
             })->map(function ($item) {

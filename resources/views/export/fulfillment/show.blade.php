@@ -45,7 +45,7 @@
         @endforeach
     </section>
     <section class="plan-panel" aria-labelledby="fulfillment-boxes-title"><div class="plan-panel-heading"><h2 id="fulfillment-boxes-title">Box untuk permintaan ini</h2><span>{{ number_format($boxes->total(), 0, ',', '.') }} box</span></div>
-        <div class="plan-table-scroll" tabindex="0" role="region" aria-label="Reservasi dan penempatan box"><table class="table plan-table fulfillment-box-table"><thead><tr><th scope="col">Nomor box</th><th scope="col">Nomor part / PCS</th><th scope="col">Pertama diterima</th><th scope="col">Pallet tujuan</th><th scope="col">Status penempatan</th></tr></thead><tbody>
+        <div class="plan-table-scroll" tabindex="0" role="region" aria-label="Reservasi dan penempatan box"><table class="table plan-table fulfillment-box-table"><thead><tr><th scope="col">ID Box</th><th scope="col">Nomor part / PCS</th><th scope="col">Pertama diterima</th><th scope="col">Pallet tujuan</th><th scope="col">Status penempatan</th></tr></thead><tbody>
             @forelse($boxes as $box)
                 <tr>
                     <th scope="row">{{ $box->box_number }}</th>
@@ -67,7 +67,7 @@
             @empty<tr><td colspan="5" class="plan-empty"><strong>Belum ada box yang tercatat</strong><span>Kebutuhan pallet tersedia. Belum ada reservasi atau konfirmasi penempatan box untuk permintaan ini.</span></td></tr>@endforelse
         </tbody></table></div>
         @if($boxes->hasPages())<div class="plan-panel-body">{{ $boxes->links('pagination::bootstrap-5') }}</div>@endif
-        <p class="plan-help fulfillment-table-note">Urutan box memakai tanggal pertama diterima gudang, lalu nomor box. Data dimuat {{ now()->format('d/m/Y H:i') }}.</p>
+        <p class="plan-help fulfillment-table-note">Urutan box memakai tanggal pertama diterima gudang, lalu ID Box. Data dimuat {{ now()->format('d/m/Y H:i') }}.</p>
     </section>
     @php($readyCount = $pallets->filter(fn ($entry) => (bool) $entry['pallet']->ready_at)->count())
     <section class="plan-panel"><div class="plan-panel-heading"><h2>Kesiapan pengiriman</h2><span>{{ $readyCount }} / {{ $pallets->count() }} pallet siap</span></div><div class="plan-panel-body">

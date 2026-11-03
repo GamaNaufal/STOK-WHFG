@@ -25,7 +25,7 @@ ringkasan arus, tanpa menggabungkan kedua satuan di satu grafik.
 | Issue scan | created_at sesuai periode. Histori returned/input_error tetap tercatat, tetapi keduanya sudah tertutup. Indikator terbuka merupakan subset issue pada periode itu. |
 | Audit | created_at, mengikuti lingkup dan filter jenis/aksi/petugas. Umum hanya pada Semua; aktivitas ekspor dikenali dari awalan type export_, nama model Export, atau snapshot scope. |
 
-Nomor box/ID pallet/order yang sama antarlingkup tetap dua identitas. Box domestik
+ID Box unik lintas domestik dan ekspor. ID internal pallet/order tetap dibedakan menurut lingkup. Box domestik
 yang tercatat di beberapa pallet dihitung satu kali pada total stok, diberi label
 **Periksa posisi ganda**, dan kedua tautan tetap terlihat pada daftar pallet.
 Jumlah per pallet dari data seperti ini tidak boleh dianggap sebagai total unik.
@@ -51,7 +51,7 @@ Data lama tidak diperbaiki otomatis oleh dashboard.
 - Workbook memuat Ringkasan, Filter, Stok, Pallet, Pemenuhan, Durasi, Issue Scan,
   Audit, dan tiga sheet grafik per lingkup. Filter audit ikut dicatat. Header
   dibekukan, kolom menyesuaikan, filter Excel tersedia. Grafik Excel native;
-  nomor box nol awal dan teks mirip formula tetap teks.
+  ID Box nol awal dan teks mirip formula tetap teks.
 
 ## Akses dan implementasi
 

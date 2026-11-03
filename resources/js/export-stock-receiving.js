@@ -105,7 +105,7 @@ if (form) {
     const checkBox = async () => {
         if (busy) { feedback(false, 'Tunggu validasi scan sebelumnya selesai.'); return; }
         const number = normalizedBox();
-        if (!/^[0-9]{8}$/.test(number)) { feedback(false, 'Nomor box harus tepat 8 angka.'); resetInput(); return; }
+        if (!/^[0-9]{8}$/.test(number)) { feedback(false, 'ID Box harus tepat 8 angka.'); resetInput(); return; }
         setBusy(true);
         try {
             const result = await request(form.dataset.checkUrl, 'POST', {box_number: number, batch_id: state.id});
@@ -125,7 +125,7 @@ if (form) {
     const addScan = async () => {
         if (busy) { feedback(false, 'Tunggu validasi scan sebelumnya selesai.'); return; }
         const number = normalizedBox(), numberPart = part.value.trim();
-        if (!/^[0-9]{8}$/.test(number)) { feedback(false, 'Nomor box harus tepat 8 angka.'); resetInput(); return; }
+        if (!/^[0-9]{8}$/.test(number)) { feedback(false, 'ID Box harus tepat 8 angka.'); resetInput(); return; }
         if (!numberPart || numberPart.length > 100) { feedback(false, 'Scan nomor part yang valid, maksimal 100 karakter.'); part.focus(); part.select(); return; }
         setBusy(true);
         try {
@@ -180,7 +180,7 @@ if (form) {
     processForm.addEventListener('submit', event => {
         if (busy || !state.items.length || pendingBox || box.value.trim() || part.value.trim()) {
             event.preventDefault();
-            feedback(false, busy ? 'Tunggu validasi scan selesai.' : !state.items.length ? 'Daftar scan masih kosong.' : 'Selesaikan scan part atau ganti nomor box sebelum memproses daftar.');
+            feedback(false, busy ? 'Tunggu validasi scan selesai.' : !state.items.length ? 'Daftar scan masih kosong.' : 'Selesaikan scan part atau ganti ID Box sebelum memproses daftar.');
             return;
         }
         setBusy(true);

@@ -4,17 +4,16 @@ Verifikasi identitas/master 3 November 2026; alur penerimaan 30 Oktober 2026 pad
 
 ## Keputusan dan alur operator
 
-- Scan nomor box delapan digit, lalu nomor part. PCS diambil ulang di server
+- Scan ID Box delapan digit, lalu nomor part. PCS diambil ulang di server
   dari master part bersama; tidak ada input PCS manual atau box tidak penuh.
-  Kolom ID box hanya menerima angka 0–9, maksimal delapan digit, dengan angka
+  Kolom ID Box hanya menerima angka 0–9, maksimal delapan digit, dengan angka
   nol di awal tetap dipertahankan. Validasi server tetap mewajibkan tepat delapan.
 - Identitas delapan digit unik global domestik/ekspor. Kedua model memakai
   registry `box_identities`; histori yang sudah keluar/dihapus tetap mengunci
   ID. Lokasi dan tabel stok operasional tetap terpisah. Request Not Full yang
   sedang disiapkan juga diperiksa sebelum menerima nomor baru.
-- Enter pada nomor box memeriksa duplikat dan memfokuskan nomor part. Enter
-  setelah nomor part menambahkan baris ke daftar scan; fokus kembali ke nomor
-  box untuk pasangan berikutnya. Tersedia tombol untuk input manual.
+- Enter pada ID Box memeriksa duplikat dan memfokuskan nomor part. Enter
+  setelah nomor part menambahkan baris ke daftar scan; fokus kembali ke ID Box untuk pasangan berikutnya. Tersedia tombol untuk input manual.
 - Scan memberi indikator OK/NG dan memakai audio OK.mp3/NG.mp3 yang sama dengan
   Stock Input domestik. Part tidak dikenal, format salah, dan duplikat mendapat
   NG tanpa menambah baris. Chrome HTTP intranet mempunyai fallback UUID aman
@@ -26,8 +25,7 @@ Verifikasi identitas/master 3 November 2026; alur penerimaan 30 Oktober 2026 pad
   ulang master/duplikat, lalu menghitung reservasi FIFO sekali untuk seluruh
   box. Kapasitas master yang berubah mengharuskan baris dihapus dan di-scan ulang.
   Waktu scan dari server dipertahankan sebagai tanggal penerimaan pertama.
-- Hasil dikelompokkan per pallet rencana/lokasi dan stok cadangan, dengan nomor
-  box, part dan PCS pada halaman transaksi tersendiri. Tugas stok lama tetap
+- Hasil dikelompokkan per pallet rencana/lokasi dan stok cadangan, dengan ID Box, part dan PCS pada halaman transaksi tersendiri. Tugas stok lama tetap
   tersedia melalui transaksi asalnya yang diprioritaskan FIFO pada antrean.
   Operator mengonfirmasi per kelompok setelah semua box benar-benar ditempatkan.
   Konfirmasi kelompok atomik; satu baris stale membatalkan seluruh kelompok.
@@ -99,7 +97,7 @@ Pilihan ini belum mengubah stok; konfirmasi tetap dilakukan setelah peletakan.
 Tombol **Cetak** di antrean atau **Cetak panduan** di halaman transaksi membuka
 panduan tersendiri. Pilih **Cetak / simpan PDF** untuk mencetak melalui browser
 Chrome atau menyimpan PDF. Layout A4 memuat kode/waktu transaksi, operator,
-jumlah box, kelompok pallet/lokasi, nomor box, part, PCS dan posisi saat dicetak.
+jumlah box, kelompok pallet/lokasi, ID Box, part, PCS dan posisi saat dicetak.
 Kotak centang dipakai di kertas setelah peletakan; box selesai ditandai **Sudah**.
 Tujuan serta judul kolom diulang saat tabel berlanjut ke halaman berikutnya,
 dan garis/teks tetap jelas tanpa pencetakan warna latar.

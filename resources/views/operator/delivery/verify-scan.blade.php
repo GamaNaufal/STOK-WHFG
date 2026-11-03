@@ -34,8 +34,8 @@
             <section class="card verification-card" aria-labelledby="verificationScanTitle">
                 <div class="card-body">
                     <span class="verification-section-label">Langkah 1 / Verifikasi</span>
-                    <h2 id="verificationScanTitle">Scan ID box</h2>
-                    <p class="verification-supporting">Pindai atau ketik ID box pada picklist, lalu tekan Enter. Jika ID tidak sesuai, periksa box dan scan ulang; progres tidak bertambah. Box expired, termasuk yang masa aktif hasil packing habis, juga ditolak tanpa memblokir sesi.</p>
+                    <h2 id="verificationScanTitle">Scan ID Box</h2>
+                    <p class="verification-supporting">Pindai atau ketik ID Box pada picklist, lalu tekan Enter. Jika ID tidak sesuai, periksa box dan scan ulang; progres tidak bertambah. Box expired, termasuk yang masa aktif hasil packing habis, juga ditolak tanpa memblokir sesi.</p>
                     <div id="verificationBlockedNotice" class="verification-blocked" role="status" @if(! $isVerificationBlocked) hidden @endif>
                         <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
                         <div>
@@ -130,7 +130,7 @@
                     </tbody>
                 </table>
             </div>
-            <p id="verificationTableHelp" class="verification-table-hint">Geser tabel untuk melihat semua kolom. ID box tetap terlihat saat digeser.</p>
+            <p id="verificationTableHelp" class="verification-table-hint">Geser tabel untuk melihat semua kolom. ID Box tetap terlihat saat digeser.</p>
         </section>
     </div>
 </div>

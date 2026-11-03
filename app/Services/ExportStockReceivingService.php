@@ -42,7 +42,7 @@ class ExportStockReceivingService
             }
             if (\App\Support\BoxIdentity::unavailable($data['box_number']) || ExportStockBox::withTrashed()->where('box_number', $data['box_number'])->exists()
                 || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
-                $this->fail('box_number', 'ID box sudah tercatat atau disiapkan pada domestik/ekspor. Gunakan ID box yang belum pernah dipakai.');
+                $this->fail('box_number', 'ID Box sudah tercatat atau disiapkan pada domestik/ekspor. Gunakan ID Box yang belum pernah dipakai.');
             }
             $part = $this->part($data['part_number'], true);
             if (isset($data['expected_pcs_quantity']) && (int) $data['expected_pcs_quantity'] !== (int) $part->qty_box) {

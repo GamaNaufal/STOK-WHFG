@@ -119,7 +119,7 @@ class ExpiredBoxHandlingService
             }
             if (DB::table('box_identities')->where('box_number', $data['box_number'])->exists()
                 || DB::table('not_full_box_requests')->where('box_number', $data['box_number'])->exists()) {
-                throw ValidationException::withMessages(['box_number' => 'ID box baru sudah pernah digunakan atau diajukan.']);
+                throw ValidationException::withMessages(['box_number' => 'ID Box baru sudah pernah digunakan atau diajukan.']);
             }
             $issuedAt = Carbon::parse($data['label_issued_at']);
             if ($issuedAt->gt(now()) || $issuedAt->lt($handling->sent_packing_at)) {

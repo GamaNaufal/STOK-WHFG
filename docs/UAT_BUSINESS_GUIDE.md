@@ -40,10 +40,10 @@ SQL menambahkan data, tidak mengganti master/user/akses existing. Nama memakai
 `UAT26`, box baseline memakai `9800xxxx`, dan ID input berikutnya `9801xxxx`.
 ID numerik tabel disesuaikan dengan data yang sudah ada; jangan mengandalkan
 nomor primary key dari contoh atau `manifest.json` sebagai ID URL.
-Cari berdasarkan nama customer, kode rencana, part, lokasi, atau nomor box.
+Cari berdasarkan nama customer, kode rencana, part, lokasi, atau ID Box.
 
 Impor kedua **sengaja ditolak**, termasuk setelah sebagian data uji selesai atau
-dihapus melalui aplikasi. Ledger ID box mempertahankan identitas historis.
+dihapus melalui aplikasi. Ledger ID Box mempertahankan identitas historis.
 Untuk mengulang dari awal, restore backup/salinan sebelum impor. Tidak disediakan
 SQL hapus massal karena dapat merusak histori, reservasi, dan relasi audit.
 
@@ -76,7 +76,7 @@ semua user dalam role yang sama.
 
 ## 3. Data acuan dan urutan
 
-Daftar lengkap part, kapasitas, nomor box, umur penerimaan, rencana, dan akun ada
+Daftar lengkap part, kapasitas, ID Box, umur penerimaan, rencana, dan akun ada
 di `database/uat/manifest.json`. Lokasi tersedia `UAT26-D01`–`D50` untuk domestik
 dan `UAT26-E01`–`E50` untuk ekspor. Lokasi yang sudah ditempati/direservasi tidak
 boleh dipilih sebagai lokasi kosong.
@@ -96,7 +96,7 @@ boleh dipilih sebagai lokasi kosong.
 | Redo/laporan | `UAT26 DOM HISTORY-REDO` | Pengiriman 100 PCS selesai D−1; box `98001101`, `102` |
 | PPC | customer `CORRECTION`, `REJECT`, `PRIORITY-LATER` | Masih pending; PRIORITY-FIRST approved lebih awal |
 
-Rentang nomor box pada tabel adalah singkatan delapan digit, bukan barcode
+Rentang ID Box pada tabel adalah singkatan delapan digit, bukan barcode
 yang dipindai literal. Contoh `98000101`–`103` berarti `98000101`, `98000102`,
 `98000103`. Selalu scan delapan digit lengkap. Singkatan lokasi D23 berarti
 `UAT26-D23`, E17 berarti `UAT26-E17`. Singkatan part D-FREE berarti
@@ -150,7 +150,7 @@ tidak berubah; muncul pesan sukses saja belum cukup.
 | D01 | Operator buka Stock Input. Scan box `98010001` dan part `UAT26-D-FREE`; tambah `98010002`. Simpan ke lokasi kosong D23. | Scan OK; PCS otomatis 10, transaksi 2 box 20 PCS; keduanya satu pallet/lokasi; riwayat penerimaan bertambah sekali. |
 | D02 | Sebelum simpan, scan box yang sama dua kali, part tidak dikenal, angka 123, huruf, lebih dari 8 digit. Hapus baris salah/reset draft bila perlu. | NG/validasi; antrean tidak menggandakan box; input tidak valid tidak menjadi stok. |
 | D03 | Input box baru `98010003` part D-FREE ke pallet D23 yang dibuat D01. | Box bergabung di pallet tersebut; jumlah 3 box 30 PCS, bukan pallet baru tanpa lokasi. |
-| D04 | Cari box `98000101`; filter part/pallet/lokasi; buka detail; unduh Excel stok. | Hasil sesuai filter, detail isi benar, nomor box delapan digit utuh; ekspor tidak ikut. |
+| D04 | Cari box `98000101`; filter part/pallet/lokasi; buka detail; unduh Excel stok. | Hasil sesuai filter, detail isi benar, ID Box delapan digit utuh; ekspor tidak ikut. |
 | D05 | Admin Warehouse edit data box bebas `98000901`; coba perubahan tidak valid; hapus `98000902` dengan alasan jika diminta. | Total/pallet sinkron; audit edit/hapus ada; ID terhapus tidak boleh dipakai lagi. Jangan edit box skenario FIFO/issue. |
 | D06 | Coba edit/hapus box yang sedang dipilih/terikat delivery; lalu hapus pallet yang tidak eligible. | Guard bisnis mencegah merusak picking/reservasi; tidak ada relasi yatim. |
 | D07 | Move pallet D07 ke D24 kosong; coba pindahkan ke lokasi occupied. | Semua isi mengikuti; D07 kosong, D24 occupied; tujuan occupied ditolak. |
@@ -305,7 +305,7 @@ Jangan menghabiskan ketiga scan benar sebelum menyelesaikan cabang salah scan.
 | ID | Langkah | Hasil yang harus terlihat |
 | --- | --- | --- |
 | L01 | Warehouse/Supervisi/Admin buka laporan existing; pilih Domestik/Ekspor, rentang tanggal, part, lokasi, user, search dan pagination yang tersedia. | Filter AJAX langsung, scope tidak bocor; histori masuk/keluar/pindah/revisi bisa dirinci. Warehouse hanya mendapat laporan sesuai izin. |
-| L02 | Unduh Excel/CSV laporan dan stok setelah filter. Bandingkan detail dan total, termasuk histori D−1. | Seluruh hasil sesuai filter, bukan hanya halaman aktif; satuan PCS/box benar, nomor box teks 8 digit, file dapat dibuka. |
+| L02 | Unduh Excel/CSV laporan dan stok setelah filter. Bandingkan detail dan total, termasuk histori D−1. | Seluruh hasil sesuai filter, bukan hanya halaman aktif; satuan PCS/box benar, ID Box teks 8 digit, file dapat dibuka. |
 | L03 | Audit: filter transaksi UAT26, user, aksi, tanggal, scope; rincian before/after dan export. | Semua mutasi penting/approval/reject/return/ship/redo/QA ada aktor, waktu, alasan; tidak ada audit sukses untuk transaksi gagal rollback. |
 | L04 | Admin Utama/Supervisi: dashboard default Semua; ubah Domestik/Ekspor dan tanggal via AJAX, Back/Forward, reset. | Default Semua; label scope jelas; grafik domestik PCS, ekspor BOX terpisah; tidak dijumlahkan sebagai satuan campuran. |
 | L05 | Bandingkan NF-SPLIT/REV yang baru reserved dengan placed; RECEIVE ready dengan complete. | Reservasi belum pemenuhan; placed valid menaikkan pemenuhan; ready masih stok; shipment baru setelah complete. Draft belum final/cancelled tidak masuk KPI pemenuhan. |
@@ -322,7 +322,7 @@ tidak habis. Catat kedua respons dan cek DB, bukan hanya toast.
 
 | ID | Kondisi bersamaan | Harapan |
 | --- | --- | --- |
-| C01 | Dua sesi operator ekspor menyimpan ID box sama dengan token berbeda. | Satu berhasil, satunya ditolak; satu stok dan satu identitas global domestik/ekspor. |
+| C01 | Dua sesi operator ekspor menyimpan ID Box sama dengan token berbeda. | Satu berhasil, satunya ditolak; satu stok dan satu identitas global domestik/ekspor. |
 | C02 | Dua finalisasi memakai lokasi kosong sama. | Hanya satu claim; tidak ada dua pallet aktif pada satu lokasi. |
 | C03 | Dua rencana membutuhkan spare box yang sama. | Hanya satu reservasi; prioritas deadline dan FIFO konsisten. |
 | C04 | Place/reduce/approve NF memakai revision lama dari tab kedua. | Conflict/replay aman; tidak ada kehilangan PCS atau box ganda. |

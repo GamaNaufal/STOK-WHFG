@@ -2,6 +2,43 @@
 
 Terakhir diverifikasi dari source code: 3 November 2026 (pembaruan inkremental).
 
+Cloudflare Tunnel / HTTPS 3 November 2026:
+- Diagnosis proses menunjukkan cloudflared --url http://127.0.0.1:8001 dan PHP
+  melayani checkout OneDrive/WHFG/STOK-WHFG. Browser tunnel awalnya menghasilkan
+  CSS/JS dan form action http pada halaman https, sehingga styling tidak termuat.
+  public/hot/config cache/route cache tidak aktif dan build terbaru tersedia.
+- bootstrap/app.php kini trustProxies hanya 127.0.0.1 dan ::1 serta hanya header
+  X-Forwarded-Proto. Tidak memakai wildcard, X-Forwarded-Host/Port/For, forceScheme
+  global, domain tunnel hardcoded, atau perubahan .env. HTTP localhost tetap
+  berfungsi; identitas host/port tidak dapat dipilih melalui header forwarding.
+- Empat tes TunnelHttpsTest mencakup aset/form HTTPS melalui loopback IPv4,
+  loopback IPv6 dengan host/port forwarding asing, HTTP lokal langsung, dan
+  penolakan spoof HTTPS dari REMOTE_ADDR non-loopback (15 assertions).
+- Regresi lengkap setelah perbaikan: 544 backend (4.941 assertions) lulus;
+  Pint dua file baru/diubah dan diff --check lulus. HTTP localhost juga
+  diverifikasi lewat browser tetap menghasilkan URL HTTP lokal.
+- Browser pada URL Quick Tunnel pengguna memverifikasi URL CSS/JS/form sekarang
+  HTTPS dan tampilan login rapi. Tidak login/mengirim kredensial atau mengubah
+  database pengguna. Bukti: storage/app/previews/cloudflare-https-20261103/.
+- Cara menjalankan server/tunnel dan penjelasan mixed content dicatat pada
+  docs/SETUP_LOCAL.md. Proxy container/IP lain perlu dikonfigurasi eksplisit.
+
+Istilah ID Box 3 November 2026:
+- Seluruh label identitas box memakai "ID Box" dengan spasi dan kapitalisasi
+  tersebut pada alur domestik/ekspor, placeholder, validasi, audit, panduan cetak,
+  header Excel/laporan, serta dokumentasi operator. Jumlah box dan nama fitur
+  fisik tetap menggunakan "box". Tidak mengubah field box_number/box_id, route,
+  struktur database, aturan scan delapan angka, FIFO, atau hak akses.
+- StockViewByBoxIdExport mempertahankan dua kolom existing: ID stok untuk PK
+  internal dan ID Box untuk identitas label delapan angka; sort internal memakai
+  label ID stok agar tidak ambigu. Data dan urutan kolom tidak diganti.
+- Catatan dashboard yang masih menyebut ID sama boleh lintas lingkup dikoreksi
+  mengikuti registri global yang telah diterapkan sebelumnya.
+- Verifikasi: 540 tes backend (4.926 assertions), 110 frontend, Vite build dan
+  diff --check lulus. Preview IAB SQLite terpisah memeriksa label form/tabel
+  penerimaan dan input 123 menghasilkan NG dengan pesan "ID Box harus tepat
+  8 angka". Bukti: storage/app/previews/id-box-20261103/penerimaan.png.
+
 Penyatuan master dan identitas 3 November 2026 (keputusan terbaru pengguna):
 - PartSetting menjadi satu master global tanpa scope; ExportPartSetting, menu/
   route export.part-settings dan permission export_parts dihapus. Lokasi tetap
@@ -304,7 +341,7 @@ Panduan manual ekspor 1 November 2026:
 Paket UAT bisnis 31 Oktober 2026:
 - SQL aditif development di database/uat/01_seed_business_uat.sql; 9 akun uji,
   35 part, 100 lokasi, 37 box domestik, 127 box ekspor, 12 delivery domestik
-  dan 17 rencana ekspor (termasuk histori/arsip). Namespace UAT26, nomor box
+  dan 17 rencana ekspor (termasuk histori/arsip). Namespace UAT26, ID Box
   9800xxxx baseline dan 9801xxxx untuk langkah input; tanggal relatif impor.
 - Dibangun melalui model/service pada SQLite baru, lalu diekspor beserta ledger
   box_identities, pivot, ringkasan, reservasi, Not Full dan audit. Bukan contoh
@@ -409,7 +446,7 @@ Dashboard Admin Utama dan Supervisi lintas lingkup 31 Oktober 2026:
   permintaan selesai; fase ditulis terpisah, tidak dirata-rata atau membuat
   durasi scan ekspor fiktif. Nilai nol dan menit:detik tetap terbaca.
 - Excel memakai OperationalDashboardExport dan native PhpSpreadsheet charts,
-  satuan terpisah, header/filter/freeze baris, nomor box nol awal sebagai teks.
+  satuan terpisah, header/filter/freeze baris, ID Box nol awal sebagai teks.
   Grafik browser SVG lokal dengan rincian tabel; tidak memakai CDN/generator
   gambar grafik eksternal. Jalur Excel legacy tanpa scope tetap tersedia.
 - AJAX hanya membaca dan melewati kalkulasi statistik/expiry lama. Load HTML
@@ -593,7 +630,7 @@ Verifikasi Picking Verification Ekspor dan Approval Pengembalian 30 Oktober 2026
   issue, sertifikat pengambilan, atau blokir. Detail: docs/EXPORT_PICKING_VERIFICATION.md.
 - Tahap wajib pada penerimaan/penempatan hanya memvalidasi pengambilan stok
   rekomendasi finalisasi rencana pallet (allocation_notice_id terisi), dengan
-  nomor box reservasi FIFO. Penerimaan/input baru dan alokasi penerimaan berikutnya
+  ID Box reservasi FIFO. Penerimaan/input baru dan alokasi penerimaan berikutnya
   tanpa notice tidak memerlukan verifikasi tambahan, termasuk pallet campuran;
   scan input dan konfirmasi penempatan tetap berlaku. Campuran ditentukan dari
   seluruh part di pallet fisik asal; flag hanya diwajibkan untuk rekomendasi
@@ -828,7 +865,7 @@ Verifikasi Label Pallet dan Pop-up Stok Ekspor 29 Oktober 2026:
 - Deep link ?box=ID dari antrean atau redirect penempatan membuka modal otomatis.
   Konfirmasi/relokasi tetap POST native dengan token/revision/validasi existing;
   kegagalan validasi HTML kembali ke modal box yang sama. Submit guard delegated
-  melindungi form yang baru dimuat. Modal memuat nomor box, part/PCS, status,
+  melindungi form yang baru dimuat. Modal memuat ID Box, part/PCS, status,
   posisi fisik, instruksi yang relevan dan waktu penerimaan/penempatan.
 - 39 tes backend terkait lulus (460 assertions), 62 tes frontend dan build lulus.
   Browser memeriksa label rencana/cadangan, dialog tanpa navigasi, pergantian box,
@@ -908,7 +945,7 @@ Verifikasi Penerimaan Bulk dan Stok Ekspor terpisah 29 Oktober 2026:
 
 Verifikasi Penerimaan Box Ekspor 29 Oktober 2026:
 - Rincian: docs/EXPORT_STOCK_RECEIVING.md. Izin export_stock_input, menu
-  /export/receiving. Sesuai jawaban pengguna: scan nomor box lalu nomor part,
+  /export/receiving. Sesuai jawaban pengguna: scan ID Box lalu nomor part,
   PCS otomatis dari master ekspor; nomor delapan digit boleh sama dengan domestik.
 - Penerimaan mencatat export_stock_boxes sebagai received dan melakukan alokasi
   otomatis, tanpa menulis boxes/box_identities domestik. Konfirmasi penempatan
@@ -950,14 +987,14 @@ Verifikasi Pemenuhan Permintaan Ekspor 29 Oktober 2026:
   pernah final tetap muncul saat revisi, meski seluruh lokasi sudah dilepas.
   Draft awal tidak ditampilkan; cancelled/arsip dikeluarkan dari daftar aktif.
   Migration 2026_10_29_000001 melakukan backfill penanda dari final/klaim/audit.
-- export_fulfillment_boxes menyimpan komitmen aktif unik per nomor box beserta
+- export_fulfillment_boxes menyimpan komitmen aktif unik per ID Box beserta
   snapshot penerimaan pertama, part/PCS, aktor/waktu reservasi dan konfirmasi
   penempatan/lokasi. Ini fondasi pencatatan, bukan penerimaan inventory fisik.
   Belum ada endpoint write. Catatan baru tidak dibuat oleh GET/finalisasi.
 - Terpenuhi hanya dari konfirmasi dengan part/PCS sesuai item dan lokasi tujuan
   benar. Reservasi belum ditempatkan dipisah. Catatan tidak sesuai dan kelebihan
   ditandai; kekurangan/progres dihitung per item agar kelebihan part lain tidak
-  menutupi kebutuhan. Daftar box urut penerimaan pertama lalu nomor box.
+  menutupi kebutuhan. Daftar box urut penerimaan pertama lalu ID Box.
 - Selama ada komitmen, perubahan delivery/pembagian, buka revisi, dan pembatalan
   melalui editor umum ditolak agar penempatan tidak hilang. Revisi/pembatalan
   dengan pengembalian memakai jalur pemenuhan atomik yang dijelaskan di atas.
@@ -1020,7 +1057,7 @@ Verifikasi tambahan 28 Oktober 2026 (Perencanaan Pallet Ekspor):
 - Master lokasi ekspor menampilkan status Direservasi serta menyaringnya dari
   pencarian lokasi tersedia. Identitas part/lokasi yang direferensikan dilindungi.
   Arsip delivery aktif mensyaratkan pembatalan perencanaan terlebih dahulu.
-- Input box, stok ekspor/cadangan, reservasi nomor box, FIFO dan pengembalian
+- Input box, stok ekspor/cadangan, reservasi ID Box, FIFO dan pengembalian
   fisik merupakan tahap Pemenuhan Permintaan berikutnya. Jangan mengambil stok
   domestik otomatis. Keputusan pengguna: FIFO tanggal penerimaan pertama,
   prioritas tenggat lalu pallet terkecil; saat kebutuhan turun, box terbaru
@@ -1417,7 +1454,7 @@ Alur normal:
 
 1. Operator membuka halaman stock input.
 2. Operator menggunakan palet baru atau memilih palet existing yang masih aktif.
-3. Operator scan ID box delapan digit.
+3. Operator scan ID Box delapan digit.
 4. Operator scan atau memilih nomor part.
 5. Sistem memvalidasi nomor part terhadap `part_settings`.
 6. Sistem menentukan kapasitas standar berdasarkan `qty_box`.
@@ -1434,8 +1471,8 @@ Alur normal:
 
 Aturan penting:
 
-- ID box harus delapan angka.
-- ID box yang pernah dipakai tidak boleh digunakan ulang, termasuk jika box lama sudah di-soft-delete.
+- ID Box harus delapan angka.
+- ID Box yang pernah dipakai tidak boleh digunakan ulang, termasuk jika box lama sudah di-soft-delete.
 - Box yang sudah tersimpan di palet berlokasi tidak dapat dimasukkan ulang.
 - Box withdrawn, expired, handled, atau archived tidak dapat dimasukkan ulang melalui scan.
 - Nomor part wajib terdaftar di master part.
@@ -1464,7 +1501,7 @@ File utama:
 
 Flow Warehouse Operator/Admin Warehouse/Admin:
 
-1. Requester mengisi ID box, nomor part, PCS aktual, alasan, delivery, dan tujuan.
+1. Requester mengisi ID Box, nomor part, PCS aktual, alasan, delivery, dan tujuan.
 2. PCS aktual harus lebih kecil dari kapasitas standar.
 3. Tujuan dapat berupa palet existing atau lokasi kosong untuk palet baru.
 4. Request dibuat dengan status `pending`.
@@ -1509,7 +1546,7 @@ File utama:
 Stock view menyediakan tampilan:
 
 - by part;
-- by box ID;
+- by ID Box;
 - by pallet;
 - box not full.
 
@@ -1890,7 +1927,7 @@ File utama:
 
 - Stock Input, Picking Verification, dan Scan Final Delivery menggunakan pemutar bersama `public/js/scan-feedback.js`, dimuat melalui `resources/views/shared/partials/scan-feedback.blade.php`.
 - Audio berasal dari `public/audio/OK.mp3` untuk input/scan berhasil dan `public/audio/NG.mp3` untuk input/scan gagal. File disertakan dalam repository dan diakses melalui URL `asset()`, sehingga deployment tidak bergantung pada folder Downloads komputer development.
-- Stock Input memutar OK setelah server menerima ID box atau nomor part; seluruh pemanggilan suara error sebelumnya memakai NG. Pesan sedang memproses tidak memutar OK.
+- Stock Input memutar OK setelah server menerima ID Box atau nomor part; seluruh pemanggilan suara error sebelumnya memakai NG. Pesan sedang memproses tidak memutar OK.
 - Picking Verification dan Scan Final Delivery memutar NG untuk validasi input gagal, penolakan server, dan kegagalan koneksi. Scan ulang box yang sudah diverifikasi tetap memakai OK sesuai perilaku sukses yang sudah ada.
 - Beep sintetis dan text-to-speech sebelumnya dihapus. Pemutar menyiapkan audio hanya saat interaksi keyboard/pointer pada kontrol scan (diverifikasi 20 Oktober 2026), bukan saat navigasi/status; suara sebelumnya dihentikan saat hasil baru datang, dan scan tetap berjalan jika audio tidak tersedia.
 - Audio OK dan NG memakai penguatan 2x (sekitar +6 dB sebelum kompresi) melalui GainNode bersama, lalu kompresor untuk menekan puncak suara dan mengurangi risiko clipping. Volume akhir tetap mengikuti perangkat pengguna.
@@ -1928,7 +1965,7 @@ Status yang digunakan:
 - Endpoint withdrawal hanya dapat diakses Warehouse Operator, Admin Warehouse, dan Admin.
 - Withdrawal exact di-rollback jika quantity box aktual tidak sama dengan quantity request.
 - `fulfilled_quantity` diperbarui dari quantity yang benar-benar berhasil di-withdraw.
-- Box ID bersifat unik dan umumnya harus delapan digit.
+- ID Box bersifat unik dan umumnya harus delapan digit.
 - `stock_input_boxes` adalah sumber mapping audit transaksi input yang paling akurat.
 - Box aktif adalah sumber utama perhitungan stok.
 - `pallet_items` merupakan ringkasan/fallback legacy, bukan satu-satunya sumber kebenaran.

@@ -37,7 +37,7 @@ class AuditDetailPresentationTest extends TestCase
             ['deleted' => true, 'soft_deleted_box_count' => 0, 'deleted_by_role' => 'admin']
         );
         $this->assertSame([], $detail['changes']);
-        $this->assertContains(['label' => 'Nomor box (sebelum aksi)', 'value' => '00000012'], $detail['facts']);
+        $this->assertContains(['label' => 'ID Box (sebelum aksi)', 'value' => '00000012'], $detail['facts']);
         $this->assertContains(['label' => 'Dihapus dari stok aktif', 'value' => 'Ya'], $detail['facts']);
         $this->assertContains(['label' => 'Box dihapus dari stok aktif', 'value' => '0'], $detail['facts']);
     }

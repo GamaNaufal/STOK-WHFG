@@ -21,7 +21,7 @@ Audit dan implementasi: 18 Oktober 2026.
 | Batas kapasitas tidak terlihat setelah memilih part | Kapasitas dan rentang PCS diperbarui dari master yang sudah dirender | Operator melihat batas sebelum mengirim |
 | Tujuan kosong, alasan pendek, dan PCS di luar batas baru ditolak server | Validasi inline sebelum konfirmasi; tujuan aktif wajib dipilih | Mengurangi perjalanan form yang gagal |
 | Listener memakai form pertama di dokumen | Listener terikat ke form request secara eksplisit | Tidak bergantung pada posisi form layout |
-| Konfirmasi request hanya menyebut part, PCS, dan jenis tujuan | ID box, delivery, tipe, serta pallet/lokasi aktual diperlihatkan | Pengguna memeriksa identitas transaksi |
+| Konfirmasi request hanya menyebut part, PCS, dan jenis tujuan | ID Box, delivery, tipe, serta pallet/lokasi aktual diperlihatkan | Pengguna memeriksa identitas transaksi |
 | Konfirmasi approval generik, alasan dan pelanggan dipotong | Teks lengkap; konfirmasi menyebut identitas dan dampak kuantitas order | Keputusan menggunakan konteks yang cukup |
 | Tombol aksi mengecil dan label hilang di ponsel | Label Setujui/Tolak tetap terlihat, target minimal 44px | Aksi mudah dikenali dan disentuh |
 | Tabel pending sangat lebar pada ponsel | Rincian per request menjadi susunan label/nilai; desktop tetap tabel | Alasan dan tujuan tidak tersembunyi saat mengambil keputusan |

@@ -1,6 +1,6 @@
 <div class="table-responsive" tabindex="0" role="region" aria-label="{{ $tableLabel }}">
     <table class="table expired-page-table mb-0">
-        <thead><tr><th scope="col" class="expired-page-first-cell">ID box</th><th scope="col">Part / PCS</th><th scope="col">Umur saat ini</th><th scope="col">Tanggal masuk asli</th><th scope="col">Pallet / lokasi</th></tr></thead>
+        <thead><tr><th scope="col" class="expired-page-first-cell">ID Box</th><th scope="col">Part / PCS</th><th scope="col">Umur saat ini</th><th scope="col">Tanggal masuk asli</th><th scope="col">Pallet / lokasi</th></tr></thead>
         <tbody>
         @forelse($inventoryBoxes as $box)
             <tr>

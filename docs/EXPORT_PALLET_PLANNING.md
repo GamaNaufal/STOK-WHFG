@@ -96,7 +96,7 @@ meskipun seluruh lokasi dilepas, tetapi rencana dengan komitmen/stock fisik masi
 dilindungi sampai alur pelepasan dan pengembalian karena revisi terhubung.
 Kesepakatan penerimaan dan tahap berikutnya:
 
-- Scan nomor box dan part; PCS dari master ekspor. Penerimaan menambah catatan
+- Scan ID Box dan part; PCS dari master ekspor. Penerimaan menambah catatan
   received, lalu konfirmasi menempatkan stok fisik di lokasi yang ditentukan.
 - Operator tidak memilih delivery; kebutuhan diprioritaskan menurut tenggat
   pengiriman terdekat, lalu nomor pallet terkecil dalam delivery tersebut.

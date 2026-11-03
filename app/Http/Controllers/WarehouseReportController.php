@@ -58,14 +58,14 @@ class WarehouseReportController extends Controller
             $snapshot=json_decode(AuditLog::findOrFail($record)->new_values,true,512,JSON_THROW_ON_ERROR);
             $all=collect($snapshot['boxes']??[])->map(fn($r)=>(object)($r+['pallet_number'=>$snapshot['pallet_number']??null]));$page=max(1,(int)$request->input('page',1));
             $lines=new LengthAwarePaginator($all->forPage($page,50)->values(),$all->count(),50,$page,['path'=>$request->url(),'query'=>$request->query()]);
-            $columns=['box_number'=>'Nomor box','part_number'=>'Nomor part','pcs_quantity'=>'PCS','pallet_number'=>'Pallet asal',
+            $columns=['box_number'=>'ID Box','part_number'=>'Nomor part','pcs_quantity'=>'PCS','pallet_number'=>'Pallet asal',
                 'from_location'=>'Lokasi asal','warehouse_location'=>'Lokasi pengembalian','first_received_at'=>'Pertama diterima'];
         }elseif($filters['kind']==='fulfillment'&&$export){
             $lines=DB::table('export_fulfillment_boxes as box')->join('export_planned_pallet_items as item','item.id','=','box.export_planned_pallet_item_id')
                 ->join('export_planned_pallets as pallet','pallet.id','=','item.export_planned_pallet_id')->where('pallet.export_pallet_plan_id',$record)
                 ->select('box.box_number','item.part_number','box.pcs_quantity','box.first_received_at','box.placed_at','pallet.position as pallet_number','pallet.location_code as warehouse_location')
                 ->orderBy('pallet.position')->orderBy('box.first_received_at')->orderBy('box.id')->paginate(50)->withQueryString();
-            $columns=['box_number'=>'Nomor box','part_number'=>'Nomor part','pcs_quantity'=>'PCS','pallet_number'=>'Pallet',
+            $columns=['box_number'=>'ID Box','part_number'=>'Nomor part','pcs_quantity'=>'PCS','pallet_number'=>'Pallet',
                 'warehouse_location'=>'Lokasi tujuan','first_received_at'=>'Pertama diterima','placed_at'=>'Ditempatkan'];
         }elseif($filters['kind']==='fulfillment'){
             $lines=DB::table('delivery_order_items')->where('delivery_order_id',$record)->orderBy('id')->paginate(50)->withQueryString();

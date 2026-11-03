@@ -9,7 +9,7 @@ class CheckInventoryUnification extends Command
 {
     protected $signature = 'inventory:unification-check';
 
-    protected $description = 'Periksa kesiapan master part bersama, ID box global dan kode delivery unik (hanya baca).';
+    protected $description = 'Periksa kesiapan master part bersama, ID Box global dan kode delivery unik (hanya baca).';
 
     public function handle(): int
     {

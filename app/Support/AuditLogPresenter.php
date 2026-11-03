@@ -8,11 +8,11 @@ use Carbon\CarbonImmutable;
 class AuditLogPresenter
 {
     private const FIELDS = [
-        'box_number' => 'Nomor box', 'pallet_number' => 'Nomor pallet',
+        'box_number' => 'ID Box', 'pallet_number' => 'Nomor pallet',
         'plan_code' => 'Kode rencana delivery', 'customer_name' => 'Customer', 'completed_at' => 'Waktu selesai',
         'duplicate_reason' => 'Alasan membuat rencana identik', 'duplicate_plan_ids' => 'ID rencana pembanding duplikasi',
         'fixed_qty' => 'Standar PCS per box', 'not_full_pcs' => 'Kebutuhan Not Full (PCS)',
-        'source_box_number' => 'Nomor box sumber', 'source_box_id' => 'ID stok sumber', 'new_box_number' => 'Nomor box hasil',
+        'source_box_number' => 'ID Box sumber', 'source_box_id' => 'ID stok sumber', 'new_box_number' => 'ID Box hasil',
         'split_pcs' => 'PCS yang dipecah', 'origin' => 'Asal box', 'preparation_mode' => 'Cara penyiapan',
         'delivery_order_id' => 'Delivery order', 'part_number' => 'Nomor part',
         'pcs_quantity' => 'Jumlah PCS', 'box_quantity' => 'Jumlah box',
@@ -123,7 +123,7 @@ class AuditLogPresenter
                 $isAdjustment = $key === 'overage_adjustments';
                 $columns = $isAdjustment
                     ? ['part_number' => 'Nomor part', 'old_quantity' => 'Sebelum (PCS)', 'new_quantity' => 'Sesudah (PCS)', 'increased_by' => 'Tambahan (PCS)']
-                    : ['box_number' => 'Nomor box', 'part_number' => 'Nomor part', 'pcs_quantity' => 'Jumlah PCS', 'warehouse_location' => 'Lokasi gudang'];
+                    : ['box_number' => 'ID Box', 'part_number' => 'Nomor part', 'pcs_quantity' => 'Jumlah PCS', 'warehouse_location' => 'Lokasi gudang'];
                 if ($log->type === 'export_fulfillment' && in_array($key, ['boxes', 'released_boxes'], true)) $columns += ['pallet_number' => 'Nomor pallet', 'first_received_at' => 'Pertama diterima'];
                 if ($log->type === 'export_fulfillment' && $key === 'items') $columns = ['part_number' => 'Nomor part', 'pcs_per_box' => 'PCS per box', 'box_quantity' => 'Jumlah box', 'pcs_quantity' => 'Total PCS'];
                 if ($log->type === 'export_fulfillment' && $key === 'pallets') $columns = ['pallet_number' => 'Nomor pallet', 'location' => 'Lokasi', 'total_boxes' => 'Jumlah box', 'ready_at' => 'Dikonfirmasi siap', 'ready_by' => 'ID operator'];

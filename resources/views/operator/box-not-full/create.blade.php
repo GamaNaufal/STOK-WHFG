@@ -54,7 +54,7 @@
                             <div class="col-md-6">
                                 <label for="boxNumber" class="form-label fw-bold">ID Box (Scan)</label>
                                 <input type="text" id="boxNumber" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" value="{{ old('box_number') }}" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" required autofocus aria-describedby="boxNumberHint">
-                            <small id="boxNumberHint" class="text-muted">Gunakan ID box 8 angka yang belum pernah dipakai.</small>
+                            <small id="boxNumberHint" class="text-muted">Gunakan ID Box 8 angka yang belum pernah dipakai.</small>
                             </div>
                             <div class="col-md-6">
                                 <label id="partNumberLabel" for="partNumberSelect" class="form-label fw-bold">No Part</label>

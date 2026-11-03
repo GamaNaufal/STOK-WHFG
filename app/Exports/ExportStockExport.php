@@ -17,7 +17,7 @@ class ExportStockExport extends DefaultValueBinder implements FromQuery, WithMap
 
     public function headings(): array
     {
-        return ['Nomor box', 'Nomor part', 'Qty (PCS)', 'Pertama diterima', 'Pallet fisik', 'Lokasi fisik',
+        return ['ID Box', 'Nomor part', 'Qty (PCS)', 'Pertama diterima', 'Pallet fisik', 'Lokasi fisik',
             'Status', 'Rencana delivery (reservasi)', 'Pallet tujuan', 'Lokasi tujuan'];
     }
 

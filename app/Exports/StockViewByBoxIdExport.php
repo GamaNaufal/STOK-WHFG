@@ -50,8 +50,8 @@ class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
 
         foreach ($rows as $stock) {
             $data->push([
-                'ID Box' => $stock['box_id'] ?? 'Legacy',
-                'No Box' => $stock['box_number'] ?? '-',
+                'ID stok' => $stock['box_id'] ?? 'Legacy',
+                'ID Box' => $stock['box_number'] ?? '-',
                 'No Part' => $stock['part_number'] ?? '-',
                 'No Pallet' => $stock['pallet_number'] ?? '-',
                 'PCS' => (int) ($stock['pcs_quantity'] ?? 0),
@@ -69,8 +69,8 @@ class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
     public function headings(): array
     {
         return [
+            'ID stok',
             'ID Box',
-            'No Box',
             'No Part',
             'No Pallet',
             'PCS',

@@ -104,7 +104,7 @@
             <div class="row g-3 align-items-end">
                 <div class="col-lg-3">
                     <label class="form-label fw-semibold" for="deliveryAssignNewBoxNumber">ID Box</label>
-                    <input type="text" class="form-control" id="deliveryAssignNewBoxNumber" placeholder="Scan/ketik ID box" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" autocomplete="off">
+                    <input type="text" class="form-control" id="deliveryAssignNewBoxNumber" placeholder="Scan/ketik ID Box" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" autocomplete="off">
                 </div>
                 <div class="col-lg-3">
                     <label class="form-label fw-semibold" for="deliveryAssignNewBoxPart">No Part</label>

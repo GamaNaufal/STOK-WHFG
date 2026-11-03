@@ -188,7 +188,7 @@ class WarehouseReportService
                 : ['required_pcs'=>'Butuh PCS','fulfilled_pcs'=>'Terpenuhi PCS'];
             if($export)$columns['completed_at']='Selesai dikirim';
         }else{
-            if(!($kind==='returns'&&$export))$columns+=['box_number'=>'Nomor box','part_number'=>'Nomor part'];
+            if(!($kind==='returns'&&$export))$columns+=['box_number'=>'ID Box','part_number'=>'Nomor part'];
             $columns+=['box_quantity'=>'Jumlah box','pcs_quantity'=>'PCS'];
             if($kind!=='receipts')$columns['pallet_number']=$kind==='returns'?'Pallet asal':'Pallet fisik';
             $columns['location']=$kind==='receipts'?'Lokasi penempatan awal':($kind==='returns'?'Tujuan pengembalian':'Lokasi');

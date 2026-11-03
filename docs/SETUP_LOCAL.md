@@ -154,8 +154,8 @@ npm run build
 
 Sertakan public/build dan CSS halaman baru pada deployment. Migration menambah
 empat tabel inventory ekspor, FK komitmen nullable dan izin export_stock_input;
-stok domestik tidak disalin. Modul memakai scan nomor box lalu part, PCS dari
-master ekspor, konfirmasi penempatan, serta FIFO stok lama. Nomor box boleh sama
+stok domestik tidak disalin. Modul memakai scan ID Box lalu part, PCS dari
+master part bersama, konfirmasi penempatan, serta FIFO stok lama. ID Box unik
 lintas lingkup. Tidak perlu konfigurasi PC/layanan baru. Migration ini sudah
 teramati tersedia pada MySQL lokal stock saat verifikasi. Detail dan batas alur:
 docs/EXPORT_STOCK_RECEIVING.md. Jangan menjalankan cutover QA/packing yang belum
@@ -175,7 +175,7 @@ tidak perlu seeder/permission baru. Sudah diterapkan pada MySQL lokal stock deng
 jumlah data existing tetap. Untuk production jalankan migration terarah tersebut,
 sertakan public/build, CSS penerimaan dan public/js/scan-feedback.js terbaru.
 
-Operator scan banyak pasangan nomor box/part dahulu, lalu Proses penerimaan
+Operator scan banyak pasangan ID Box/part dahulu, lalu Proses penerimaan
 untuk melihat kelompok lokasi/pallet. Draft tersimpan setelah refresh, maksimal
 1.000 box, dan belum masuk stok sebelum diproses. Indikator/audio OK/NG sama
 dengan Stock Input. Menu Stok Ekspor tersendiri berada di /export/stock; memakai
@@ -226,3 +226,38 @@ Sertakan seluruh perubahan model/service/controller/rute/view dan rebuild route
 cache jika digunakan. Pop-up memakai Bootstrap existing; tidak ada dependency,
 build JS baru atau konfigurasi PC tambahan. Detail alur Oke dan pengujian:
 docs/EXPORT_FIFO_STOCK_REVIEW.md.
+
+
+## Cloudflare Tunnel untuk pengujian dari luar PC
+
+Cloudflare menerima HTTPS dari browser lalu meneruskan HTTP ke aplikasi lokal.
+`bootstrap/app.php` mempercayai hanya header `X-Forwarded-Proto` dari proxy
+loopback `127.0.0.1`/`::1`, sehingga aset, form dan route menggunakan HTTPS
+pada URL tunnel. Host/port/IP dari header forwarding lain tidak dipercaya.
+Akses HTTP langsung ke localhost tetap tersedia.
+
+Jalankan aplikasi dari folder checkout yang sedang dikerjakan, misalnya:
+
+```powershell
+cd "C:\Users\ygi\OneDrive\ドキュメント\WHFG\STOK-WHFG"
+php artisan serve --host=127.0.0.1 --port=8001
+```
+
+Pada terminal lain:
+
+```powershell
+cloudflared tunnel --url http://127.0.0.1:8001
+```
+
+Gunakan URL HTTPS yang dicetak oleh proses tunnel tersebut. Quick Tunnel dapat
+memberikan hostname baru setelah proses dijalankan ulang. Port tujuan harus sama
+dengan port PHP yang aktif. Untuk membagikan build, jalankan `npm run build`
+setelah perubahan JavaScript; jangan mengandalkan Vite localhost:5173 pada PC
+pengunjung. Pada pemeriksaan 3 November 2026, `public/hot` tidak aktif dan build
+sudah tersedia.
+
+Jika tampilan kehilangan CSS/ikon, periksa apakah URL aset masih HTTP pada
+halaman HTTPS. Ini mixed content, bukan bukti bahwa branch lama sedang dilayani.
+Tidak perlu mengubah APP_URL setiap kali hostname Quick Tunnel berubah. Bila
+proxy berada di IP lain (misalnya container), tentukan IP proxy yang benar
+secara eksplisit; konfigurasi saat ini khusus proxy pada loopback.

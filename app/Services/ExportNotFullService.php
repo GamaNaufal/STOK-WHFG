@@ -165,12 +165,12 @@ class ExportNotFullService
     private function assertNewNumber(string $number, int $requestId): void
     {
         if (! preg_match('/^[0-9]{8}$/D', $number)) {
-            $this->fail('ID box baru wajib tepat 8 angka.');
+            $this->fail('ID Box baru wajib tepat 8 angka.');
         }
         app(ExportPickingService::class)->assertReceiptAllowed($number);
         if (\App\Support\BoxIdentity::unavailable($number,$requestId) || ExportStockBox::withTrashed()->where('box_number', $number)->exists()
             || ExportNotFullRequest::whereKeyNot($requestId)->where('status', 'prepared')->where('preparation->box_number', $number)->exists()) {
-            $this->fail('ID box sudah dipakai pada domestik/ekspor atau sedang disiapkan request lain.');
+            $this->fail('ID Box sudah dipakai pada domestik/ekspor atau sedang disiapkan request lain.');
         }
     }
 

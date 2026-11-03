@@ -11,7 +11,7 @@ Reservasi existing tidak dicabut untuk mengisi rencana lain.
 
 Stok existing yang ditemukan untuk rencana yang baru final direservasi segera
 agar tidak diambil permintaan lain. Pop-up **Stok FIFO untuk rencana pallet**
-menampilkan jumlah, nomor box/part/PCS, tanggal penerimaan pertama, posisi fisik
+menampilkan jumlah, ID Box/part/PCS, tanggal penerimaan pertama, posisi fisik
 asal dan tujuan pallet/lokasi. Daftar maksimal 100 baris per halaman, urut FIFO.
 Pagination membuka kembali pop-up pada halaman berikutnya.
 

@@ -15,7 +15,7 @@ export function initExportPicking({documentRef = globalThis.document, fetcher = 
         event.preventDefault(); if (busy) return;
         const input = form.querySelector('[name="box_number"]');
         const number = input.value.trim();
-        if (!/^[0-9]{8}$/.test(number)) { report(false, 'NG · Nomor box harus tepat 8 angka. Scan ulang; input ini tidak membuat approval.'); input.focus(); input.select(); return; }
+        if (!/^[0-9]{8}$/.test(number)) { report(false, 'NG · ID Box harus tepat 8 angka. Scan ulang; input ini tidak membuat approval.'); input.focus(); input.select(); return; }
         busy = true; form.setAttribute('aria-busy', 'true');
         const controls = [...form.querySelectorAll('input,button')];
         const payload = Object.fromEntries(formData(form)); payload.box_number = number;

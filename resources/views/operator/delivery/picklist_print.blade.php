@@ -133,7 +133,7 @@
     <div class="instructions">
         <strong>PETUNJUK PENGAMBILAN:</strong>
         <br>
-        1. Ikuti urutan nomor box sesuai tabel di bawah<br>
+        1. Ikuti urutan ID Box sesuai tabel di bawah<br>
         2. Cek lokasi pallet di kolom "LOKASI PALLET"<br>
         3. Verifikasi part number dan qty sebelum mengambil<br>
         4. Scan setiap box setelah diambil<br>

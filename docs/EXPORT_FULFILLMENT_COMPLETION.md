@@ -29,7 +29,7 @@ Untuk pengurangan, operator mengisi jumlah box yang tetap diperlukan per part.
 Tahap ini mendukung pengurangan saat pallet belum penuh, bahkan tanpa box.
 Semua part boleh nol untuk menghapus pallet; menghapus pallet terakhir membatalkan
 permintaan. Nomor pallet lainnya tetap, agar panduan peletakan tidak berganti.
-Tinjauan menampilkan nomor box terbaru yang harus dikembalikan menurut
+Tinjauan menampilkan ID Box terbaru yang harus dikembalikan menurut
 first_received_at menurun lalu ID stok terbesar, khusus dari part dan pallet
 tersebut. Box tertua dipertahankan untuk pengiriman FIFO; tanggal penerimaan
 box yang dikembalikan tetap. Membuka tinjauan tidak mengubah data.
@@ -62,7 +62,7 @@ belum dipindahkan dilepas di asalnya. Seluruh mutasi, pengosongan pallet,
 pembebasan klaim lokasi, pembaruan jumlah dan audit berlangsung atomik.
 
 Delivery menjadi cancelled dan diarsipkan; tidak mengirim box, tidak menandai
-completed_at, dan tidak mengurangi stok fisik. Pallet kosong diretir, nomor box
+completed_at, dan tidak mengurangi stok fisik. Pallet kosong diretir, ID Box
 dan tanggal FIFO tetap. Retry aman setelah request/pallet tidak lagi aktif.
 Fingerprint seluruh reservasi menolak tinjauan sebelum ada penerimaan baru.
 Issue picking terbuka tetap harus diselesaikan dahulu. Laporan revisi menampilkan

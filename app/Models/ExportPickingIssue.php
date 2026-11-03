@@ -23,7 +23,7 @@ class ExportPickingIssue extends Model
         return match ($this->issue_type) {
             'unknown_box' => 'Box belum terdaftar pada stok ekspor',
             'missing_location' => 'Box tidak sesuai; lokasi asal belum tersedia',
-            default => 'Nomor box tidak sesuai rekomendasi FIFO',
+            default => 'ID Box tidak sesuai rekomendasi FIFO',
         };
     }
 }

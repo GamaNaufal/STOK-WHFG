@@ -16,7 +16,7 @@ Pengembalian karena revisi/pembatalan masih tahap berikutnya.
   status, pagination 15 rencana, dan urutan tenggat lalu ID delivery.
 - GET `/export/fulfillment/{deliveryPlan}` menampilkan progres, kebutuhan tiap
   part/pallet/lokasi, dan daftar box. Rincian pallet dapat dibuka dengan keyboard.
-  Daftar box dipaginasi 25 baris, urut tanggal pertama diterima lalu nomor box.
+  Daftar box dipaginasi 25 baris, urut tanggal pertama diterima lalu ID Box.
 - Menu tersedia di navigasi dan dashboard ekspor. Perencanaan final mempunyai
   tautan menuju pemantauannya. Tombol Perbarui tampilan mengambil data terkini;
   tidak ada polling otomatis.
@@ -35,11 +35,11 @@ revision, occupancy, atau klaim lokasi yang sudah ada.
 
 ## Sumber angka pemenuhan
 
-`export_fulfillment_boxes` adalah catatan komitmen aktif per nomor box, bukan tabel
-penerimaan inventory. Satu nomor box hanya boleh mempunyai satu komitmen aktif
+`export_fulfillment_boxes` adalah catatan komitmen aktif per ID Box, bukan tabel
+penerimaan inventory. Satu ID Box hanya boleh mempunyai satu komitmen aktif
 di tabel ini. Relasi mengarah ke item pallet, dengan part/PCS, tanggal penerimaan
 pertama, waktu/aktor reservasi, serta waktu/aktor/lokasi penempatan. FK membatasi
-penghapusan referensi. Nomor box dipertahankan sebagai string termasuk nol awal.
+penghapusan referensi. ID Box dipertahankan sebagai string termasuk nol awal.
 
 - Kebutuhan memakai item pallet dan snapshot PCS/box hasil perencanaan.
 - Reservasi: part/PCS sesuai snapshot dan belum ada konfirmasi penempatan.

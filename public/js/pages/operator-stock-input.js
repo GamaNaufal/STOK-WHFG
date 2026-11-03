@@ -318,7 +318,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>No Box</th>
+                            <th>ID Box</th>
                             <th>No Part</th>
                             <th>PCS</th>
                             <th>Qty Box</th>

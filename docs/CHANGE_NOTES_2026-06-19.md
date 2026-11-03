@@ -35,7 +35,7 @@ Batch ini memperkuat keamanan withdrawal, konsistensi quantity delivery, integri
 - Merge pallet membangun `pallet_items` dari box aktif unik, bukan ringkasan sumber yang mungkin basi.
 - Occupancy lokasi menggunakan box aktif sebagai sumber utama.
 - Box withdrawn, expired, handled, atau archived tidak dapat dimasukkan ulang.
-- ID box yang pernah di-soft-delete tidak dapat digunakan ulang sehingga histori inbound tidak terputus.
+- ID Box yang pernah di-soft-delete tidak dapat digunakan ulang sehingga histori inbound tidak terputus.
 - Koreksi box memperbarui QR, header stock input, part, PCS, dan tanggal umur box.
 - Box yang sedang berada dalam sesi picking tidak dapat diedit atau dihapus.
 - Query stok aktif mengabaikan pallet soft-deleted.

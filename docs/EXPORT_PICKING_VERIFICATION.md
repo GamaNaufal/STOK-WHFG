@@ -13,7 +13,7 @@ langsung mencoba lagi. Pencarian tidak menerbitkan sertifikat pengambilan,
 membuat issue, mengubah reservasi, atau memindahkan inventory.
 
 **Verifikasi pengambilan wajib** dibuka dari kelompok penempatan yang memerlukan
-scan. Setiap box rekomendasi dari pallet asal campuran harus cocok dengan nomor box pada
+scan. Setiap box rekomendasi dari pallet asal campuran harus cocok dengan ID Box pada
 reservasi, termasuk jika box lain memiliki part yang sama. Setelah scan benar,
 konfirmasi penempatan fisik tetap diperlukan pada transaksi penerimaan asal.
 Penerimaan/input box baru cukup mengikuti scan input dan konfirmasi penempatan,
@@ -35,7 +35,7 @@ asalnya; pencarian atau perubahan data dari browser tidak bisa menggantikannya.
 
 ## Kesalahan dan pengembalian
 
-Nomor box harus tepat delapan digit ASCII. Leading zero dipertahankan. Input
+ID Box harus tepat delapan digit ASCII. Leading zero dipertahankan. Input
 seperti `123`, huruf, angka lebih panjang, atau digit full-width mendapat NG
 tanpa issue atau blokir baru. Input tidak dipotong atau ditambah nol agar cocok.
 
@@ -70,9 +70,9 @@ approval domestik dan ekspor yang masih menunggu keputusan.
   kosong atau pallet ekspor existing. Part, PCS, dan tanggal pertama diterima
   tetap dipertahankan.
 - Box belum tercatat pada stok ekspor: admin wajib memilih nomor part dari
-  master ekspor dan tujuan pengembalian. PCS mengikuti kapasitas master dan
-  disimpan sebagai snapshot approval. Data domestik dengan nomor box sama
-  tidak dipakai untuk membuat atau mengoreksi stok ekspor.
+  master part bersama dan tujuan pengembalian. PCS mengikuti kapasitas master dan
+  disimpan sebagai snapshot approval. ID Box yang sudah terdaftar di domestik
+  ditolak untuk registrasi stok ekspor.
 
 Approval hanya menyimpan arahan. Box baru didaftarkan dan posisi fisik box yang
 belum memiliki lokasi baru dicatat ketika operator mengonfirmasi penempatan.

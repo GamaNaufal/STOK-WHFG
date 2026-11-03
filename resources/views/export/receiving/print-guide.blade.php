@@ -23,7 +23,7 @@
                         @if($destination['delivery'])<span class="guide-delivery">{{ $destination['delivery']->plan_code }} · {{ $destination['delivery']->customer_name }} · Tenggat {{ $destination['delivery']->delivery_deadline->format('d/m/Y') }}</span>@endif
                         @if($destination['load'] !== null && \App\Support\ExportPalletLoad::level($destination['load']) !== 'normal')<span class="guide-load">Setelah penempatan kelompok ini: {{ $destination['load'] }} box · {{ \App\Support\ExportPalletLoad::note($destination['load']) }}</span>@endif
                     </th></tr>
-                    <tr><th class="col-number">No.</th><th class="col-box">Nomor box</th><th class="col-part">Nomor part</th><th class="col-pcs">PCS</th><th class="col-source">Posisi saat dicetak</th><th class="col-check">Cek</th></tr>
+                    <tr><th class="col-number">No.</th><th class="col-box">ID Box</th><th class="col-part">Nomor part</th><th class="col-pcs">PCS</th><th class="col-source">Posisi saat dicetak</th><th class="col-check">Cek</th></tr>
                 </thead>
                 <tbody>
                     @foreach($destination['rows'] as $row)

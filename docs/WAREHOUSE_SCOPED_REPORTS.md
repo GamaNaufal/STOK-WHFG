@@ -59,7 +59,7 @@ operasi yang memerlukan izin lain. Riwayat tetap terbaca setelah stok/delivery
 diarsipkan, tanpa membuka kembali reservasi, mengubah audit atau inventory.
 
 WarehouseRecordsExport membaca semua hasil query filter, termasuk halaman lain,
-dan mencantumkan lingkup pada setiap baris. Nomor box/referensi/teks disimpan
+dan mencantumkan lingkup pada setiap baris. ID Box/referensi/teks disimpan
 sebagai teks (leading zero tetap, teks mirip formula tidak dieksekusi). Tanggal
 dan jumlah bertipe numerik dengan format tanggal Excel; header teal, freeze
 dan autofilter tersedia. Export pengambilan domestik juga menerapkan filter

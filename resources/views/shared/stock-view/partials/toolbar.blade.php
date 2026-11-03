@@ -1,6 +1,6 @@
 <section class="stock-toolbar mb-4" aria-label="Pencarian dan tampilan stok">
     <nav class="stock-toolbar__modes" aria-label="Tampilkan stok berdasarkan">
-        @foreach(['part' => 'Part Number', 'box_id' => 'Box ID', 'pallet' => 'Pallet', 'not_full' => 'Box Not Full'] as $mode => $label)
+        @foreach(['part' => 'Part Number', 'box_id' => 'ID Box', 'pallet' => 'Pallet', 'not_full' => 'Box Not Full'] as $mode => $label)
             <a href="{{ route('stock-view.index', ['view_mode' => $mode, 'search' => $search, 'sort' => $sortMode]) }}"
                @if($viewMode === $mode) aria-current="page" @endif>{{ $label }}</a>
         @endforeach

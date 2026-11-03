@@ -35,7 +35,7 @@ Perubahan 3 November 2026. Berlaku pada branch aktif tanpa membuat branch baru.
    ```
 
 4. Jika ditemukan konflik, migrasi berhenti sebelum DML/DDL. Jangan mengubah
-   ID box, menggabungkan kuantitas atau menebak kode kosong secara otomatis.
+   ID Box, menggabungkan kuantitas atau menebak kode kosong secara otomatis.
    Tinjau identitas fisik dan histori bersama pemilik data. Part dengan kapasitas
    berbeda pada rencana aktif perlu diselesaikan/dibatalkan dahulu lewat alur
    pengembalian yang ada. Benturan relasi item perlu ditinjau per rencana.

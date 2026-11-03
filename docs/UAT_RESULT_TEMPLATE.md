@@ -128,7 +128,7 @@ berada pada kasus dengan ID yang sama dalam panduan.
 | L08 | Coba rentang tanggal terbalik, hasil kosong, mengetik search cepat, koneksi lambat/error lalu retry. | Belum diuji | | |
 | UI01 | Chrome desktop, layar sempit, keyboard Tab/Enter, scanner USB dengan Enter; tutup modal Esc, cetak A4. | Belum diuji | | |
 | UI02 | DevTools Network: filter/search/pagination, navigasi keluar/masuk, doubleclick simpan. | Belum diuji | | |
-| C01 | Dua sesi operator ekspor menyimpan ID box sama dengan token berbeda. | Belum diuji | | |
+| C01 | Dua sesi operator ekspor menyimpan ID Box sama dengan token berbeda. | Belum diuji | | |
 | C02 | Dua finalisasi memakai lokasi kosong sama. | Belum diuji | | |
 | C03 | Dua rencana membutuhkan spare box yang sama. | Belum diuji | | |
 | C04 | Place/reduce/approve NF memakai revision lama dari tab kedua. | Belum diuji | | |

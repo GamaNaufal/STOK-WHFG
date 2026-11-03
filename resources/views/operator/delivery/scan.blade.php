@@ -39,8 +39,8 @@
             <section class="card delivery-scan-card delivery-scan-input-card" aria-labelledby="deliveryScanInputTitle">
                 <div class="card-body">
                     <span class="delivery-scan-section-label">Pemindaian</span>
-                    <h2 id="deliveryScanInputTitle">Scan ID box</h2>
-                    <p class="delivery-scan-supporting">Gunakan scanner atau ketik ID box, lalu tekan Enter. Scan yang tidak sesuai akan memblokir sesi sampai disetujui admin.</p>
+                    <h2 id="deliveryScanInputTitle">Scan ID Box</h2>
+                    <p class="delivery-scan-supporting">Gunakan scanner atau ketik ID Box, lalu tekan Enter. Scan yang tidak sesuai akan memblokir sesi sampai disetujui admin.</p>
                     <div id="scanBlockedNotice" class="delivery-scan-blocked" role="status" @if(! $isScanBlocked) hidden @endif>
                         <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
                         <div>
@@ -51,7 +51,7 @@
                     </div>
                     <div class="delivery-scan-field">
                         <label for="scanInput" class="form-label">ID Box</label>
-                        <input type="text" id="scanInput" class="form-control" placeholder="Scan / input ID box" inputmode="numeric" aria-describedby="deliveryScanInputHelp" @disabled($isScanBlocked) @if(! $isScanBlocked) autofocus @endif>
+                        <input type="text" id="scanInput" class="form-control" placeholder="Scan / input ID Box" inputmode="numeric" aria-describedby="deliveryScanInputHelp" @disabled($isScanBlocked) @if(! $isScanBlocked) autofocus @endif>
                         <span id="deliveryScanInputHelp" class="delivery-scan-field-hint">Input dikosongkan dan kembali fokus setelah scan dikirim.</span>
                     </div>
                     <button type="button" class="btn btn-primary delivery-scan-submit" id="btnScan" @disabled($isScanBlocked)>
@@ -128,7 +128,7 @@
                         </tbody>
                     </table>
                 </div>
-                <p id="deliveryScanTableHelp" class="delivery-scan-table-hint">Geser tabel untuk melihat semua kolom. ID box tetap terlihat saat digeser.</p>
+                <p id="deliveryScanTableHelp" class="delivery-scan-table-hint">Geser tabel untuk melihat semua kolom. ID Box tetap terlihat saat digeser.</p>
             </section>
 
             @if($session->issues->where('status', 'pending')->count() > 0)

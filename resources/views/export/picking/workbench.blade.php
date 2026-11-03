@@ -18,10 +18,10 @@
     </div></section>
 @elseif($helper || $mandatoryRows->isNotEmpty())
     <section class="card verification-card"><div class="card-body">
-        <span class="verification-section-label">{{ $helper ? 'Pencarian box' : 'Pengambilan wajib' }}</span><h2>Scan nomor box</h2><p class="verification-supporting">{{ $helper ? 'Periksa apakah box sesuai daftar rekomendasi.' : 'Cocokkan setiap box dari pallet campuran sebelum dipindahkan.' }}</p>
+        <span class="verification-section-label">{{ $helper ? 'Pencarian box' : 'Pengambilan wajib' }}</span><h2>Scan ID Box</h2><p class="verification-supporting">{{ $helper ? 'Periksa apakah box sesuai daftar rekomendasi.' : 'Cocokkan setiap box dari pallet campuran sebelum dipindahkan.' }}</p>
         <form method="POST" action="{{ route($helper ? 'export.picking.seek' : 'export.receiving.picking.scan', $pickParameters) }}" data-export-pick-scan data-scan-feedback novalidate>
             @csrf<input type="hidden" name="request_token" value="{{ (string)\Illuminate\Support\Str::uuid() }}">
-            <label class="form-label" for="export-pick-box">Scan nomor box (8 angka)</label><div class="verification-field"><input class="form-control export-picking-input" id="export-pick-box" name="box_number" inputmode="numeric" pattern="[0-9]{8}" maxlength="64" autocomplete="off" autofocus required aria-describedby="export-pick-hint"><button class="btn verification-submit" type="submit"><i class="bi bi-upc-scan" aria-hidden="true"></i> {{ $helper ? 'Cari box' : 'Verifikasi box' }}</button></div><p class="verification-field-hint" id="export-pick-hint">Scan label box yang utuh. Nomor pendek seperti 123 ditolak tanpa membuat approval.</p>
+            <label class="form-label" for="export-pick-box">Scan ID Box (8 angka)</label><div class="verification-field"><input class="form-control export-picking-input" id="export-pick-box" name="box_number" inputmode="numeric" pattern="[0-9]{8}" maxlength="64" autocomplete="off" autofocus required aria-describedby="export-pick-hint"><button class="btn verification-submit" type="submit"><i class="bi bi-upc-scan" aria-hidden="true"></i> {{ $helper ? 'Cari box' : 'Verifikasi box' }}</button></div><p class="verification-field-hint" id="export-pick-hint">Scan label box yang utuh. ID Box pendek seperti 123 ditolak tanpa membuat approval.</p>
         </form>
     </div></section>
 @else
@@ -30,7 +30,7 @@
     <section class="card verification-card"><div class="card-body"><span class="verification-section-label">Progres pengambilan wajib</span><div class="verification-metrics"><div class="verification-metric"><span>Sudah diverifikasi</span><strong>{{ $verifiedCount }} <small>box</small></strong></div><div class="verification-metric"><span>Belum diverifikasi</span><strong>{{ $remainingCount }} <small>box</small></strong></div></div><p class="verification-supporting mb-0">{{ $helper ? 'Mode pencarian tidak mengubah progres verifikasi wajib.' : 'Verifikasi bukan konfirmasi penempatan. Lanjutkan penempatan setelah pengambilan sesuai.' }}</p>@if($helper && $mandatoryRows->isNotEmpty())<div class="verification-actions"><a class="btn btn-primary" href="{{ route('export.receiving.picking.show', $pickParameters) }}">Buka verifikasi wajib</a></div>@endif</div></section>
 </div>
 <section class="card verification-card"><div class="verification-list-heading"><div><span class="verification-section-label">Daftar rekomendasi</span><h2>Box untuk diambil</h2></div><span class="verification-total">{{ $rows->count() }} box</span></div>
-    <div class="verification-table-scroll" role="region" tabindex="0" aria-label="Rekomendasi pengambilan FIFO"><table class="table verification-table align-middle mb-0"><thead><tr><th>Nomor box / part</th><th>Ambil dari</th><th>Pertama diterima</th><th>Verifikasi pengambilan</th></tr></thead><tbody>
+    <div class="verification-table-scroll" role="region" tabindex="0" aria-label="Rekomendasi pengambilan FIFO"><table class="table verification-table align-middle mb-0"><thead><tr><th>ID Box / part</th><th>Ambil dari</th><th>Pertama diterima</th><th>Verifikasi pengambilan</th></tr></thead><tbody>
         @forelse($rows as $row)
             @php($scanned = $row->requires_scan && $row->picking_ready)
             <tr data-pick-box-number="{{ $row->box_number }}" @class(['table-success' => $scanned])>

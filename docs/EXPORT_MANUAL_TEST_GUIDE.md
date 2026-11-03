@@ -22,10 +22,10 @@ tercatat saat pemeriksaan. Kondisi dapat berubah setelah Anda menjalankan tes.
 - Approval Not Full: `uat26.supervisi@whfg.test` atau `uat26.admin@whfg.test`.
 - Password akun uji: `UatWHFG!2026`.
 - H berarti hari Anda menjalankan tes. H+7 berarti tujuh hari sesudahnya.
-- Nomor box harus dipindai/diketik lengkap 8 digit. Pada tes development,
+- ID Box harus dipindai/diketik lengkap 8 digit. Pada tes development,
   ketik nomor tersebut sebagai simulasi label box.
 - Semua part ditulis lengkap. Singkatan lokasi E41 berarti `UAT26-E41`.
-- Jalankan berurutan. Untuk mencoba ulang, gunakan kode rencana/ID box baru
+- Jalankan berurutan. Untuk mencoba ulang, gunakan kode rencana/ID Box baru
   dan lokasi yang masih kosong. Jangan menghapus reservasi melalui SQL.
 
 Sebagian rencana contoh sudah final agar kasus lanjutan dapat langsung diuji.
@@ -320,13 +320,13 @@ isi serupa dengan kode baru boleh, dan retry tidak membuat data ganda.
    selama ada rencana aktif harus ditolak. Lokasi occupied/reserved dilindungi.
 2. Cari `UAT26-SHARED` pada **Master Nomor Part Bersama**: hanya satu master
    untuk kedua alur. Fixture baru memakai 100 PCS/box; pada data lama tanpa
-   pasangan domestik, kapasitas existing dipertahankan. ID box yang tercatat
+   pasangan domestik, kapasitas existing dipertahankan. ID Box yang tercatat
    pada satu lingkup harus ditolak jika dicoba pada lingkup lain, termasuk histori.
    Lokasi tetap terpisah; akses master operator untuk debug hanya default lokal/testing.
 3. Buka **Stok Ekspor**, cari box, part, lokasi dan pallet hasil kasus 1–11.
    Ganti pengelompokan box/pallet dan filter status. Filter harus AJAX tanpa
    klik Cari; Lihat detail pallet membuka popup berisi box, tidak autoexpand.
-4. Unduh Excel stok dengan filter: cocokkan nomor box/PCS/lokasi/seluruh hasil.
+4. Unduh Excel stok dengan filter: cocokkan ID Box/PCS/lokasi/seluruh hasil.
 5. Admin Warehouse/Supervisi/Admin buka laporan existing, pilih scope Ekspor,
    periode pengujian dan part. Cocokkan inbound, perpindahan, return, shipment.
    Split kasus 6 tidak menambah inbound PCS; external kasus 5 menambah 20 PCS.

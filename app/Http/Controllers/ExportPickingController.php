@@ -64,7 +64,7 @@ class ExportPickingController extends Controller
         }
 
         return $request->validate(['box_number' => ['required', 'string', 'regex:/^[0-9]{8}$/']],
-            ['box_number.regex' => 'Nomor box harus tepat 8 angka. Scan ulang; input tidak lengkap tidak membuat issue approval.']);
+            ['box_number.regex' => 'ID Box harus tepat 8 angka. Scan ulang; input tidak lengkap tidak membuat issue approval.']);
     }
 
     public function seek(Request $request, ExportPlannedPallet $pallet, ExportPickingService $service)

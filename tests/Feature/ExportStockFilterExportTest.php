@@ -148,7 +148,7 @@ class ExportStockFilterExportTest extends TestCase
         $this->get(route('export.stock.index'))->assertViewHas('filterLocations', fn ($locations) => $locations->isEmpty());
         $sheet = $this->workbook(['location_id' => $empty->master_location_id])->getActiveSheet();
         $this->assertSame(1, $sheet->getHighestRow());
-        $this->assertSame('Nomor box', $sheet->getCell('A1')->getValue());
+        $this->assertSame('ID Box', $sheet->getCell('A1')->getValue());
         $this->assertSame('Lokasi tujuan', $sheet->getCell('J1')->getValue());
     }
 

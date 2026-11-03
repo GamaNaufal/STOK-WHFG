@@ -34,7 +34,7 @@
         @else<div class="alert alert-warning">Tidak ada box penuh yang bebas untuk part ini. Opsi pemecahan belum tersedia. Kebutuhan penuh yang sudah direservasi tetap dipertahankan.</div>@endif
         <form method="POST" action="{{ route('box-not-full.export.prepare',$record) }}">@csrf<input type="hidden" name="revision" value="{{ $record->revision }}">
             <label class="form-label" for="nf-mode">Asal box</label><select class="form-select mb-3" id="nf-mode" name="mode" required><option value="external" @selected(old('mode',$p['mode']??'external')==='external')>Datang sudah dikemas Not Full {{ $record->pcs_quantity }} PCS</option><option value="split" @disabled(!$source) @selected(old('mode',$p['mode']??'external')==='split' && $source)>Ambil dari box penuh di stok · FIFO</option></select>
-            <label class="form-label" for="nf-box">ID box baru (8 angka)</label><input class="form-control mb-3" id="nf-box" name="box_number" type="text" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" value="{{ old('box_number',$p['box_number']??'') }}" required autocomplete="off">
+            <label class="form-label" for="nf-box">ID Box baru (8 angka)</label><input class="form-control mb-3" id="nf-box" name="box_number" type="text" maxlength="8" pattern="[0-9]{8}" inputmode="numeric" value="{{ old('box_number',$p['box_number']??'') }}" required autocomplete="off">
             <label class="form-label" for="nf-notes">Catatan penyiapan</label><textarea class="form-control mb-3" id="nf-notes" name="notes" maxlength="1000" minlength="3" required>{{ old('notes',$p['notes']??'') }}</textarea>
             <button class="btn btn-primary" type="submit">Simpan penyiapan untuk approval</button>
         </form>

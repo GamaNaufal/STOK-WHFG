@@ -16,7 +16,7 @@
     @if($errors->any())<div role="alert" class="alert alert-danger"><strong>Periksa kembali isian:</strong><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
     <section class="expired-page-panel p-4" aria-label="Identitas box">
         <div class="row g-3">
-            <div class="col-sm-6 col-lg-3"><small>ID box asal</small><div class="fw-bold">{{ $handling->source_box_number }}</div></div>
+            <div class="col-sm-6 col-lg-3"><small>ID Box asal</small><div class="fw-bold">{{ $handling->source_box_number }}</div></div>
             <div class="col-sm-6 col-lg-3"><small>Part / PCS tetap</small><div class="fw-bold">{{ $handling->part_number }} / {{ $handling->pcs_quantity }} PCS</div></div>
             <div class="col-sm-6 col-lg-3"><small>Masuk asli · dasar umur/FIFO</small><div class="fw-bold">{{ $handling->original_stored_at->format('d M Y H:i') }}</div></div>
             <div class="col-sm-6 col-lg-3"><small>ID pengganti</small><div class="fw-bold">{{ $handling->replacement_box_number ?? 'Belum diterima' }}</div></div>

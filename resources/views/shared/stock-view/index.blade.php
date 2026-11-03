@@ -161,7 +161,7 @@
 
                 <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel stok, geser untuk melihat kolom lainnya">
                     <table class="table table-hover mb-0" style="margin-bottom: 0;">
-                        <caption class="visually-hidden">Hasil stok berdasarkan {{ ['part' => 'part number', 'box_id' => 'ID box', 'pallet' => 'pallet', 'not_full' => 'box not full'][$viewMode] ?? $viewMode }}</caption>
+                        <caption class="visually-hidden">Hasil stok berdasarkan {{ ['part' => 'part number', 'box_id' => 'ID Box', 'pallet' => 'pallet', 'not_full' => 'box not full'][$viewMode] ?? $viewMode }}</caption>
                         <thead style="background: #f9fafb; border-bottom: 2px solid #e5e7eb;">
                             <tr>
                                 @if($viewMode === 'part')

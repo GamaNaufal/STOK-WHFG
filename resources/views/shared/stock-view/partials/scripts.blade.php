@@ -402,7 +402,7 @@
 
         const boxId = dataset.boxId || dataset.box_id;
         if (!boxId) {
-            showToast('ID box tidak valid untuk dihapus.', 'danger');
+            showToast('ID Box tidak valid untuk dihapus.', 'danger');
             return;
         }
 

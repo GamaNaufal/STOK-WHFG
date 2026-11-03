@@ -4,7 +4,7 @@
 
 ## Cakupan
 
-Pencarian, urutan, dan navigasi Part Number / Box ID / Pallet / Box Not Full.
+Pencarian, urutan, dan navigasi Part Number / ID Box / Pallet / Box Not Full.
 Backend, hak akses, perhitungan stok, export, tabel, dan modal detail tidak diubah.
 Pilihan urutan menggunakan sortOptions yang sudah disediakan controller.
 
@@ -90,7 +90,7 @@ inventory, serta isi template cetak tetap dipertahankan.
 | Area | Skenario dan hasil |
 | --- | --- |
 | Navigasi dan filter | Empat tab dibuka; pengurutan, pencarian Enter, reset, dan parameter URL diperiksa. Tes Laravel memeriksa empat mode dengan filter berisi/kosong. |
-| Saran pencarian | Tab memfokuskan saran; Escape menutup saran dan kembali ke input. Pencarian ID box membuka detail pallet terkait. |
+| Saran pencarian | Tab memfokuskan saran; Escape menutup saran dan kembali ke input. Pencarian ID Box membuka detail pallet terkait. |
 | Detail part/pallet | Data normal, loading lambat, buka-tutup saat request berjalan, error JSON/HTML, serta item pallet kosong diperiksa. Respons lama tidak menggantikan request yang lebih baru. |
 | Riwayat | Data berisi dan kosong, error, serta Coba lagi setelah server pulih diperiksa. |
 | Edit Box | Alasan kosong/pendek, PCS nol, tanpa perubahan, pilihan master part tanpa hasil, konfirmasi kembali, penolakan 422, respons HTML, dan sukses setelah reload diperiksa. Input tetap tersimpan saat gagal. |
