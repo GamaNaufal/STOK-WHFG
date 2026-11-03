@@ -26,7 +26,7 @@
     @elseif($group['picking_remaining'] > 0)
         <div class="alert alert-warning mx-3"><strong>{{ $group['picking_remaining'] }} box wajib diverifikasi.</strong><p>Scan ID Box rekomendasi sebelum konfirmasi penempatan.</p><a class="btn btn-primary" href="{{ route('export.receiving.picking.show', $pickParameters) }}">Verifikasi pengambilan</a></div>
     @endif
-    @if($group['actionable']->isNotEmpty() && !$group['picking_issue'] && $group['picking_remaining'] === 0)
+    @if($group['actionable']->isNotEmpty() && !$group['picking_issue'] && $group['picking_remaining'] === 0 && empty($receipt['picking_start_needed']))
         <form method="POST" action="{{ route('export.receiving.place-bulk') }}" class="plan-panel-body receiving-group-form" data-placement-form>
             @csrf
             @if(!empty($receipt['notice_id']))<input type="hidden" name="return_notice" value="{{ $receipt['notice_id'] }}"><input type="hidden" name="return_pallet" value="{{ $receipt['pallet_id'] }}">@elseif($batch)<input type="hidden" name="return_batch" value="{{ $batch->id }}">@elseif($returnBox)<input type="hidden" name="return_box" value="{{ $returnBox }}">@endif

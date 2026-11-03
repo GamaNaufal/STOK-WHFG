@@ -242,6 +242,7 @@ class ExportPalletMergeTest extends TestCase
         $first = $this->plan([1]);
         $this->plan([1]);
         $this->invalid(fn () => $this->data([$a->current_pallet_id, $b->current_pallet_id]), 'Lintas rencana delivery');
+        $this->startRecommendation($a);
         $this->place($a->fresh());
         $physical = ExportStockPallet::where('export_planned_pallet_id', $first->palletPlan->pallets->sole()->id)->sole();
         $this->invalid(fn () => $this->data([$physical->id, $b->current_pallet_id]), 'delivery lain');
@@ -352,8 +353,17 @@ class ExportPalletMergeTest extends TestCase
         $freshNotice = ExportStockAllocationNotice::where('export_pallet_plan_id', $plan->id)->orderByDesc('id')->first();
         $this->assertSame(2, $freshNotice->plan_revision);
         app(ExportStockAllocationNoticeService::class)->acknowledge($d->id, $freshNotice->id, 2, $this->operator);
+        $this->startRecommendation($outside);
         $this->place($outside->fresh());
         $this->assertNotNull($outside->fresh()->fulfillment->placed_at);
+    }
+
+    private function startRecommendation(ExportStockBox $box): void
+    {
+        $f = $box->fresh()->fulfillment;
+        $picking = app(\App\Services\ExportPickingService::class);
+        $pallet = $f->plannedItem->export_planned_pallet_id;
+        $picking->start($pallet, $f->allocation_notice_id, $picking->startFingerprint($picking->rows($pallet, $f->allocation_notice_id)), $this->operator);
     }
 
     public function test_prepared_not_full_is_invalidated_and_retargeted_to_new_location(): void

@@ -4,16 +4,30 @@
 
 @section('styles')
 <link rel="stylesheet" href="{{ asset('css/pages/move-pallet.css') }}">
+<link rel="stylesheet" href="{{ asset('css/pages/warehouse-scope-switch.css') }}?v={{ filemtime(public_path('css/pages/warehouse-scope-switch.css')) }}">
 @endsection
 
 @section('content')
+@php
+    $exportMove = $exportMove ?? false;
+    $moveRoutes = app(\App\Services\NavigationContextService::class)->moveRoutes(auth()->user());
+    $scopeUrls = array_map(fn ($name) => route($name), $moveRoutes);
+@endphp
 <div class="container-fluid move-pallet-page" id="movePalletPage">
-    <header class="move-pallet-header">
-        <span class="move-pallet-eyebrow">Inventory / Lokasi pallet</span>
-        <h1><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Pemindahan Pallet</h1>
-        <p>Pilih pallet aktif, tentukan lokasi kosong, lalu periksa perpindahan sebelum menyimpan. Nomor dan isi pallet tetap sama.</p>
+    <header class="move-pallet-header warehouse-scope-header">
+        <div class="warehouse-scope-heading">
+            <span class="move-pallet-eyebrow">Inventory / Lokasi pallet {{ $exportMove ? 'ekspor' : 'domestik' }}</span>
+            <h1><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Pemindahan Pallet</h1>
+            <p>Pilih pallet aktif, tentukan lokasi kosong, lalu periksa perpindahan sebelum menyimpan. Nomor dan isi pallet tetap sama.</p>
+        </div>
+        @if(count($scopeUrls) === 2)
+            @include('shared.warehouse-scope-switch', ['scope' => $exportMove ? 'export' : 'domestic', 'scopeLabel' => 'Lingkup pemindahan pallet'])
+        @endif
     </header>
 
+    @if(session('export_move_success') && $exportMove)
+        <div class="alert alert-success" role="status">{{ session('export_move_success') }}</div>
+    @endif
     <div id="alertBox" class="alert d-none" role="alert"></div>
     <div class="row g-3 g-xl-4 move-pallet-workflow">
         <div class="col-lg-5">
@@ -33,7 +47,7 @@
                             <i class="bi bi-search" aria-hidden="true"></i> Cari
                         </button>
                     </div>
-                    <div id="palletCodeHint" class="form-text">Box assigned atau not-full boleh ikut dipindahkan. Sesi picking berstatus scanning, blocked, atau approved tetap mengunci pallet.</div>
+                    <div id="palletCodeHint" class="form-text">{{ $exportMove ? 'Pakai kode pallet fisik seperti EX-000001. Picking yang sudah dimulai atau issue picking yang masih terbuka mengunci pallet.' : 'Box assigned atau not-full boleh ikut dipindahkan. Sesi picking berstatus scanning, blocked, atau approved tetap mengunci pallet.' }}</div>
                     <div id="palletSearchStatus" class="move-pallet-search-status d-none" role="status" aria-live="polite"></div>
                     <div id="palletSummary" class="move-pallet-summary mt-4 d-none" aria-live="polite">
                         <div class="move-pallet-summary-head">
@@ -48,25 +62,30 @@
                     </div>
                     <div class="move-pallet-choices mt-4">
                         <div class="move-pallet-list-head">
-                            <h3 id="availablePalletTitle">Pallet yang dapat dipindahkan</h3>
+                            <h3 id="availablePalletTitle">{{ $exportMove ? 'Pallet aktif' : 'Pallet yang dapat dipindahkan' }}</h3>
                             <span class="move-pallet-count">{{ $pallets->count() }} pallet</span>
                         </div>
-                        <label for="palletListSearch" class="visually-hidden">Filter pallet yang dapat dipindahkan</label>
+                        <label for="palletListSearch" class="visually-hidden">Filter daftar pallet</label>
                         <input type="search" id="palletListSearch" class="form-control mb-2" placeholder="Filter nomor pallet atau lokasi">
                         <div id="availablePalletList" class="list-group move-pallet-option-list" aria-labelledby="availablePalletTitle">
                             @forelse($pallets as $availablePallet)
+                                @php
+                                    $palletNumber = $exportMove ? $availablePallet->number : $availablePallet->pallet_number;
+                                    $palletLocation = $exportMove ? $availablePallet->location_code : $availablePallet->stockLocation?->warehouse_location;
+                                    $palletPcs = $exportMove ? $availablePallet->boxes_sum_pcs_quantity : $availablePallet->boxes->sum('pcs_quantity');
+                                @endphp
                                 <button type="button"
                                     class="list-group-item list-group-item-action text-start available-pallet"
-                                    data-pallet-number="{{ $availablePallet->pallet_number }}"
-                                    data-search="{{ strtolower($availablePallet->pallet_number . ' ' . ($availablePallet->stockLocation?->warehouse_location ?? '')) }}">
+                                    data-pallet-number="{{ $palletNumber }}"
+                                    data-search="{{ strtolower($palletNumber . ' ' . ($palletLocation ?? '') . ' ' . ($exportMove ? $availablePallet->display_name : '')) }}">
                                     <div class="move-pallet-option-head">
-                                        <strong>{{ $availablePallet->pallet_number }}</strong>
-                                        <span class="move-pallet-option-status">Tersedia</span>
+                                        <strong>{{ $palletNumber }}@if($exportMove) · {{ $availablePallet->display_name }}@endif</strong>
+                                        <span class="move-pallet-option-status">{{ $exportMove ? 'Periksa' : 'Tersedia' }}</span>
                                     </div>
                                     <span class="move-pallet-option-meta">
-                                        <span><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ $availablePallet->stockLocation?->warehouse_location ?? '-' }}</span>
+                                        <span><i class="bi bi-geo-alt" aria-hidden="true"></i> {{ $palletLocation ?? '-' }}</span>
                                         <span>{{ $availablePallet->boxes_count }} Box</span>
-                                        <span>{{ number_format($availablePallet->boxes->sum('pcs_quantity')) }} PCS</span>
+                                        <span>{{ number_format($palletPcs) }} PCS</span>
                                     </span>
                                 </button>
                             @empty
@@ -248,7 +267,7 @@
         searchButton.textContent = 'Mencari...';
         setSearchStatus(palletSearchStatus, `Memeriksa pallet ${code}...`);
         try {
-            const response = await fetch(`{{ route('move-pallet.search') }}?code=${encodeURIComponent(code)}`);
+            const response = await fetch(`{{ route($exportMove ? 'export.move-pallet.search' : 'move-pallet.search') }}?code=${encodeURIComponent(code)}`, {headers: {'Accept': 'application/json'}});
             const data = await response.json();
             if (requestToken !== palletSearchToken) return;
             if (!response.ok || !data.success) throw new Error(data.message || 'Pallet tidak dapat dipilih.');
@@ -323,7 +342,7 @@
         setSearchStatus(locationSearchStatus, `Mencari lokasi kosong untuk “${query}”...`);
         searchTimer = setTimeout(async () => {
             try {
-                const response = await fetch(`/api/locations/search?q=${encodeURIComponent(query)}`);
+                const response = await fetch(`{{ route($exportMove ? 'export.move-pallet.locations' : 'api.locations.search') }}?q=${encodeURIComponent(query)}`);
                 if (!response.ok) throw new Error('Pencarian lokasi gagal. Coba lagi atau pilih dari daftar.');
                 const locations = await response.json();
                 if (requestToken !== locationSearchToken || !pallet) return;
@@ -405,13 +424,18 @@
         moveButton.disabled = true;
         moveButton.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Memproses...';
         try {
-            const response = await fetch('{{ route('move-pallet.store') }}', {
+            const response = await fetch('{{ route($exportMove ? 'export.move-pallet.store' : 'move-pallet.store') }}', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}'},
-                body: JSON.stringify({pallet_id: pallet.id, location_id: Number(targetLocationId.value)})
+                body: JSON.stringify({pallet_id: pallet.id, location_id: Number(targetLocationId.value),
+                    ...(pallet.request_token ? {request_token: pallet.request_token, fingerprint: pallet.fingerprint, ready_confirmed: Boolean(pallet.ready)} : {})})
             });
             const data = await response.json();
             if (!response.ok || !data.success) throw new Error(data.message || 'Pemindahan gagal.');
+            if (pallet.request_token) {
+                window.location.reload();
+                return;
+            }
             showAlert(data.message, 'success');
             pallet.location = document.getElementById('targetLocationCode').textContent;
             pallet.location_id = Number(targetLocationId.value);
@@ -450,6 +474,7 @@
                     </div>
                     <div class="move-pallet-confirm-contents">Isi tetap sama: <strong>${boxCount} Box</strong> · <strong>${pcsCount} PCS</strong></div>
                 </div>
+                ${pallet.ready ? '<p class="alert alert-warning text-start"><strong>Status Siap akan dibatalkan.</strong> Konfirmasikan ulang pallet di lokasi baru melalui Pemenuhan Permintaan.</p>' : ''}
                 <p class="move-pallet-confirm-note">Saat dikonfirmasi, lokasi asal dilepas dan lokasi tujuan ditempati pallet ini. Server memeriksa ulang kelayakan pallet dan ketersediaan lokasi; jika ada konflik, perpindahan ditolak tanpa mengubah stok.</p>
             </div>`;
 
@@ -459,7 +484,7 @@
                 html,
                 icon: 'question',
                 showCancelButton: true,
-                confirmButtonText: 'Pindahkan pallet',
+                confirmButtonText: pallet.ready ? 'Pindahkan dan batalkan status Siap' : 'Pindahkan pallet',
                 cancelButtonText: 'Kembali periksa',
                 confirmButtonColor: '#0b7072',
                 reverseButtons: true,
@@ -472,7 +497,7 @@
             return;
         }
 
-        if (window.confirm(`Pindahkan pallet ${pallet.pallet_number} dari ${pallet.location} ke ${targetLocation}?\nIsi: ${boxCount} Box · ${pcsCount} PCS. Lokasi dan kelayakan pallet akan diperiksa ulang.`)) {
+        if (window.confirm(`Pindahkan pallet ${pallet.pallet_number} dari ${pallet.location} ke ${targetLocation}?\nIsi: ${boxCount} Box · ${pcsCount} PCS. Lokasi dan kelayakan pallet akan diperiksa ulang.${pallet.ready ? '\nStatus Siap dibatalkan dan wajib dikonfirmasi ulang.' : ''}`)) {
             submitMove();
         }
     });

@@ -45,6 +45,10 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     });
 
     Route::prefix('export')->name('export.')->group(function () {
+        Route::get('move-pallet', [\App\Http\Controllers\ExportMovePalletController::class, 'index'])->name('move-pallet.index');
+        Route::get('move-pallet/search', [\App\Http\Controllers\ExportMovePalletController::class, 'search'])->name('move-pallet.search');
+        Route::get('move-pallet/locations', [\App\Http\Controllers\ExportMovePalletController::class, 'locations'])->name('move-pallet.locations');
+        Route::post('move-pallet/store', [\App\Http\Controllers\ExportMovePalletController::class, 'store'])->name('move-pallet.store');
         Route::get('merge-pallet', [\App\Http\Controllers\ExportPalletMergeController::class, 'index'])->name('merge.index');
         Route::post('merge-pallet/preview', [\App\Http\Controllers\ExportPalletMergeController::class, 'preview'])->name('merge.preview');
         Route::post('merge-pallet', [\App\Http\Controllers\ExportPalletMergeController::class, 'store'])->name('merge.store');
@@ -68,6 +72,7 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::get('receiving/transactions/box/{stockBox}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'legacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy');
         Route::match(['get', 'post'], 'receiving/transactions/box/{stockBox}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printLegacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy-print');
         Route::get('receiving/recommendations/{notice}/pallets/{pallet}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'recommendation'])->whereNumber(['notice', 'pallet'])->name('receiving.transactions.recommendation');
+        Route::post('receiving/recommendations/{notice}/pallets/{pallet}/start-picking', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'startPicking'])->whereNumber(['notice', 'pallet'])->name('receiving.transactions.start-picking');
         Route::get('receiving/recommendations/{notice}/pallets/{pallet}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printRecommendation'])->whereNumber(['notice', 'pallet'])->name('receiving.transactions.recommendation-print');
         Route::get('stock', [\App\Http\Controllers\ExportStockController::class, 'index'])->name('stock.index');
         Route::get('picking-verification', [\App\Http\Controllers\ExportPickingController::class, 'index'])->name('picking.index');

@@ -74,11 +74,12 @@ class ExportFulfillmentRevisionService
         }
         if ($difference < 1) $this->fail('Kurangi minimal satu box dari kebutuhan pallet.');
         // A verified pick may already be in the operator's hands even before placement.
-        $returns = $selected->filter(fn ($f) => $f->placed_at || $f->picking_verified_at || $f->merge_pending_verification)->values();
-        $released = $selected->reject(fn ($f) => $f->placed_at || $f->picking_verified_at || $f->merge_pending_verification)->values();
+        $returns = $selected->filter(fn ($f) => $f->placed_at || $f->picking_started_at || $f->picking_verified_at || $f->merge_pending_verification)->values();
+        $returnedIds = $returns->pluck('id')->flip();
+        $released = $selected->reject(fn ($f) => $returnedIds->has($f->id))->values();
         $fingerprint = hash('sha256', json_encode([$pallet->id, $quantities,
             $items->map(fn ($i) => [$i->id, $i->box_quantity])->all(),
-            $commitments->map(fn ($f) => [$f->id, $f->placed_at?->toJSON(), $f->picking_verified_at?->toJSON(),
+            $commitments->map(fn ($f) => [$f->id, $f->placed_at?->toJSON(), $f->picking_started_at?->toJSON(), $f->picking_verified_at?->toJSON(),
                 $f->stockBox->revision, $f->stockBox->state, $f->stockBox->current_pallet_id])->all(),
         ], JSON_THROW_ON_ERROR));
         return compact('physical', 'items', 'selected', 'returns', 'released', 'fingerprint', 'quantities', 'difference');

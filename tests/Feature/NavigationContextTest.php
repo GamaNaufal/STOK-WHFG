@@ -30,6 +30,8 @@ class NavigationContextTest extends TestCase
             'export.merge.preview' => 'export.merge.index',
             'export.merge.result' => 'export.merge.index',
             'merge-pallet.store' => 'merge-pallet.index',
+            'export.move-pallet.search' => 'export.move-pallet.index',
+            'move-pallet.store' => 'move-pallet.index',
             'part-settings.edit' => 'part-settings.index',
             'export.locations.create' => 'export.locations.index',
             'reports.withdrawal.export' => 'reports.withdrawal',
@@ -60,6 +62,9 @@ class NavigationContextTest extends TestCase
             $expected = array_column(app(FeatureAccessService::class)->navigation($user), 'route');
             if (in_array('merge-pallet.index', $expected, true)) {
                 $expected = array_values(array_diff($expected, ['export.merge.index']));
+            }
+            if (in_array('move-pallet.index', $expected, true)) {
+                $expected = array_values(array_diff($expected, ['export.move-pallet.index']));
             }
             $context = app(NavigationContextService::class)->build($user, 'profile.edit');
             $actual = array_column($context['items'], 'route');

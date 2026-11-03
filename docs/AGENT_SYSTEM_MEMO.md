@@ -2,6 +2,25 @@
 
 Terakhir diverifikasi dari source code: 4 November 2026 (pembaruan inkremental).
 
+Pemindahan Pallet Ekspor 4 November 2026:
+- Warehouse > Pemindahan Pallet memakai tampilan bersama dan pemilih lingkup
+  Domestik/Ekspor sesuai izin. Endpoint export.move-pallet.* memakai izin
+  export_move_pallet untuk Operator Ekspor, Admin Warehouse, dan Admin Utama.
+- ExportPalletMoveService memindahkan pallet fisik utuh ke lokasi ekspor kosong
+  yang tidak direservasi, di dalam transaksi inventory. Lokasi rencana final,
+  reservasi lokasi, dan snapshot box yang sudah ditempatkan ikut diperbarui.
+  Status Siap dibuka setelah persetujuan operator dan wajib dikonfirmasi ulang.
+  Identitas, PCS, tanggal FIFO, dan alokasi box tetap. Audit mencatat perpindahan;
+  penyiapan Box Not Full dengan sumber atau tujuan terkait harus diulang.
+- Oke FIFO memasukkan rekomendasi ke antrean. Mulai Picking mengunci pallet
+  sumber dan tujuan selama box masih menunggu penempatan. Scan terverifikasi
+  dan issue terbuka juga menghalangi perpindahan. Revisi atau pembatalan
+  meminta konfirmasi pengembalian untuk box dari picking yang telah dimulai.
+  Rekomendasi tanpa scan satuan tetap tidak memerlukan scan. Box baru dari
+  penerimaan tetap bisa ditempatkan melalui transaksi penerimaan seperti biasa.
+- Verifikasi: 276 tes ekspor, navigasi dan pemindahan pallet lulus
+  (2.832 assertions) dengan SQLite in-memory.
+
 Picking Verification Ekspor 4 November 2026:
 - Kewajiban scan dinilai per part dalam gelombang rekomendasi. Jika seluruh
   stok Part B yang cocok masuk satu tujuan dari sumber satu jenis part,

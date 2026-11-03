@@ -30,6 +30,20 @@ class NavigationContextService
         }
         unset($item);
 
+        $moveRoutes = $this->moveRoutes($user);
+        $moveAnchor = $moveRoutes['domestic'] ?? $moveRoutes['export'] ?? null;
+        $moveRoute = Str::is('export.move-pallet.*', $routeName ?? '') ? ($moveRoutes['export'] ?? $moveAnchor) : $moveAnchor;
+        $items = array_filter($items, fn ($item) => ! in_array($item['key'], ['move_pallet', 'export_move_pallet'], true)
+            || $item['route'] === $moveAnchor);
+        foreach ($items as &$item) {
+            if ($item['route'] === $moveAnchor) {
+                $item['route'] = $moveRoute;
+                $item['key'] = $moveRoute === 'export.move-pallet.index' ? 'export_move_pallet' : 'move_pallet';
+                $item['label'] = 'Pemindahan Pallet';
+            }
+        }
+        unset($item);
+
         $order = array_flip(['Warehouse', 'Delivery', 'Pengiriman Ekspor', 'Master Data', 'Master Data Ekspor', 'Laporan', 'Administrasi']);
         usort($items, fn ($a, $b) => ($order[$a['group']] ?? 99) <=> ($order[$b['group']] ?? 99));
         $activeRoute = $this->activeRoute($items, $routeName, $access);
@@ -54,7 +68,8 @@ class NavigationContextService
                 'parts' => 'master nomor no part part number kapasitas pcs box',
                 'export_locations', 'locations' => 'master lokasi location tempat',
                 'merge_pallet', 'export_merge_pallet' => 'gabung palet pallet'.(count($mergeRoutes) === 2 ? ' domestik lokal ekspor export' : ''),
-                'export_pallet_plans', 'move_pallet' => 'palet pallet rencana planning',
+                'export_pallet_plans' => 'palet pallet rencana planning',
+                'move_pallet', 'export_move_pallet' => 'palet pallet pindah lokasi'.(count($moveRoutes) === 2 ? ' domestik lokal ekspor export' : ''),
                 'export_delivery_plans', 'delivery_schedule', 'delivery_order' => 'rencana jadwal pengiriman delivery',
                 'not_full_request', 'not_full_approval' => 'box not full nf pengajuan persetujuan approval',
                 'reports' => 'laporan report excel ekspor export unduh',
@@ -98,6 +113,19 @@ class NavigationContextService
         if (in_array($user->role, ['admin', ...config('feature_access.features.export_merge_pallet.roles')], true)
             && $user->canAccess('export_merge_pallet')) {
             $routes['export'] = 'export.merge.index';
+        }
+
+        return $routes;
+    }
+
+    public function moveRoutes(User $user): array
+    {
+        $routes = [];
+        if ($user->canAccess('move_pallet')) {
+            $routes['domestic'] = 'move-pallet.index';
+        }
+        if ($user->canAccess('export_move_pallet')) {
+            $routes['export'] = 'export.move-pallet.index';
         }
 
         return $routes;

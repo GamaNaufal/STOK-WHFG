@@ -78,6 +78,7 @@ class AuditLogPresenter
             'export_delivery_plan' => 'Rencana delivery ekspor', 'export_pallet_plan' => 'Perencanaan pallet ekspor',
             'export_picking' => 'Verifikasi picking ekspor', 'export_allocation_notice' => 'Rekomendasi stok ekspor',
             'export_stock_receipt' => 'Penerimaan transfer box ekspor', 'export_pallet_merge' => 'Merge pallet ekspor', 'export_stock_reservation' => 'Reservasi stok ekspor',
+            'export_pallet_location_moved' => 'Pemindahan pallet ekspor',
             'export_stock_placement' => 'Penempatan box ekspor', 'export_receiving_batch' => 'Transaksi penerimaan ekspor',
             'delivery_pickup' => 'Pengiriman', 'delivery_assignment' => 'Assignment delivery',
             'delivery_redo' => 'Redo delivery', 'box_pallet_moved' => 'Pemindahan box',

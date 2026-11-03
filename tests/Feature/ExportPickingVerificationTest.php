@@ -286,6 +286,9 @@ class ExportPickingVerificationTest extends TestCase
         $this->assertSame($boxes->take(36)->pluck('id')->all(), $selected->pluck('id')->all());
         $this->assertSame(0, ExportFulfillmentBox::where('picking_required', true)->count());
         $this->get(route('export.picking.index'))->assertOk()->assertSee('Tanpa scan satuan');
+        $picking = app(\App\Services\ExportPickingService::class);
+        $noticeId = $selected->first()->fulfillment()->sole()->allocation_notice_id;
+        $picking->start($pallet->id, $noticeId, $picking->startFingerprint($picking->rows($pallet->id, $noticeId)), $this->operator);
         app(ExportStockReceivingService::class)->placeMany($selected->map(fn ($box) => ['id' => $box->id, 'revision' => $box->revision,
             'request_token' => (string) Str::uuid()])->all(), $this->operator);
         $this->assertSame(36, ExportFulfillmentBox::whereNotNull('placed_at')->count());

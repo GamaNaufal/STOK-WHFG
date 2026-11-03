@@ -102,7 +102,7 @@ class ExportPalletMergeService
             ->where(fn ($q) => $q->whereIn('export_stock_box_id', $boxes->pluck('id')->all())
                 ->orWhereIn('export_planned_pallet_item_id', $items->pluck('id')->all()))->orderBy('id')->get();
         foreach ($commitments as $f) {
-            if (! $f->placed_at && $f->picking_verified_at) {
+            if (! $f->placed_at && ($f->picking_verified_at || $f->picking_started_at)) {
                 $this->fail('Pengambilan sudah berjalan. Selesaikan penempatan/pengembalian sebelum merge.');
             }
             if ($plan && (int) $f->plannedItem->pallet->export_pallet_plan_id !== $plan->id) {

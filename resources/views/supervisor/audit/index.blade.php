@@ -102,6 +102,7 @@
                     <option value="export_fulfillment" {{ $filters['type'] === 'export_fulfillment' ? 'selected' : '' }}>Pemenuhan Permintaan Ekspor</option>
                     <option value="export_picking_issue" {{ $filters['type'] === 'export_picking_issue' ? 'selected' : '' }}>Issue Scan Ekspor</option>
                     <option value="export_pallet_merge" {{ $filters['type'] === 'export_pallet_merge' ? 'selected' : '' }}>Merge Pallet Ekspor</option>
+                    <option value="export_pallet_location_moved" {{ $filters['type'] === 'export_pallet_location_moved' ? 'selected' : '' }}>Pemindahan Pallet Ekspor</option>
                     <option value="delivery_redo" {{ $filters['type'] === 'delivery_redo' ? 'selected' : '' }}>Redo Delivery</option>
                     <option value="pallet_location_moved" {{ $filters['type'] === 'pallet_location_moved' ? 'selected' : '' }}>Pemindahan Lokasi Pallet</option>
                     <option value="box_pallet_moved" {{ $filters['type'] === 'box_pallet_moved' ? 'selected' : '' }}>Pemindahan Box</option>

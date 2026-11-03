@@ -79,6 +79,35 @@ class ExportPickingService
             && $f->pcs_quantity === $box->pcs_quantity;
     }
 
+    public function startFingerprint(Collection $rows): string
+    {
+        return hash('sha256', json_encode($rows->sortBy('id')->map(fn ($row) => [
+            $row->id, $row->stockBox->revision, $row->stockBox->current_pallet_id,
+            $row->plannedItem->pallet->fulfillment_revision,
+        ])->values()->all(), JSON_THROW_ON_ERROR));
+    }
+
+    public function start(int $palletId, int $noticeId, string $fingerprint, User $actor): void
+    {
+        app(ExportInventoryService::class)->transaction(function () use ($palletId, $noticeId, $fingerprint, $actor) {
+            $this->assertTarget(ExportPlannedPallet::findOrFail($palletId));
+            $rows = $this->rows($palletId, $noticeId, recommendationsOnly: true);
+            if ($rows->isEmpty() || ! hash_equals($this->startFingerprint($rows), $fingerprint)) {
+                $this->fail('Daftar atau lokasi picking berubah. Muat ulang panduan sebelum mulai.');
+            }
+            if (ExportPickingIssue::open()->where(fn ($query) => $query->where('reported_by', $actor->id)
+                ->orWhere('export_planned_pallet_id', $palletId)->orWhereIn('box_number', $rows->pluck('box_number')))->exists()) {
+                $this->fail('Selesaikan issue picking sebelum mulai.');
+            }
+            $ids = $rows->whereNull('picking_started_at')->pluck('id');
+            if ($ids->isNotEmpty()) {
+                ExportFulfillmentBox::whereKey($ids->all())->update(['picking_started_at' => now()]);
+                AuditService::record('export_picking', 'started', 'ExportPlannedPallet', $palletId, $actor->id,
+                    [], ['allocation_notice_id' => $noticeId, 'box_count' => $ids->count()], 'Picking ekspor dimulai.');
+            }
+        });
+    }
+
     public function block(User $actor, ?int $palletId = null, ?string $boxNumber = null): ?ExportPickingIssue
     {
         return ExportPickingIssue::open()->where(function ($q) use ($actor, $palletId, $boxNumber) {
@@ -109,8 +138,14 @@ class ExportPickingService
             return;
         }
         $f->setRelation('stockBox', $box);
-        if (! $this->verified($f) && ExportFulfillmentBox::whereKey($f->id)->requiresPickingScan()->exists()) {
+        if ($this->verified($f)) {
+            return;
+        }
+        if (ExportFulfillmentBox::whereKey($f->id)->requiresPickingScan()->exists()) {
             $this->fail('Scan verifikasi pengambilan box '.$box->box_number.' sebelum konfirmasi penempatan.');
+        }
+        if (! $f->picking_started_at) {
+            $this->fail('Klik Mulai Picking pada transaksi rekomendasi sebelum mengambil dan menempatkan box.');
         }
     }
 

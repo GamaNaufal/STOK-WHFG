@@ -3,17 +3,19 @@
 @section('title', 'Merge Pallet')
 
 @section('styles')
-<link rel="stylesheet" href="{{ asset('css/pages/merge-pallet.css') }}">
-<link rel="stylesheet" href="{{ asset('css/pages/merge-scope-switch.css') }}">
+<link rel="stylesheet" href="{{ asset('css/pages/merge-pallet.css') }}?v={{ filemtime(public_path('css/pages/merge-pallet.css')) }}">
+<link rel="stylesheet" href="{{ asset('css/pages/warehouse-scope-switch.css') }}?v={{ filemtime(public_path('css/pages/warehouse-scope-switch.css')) }}">
 @endsection
 
 @section('content')
 <div class="container-fluid merge-pallet-page" id="mergePalletPage">
-    <header class="merge-pallet-header">
-        <span class="merge-pallet-eyebrow">Warehouse / Domestik</span>
-        <h1><i class="bi bi-intersect" aria-hidden="true"></i> Merge Pallet</h1>
-        <p>Pilih minimal dua pallet sumber. Box aktifnya akan digabung ke satu pallet baru setelah lokasi tujuan diperiksa.</p>
+    <header class="merge-pallet-header warehouse-scope-header">
+        <div class="warehouse-scope-heading">
+            <span class="warehouse-scope-eyebrow">Warehouse / Domestik</span>
+            <h1><i class="bi bi-intersect" aria-hidden="true"></i> Merge Pallet</h1>
+        </div>
         @include('shared.merge-scope-switch', ['scope' => 'domestic'])
+        <p class="warehouse-scope-description">Pilih minimal dua pallet sumber. Box aktifnya akan digabung ke satu pallet baru setelah lokasi tujuan diperiksa.</p>
     </header>
 
 <div class="row g-3 g-xl-4 merge-pallet-workflow">
@@ -31,7 +33,7 @@
                 <div class="mb-3">
                     <label for="scanInput" class="form-label fw-semibold">Nomor pallet</label>
                     <div class="input-group">
-                        <input type="text" id="scanInput" class="form-control" placeholder="Scan atau masukkan nomor pallet" aria-describedby="mergeScanHint" autofocus>
+                        <input type="text" id="scanInput" class="form-control" placeholder="Scan atau masukkan nomor pallet" aria-describedby="mergeScanHint">
                         <button class="btn btn-primary" type="button" onclick="searchForAdd()">
                             <i class="bi bi-search" aria-hidden="true"></i> Cari
                         </button>
@@ -444,7 +446,9 @@
 
     // --- End destination location selection ---
 
-    document.getElementById('scanInput').addEventListener('keypress', function (e) {
+    const scanInput = document.getElementById('scanInput');
+    scanInput.focus({ preventScroll: true });
+    scanInput.addEventListener('keypress', function (e) {
         if (e.key === 'Enter') {
             searchForAdd();
         }

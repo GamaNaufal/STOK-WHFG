@@ -3,10 +3,8 @@
 @endphp
 
 @if(count($mergeRoutes) === 2)
-    <nav class="merge-scope-switch" data-scope="{{ $scope }}" aria-label="Lingkup merge pallet">
-        <span class="merge-scope-thumb" aria-hidden="true"></span>
-        @foreach(['domestic' => 'Domestik', 'export' => 'Ekspor'] as $key => $label)
-            <a href="{{ route($mergeRoutes[$key]) }}" @if($scope === $key) aria-current="page" @endif>{{ $label }}</a>
-        @endforeach
-    </nav>
+    @include('shared.warehouse-scope-switch', [
+        'scopeLabel' => 'Lingkup merge pallet',
+        'scopeUrls' => array_map(fn ($name) => route($name), $mergeRoutes),
+    ])
 @endif

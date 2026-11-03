@@ -77,8 +77,11 @@ class ExportStockAllocationNoticeTest extends TestCase
         $this->assertSame($audits+1,AuditLog::count());
         $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn ($p) => $p->total() === 1 && $p[0]->kind === 'recommendation' && (int) $p[0]->transaction_id === $notice->id
             && (int) $p[0]->pending_boxes === 2 && (int) $p[0]->placed_boxes === 0);
-        $this->post(route('export.receiving.place-bulk'),['return_notice' => $notice->id, 'return_pallet' => $plan->pallets()->first()->id,
-            'placements_json' => json_encode($rows(collect([$boxes[1],$boxes[2]])))])->assertRedirect();
+        $pallet = $plan->pallets()->first();
+        $receipt = $this->get(route('export.receiving.transactions.recommendation', [$notice, $pallet]))->assertOk()->viewData('receipt');
+        $this->post(route('export.receiving.transactions.start-picking', [$notice, $pallet]), ['fingerprint' => $receipt['picking_fingerprint']])->assertSessionHasNoErrors();
+        $this->post(route('export.receiving.place-bulk'),['return_notice' => $notice->id, 'return_pallet' => $pallet->id,
+            'placements_json' => json_encode($rows(collect([$boxes[1],$boxes[2]])))])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('export_stock_movements',5);
         $this->assertNotNull($boxes[1]->fresh()->fulfillment->placed_at);
         $audits = AuditLog::count();

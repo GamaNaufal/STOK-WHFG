@@ -5,12 +5,12 @@
 @section('styles')
     <link href="{{ asset('vendor/select2-4.1.0-rc.0/dist/css/select2.min.css') }}" rel="stylesheet" />
     <link rel="stylesheet" href="{{ asset('css/not-full.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/pages/warehouse-scope-switch.css') }}?v={{ filemtime(public_path('css/pages/warehouse-scope-switch.css')) }}">
 @endsection
 
 @section('content')
 <div class="container-fluid not-full-page">
     @include('shared.not-full-feedback')
-    @if(in_array(auth()->user()->role,['admin','admin_warehouse']))@include('shared.not-full-scope', ['approval'=>false])@endif
     @if($errors->any())
         <div class="alert alert-dismissible fade show shadow-sm" role="alert" style="background: #FEF2F2; border: none; border-left: 4px solid #EF4444; color: #991B1B; border-radius: 8px;">
             <strong><i class="bi bi-exclamation-triangle"></i> Gagal mengirim request:</strong>
@@ -23,22 +23,16 @@
         </div>
     @endif
 
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="app-page-banner" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
-                        color: white;
-                        padding: 30px 24px;
-                        border-radius: 12px;
-                        box-shadow: 0 8px 24px rgba(12, 119, 121, 0.15);">
-                <h1 class="h4" style="margin: 0 0 8px 0; font-weight: 700;">
-                    <i class="bi bi-exclamation-circle"></i> Request Box Not Full
-                </h1>
-                <p style="margin: 0; opacity: 0.95; font-size: 14px;">
-                    Ajukan 1 box not full untuk approval Supervisi, lalu pilih delivery dan lokasi/pallet tujuan.
-                </p>
-            </div>
+    <header class="warehouse-scope-header mb-4">
+        <div class="warehouse-scope-heading">
+            <span class="warehouse-scope-eyebrow">Warehouse / Domestik</span>
+            <h1>Request Box Not Full</h1>
         </div>
-    </div>
+        @if(in_array(auth()->user()->role, ['admin', 'admin_warehouse'], true))
+            @include('shared.not-full-scope', ['approval' => false])
+        @endif
+        <p class="warehouse-scope-description">Ajukan 1 box not full untuk approval Supervisi, lalu pilih delivery dan lokasi/pallet tujuan.</p>
+    </header>
 
     <div class="row g-4">
         <div class="col-xl-8">
@@ -53,7 +47,7 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label for="boxNumber" class="form-label fw-bold">ID Box (Scan)</label>
-                                <input type="text" id="boxNumber" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" value="{{ old('box_number') }}" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" required autofocus aria-describedby="boxNumberHint">
+                                <input type="text" id="boxNumber" name="box_number" class="form-control" placeholder="Scan/ketik ID Box" value="{{ old('box_number') }}" minlength="8" maxlength="8" inputmode="numeric" pattern="[0-9]{8}" required aria-describedby="boxNumberHint">
                             <small id="boxNumberHint" class="text-muted">Gunakan ID Box 8 angka yang belum pernah dipakai.</small>
                             </div>
                             <div class="col-md-6">
@@ -213,5 +207,5 @@
 @section('scripts')
     <script src="{{ asset('vendor/jquery-3.7.1/dist/jquery.min.js') }}"></script>
     <script src="{{ asset('vendor/select2-4.1.0-rc.0/dist/js/select2.min.js') }}"></script>
-<script src="{{ asset('js/pages/not-full.js') }}"></script>
+<script src="{{ asset('js/pages/not-full.js') }}?v={{ filemtime(public_path('js/pages/not-full.js')) }}"></script>
 @endsection

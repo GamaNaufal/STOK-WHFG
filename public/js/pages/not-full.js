@@ -45,6 +45,7 @@
     });
 
     if (requestForm) {
+        document.getElementById('boxNumber')?.focus({ preventScroll: true });
         const part = document.getElementById('partNumberSelect');
         const pcs = document.getElementById('pcsQuantityInput');
         const reason = document.getElementById('notFullReason');

@@ -3,15 +3,17 @@
 @section('styles')
 <link rel="stylesheet" href="{{ asset('css/pages/export-delivery-plans.css') }}">
 <link rel="stylesheet" href="{{ asset('css/pages/export-merge.css') }}">
-<link rel="stylesheet" href="{{ asset('css/pages/merge-scope-switch.css') }}">
+<link rel="stylesheet" href="{{ asset('css/pages/warehouse-scope-switch.css') }}?v={{ filemtime(public_path('css/pages/warehouse-scope-switch.css')) }}">
 @endsection
 @section('content')
 <div class="delivery-plan-page export-merge-page">
-    <header class="mb-4">
-        <p class="text-muted mb-1">Warehouse / Ekspor</p>
-        <h1>Merge Pallet Ekspor</h1>
-        <p class="mb-0">Gabungkan seluruh box dari beberapa pallet. Tinjau perubahan rencana sebelum mengonfirmasi pemindahan fisik.</p>
+    <header class="warehouse-scope-header mb-4">
+        <div class="warehouse-scope-heading">
+            <span class="warehouse-scope-eyebrow">Warehouse / Ekspor</span>
+            <h1>Merge Pallet Ekspor</h1>
+        </div>
         @include('shared.merge-scope-switch', ['scope' => 'export'])
+        <p class="warehouse-scope-description">Gabungkan seluruh box dari beberapa pallet. Tinjau perubahan rencana sebelum mengonfirmasi pemindahan fisik.</p>
     </header>
     @if($errors->any())<div class="alert alert-danger" role="alert"><strong>Merge belum diproses.</strong><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul><p class="mb-0 mt-2">Periksa pilihan dan tinjau ulang data sebelum melanjutkan.</p></div>@endif
     <div class="alert alert-info">Pallet permintaan harus berada dalam <strong>rencana delivery yang sama</strong>. Stok cadangan boleh digabung; reservasi delivery lain tetap dilindungi.</div>

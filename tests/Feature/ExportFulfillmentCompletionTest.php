@@ -56,6 +56,33 @@ class ExportFulfillmentCompletionTest extends TestCase
         return ['revision' => $pallet->palletPlan->revision, 'fulfillment_revision' => $pallet->fulfillment_revision, 'request_token' => (string) Str::uuid()];
     }
 
+    public function test_export_move_can_relocate_ready_pallet_after_warning_and_requires_reconfirmation(): void
+    {
+        $delivery = $this->plan([1]);
+        $pallet = $delivery->palletPlan->pallets->sole();
+        $physical = ExportStockPallet::where('export_planned_pallet_id', $pallet->id)->sole();
+        $this->ready($delivery, $pallet)->assertSessionHasNoErrors();
+        $target = ExportMasterLocation::create(['code' => 'READY-NEW-LOCATION']);
+        $reserved = $this->plan([1], false)->palletPlan->pallets->sole();
+        $operator = $this->operator;
+        $this->actingAs(User::factory()->create(['role' => 'admin_warehouse']))
+            ->get(route('export.move-pallet.index'))->assertOk()->assertSee('Lingkup pemindahan pallet')->assertSee($physical->number);
+        $found = $this->getJson(route('export.move-pallet.search', ['code' => $physical->number]))->assertOk()->assertJsonPath('pallet.ready', true)->json('pallet');
+        $data = ['pallet_id' => $physical->id, 'location_id' => $target->id, 'request_token' => $found['request_token'], 'fingerprint' => $found['fingerprint']];
+        $url = route('export.move-pallet.store');
+        $this->postJson($url, $data)->assertUnprocessable()->assertJsonValidationErrors('pallet');
+        $this->postJson($url, array_replace($data, ['location_id' => $reserved->master_location_id, 'ready_confirmed' => true]))->assertUnprocessable();
+        $this->assertNotNull($pallet->fresh()->ready_at);
+        $this->postJson($url, $data + ['ready_confirmed' => true])->assertOk();
+        $this->assertNull($pallet->fresh()->ready_at);
+        $this->assertTrue($delivery->palletPlan->fresh()->isFinalFor($delivery->fresh()));
+        $this->assertFalse($physical->location->is_occupied);
+        $this->assertTrue($target->fresh()->is_occupied);
+        $this->assertSame($target->id, $physical->fresh()->master_location_id);
+        $this->actingAs($operator)->ready($delivery, $pallet->fresh())->assertSessionHasNoErrors();
+        $this->assertNotNull($pallet->fresh()->ready_at);
+    }
+
     public function test_partially_filled_pallet_can_reduce_below_current_stock_and_returns_newest_only(): void
     {
         $delivery=$this->plan([10],false);$pallet=$delivery->palletPlan->pallets->sole();

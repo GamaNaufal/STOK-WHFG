@@ -92,6 +92,7 @@ class ExportFulfillmentCompletionService
             if (!$claim || (int) $claim->master_location_id !== $sourceId) $this->fail('Reservasi lokasi pallet sudah berubah.');
             $before = ['location' => $pallet->location_code, 'status' => 'terpenuhi'];
             if ($sourceId !== $targetId) {
+                app(ExportPalletMoveService::class)->assertPickingIdle($physical);
                 foreach ($commitments as $f) {
                     $box = $f->stockBox;
                     ExportStockMovement::create(['export_stock_box_id' => $box->id, 'request_token' => (string) Str::uuid(),

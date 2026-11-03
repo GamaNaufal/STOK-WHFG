@@ -8,6 +8,7 @@ use App\Models\ExportReceivingBatchItem;
 use App\Models\ExportStockAllocationNotice;
 use App\Models\ExportStockBox;
 use App\Services\ExportPlacementGuideService;
+use App\Services\ExportPickingService;
 use App\Services\ExportReceivingTransactionService;
 use App\Services\ExportStockViewService;
 use Illuminate\Http\Request;
@@ -46,6 +47,8 @@ class ExportReceivingTransactionController extends Controller
         abort_if($boxes->isEmpty(), 404, 'Rekomendasi tidak lagi aktif. Periksa antrean terbaru.');
         $notice->load('palletPlan.deliveryPlan');
         $parameters = ['notice' => $notice->id, 'pallet' => $pallet->id];
+        $picking = app(ExportPickingService::class);
+        $rows = $notice->acknowledged_at ? $picking->rows($pallet->id, $notice->id, recommendationsOnly: true) : collect();
 
         return $this->detail($boxes, [
             'code' => $service::code('recommendation', $notice->id, $pallet->id),
@@ -55,7 +58,18 @@ class ExportReceivingTransactionController extends Controller
             'print_url' => route('export.receiving.transactions.recommendation-print', $parameters),
             'detail_url' => route('export.receiving.transactions.recommendation', $parameters),
             'delivery' => $notice->palletPlan->deliveryPlan,
+            'picking_fingerprint' => $rows->isNotEmpty() ? $picking->startFingerprint($rows) : null,
+            'picking_start_needed' => $rows->contains(fn ($row) => ! $row->picking_started_at && ! $row->picking_ready),
         ], $view, null);
+    }
+
+    public function startPicking(Request $request, ExportStockAllocationNotice $notice, ExportPlannedPallet $pallet, ExportPickingService $picking)
+    {
+        abort_unless((int) $notice->export_pallet_plan_id === (int) $pallet->export_pallet_plan_id, 404);
+        $data = $request->validate(['fingerprint' => 'required|string|size:64']);
+        $picking->start($pallet->id, $notice->id, $data['fingerprint'], $request->user());
+
+        return redirect()->route('export.receiving.transactions.recommendation', [$notice, $pallet]);
     }
 
     private function detail($boxes, array $receipt, ExportStockViewService $view, ?ExportReceivingBatch $batch, ?int $returnBox = null)

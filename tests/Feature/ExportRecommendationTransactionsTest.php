@@ -128,6 +128,74 @@ class ExportRecommendationTransactionsTest extends TestCase
                 'revision' => $box->fresh()->revision, 'request_token' => (string) Str::uuid()])->values()->all())];
     }
 
+    private function pickingFingerprint($notice, $pallet): string
+    {
+        return $this->get($this->url($notice, $pallet))->assertOk()->assertSee('Mulai Picking')
+            ->viewData('receipt')['picking_fingerprint'];
+    }
+
+    private function startPicking($notice, $pallet): void
+    {
+        $this->post(route('export.receiving.transactions.start-picking', [$notice, $pallet]),
+            ['fingerprint' => $this->pickingFingerprint($notice, $pallet)])->assertRedirect($this->url($notice, $pallet))->assertSessionHasNoErrors();
+    }
+
+    public function test_relocation_refreshes_unstarted_source_and_destination_then_both_lock_until_placement(): void
+    {
+        $stock = $this->receive();
+        $this->store([$stock]);
+        [$delivery, $plan, $notice, $pallets] = $this->demand([[$this->a->id => 2]]);
+        $pallet = $pallets->sole();
+        $this->acknowledge($delivery, $plan, $notice);
+        $newBox = app(ExportStockReceivingService::class)->receive(['box_number' => (string) ++$this->sequence,
+            'part_number' => $this->a->part_number, 'receive_token' => (string) Str::uuid()], $this->operator);
+        app(ExportStockReceivingService::class)->place($newBox->id, ['revision' => $newBox->revision, 'request_token' => (string) Str::uuid()], $this->operator);
+        $physical = $newBox->fresh()->currentPallet;
+        $source = $stock->fresh()->currentPallet;
+        $reservedLocation = $pallet->master_location_id;
+        $firstReceived = $stock->first_received_at->toJSON();
+        $staleStart = $this->pickingFingerprint($notice, $pallet);
+        $locations = [$this->location(), $this->location(), $this->location()];
+        $domestic = \App\Models\MasterLocation::create(['code' => 'DOMESTIC-ONLY']);
+
+        $sourceMove = $this->movePayload($source, $locations[0]);
+        $this->postJson(route('export.move-pallet.store'), array_replace($sourceMove, ['location_id' => $domestic->id]))->assertUnprocessable();
+        $this->postJson(route('export.move-pallet.store'), $sourceMove)->assertOk();
+        $this->postJson(route('export.move-pallet.store'), $sourceMove)->assertOk();
+        $this->assertSame(1, AuditLog::where('type', 'export_pallet_location_moved')->count());
+        $this->assertSame($source->id, $stock->fresh()->current_pallet_id);
+        $this->assertSame($firstReceived, $stock->fresh()->first_received_at->toJSON());
+        $this->postJson(route('export.receiving.transactions.start-picking', [$notice, $pallet]), ['fingerprint' => $staleStart])->assertUnprocessable();
+        $targetMove = $this->movePayload($physical, $locations[1]);
+        $this->postJson(route('export.move-pallet.store'), $targetMove)->assertOk();
+        $this->assertDatabaseMissing('export_pallet_location_reservations', ['master_location_id' => $reservedLocation]);
+        $this->assertDatabaseHas('export_pallet_location_reservations', ['master_location_id' => $locations[1]->id, 'export_planned_pallet_id' => $pallet->id]);
+        $this->assertSame($locations[1]->id, $newBox->fresh()->fulfillment->placed_location_id);
+        $this->assertSame($locations[1]->id, $pallet->fresh()->master_location_id);
+        $this->get($this->url($notice, $pallet))->assertOk()->assertSee($locations[0]->code)->assertSee($locations[1]->code);
+
+        $issue = ExportPickingIssue::create(['export_planned_pallet_id' => $pallet->id, 'box_number' => '99999999',
+            'reported_by' => $this->operator->id, 'issue_type' => 'unknown_box', 'registration_token' => (string) Str::uuid(),
+            'context' => ['allocation_notice_id' => $notice->id]]);
+        $this->getJson(route('export.move-pallet.search', ['code' => $source->number]))->assertUnprocessable()->assertJsonValidationErrors('pallet');
+        $issue->update(['status' => 'input_error']);
+
+        $moveWhilePicking = $this->movePayload($physical, $locations[2]);
+        $this->startPicking($notice, $pallet);
+        $this->getJson(route('export.move-pallet.search', ['code' => $source->number]))->assertUnprocessable()->assertJsonValidationErrors('pallet');
+        $this->postJson(route('export.move-pallet.store'), $moveWhilePicking)->assertUnprocessable()->assertJsonValidationErrors('pallet');
+        $this->postJson(route('export.receiving.place-bulk'), $this->placements([$stock], $notice, $pallet))->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertDatabaseCount('export_picking_scans', 0);
+        $this->postJson(route('export.move-pallet.store'), $this->movePayload($physical, $locations[2]))->assertOk();
+    }
+
+    private function movePayload($pallet, ExportMasterLocation $target): array
+    {
+        $found = $this->getJson(route('export.move-pallet.search', ['code' => $pallet->number]))->assertOk()->json('pallet');
+
+        return ['pallet_id' => $pallet->id, 'location_id' => $target->id, 'request_token' => $found['request_token'], 'fingerprint' => $found['fingerprint']];
+    }
+
     public function test_one_transaction_per_destination_combines_sources_parts_and_receipt_origins(): void
     {
         $batch = $this->batch(1);
@@ -194,6 +262,8 @@ class ExportRecommendationTransactionsTest extends TestCase
         [$delivery, $plan, $notice, $pallets] = $this->demand([[$this->a->id => 3]]);
         $this->acknowledge($delivery, $plan, $notice);
         $payload = $this->placements([$boxes[0]], $notice, $pallets[0]);
+        $this->postJson(route('export.receiving.place-bulk'), $payload)->assertUnprocessable()->assertJsonValidationErrors('picking');
+        $this->startPicking($notice, $pallets[0]);
         $this->postJson(route('export.receiving.place-bulk'), $payload)->assertRedirect();
         $this->postJson(route('export.receiving.place-bulk'), $payload)->assertRedirect();
         $this->get($this->url($notice, $pallets[0]))->assertViewHas('receipt', fn ($r) => $r['total'] === 3 && $r['pending'] === 2 && $r['placed'] === 1);
@@ -304,6 +374,7 @@ class ExportRecommendationTransactionsTest extends TestCase
         $this->get($helper)->assertOk()->assertSee('id="export-pick-box"', false);
         $this->postJson(route('export.picking.seek', $scope), ['box_number' => $partB[0]->box_number])
             ->assertOk()->assertJsonPath('success', true);
+        $this->startPicking($notice, $pallet);
         $this->postJson(route('export.receiving.place-bulk'), $this->placements($partB->prepend($partA), $notice, $pallet))
             ->assertRedirect($this->url($notice, $pallet));
 

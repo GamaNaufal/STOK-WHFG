@@ -362,8 +362,11 @@ class ExportNotFullWorkflowTest extends TestCase
         $this->prepare($r);
         $this->approve($r);
         $this->assertSame(0, $s->pending()->count());
-        app(ExportStockReceivingService::class)->place($box->id, ['revision' => $box->fresh()->revision, 'request_token' => (string) Str::uuid()], $this->operator);
         $p = $d->palletPlan->pallets->sole();
+        $picking = app(\App\Services\ExportPickingService::class);
+        $noticeId = $box->fulfillment()->sole()->allocation_notice_id;
+        $picking->start($p->id, $noticeId, $picking->startFingerprint($picking->rows($p->id, $noticeId)), $this->operator);
+        app(ExportStockReceivingService::class)->place($box->id, ['revision' => $box->fresh()->revision, 'request_token' => (string) Str::uuid()], $this->operator);
         $completion = app(ExportFulfillmentCompletionService::class);
         $completion->ready($d->id, $p->id, ['revision' => 1, 'fulfillment_revision' => 1, 'request_token' => (string) Str::uuid(), 'location_id' => $p->master_location_id], $this->operator);
         $completion->complete($d->id, ['revision' => 1, 'request_token' => (string) Str::uuid()], $this->operator);

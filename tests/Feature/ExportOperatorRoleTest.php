@@ -63,13 +63,14 @@ class ExportOperatorRoleTest extends TestCase
     {
         $operator = User::factory()->create(['role' => 'export_operator']);
         $access = app(FeatureAccessService::class);
-        $this->assertSame(['parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_merge_pallet', 'export_picking_verification', 'export_fulfillment', 'export_locations'], $access->defaults($operator->role));
+        $permissions = ['export_move_pallet', 'parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_merge_pallet', 'export_picking_verification', 'export_fulfillment', 'export_locations'];
+        $this->assertSame($permissions, $access->defaults($operator->role));
         foreach (array_keys(config('feature_access.features')) as $feature) {
-            $this->assertSame(in_array($feature, ['parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_merge_pallet', 'export_picking_verification', 'export_fulfillment', 'export_locations'], true), $access->allows($operator, $feature), $feature);
+            $this->assertSame(in_array($feature, $permissions, true), $access->allows($operator, $feature), $feature);
         }
 
         $this->actingAs($operator);
-        foreach (['stock-input.index', 'stock-view.index', 'delivery.index', 'delivery-assign.index',
+        foreach (['stock-input.index', 'stock-view.index', 'move-pallet.index', 'delivery.index', 'delivery-assign.index',
             'delivery.pick.verification', 'reports.stock-input', 'users.index', 'access.index'] as $route) {
             $this->get(route($route))->assertForbidden();
         }
@@ -88,7 +89,7 @@ class ExportOperatorRoleTest extends TestCase
     {
         $this->actingAs(User::factory()->create(['role' => 'admin']))
             ->get(route('access.index', ['role' => 'export_operator']))
-            ->assertOk()->assertSee('Operator Export')->assertViewHas('selected', ['parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_merge_pallet', 'export_picking_verification', 'export_fulfillment', 'export_locations']);
+            ->assertOk()->assertSee('Operator Export')->assertViewHas('selected', ['export_move_pallet', 'parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_merge_pallet', 'export_picking_verification', 'export_fulfillment', 'export_locations']);
         $this->put(route('access.update'), ['role' => 'export_operator', 'permissions' => []])
             ->assertSessionHasNoErrors()->assertRedirect(route('access.index', ['role' => 'export_operator']));
         $this->assertDatabaseHas('role_feature_access', ['role' => 'export_operator', 'permissions' => '[]']);

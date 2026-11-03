@@ -13,6 +13,7 @@ class ExportFulfillmentBox extends Model
     protected $casts = [
         'box_number' => 'string', 'pcs_quantity' => 'integer',
         'first_received_at' => 'datetime', 'reserved_at' => 'datetime', 'placed_at' => 'datetime',
+        'picking_started_at' => 'datetime',
         'merge_pending_verification' => 'boolean', 'picking_required' => 'boolean', 'picking_verified_at' => 'datetime', 'picking_verified_revision' => 'integer',
     ];
 

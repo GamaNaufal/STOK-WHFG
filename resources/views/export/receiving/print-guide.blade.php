@@ -11,6 +11,7 @@
         <header class="guide-header"><p>PT. YAMATOGOMU INDONESIA · WAREHOUSE FG EKSPOR</p><h1>Panduan peletakan box</h1><strong class="guide-code">{{ $receipt['code'] }}</strong></header>
         <table class="guide-meta"><tbody><tr><th>{{ !empty($receipt['notice_id']) ? 'Transaksi' : 'Penerimaan' }}</th><td>{{ $receipt['received_at']->format('d/m/Y H:i') }}</td><th>Operator</th><td>{{ $receipt['operator'] }}</td></tr><tr><th>Dicetak</th><td>{{ $printedAt->format('d/m/Y H:i') }}</td><th>Jumlah</th><td>{{ $receipt['total'] }} box · {{ $receipt['pending'] }} menunggu · {{ $receipt['placed'] }} selesai @if($receipt['redirected'] ?? 0) · {{ $receipt['redirected'] }} pada transaksi FIFO @endif</td></tr></tbody></table>
         @if($guideWarning)<p class="guide-warning">{{ $guideWarning }}</p>@endif
+        @if(!empty($receipt['picking_fingerprint']))<p class="guide-warning">Sebelum mengambil box, buka transaksi, klik Mulai Picking, dan cocokkan lokasi di panduan ini dengan lokasi terbaru di layar.</p>@endif
         @if($receipt['pending'] === 0 && !($receipt['redirected'] ?? 0))<p class="guide-complete">Seluruh box pada transaksi ini sudah ditempatkan.</p>@endif
         @foreach($printGroups as $destination)
             <table class="guide-table">
