@@ -8,7 +8,7 @@ class ExportNotFullRequest extends Model
 {
     protected $guarded = ['id'];
 
-    protected $casts = ['preparation' => 'array', 'revision' => 'integer', 'pcs_quantity' => 'integer', 'fixed_qty' => 'integer', 'approved_at' => 'datetime'];
+    protected $casts = ['preparation' => 'array', 'revision' => 'integer', 'required_boxes' => 'integer', 'pcs_quantity' => 'integer', 'fixed_qty' => 'integer', 'approved_at' => 'datetime'];
 
     public function delivery()
     {

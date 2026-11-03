@@ -1,6 +1,65 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 3 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 4 November 2026 (pembaruan inkremental).
+
+Navigasi Merge Pallet 4 November 2026:
+- Warehouse menampilkan satu menu Merge Pallet. Akun yang memiliki kedua izin
+  masuk ke Domestik dari halaman lain dan bisa memilih Ekspor lewat tombol geser.
+  Pada halaman merge, menu tetap aktif dan mengarah ke lingkup yang sedang dibuka.
+- Akun dengan satu izin langsung masuk ke lingkupnya. Endpoint dan pemeriksaan
+  izin domestik dan ekspor tetap terpisah.
+- Verifikasi: 45 tes navigasi dan merge, 7 tes navigasi setelah penyesuaian posisi
+  menu, serta perpindahan klik dan keyboard di browser dan viewport 390px.
+
+Merge Pallet Ekspor 3 November 2026:
+- ExportPalletMergeService/Controller dan export.merge.* memakai permission
+  export_merge_pallet untuk export_operator/admin_warehouse/admin. UI terpisah di
+  Pengiriman Ekspor mengikuti teal/Bootstrap, pencarian sumber, ketersediaan
+  lokasi, pratinjau perubahan kebutuhan dan konfirmasi pemindahan fisik.
+- Minimal dua pallet fisik, seluruh box ikut. Pallet permintaan hanya boleh
+  satu delivery final aktif, termasuk jika customer sama. Cadangan + permintaan
+  melindungi reservasi RD lain. Cadangan + cadangan juga ditolak bila reservasi
+  terkait lebih dari satu RD; satu RD tetap mempertahankan target masing-masing. Pengambilan yang sudah mulai
+  atau issue terbuka memblokir merge. Reservasi belum dipindahkan mengikuti target.
+- Cadangan bebas: operator memilih mengisi kebutuhan belum direservasi pada
+  pallet terpilih dahulu atau menambah semuanya. Tambahan part/PCS/box wajib
+  disetujui melalui peringatan besar. FIFO menolak melewati box bebas lebih tua
+  dengan part dan kapasitas sama, menunjukkan ID Box/lokasi yang benar.
+- Result fisik baru, nomor rencana terkecil dipertahankan; logical sumber lain
+  dilepas setelah referensi aktif dipindah. Snapshot sebelum/sesudah di audit
+  export_pallet_merge dan export_pallet_merges; sumber fisik retired tetap ada
+  untuk histori movement. Lokasi, reservasi dan penempatan diperbarui atomik
+  melalui mutex inventory. Fingerprint dan token menjaga data stale/replay.
+- Tetap final dengan revisi baru. Status siap hanya pada sumber terpilih dibuka
+  setelah warning wajib, harus dikonfirmasi ulang. 36/72 tetap warning. Picking
+  wajib tidak hilang saat merge: merge_pending_verification menahan fulfillment
+  yang ikut fisik target sampai scan dan penempatan normal selesai. Kebutuhan
+  lain yang belum dipindah tetap di sumber. Notice belum ditinjau dipindah ke
+  notice revisi baru sehingga acknowledgment tidak buntu.
+- Migration 2026_11_03_000002 menambah box_composition nullable pada delivery item,
+  required_boxes pada request Not Full, unique per item+kapasitas dan tabel merge.
+  ExportBoxRequirements menjadi sumber komposisi pasti; pengurangan pallet ikut
+  mengurangi kapasitas tersebut, bukan ceil(PCS/master) yang dapat mengubah box.
+  Not Full mendukung beberapa kapasitas/jumlah per part, satu box per approval,
+  dengan hitungan seluruh reservasi/penempatan per kapasitas. Prepared target atau
+  sumber yang berubah dikembalikan waiting untuk disiapkan/disetujui ulang.
+- Panduan dan kasus uji: docs/EXPORT_PALLET_MERGE.md. Preview browser memakai
+  SQLite terpisah; bukti storage/app/previews/export-merge-20261103/.
+- Pallet campuran ditentukan berdasarkan part_setting_id aktif, sehingga
+  perbedaan huruf/angka pada nomor part tidak melemahkan verifikasi picking.
+  merge_pending_verification juga wajib masuk pengembalian fisik pada revisi/
+  pembatalan; tidak boleh hanya melepas reservasi sambil meninggalkan box di target.
+- Verifikasi akhir: 102 tes area perubahan (820 assertions), 52 tes merge/picking/
+  transaksi rekomendasi (469 assertions), 110 frontend, Vite build, sintaks JS
+  serta diff --check lulus. Termasuk 22 kasus merge, batas warning 36/72, rollback
+  sesudah mutasi, token replay dan error stale browser yang kembali ke form GET
+  dengan pilihan/pesan tersimpan. IAB desktop dan viewport 390px memeriksa lokasi,
+  perubahan demand, status siap, sidebar, pencarian kosong dan keyboard.
+- MySQL development lokal stock sudah dimigrasi setelah backup
+  storage/app/backups/before-export-merge-20261103-200810-c4aaab.sql (295.809 byte).
+  Sebelum migrasi: 0 box domestik, 0 box ekspor, 0 delivery ekspor; tidak ada seed
+  atau merge inventory pada DB pengguna. Production tidak diakses. Server/tab
+  preview terisolasi dihentikan setelah pemeriksaan.
 
 Cloudflare Tunnel / HTTPS 3 November 2026:
 - Diagnosis proses menunjukkan cloudflared --url http://127.0.0.1:8001 dan PHP

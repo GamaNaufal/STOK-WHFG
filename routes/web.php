@@ -45,6 +45,10 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     });
 
     Route::prefix('export')->name('export.')->group(function () {
+        Route::get('merge-pallet', [\App\Http\Controllers\ExportPalletMergeController::class, 'index'])->name('merge.index');
+        Route::post('merge-pallet/preview', [\App\Http\Controllers\ExportPalletMergeController::class, 'preview'])->name('merge.preview');
+        Route::post('merge-pallet', [\App\Http\Controllers\ExportPalletMergeController::class, 'store'])->name('merge.store');
+        Route::get('merge-pallet/result/{token}', [\App\Http\Controllers\ExportPalletMergeController::class, 'result'])->whereUuid('token')->name('merge.result');
         Route::get('delivery-plans/template', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'template'])->name('delivery-plans.template');
         Route::post('delivery-plans/import-excel', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'importExcel'])->name('delivery-plans.import-excel');
         Route::get('delivery-plans/{deliveryPlan}/print', [\App\Http\Controllers\ExportPlanPrintController::class, 'delivery'])->whereNumber('deliveryPlan')->name('delivery-plans.print');

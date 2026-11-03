@@ -27,6 +27,9 @@ class NavigationContextTest extends TestCase
             'export.delivery-plans.create' => 'export.delivery-plans.index',
             'export.pallet-plans.show' => 'export.pallet-plans.index',
             'export.fulfillment.ready-form' => 'export.fulfillment.index',
+            'export.merge.preview' => 'export.merge.index',
+            'export.merge.result' => 'export.merge.index',
+            'merge-pallet.store' => 'merge-pallet.index',
             'part-settings.edit' => 'part-settings.index',
             'export.locations.create' => 'export.locations.index',
             'reports.withdrawal.export' => 'reports.withdrawal',
@@ -55,6 +58,9 @@ class NavigationContextTest extends TestCase
         foreach (['admin', ...array_keys(config('feature_access.roles'))] as $role) {
             $user = User::factory()->create(compact('role'));
             $expected = array_column(app(FeatureAccessService::class)->navigation($user), 'route');
+            if (in_array('merge-pallet.index', $expected, true)) {
+                $expected = array_values(array_diff($expected, ['export.merge.index']));
+            }
             $context = app(NavigationContextService::class)->build($user, 'profile.edit');
             $actual = array_column($context['items'], 'route');
             sort($expected);
@@ -63,6 +69,40 @@ class NavigationContextTest extends TestCase
             $this->assertCount(0, collect($context['items'])->where('active', true));
             $this->assertSame('Profil Saya', $context['breadcrumbs'][1]['label']);
         }
+    }
+
+    public function test_merge_has_one_warehouse_link_and_switches_only_between_allowed_scopes(): void
+    {
+        $this->withoutVite();
+        $this->actingAs(User::factory()->create(['role' => 'admin_warehouse']));
+
+        foreach (['domestic' => 'merge-pallet.index', 'export' => 'export.merge.index'] as $scope => $route) {
+            $response = $this->get(route($route))->assertOk();
+            $dom = new DOMDocument;
+            @$dom->loadHTML($response->getContent());
+            $xpath = new DOMXPath($dom);
+            $menu = $xpath->query('//nav[@id="mobileSidebar"]//*[@id="featureMenuwarehouse"]//a[@aria-label="Merge Pallet"]');
+            $this->assertCount(1, $menu);
+            $this->assertCount(1, $xpath->query('//nav[@id="mobileSidebar"]//a[contains(@href,"/merge-pallet")]'));
+            $this->assertSame(route($route), $menu->item(0)->getAttribute('href'));
+            $this->assertSame('page', $menu->item(0)->getAttribute('aria-current'));
+
+            $switch = '//nav[@aria-label="Lingkup merge pallet" and @data-scope="'.$scope.'"]';
+            $this->assertCount(2, $xpath->query($switch.'/a'));
+            $this->assertSame(route($route), $xpath->query($switch.'/a[@aria-current="page"]')->item(0)->getAttribute('href'));
+        }
+
+        RoleFeatureAccess::create(['role' => 'admin_warehouse', 'permissions' => ['export_merge_pallet']]);
+        $this->get(route('export.merge.index'))->assertOk()
+            ->assertDontSee('aria-label="Lingkup merge pallet"', false)
+            ->assertDontSee('href="'.route('merge-pallet.index').'"', false);
+        $this->get(route('merge-pallet.index'))->assertForbidden();
+
+        $this->actingAs(User::factory()->create(['role' => 'warehouse_operator']));
+        $this->get(route('merge-pallet.index'))->assertOk()
+            ->assertDontSee('aria-label="Lingkup merge pallet"', false)
+            ->assertDontSee('href="'.route('export.merge.index').'"', false);
+        $this->get(route('export.merge.index'))->assertForbidden();
     }
 
     public function test_input_only_role_uses_receiving_context_without_gaining_picking_menu(): void

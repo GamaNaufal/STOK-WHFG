@@ -12,6 +12,24 @@ class NavigationContextService
     {
         $access = app(FeatureAccessService::class);
         $items = $access->navigation($user);
+        $mergeRoutes = $this->mergeRoutes($user);
+        $mergeAnchor = $mergeRoutes['domestic'] ?? $mergeRoutes['export'] ?? null;
+        $mergeRoute = Str::is('export.merge.*', $routeName ?? '')
+            ? ($mergeRoutes['export'] ?? $mergeAnchor)
+            : $mergeAnchor;
+        $items = array_filter($items, fn ($item) => ! in_array($item['key'], ['merge_pallet', 'export_merge_pallet'], true)
+            || $item['route'] === $mergeAnchor);
+        foreach ($items as &$item) {
+            if ($item['route'] === $mergeAnchor) {
+                $item['route'] = $mergeRoute;
+                $item['key'] = $mergeRoute === 'export.merge.index' ? 'export_merge_pallet' : 'merge_pallet';
+                $item['group'] = 'Warehouse';
+                $item['label'] = 'Merge Pallet';
+                $item['icon'] = 'intersect';
+            }
+        }
+        unset($item);
+
         $order = array_flip(['Warehouse', 'Delivery', 'Pengiriman Ekspor', 'Master Data', 'Master Data Ekspor', 'Laporan', 'Administrasi']);
         usort($items, fn ($a, $b) => ($order[$a['group']] ?? 99) <=> ($order[$b['group']] ?? 99));
         $activeRoute = $this->activeRoute($items, $routeName, $access);
@@ -23,7 +41,7 @@ class NavigationContextService
                 default => str_contains($item['group'], 'Ekspor') ? Str::replaceEnd(' Ekspor', '', $item['label']) : $item['label'],
             };
             $item['group_label'] = match ($item['group']) {
-                'Warehouse' => 'Gudang', 'Delivery' => 'Pengiriman', default => $item['group'],
+                'Warehouse' => 'Warehouse', 'Delivery' => 'Pengiriman Lokal', default => $item['group'],
             };
             $scope = str_starts_with($item['key'], 'export_') ? 'ekspor export' : match ($item['key']) {
                 'not_full_request', 'not_full_approval', 'delivery_issues', 'reports', 'audit', 'parts' => 'domestik lokal ekspor export',
@@ -35,7 +53,8 @@ class NavigationContextService
                 'export_stock_input', 'stock_input' => 'input penerimaan stok stock box transfer',
                 'parts' => 'master nomor no part part number kapasitas pcs box',
                 'export_locations', 'locations' => 'master lokasi location tempat',
-                'export_pallet_plans', 'merge_pallet', 'move_pallet' => 'palet pallet rencana planning',
+                'merge_pallet', 'export_merge_pallet' => 'gabung palet pallet'.(count($mergeRoutes) === 2 ? ' domestik lokal ekspor export' : ''),
+                'export_pallet_plans', 'move_pallet' => 'palet pallet rencana planning',
                 'export_delivery_plans', 'delivery_schedule', 'delivery_order' => 'rencana jadwal pengiriman delivery',
                 'not_full_request', 'not_full_approval' => 'box not full nf pengajuan persetujuan approval',
                 'reports' => 'laporan report excel ekspor export unduh',
@@ -68,6 +87,20 @@ class NavigationContextService
                 default => config('feature_access.roles.'.$user->role, ucfirst(str_replace('_', ' ', $user->role))),
             },
         ];
+    }
+
+    public function mergeRoutes(User $user): array
+    {
+        $routes = [];
+        if ($user->canAccess('merge_pallet')) {
+            $routes['domestic'] = 'merge-pallet.index';
+        }
+        if (in_array($user->role, ['admin', ...config('feature_access.features.export_merge_pallet.roles')], true)
+            && $user->canAccess('export_merge_pallet')) {
+            $routes['export'] = 'export.merge.index';
+        }
+
+        return $routes;
     }
 
     private function activeRoute(array $items, ?string $route, FeatureAccessService $access): ?string

@@ -33,7 +33,7 @@ class ExportDeliveryPlanService
             'revision' => $plan->revision, 'total_pcs' => $plan->total_pcs, 'total_boxes' => $plan->total_boxes,
             'source_type' => $plan->source_type, 'source_name' => $plan->source_name,
             'items' => $plan->items->map(fn ($item) => $item->only([
-                'part_setting_id', 'part_number', 'pcs_quantity', 'pcs_per_box', 'box_quantity', 'not_full_pcs',
+                'part_setting_id', 'part_number', 'pcs_quantity', 'pcs_per_box', 'box_quantity', 'not_full_pcs', 'box_composition',
             ]))->all(),
         ];
     }

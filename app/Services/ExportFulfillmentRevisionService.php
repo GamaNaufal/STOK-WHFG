@@ -43,12 +43,13 @@ class ExportFulfillmentRevisionService
                 } elseif ($f->placed_by || $f->placed_location_id || !in_array($box->state, ['received', 'stored'], true)
                     || ($box->state === 'received' && $box->current_pallet_id)
                     || ($box->state === 'stored' && (!$box->currentPallet || $box->currentPallet->retired_at || !$box->stored_at || !$box->stored_by
-                        || ($physical && (int) $box->current_pallet_id === $physical->id)))) {
+                        || ($physical && (int) $box->current_pallet_id === $physical->id && !($f->merge_pending_verification && $f->allocation_notice_id && $f->picking_required))))) {
                     $this->fail('Posisi reservasi yang belum ditempatkan tidak konsisten.');
                 }
             }
         }
-        if ($physical && $physical->boxes()->count() !== $commitments->whereNotNull('placed_at')->count()) {
+        if ($physical && $physical->boxes()->count() !== $commitments->filter(fn ($f) => $f->placed_at
+            || ($f->merge_pending_verification && (int) $f->stockBox?->current_pallet_id === $physical->id))->count()) {
             $this->fail('Pallet berisi box di luar permintaan. Pindahkan stok tambahan sebelum revisi.');
         }
         if (ExportPickingIssue::open()->where(fn ($q) => $q->where('export_planned_pallet_id', $pallet->id)
@@ -73,8 +74,8 @@ class ExportFulfillmentRevisionService
         }
         if ($difference < 1) $this->fail('Kurangi minimal satu box dari kebutuhan pallet.');
         // A verified pick may already be in the operator's hands even before placement.
-        $returns = $selected->filter(fn ($f) => $f->placed_at || $f->picking_verified_at)->values();
-        $released = $selected->reject(fn ($f) => $f->placed_at || $f->picking_verified_at)->values();
+        $returns = $selected->filter(fn ($f) => $f->placed_at || $f->picking_verified_at || $f->merge_pending_verification)->values();
+        $released = $selected->reject(fn ($f) => $f->placed_at || $f->picking_verified_at || $f->merge_pending_verification)->values();
         $fingerprint = hash('sha256', json_encode([$pallet->id, $quantities,
             $items->map(fn ($i) => [$i->id, $i->box_quantity])->all(),
             $commitments->map(fn ($f) => [$f->id, $f->placed_at?->toJSON(), $f->picking_verified_at?->toJSON(),
@@ -123,8 +124,11 @@ class ExportFulfillmentRevisionService
             if (!$line || $line->box_quantity < $difference) $this->fail('Jumlah delivery tidak sesuai dengan perencanaan.');
             $pcs = $line->pcs_quantity - $difference * $item->pcs_per_box;
             if ($pcs < 0) $this->fail('Jumlah PCS delivery tidak sesuai dengan revisi pallet.');
-            $line->update(['box_quantity' => (int) ceil($pcs / $line->pcs_per_box), 'pcs_quantity' => $pcs,
-                'not_full_pcs' => $pcs % $line->pcs_per_box]);
+            $composition = collect(ExportBoxRequirements::composition($line))->map(function ($r) use ($item, $difference) {
+                if ($r['pcs_per_box'] === $item->pcs_per_box) $r['box_quantity'] -= $difference;
+                return $r;
+            })->all();
+            ExportBoxRequirements::updateComposition($line, $composition);
             if ($quantity === 0) $item->delete(); else $item->update(['box_quantity' => $quantity]);
         }
         if (!$pallet->items()->exists()) {

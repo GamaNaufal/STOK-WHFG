@@ -173,7 +173,7 @@ class ExportStockReceivingService
             $box->update(['current_pallet_id' => $target->id, 'state' => 'stored', 'revision' => $box->revision + 1,
                 'stored_at' => $moment, 'stored_by' => $actor->id]);
             $location->update(['is_occupied' => true]);
-            if ($commitment) $commitment->update(['placed_at' => $moment, 'placed_by' => $actor->id, 'placed_location_id' => $location->id]);
+            if ($commitment) $commitment->update(['merge_pending_verification' => false, 'placed_at' => $moment, 'placed_by' => $actor->id, 'placed_location_id' => $location->id]);
             if ($source && $source->id !== $target->id && !$source->boxes()->exists()) {
                 $sourceLocation = $locations->get($source->master_location_id);
                 $source->update(['master_location_id' => null, 'export_planned_pallet_id' => null, 'retired_at' => $moment]);

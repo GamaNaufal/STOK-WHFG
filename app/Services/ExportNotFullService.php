@@ -24,23 +24,28 @@ class ExportNotFullService
         return ExportNotFullRequest::where('status', '!=', 'cancelled')
             ->whereHas('delivery', fn ($q) => $q->whereNull('export_delivery_plans.deleted_at')->whereNotIn('status', ['completed', 'cancelled']))
             ->whereHas('item', fn ($q) => $q->where('not_full_pcs', '>', 0))
-            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('export_fulfillment_boxes as f')
-                ->join('export_planned_pallet_items as i', 'i.id', '=', 'f.export_planned_pallet_item_id')
-                ->join('export_planned_pallets as p', 'p.id', '=', 'i.export_planned_pallet_id')
-                ->join('export_pallet_plans as plan', 'plan.id', '=', 'p.export_pallet_plan_id')
-                ->join('export_stock_boxes as b', 'b.id', '=', 'f.export_stock_box_id')
-                ->whereColumn('plan.export_delivery_plan_id', 'export_not_full_requests.export_delivery_plan_id')->where('plan.status', 'final')
-                ->whereColumn('i.part_setting_id', 'export_not_full_requests.part_setting_id')->whereColumn('i.pcs_per_box', 'export_not_full_requests.pcs_quantity')
-                ->whereNotNull('f.placed_at')->whereNotNull('f.placed_by')->whereColumn('f.placed_location_id', 'p.master_location_id')
-                ->whereColumn('b.pcs_quantity', 'i.pcs_per_box')->whereColumn('b.part_setting_id', 'i.part_setting_id')
-                ->whereNull('b.deleted_at')->where('b.state', 'stored'));
+            ->whereRaw('export_not_full_requests.required_boxes > (SELECT COUNT(*) FROM export_fulfillment_boxes f
+                JOIN export_planned_pallet_items i ON i.id=f.export_planned_pallet_item_id
+                JOIN export_planned_pallets p ON p.id=i.export_planned_pallet_id
+                JOIN export_pallet_plans plan ON plan.id=p.export_pallet_plan_id
+                JOIN export_stock_boxes b ON b.id=f.export_stock_box_id
+                WHERE plan.export_delivery_plan_id=export_not_full_requests.export_delivery_plan_id AND plan.status=\'final\'
+                AND i.part_setting_id=export_not_full_requests.part_setting_id AND i.pcs_per_box=export_not_full_requests.pcs_quantity
+                AND f.placed_at IS NOT NULL AND f.placed_by IS NOT NULL AND f.placed_location_id=p.master_location_id
+                AND b.pcs_quantity=i.pcs_per_box AND b.part_setting_id=i.part_setting_id AND b.deleted_at IS NULL AND b.state=\'stored\')');
+    }
+
+    private function reservedCount(ExportNotFullRequest $r): int
+    {
+        return ExportFulfillmentBox::whereHas('plannedItem', fn ($q) => $q->where('part_setting_id', $r->part_setting_id)
+            ->where('pcs_per_box', $r->pcs_quantity)->whereHas('pallet.palletPlan', fn ($p) => $p->where('export_delivery_plan_id', $r->export_delivery_plan_id)))->count();
     }
 
     private function useExisting(ExportNotFullRequest $r, User $actor): bool
     {
         $r->load('item', 'delivery.palletPlan');
         $target = $this->target($r);
-        if (! $target || ! $target->fulfillmentBoxes()->exists()) {
+        if (! $target || $this->reservedCount($r) < $r->required_boxes) {
             return false;
         }
         if ($r->status === 'prepared') {
@@ -52,14 +57,18 @@ class ExportNotFullService
         return true;
     }
 
-    /** One current request per delivery line. The audit retains superseded preparations/approvals. */
+    /** One current request per exact Not Full capacity; approvals remain audited per physical box. */
     public function sync(ExportDeliveryPlan $delivery, User $actor): void
     {
         $items = $delivery->items()->get();
         $existing = ExportNotFullRequest::where('export_delivery_plan_id', $delivery->id)->get();
+        $needs = $items->flatMap(fn ($item) => collect(ExportBoxRequirements::composition($item))
+            ->filter(fn ($r) => $r['pcs_per_box'] < $item->pcs_per_box)
+            ->map(fn ($r) => ['item' => $item, 'pcs' => $r['pcs_per_box'], 'count' => $r['box_quantity']]))
+            ->keyBy(fn ($r) => $r['item']->id.':'.$r['pcs']);
         foreach ($existing as $request) {
             $item = $items->firstWhere('id', $request->export_delivery_plan_item_id);
-            if (! $item || ! $item->not_full_pcs || $delivery->trashed() || $delivery->status === 'cancelled') {
+            if (! $item || ! $needs->has($item->id.':'.$request->pcs_quantity) || $delivery->trashed() || $delivery->status === 'cancelled') {
                 if ($request->status !== 'cancelled') {
                     $before = $request->toArray();
                     $request->update(['status' => 'cancelled', 'revision' => $request->revision + 1, 'preparation' => null]);
@@ -70,9 +79,10 @@ class ExportNotFullService
         if ($delivery->trashed() || $delivery->status === 'cancelled') {
             return;
         }
-        foreach ($items->where('not_full_pcs', '>', 0) as $item) {
-            $request = $existing->firstWhere('export_delivery_plan_item_id', $item->id);
-            $changed = ! $request || $request->pcs_quantity !== $item->not_full_pcs || $request->fixed_qty !== $item->pcs_per_box
+        foreach ($needs as $need) {
+            $item = $need['item'];
+            $request = $existing->first(fn ($r) => $r->export_delivery_plan_item_id === $item->id && $r->pcs_quantity === $need['pcs']);
+            $changed = ! $request || $request->required_boxes !== $need['count'] || $request->fixed_qty !== $item->pcs_per_box
                 || $request->status === 'cancelled' || ($request->status === 'prepared' && ($request->preparation['delivery_revision'] ?? 0) !== $delivery->revision);
             if (! $changed) {
                 continue;
@@ -80,7 +90,7 @@ class ExportNotFullService
             $before = $request?->toArray() ?? [];
             $request ??= new ExportNotFullRequest(['export_delivery_plan_id' => $delivery->id, 'export_delivery_plan_item_id' => $item->id, 'requested_by' => $actor->id, 'revision' => 0]);
             $request->fill(['part_setting_id' => $item->part_setting_id, 'part_number' => $item->part_number,
-                'pcs_quantity' => $item->not_full_pcs, 'fixed_qty' => $item->pcs_per_box, 'status' => 'waiting',
+                'pcs_quantity' => $need['pcs'], 'required_boxes' => $need['count'], 'fixed_qty' => $item->pcs_per_box, 'status' => 'waiting',
                 'revision' => $request->revision + 1, 'preparation' => null, 'prepared_by' => null,
                 'approved_by' => null, 'approved_at' => null, 'export_stock_box_id' => null])->save();
             $this->audit($request, $before ? 'updated' : 'created', $actor, $before, 'Request wajib Not Full ekspor dicatat dari sisa PCS rencana delivery.');
@@ -96,7 +106,7 @@ class ExportNotFullService
     /** The destination is read from a final plan; it cannot be overridden by a request payload. */
     public function target(ExportNotFullRequest $request): ?ExportPlannedPalletItem
     {
-        if ($request->status === 'cancelled' || ! $request->item || $request->item->not_full_pcs !== $request->pcs_quantity
+        if ($request->status === 'cancelled' || ! $request->item || ! collect(ExportBoxRequirements::composition($request->item))->contains(fn ($r) => $r['pcs_per_box'] === $request->pcs_quantity)
             || $request->pcs_quantity < 1 || $request->pcs_quantity >= $request->fixed_qty) {
             return null;
         }
@@ -106,9 +116,11 @@ class ExportNotFullService
             return null;
         }
 
-        return ExportPlannedPalletItem::with('pallet')->where('part_setting_id', $request->part_setting_id)
-            ->where('pcs_per_box', $request->pcs_quantity)->where('box_quantity', 1)
-            ->whereHas('pallet', fn ($q) => $q->where('export_pallet_plan_id', $plan->id))->first();
+        $items = ExportPlannedPalletItem::with('pallet')->withCount('fulfillmentBoxes')->where('part_setting_id', $request->part_setting_id)
+            ->where('pcs_per_box', $request->pcs_quantity)
+            ->whereHas('pallet', fn ($q) => $q->where('export_pallet_plan_id', $plan->id))->orderBy('id')->get();
+        return $items->first(fn ($i) => $i->fulfillment_boxes_count < $i->box_quantity)
+            ?? $items->first(fn ($i) => $i->fulfillmentBoxes()->whereNull('placed_at')->exists()) ?? $items->first();
     }
 
     public function state(ExportNotFullRequest $request, ?ExportPlannedPalletItem $target): string
@@ -117,9 +129,8 @@ class ExportNotFullService
             return 'Dibatalkan';
         }
         if ($target) {
-            $f = $target->fulfillmentBoxes()->first();
-            if ($f) {
-                return app(ExportFulfillmentService::class)->boxState($f) === 'placed' ? 'Terpenuhi' : 'Direservasi · menunggu penempatan';
+            if ($this->reservedCount($request) >= $request->required_boxes) {
+                return $this->pending()->whereKey($request->id)->exists() ? 'Direservasi · menunggu penempatan' : 'Terpenuhi';
             }
         }
 
@@ -148,7 +159,7 @@ class ExportNotFullService
         if (! $target || $target->pallet->ready_at) {
             $this->fail('Box Not Full hanya dapat dibuat untuk pallet final yang belum dikonfirmasi siap.');
         }
-        if ($target->fulfillmentBoxes()->exists()) {
+        if ($target->fulfillmentBoxes()->count() >= $target->box_quantity) {
             $this->fail('Kebutuhan ini sudah memiliki box direservasi/ditempatkan. Ikuti antrean penempatan; tidak perlu membuat box baru.');
         }
 
@@ -252,7 +263,7 @@ class ExportNotFullService
                 'export_planned_pallet_item_id' => $target->id, 'part_setting_id' => $r->part_setting_id,
                 'pcs_quantity' => $box->pcs_quantity, 'first_received_at' => $box->first_received_at, 'reserved_at' => now(), 'reserved_by' => $actor->id]);
             app(ExportStockReceivingService::class)->place($box->id, ['revision' => 1, 'request_token' => (string) Str::uuid()], $actor);
-            $r->update(['status' => 'approved', 'approved_by' => $actor->id, 'approved_at' => now(),
+            $r->update(['status' => $this->reservedCount($r) < $r->required_boxes ? 'waiting' : 'approved', 'approved_by' => $actor->id, 'approved_at' => now(),
                 'export_stock_box_id' => $box->id, 'revision' => $r->revision + 1]);
             $this->audit($r, 'approved', $actor, $before, 'Not Full ekspor disetujui, menjadi stok dan ditempatkan pada pallet rencana.');
             if ($source) {

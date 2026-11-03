@@ -5,7 +5,7 @@
 @php
     $canPrepare=in_array(auth()->user()->role,['admin','admin_warehouse']) && auth()->user()->canAccess('not_full_request');
     $canApprove=in_array(auth()->user()->role,['admin','supervisi']) && auth()->user()->canAccess('not_full_approval');
-    $covered=$target && $target->fulfillmentBoxes()->exists();
+    $covered=$target && in_array($state,['Terpenuhi','Direservasi · menunggu penempatan'],true);
     $p=$record->preparation;
 @endphp
 <div class="delivery-plan-page">
@@ -14,13 +14,13 @@
     <header class="plan-header"><div><h1>{{ $record->part_number }} · Not Full {{ $record->pcs_quantity }} PCS</h1><p>{{ $record->delivery->plan_code ?: 'RD-'.$record->export_delivery_plan_id }} · {{ $record->delivery->customer_name }}</p><p><strong>{{ $state }}</strong></p></div></header>
     @if($errors->any())<div class="alert alert-danger" role="alert">{{ $errors->first() }}</div>@endif
     <div class="alert {{ $target ? 'alert-info' : 'alert-warning' }}">
-        @if($target)Tujuan wajib: <strong>Pallet {{ $target->pallet->position }} · {{ $target->pallet->location_code }}</strong>. Kebutuhan 1 box {{ $record->pcs_quantity }} PCS, standar {{ $record->fixed_qty }} PCS/box.
+        @if($target)Tujuan wajib: <strong>Pallet {{ $target->pallet->position }} · {{ $target->pallet->location_code }}</strong>. Kebutuhan {{ $record->required_boxes }} box × {{ $record->pcs_quantity }} PCS. Penyiapan dilakukan satu box per approval, standar {{ $record->fixed_qty }} PCS/box.
         @else Penyiapan menunggu perencanaan pallet final dengan alokasi Not Full yang sesuai. Kebutuhan ini tetap wajib dipenuhi.
         @endif
     </div>
     @if($covered)<div class="alert alert-success">{{ $state==='Terpenuhi' ? 'Box sudah tercatat sebagai stok dan penempatannya pada pallet rencana sudah dikonfirmasi. Tidak perlu penerimaan atau scan ulang.' : 'Box yang sesuai sudah direservasi. Ikuti antrean untuk konfirmasi penempatan; tidak perlu membuat box baru.' }}</div>@endif
     @if($record->notes)<p>Catatan: {{ $record->notes }}</p>@endif
-    @if($record->stockBox)<p>Box hasil approval: <strong>{{ $record->stockBox->box_number }}</strong> · {{ $record->stockBox->pcs_quantity }} PCS. Disetujui {{ $record->approver?->name }}.</p>@endif
+    @if($record->stockBox)<p>Box hasil approval terakhir: <strong>{{ $record->stockBox->box_number }}</strong> · {{ $record->stockBox->pcs_quantity }} PCS. Disetujui {{ $record->approver?->name }}.</p>@endif
     @if($p)
     <section class="plan-panel"><div class="plan-panel-body"><h2>Data yang disiapkan</h2><p>ID baru <strong>{{ $p['box_number'] }}</strong> · {{ $p['mode']==='split'?'Ambil dari box penuh di stok':'Datang sudah dikemas Not Full' }} · {{ $record->pcs_quantity }} PCS</p>
         @if($p['mode']==='split')<p>Box sumber <strong>{{ $p['source_box_number'] }}</strong> · lokasi {{ $p['source_location'] }}. Sisa <strong>{{ $record->fixed_qty-$record->pcs_quantity }} PCS</strong> tetap pada ID dan lokasi sumber. Tanggal FIFO kedua box mengikuti sumber.</p>@endif

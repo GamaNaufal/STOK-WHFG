@@ -4,14 +4,16 @@
 
 @section('styles')
 <link rel="stylesheet" href="{{ asset('css/pages/merge-pallet.css') }}">
+<link rel="stylesheet" href="{{ asset('css/pages/merge-scope-switch.css') }}">
 @endsection
 
 @section('content')
 <div class="container-fluid merge-pallet-page" id="mergePalletPage">
     <header class="merge-pallet-header">
-        <span class="merge-pallet-eyebrow">Inventory / Konsolidasi pallet</span>
+        <span class="merge-pallet-eyebrow">Warehouse / Domestik</span>
         <h1><i class="bi bi-intersect" aria-hidden="true"></i> Merge Pallet</h1>
         <p>Pilih minimal dua pallet sumber. Box aktifnya akan digabung ke satu pallet baru setelah lokasi tujuan diperiksa.</p>
+        @include('shared.merge-scope-switch', ['scope' => 'domestic'])
     </header>
 
 <div class="row g-3 g-xl-4 merge-pallet-workflow">
