@@ -75,9 +75,9 @@ class ExportStockAllocationNoticeTest extends TestCase
         $this->assertDatabaseCount('export_stock_movements',3); $this->assertSame($audits+1,AuditLog::count());
         $this->post($this->ackUrl($delivery,$notice),['revision' => $plan->revision])->assertRedirect();
         $this->assertSame($audits+1,AuditLog::count());
-        $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn ($p) => $p->total() === 1 && (int) $p[0]->transaction_id === $batch->id
-            && (int) $p[0]->pending_boxes === 2 && (int) $p[0]->placed_boxes === 1);
-        $this->post(route('export.receiving.place-bulk'),['return_batch' => $batch->id,
+        $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn ($p) => $p->total() === 1 && $p[0]->kind === 'recommendation' && (int) $p[0]->transaction_id === $notice->id
+            && (int) $p[0]->pending_boxes === 2 && (int) $p[0]->placed_boxes === 0);
+        $this->post(route('export.receiving.place-bulk'),['return_notice' => $notice->id, 'return_pallet' => $plan->pallets()->first()->id,
             'placements_json' => json_encode($rows(collect([$boxes[1],$boxes[2]])))])->assertRedirect();
         $this->assertDatabaseCount('export_stock_movements',5);
         $this->assertNotNull($boxes[1]->fresh()->fulfillment->placed_at);
@@ -120,7 +120,7 @@ class ExportStockAllocationNoticeTest extends TestCase
         $this->assertNull($notice->fresh()->acknowledged_at); $this->assertSame($audits,AuditLog::count());
         $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn ($p) => $p->total() === 0);
         $this->post($this->ackUrl($delivery,$notice),['revision' => $plan->revision])->assertRedirect();
-        $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn ($p) => $p->total() === 101);
+        $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn ($p) => $p->total() === 1 && $p[0]->kind === 'recommendation' && (int) $p[0]->total_boxes === 101);
         $audits = AuditLog::count();
         $this->get(route('export.pallet-plans.show',['deliveryPlan' => $delivery->id,'review_stock' => 1,'stock_page' => 2]))->assertOk()
             ->assertViewHas('stockReviewRequired',false)->assertViewHas('stockAssignments',fn ($p) => $p->total() === 101 && $p->count() === 1)
@@ -162,7 +162,7 @@ class ExportStockAllocationNoticeTest extends TestCase
         $this->get(route('export.receiving.transactions.show',$batch))->assertOk()->assertSee('Buka tinjauan perencanaan')
             ->assertViewHas('groups',fn ($groups) => $groups->sum(fn ($g) => $g['actionable']->count()) === 1 && $groups->sum(fn ($g) => $g['waiting']->count()) === 1);
         $this->post($this->ackUrl($delivery,$notice),['revision' => $plan->revision])->assertRedirect();
-        $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn ($p) => (int) $p[0]->pending_boxes === 2
-            && (int) $p[0]->waiting_boxes === 0 && (int) $p[0]->placed_boxes === 0);
+        $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn ($p) => $p->total() === 2 && (int) $p->sum('pending_boxes') === 2
+            && (int) $p->sum('waiting_boxes') === 0 && (int) $p->sum('placed_boxes') === 0 && (int) $p->firstWhere('kind', 'batch')->recommendation_boxes === 1);
     }
 }

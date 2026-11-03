@@ -1,6 +1,6 @@
 # Tinjauan Stok FIFO setelah Finalisasi Pallet
 
-Verifikasi 30 Oktober 2026 pada branch Export-plan.
+Verifikasi awal 30 Oktober 2026; diperbarui 3 November 2026 pada branch Export-plan.
 
 ## Alur operator
 
@@ -21,17 +21,21 @@ ini wajib: hanya ada satu tombol Oke, tanpa Tinjau nanti/tombol X. Escape dan
 klik di luar tidak menutup pop-up. Jika halaman ditinggalkan, reservasi tetap
 tersimpan dan pop-up muncul lagi saat rencana dibuka. GET tidak mengakui hasil.
 
-Setelah Oke, tugas aktif pada antrean penempatan/pemindahan menurut transaksi
-penerimaan asal, bukan membuat penerimaan stok baru. Operator berizin penerimaan
-diarahkan ke antrean. Tombol Oke tidak memindahkan box, mengubah tanggal FIFO,
+Setelah Oke, tugas aktif pada antrean penempatan/pemindahan sebagai **satu
+transaksi per pallet tujuan dan gelombang rekomendasi FIFO**. Contoh: 12 box
+untuk Pallet 1 dari beberapa sumber menjadi satu transaksi; 8 box untuk Pallet 2
+menjadi transaksi lain. Tambahan dari revisi membuat transaksi baru, sehingga
+daftar yang sedang dikerjakan tidak bertambah diam-diam. Penerimaan box baru
+melalui scan massal tetap memakai transaksi penerimaan existing. Operator tetap
+di halaman planning setelah Oke. Tombol Oke tidak memindahkan box, mengubah tanggal FIFO,
 occupancy, pergerakan atau placed_at; pemenuhan tetap menunggu konfirmasi fisik.
 
 Hasil finalisasi terakhir tetap dapat dilihat melalui **Tinjau alokasi FIFO**
 setelah masuk antrean. Tinjauan ini menampilkan posisi fisik saat ini, tujuan dan
 status (menunggu/sudah ditempatkan), dengan satu tombol **Tutup**. Tidak ada
 formulir aktivasi ulang, reservasi atau mutasi stok ketika ditinjau. Daftar
-dibuka melalui review_stock=1 dan tetap mendukung pagination; halaman biasa
-setelah pengakuan hanya memuat header hasil, sehingga daftar tidak selalu dimuat.
+dipersiapkan bersama halaman hasil sehingga tombol tinjau membuka modal lokal
+tanpa loading tambahan. Pagination tetap membuka halaman hasil berikutnya.
 Hasil revisi sebelumnya dapat ditinjau saat planning dibuka untuk revisi, tanpa
 memaksa pengakuan atas hasil yang sudah bukan revisi final terkini.
 
@@ -66,11 +70,42 @@ Oke, dan sudah ditempatkan. Detail stok/kelompok tetap menunjukkan status
 menunggu Oke, tanpa formulir untuk box yang ditahan. Konfirmasi server selalu
 memeriksa pengakuan; panduan cetak menandai baris tersebut **Menunggu Oke FIFO**.
 
-Guard revisi/pembatalan dengan komitmen tetap berlaku. Pengembalian/pelepasan
-reservasi karena revisi masih tahap berikutnya. Finalisasi yang terjadi sebelum
-migration tidak dibuatkan tinjauan fiktif atau ditahan secara retroaktif.
+Identitas transaksi rekomendasi adalah pasangan allocation_notice_id dan ID
+pallet tujuan, berkode FIFO-<notice 6 digit>-<planned pallet 6 digit>. Pengelompokan
+dihitung dari relasi existing, tanpa schema baru atau penulisan ulang riwayat
+penerimaan. Box ini tidak menjadi tugas aktif pada transaksi penerimaan asal;
+detail asal menyediakan tautan ke transaksi FIFO. Cetak asal tidak menggandakan
+daftar rekomendasi, dan hitungan selesai memisahkan tugas yang dialihkan.
+
+Detail/cetak di receiving/recommendations/{notice}/pallets/{pallet} dan /print
+memuat anggota transaksi tersebut. Picking Verification menampilkan daftar per
+transaksi dan memakai parameter ?notice=<id>, termasuk pada scan, replay token
+dan pengembalian issue. Sumber campuran tetap wajib scan setiap box; sumber satu
+jenis part bebas scan satuan. NG pencarian tidak membuat issue. NG wajib tetap
+memblokir sampai approval dan konfirmasi pengembalian. Penerimaan baru tidak
+memerlukan scan picking tambahan. POST penempatan memeriksa keanggotaan transaksi
+di dalam mutex ekspor; setelah selesai kembali ke detail transaksi yang sama.
+
+Revisi/pembatalan memakai alur pengembalian/pelepasan reservasi existing.
+Finalisasi sebelum migration tidak dibuatkan tinjauan fiktif atau ditahan
+secara retroaktif. Notice existing otomatis mengikuti pengelompokan terbaru.
 
 ## Deployment dan verifikasi
+
+Pembaruan 3 November memakai schema/izin existing tanpa migration baru. Deploy
+service/controller/model/rute/view terbaru dan perbarui cache aplikasi sesuai
+prosedur deployment. Tidak ada dependency atau konfigurasi PC tambahan.
+
+535 tes backend (4.956 assertions), 101 frontend dan Vite build lulus. Tujuh tes
+baru mencakup sumber/part campuran per tujuan, penerimaan baru, revisi/gelombang
+terpisah, isolasi transaksi, replay, penempatan bertahap dan pagination.
+Query SQL diuji pada MySQL dengan READ ONLY/ROLLBACK tanpa perubahan data.
+Browser SQLite terpisah memverifikasi dua transaksi untuk empat box (3/1),
+cetak beranggotakan tepat tiga box Pallet 1, NG pencarian lintas transaksi,
+scan wajib tiga box dari sumber campuran, dan penempatan satu box sumber satu
+part tanpa scan tambahan. Bukti: storage/app/previews/recommendation-transactions-20261103/.
+
+Catatan verifikasi awal 30 Oktober (sebelum pengelompokan per pallet tujuan):
 
 Jalankan migration terarah setelah migration penerimaan/batch tersedia. Sertakan
 model/service/controller/rute/view terbaru dan rebuild route cache jika digunakan.

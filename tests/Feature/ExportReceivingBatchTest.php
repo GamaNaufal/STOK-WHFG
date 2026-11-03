@@ -170,7 +170,7 @@ class ExportReceivingBatchTest extends TestCase
                 && !$groups->contains(fn($group)=>$group['boxes']->contains('id',$old->id)));
         $this->post(route('export.pallet-plans.acknowledge-stock',['deliveryPlan'=>$delivery->id,
             'notice'=>$old->fresh()->fulfillment->allocation_notice_id]),['revision'=>$delivery->palletPlan->revision])->assertRedirect();
-        $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn($p)=>$p->contains(fn($transaction)=>$transaction->kind==='legacy' && (int)$transaction->transaction_id===$old->id));
+        $this->get(route('export.receiving.index'))->assertViewHas('transactions',fn($p)=>$p->contains(fn($transaction)=>$transaction->kind==='recommendation' && (int)$transaction->transaction_id===$old->fresh()->fulfillment->allocation_notice_id));
     }
     public function test_draft_limit_accepts_large_delivery_batches_and_rejects_more_than_one_thousand(): void
     {

@@ -5,8 +5,8 @@ namespace App\Services;
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportFulfillmentBox;
 use App\Models\ExportPalletPlan;
-use App\Models\ExportStockBox;
 use App\Models\ExportStockAllocationNotice;
+use App\Models\ExportStockBox;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
@@ -24,51 +24,66 @@ class ExportStockAllocationService
         $allocated = 0;
         foreach ($deliveries->sortBy(fn ($d) => [$d->delivery_deadline->format('Y-m-d'), $d->id]) as $delivery) {
             $plan = $plans->get($delivery->id);
-            if (!$plan || $plan->delivery_revision !== $delivery->revision) continue;
-            foreach ($plan->pallets as $pallet) foreach ($pallet->items as $item) {
-                if ($pallet->ready_at) continue;
-                if ($partIds !== null && !in_array($item->part_setting_id, $partIds, true)) continue;
-                $remaining = $item->box_quantity - $item->fulfillment_boxes_count;
-                if ($remaining <= 0) continue;
-                $boxes = ExportStockBox::where('part_setting_id', $item->part_setting_id)
-                    ->where('pcs_quantity', $item->pcs_per_box)->whereIn('state', ['received', 'stored'])
-                    ->whereDoesntHave('fulfillment')->whereNotIn('box_number', \App\Models\ExportPickingIssue::open()->select('box_number'))->with('currentPallet')
-                    ->orderBy('first_received_at')->orderBy('id')->limit($remaining)->lockForUpdate()->get();
-                if ($boxes->isEmpty()) continue;
-                $claim = $plan->reservations->firstWhere('export_planned_pallet_id', $pallet->id);
-                if (!$pallet->location || !$claim || $claim->master_location_id !== $pallet->master_location_id) {
-                    throw ValidationException::withMessages(['allocation' => 'Reservasi lokasi pallet tidak sesuai. Periksa perencanaan sebelum menerima box.']);
-                }
-                foreach ($boxes as $box) {
-                    if (($box->state === 'stored' && (!$box->currentPallet || $box->currentPallet->retired_at || !$box->stored_at || !$box->stored_by))
-                        || ($box->state === 'received' && $box->current_pallet_id !== null)) {
-                        throw ValidationException::withMessages(['allocation' => 'Penempatan stok ekspor tidak konsisten. Periksa box '.$box->box_number.'.']);
+            if (! $plan || $plan->delivery_revision !== $delivery->revision) {
+                continue;
+            }
+            foreach ($plan->pallets as $pallet) {
+                foreach ($pallet->items as $item) {
+                    if ($pallet->ready_at) {
+                        continue;
                     }
-                    $alreadyThere = $box->state === 'stored'
-                        && (int) $box->currentPallet->export_planned_pallet_id === $pallet->id
-                        && (int) $box->currentPallet->master_location_id === $pallet->master_location_id;
-                    $commitment = ExportFulfillmentBox::create([
-                        'allocation_notice_id' => !$alreadyThere && $notice && (int) $notice->export_pallet_plan_id === $plan->id ? $notice->id : null,
-                        'export_stock_box_id' => $box->id, 'box_number' => $box->box_number,
-                        'export_planned_pallet_item_id' => $item->id, 'part_setting_id' => $box->part_setting_id,
-                        'pcs_quantity' => $box->pcs_quantity, 'first_received_at' => $box->first_received_at,
-                        'reserved_at' => now(), 'reserved_by' => $actor->id,
-                        'placed_at' => $alreadyThere ? $box->stored_at : null,
-                        'placed_by' => $alreadyThere ? $box->stored_by : null,
-                        'placed_location_id' => $alreadyThere ? $pallet->master_location_id : null,
-                        'picking_required' => !$alreadyThere && $notice && (int) $notice->export_pallet_plan_id === $plan->id && $box->current_pallet_id
-                            && \App\Models\ExportStockPallet::whereKey($box->current_pallet_id)->mixed()->exists(),
-                    ]);
-                    $box->increment('revision');
-                    AuditService::record('export_stock_reservation', 'reserved', 'ExportStockBox', $box->id, $actor->id,
-                        [], ['box_number' => $box->box_number, 'commitment_id' => $commitment->id,
-                            'delivery_id' => $delivery->id, 'planned_pallet_id' => $pallet->id,
-                            'first_received_at' => $box->first_received_at->toDateTimeString(), 'already_at_target' => $alreadyThere],
-                        'Box ekspor direservasi sesuai tenggat, nomor pallet, dan FIFO.');
-                    $allocated++;
+                    if ($partIds !== null && ! in_array($item->part_setting_id, $partIds, true)) {
+                        continue;
+                    }
+                    $remaining = $item->box_quantity - $item->fulfillment_boxes_count;
+                    if ($remaining <= 0) {
+                        continue;
+                    }
+                    $boxes = ExportStockBox::where('part_setting_id', $item->part_setting_id)
+                        ->where('pcs_quantity', $item->pcs_per_box)->whereIn('state', ['received', 'stored'])
+                        ->whereDoesntHave('fulfillment')->whereNotIn('box_number', \App\Models\ExportPickingIssue::open()->select('box_number'))->with('currentPallet')
+                        ->orderBy('first_received_at')->orderBy('id')->limit($remaining)->lockForUpdate()->get();
+                    if ($boxes->isEmpty()) {
+                        continue;
+                    }
+                    $claim = $plan->reservations->firstWhere('export_planned_pallet_id', $pallet->id);
+                    if (! $pallet->location || ! $claim || $claim->master_location_id !== $pallet->master_location_id) {
+                        throw ValidationException::withMessages(['allocation' => 'Reservasi lokasi pallet tidak sesuai. Periksa perencanaan sebelum menerima box.']);
+                    }
+                    foreach ($boxes as $box) {
+                        if (($box->state === 'stored' && (! $box->currentPallet || $box->currentPallet->retired_at || ! $box->stored_at || ! $box->stored_by))
+                            || ($box->state === 'received' && $box->current_pallet_id !== null)) {
+                            throw ValidationException::withMessages(['allocation' => 'Penempatan stok ekspor tidak konsisten. Periksa box '.$box->box_number.'.']);
+                        }
+                        $alreadyThere = $box->state === 'stored'
+                            && (int) $box->currentPallet->export_planned_pallet_id === $pallet->id
+                            && (int) $box->currentPallet->master_location_id === $pallet->master_location_id;
+                        $commitment = ExportFulfillmentBox::create([
+                            'allocation_notice_id' => ! $alreadyThere && $notice && (int) $notice->export_pallet_plan_id === $plan->id ? $notice->id : null,
+                            'export_stock_box_id' => $box->id, 'box_number' => $box->box_number,
+                            'export_planned_pallet_item_id' => $item->id, 'part_setting_id' => $box->part_setting_id,
+                            'pcs_quantity' => $box->pcs_quantity, 'first_received_at' => $box->first_received_at,
+                            'reserved_at' => now(), 'reserved_by' => $actor->id,
+                            'placed_at' => $alreadyThere ? $box->stored_at : null,
+                            'placed_by' => $alreadyThere ? $box->stored_by : null,
+                            'placed_location_id' => $alreadyThere ? $pallet->master_location_id : null,
+                            'picking_required' => ! $alreadyThere && $notice && (int) $notice->export_pallet_plan_id === $plan->id && $box->current_pallet_id
+                                && \App\Models\ExportStockPallet::whereKey($box->current_pallet_id)->mixed()->exists(),
+                        ]);
+                        $box->increment('revision');
+                        AuditService::record('export_stock_reservation', 'reserved', 'ExportStockBox', $box->id, $actor->id,
+                            [], ['box_number' => $box->box_number, 'commitment_id' => $commitment->id,
+                                'delivery_id' => $delivery->id, 'planned_pallet_id' => $pallet->id,
+                                'allocation_notice_id' => $commitment->allocation_notice_id,
+                                'recommendation_transaction' => $commitment->allocation_notice_id ? ExportReceivingTransactionService::code('recommendation', $commitment->allocation_notice_id, $pallet->id) : null,
+                                'first_received_at' => $box->first_received_at->toDateTimeString(), 'already_at_target' => $alreadyThere],
+                            'Box ekspor direservasi sesuai tenggat, nomor pallet, dan FIFO.');
+                        $allocated++;
+                    }
                 }
             }
         }
+
         return $allocated;
     }
 }

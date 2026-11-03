@@ -9,9 +9,9 @@
     <nav class="guide-toolbar no-print" aria-label="Aksi panduan cetak"><a href="{{ $receipt['detail_url'] }}">Kembali ke transaksi</a><button type="button" id="placement-guide-print">Cetak / simpan PDF</button></nav>
     <main class="guide-sheet">
         <header class="guide-header"><p>PT. YAMATOGOMU INDONESIA · WAREHOUSE FG EKSPOR</p><h1>Panduan peletakan box</h1><strong class="guide-code">{{ $receipt['code'] }}</strong></header>
-        <table class="guide-meta"><tbody><tr><th>Penerimaan</th><td>{{ $receipt['received_at']->format('d/m/Y H:i') }}</td><th>Operator</th><td>{{ $receipt['operator'] }}</td></tr><tr><th>Dicetak</th><td>{{ $printedAt->format('d/m/Y H:i') }}</td><th>Jumlah</th><td>{{ $receipt['total'] }} box · {{ $receipt['pending'] }} menunggu · {{ $receipt['placed'] }} selesai</td></tr></tbody></table>
+        <table class="guide-meta"><tbody><tr><th>{{ !empty($receipt['notice_id']) ? 'Transaksi' : 'Penerimaan' }}</th><td>{{ $receipt['received_at']->format('d/m/Y H:i') }}</td><th>Operator</th><td>{{ $receipt['operator'] }}</td></tr><tr><th>Dicetak</th><td>{{ $printedAt->format('d/m/Y H:i') }}</td><th>Jumlah</th><td>{{ $receipt['total'] }} box · {{ $receipt['pending'] }} menunggu · {{ $receipt['placed'] }} selesai @if($receipt['redirected'] ?? 0) · {{ $receipt['redirected'] }} pada transaksi FIFO @endif</td></tr></tbody></table>
         @if($guideWarning)<p class="guide-warning">{{ $guideWarning }}</p>@endif
-        @if($receipt['pending'] === 0)<p class="guide-complete">Seluruh box pada transaksi ini sudah ditempatkan.</p>@endif
+        @if($receipt['pending'] === 0 && !($receipt['redirected'] ?? 0))<p class="guide-complete">Seluruh box pada transaksi ini sudah ditempatkan.</p>@endif
         @foreach($printGroups as $destination)
             <table class="guide-table">
                 <colgroup><col style="width:7%"><col style="width:19%"><col style="width:25%"><col style="width:9%"><col style="width:30%"><col style="width:10%"></colgroup>

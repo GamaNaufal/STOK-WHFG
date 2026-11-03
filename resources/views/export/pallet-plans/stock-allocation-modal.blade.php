@@ -15,7 +15,7 @@
                     @endforeach
                     </tbody></table></div>
                     @if($stockAssignments->hasPages())<div class="mt-3">{{ $stockAssignments->links('pagination::bootstrap-5') }}</div>@endif
-                    <p class="plan-help mt-2 mb-0">Menampilkan {{ $stockAssignments->firstItem() }}–{{ $stockAssignments->lastItem() }} dari {{ $stockAssignments->total() }} box. Antrean tetap dikelompokkan menurut transaksi penerimaan asal.</p>
+                    <p class="plan-help mt-2 mb-0">Menampilkan {{ $stockAssignments->firstItem() }}–{{ $stockAssignments->lastItem() }} dari {{ $stockAssignments->total() }} box. Antrean rekomendasi dibuat satu transaksi per pallet tujuan. Rekomendasi tambahan setelah revisi menjadi transaksi baru.</p>
                 @else
                     <p class="mb-1"><strong>Belum ada stok yang dapat dialokasikan saat finalisasi ini.</strong></p><p class="plan-help mb-0">Box yang diterima berikutnya akan dicocokkan ke kebutuhan sesuai FIFO. Tidak ada tugas stok existing yang ditambahkan melalui tinjauan ini.</p>
                 @endif

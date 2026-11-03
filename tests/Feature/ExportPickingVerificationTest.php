@@ -255,7 +255,7 @@ class ExportPickingVerificationTest extends TestCase
         $selected = ExportStockBox::whereHas('fulfillment')->orderBy('id')->get();
         $this->assertSame($boxes->take(36)->pluck('id')->all(), $selected->pluck('id')->all());
         $this->assertSame(0, ExportFulfillmentBox::where('picking_required', true)->count());
-        $this->get(route('export.picking.index'))->assertOk()->assertSee('Belum ada tugas pallet campuran');
+        $this->get(route('export.picking.index'))->assertOk()->assertSee('Tanpa scan satuan');
         app(ExportStockReceivingService::class)->placeMany($selected->map(fn ($box) => ['id' => $box->id, 'revision' => $box->revision,
             'request_token' => (string) Str::uuid()])->all(), $this->operator);
         $this->assertSame(36, ExportFulfillmentBox::whereNotNull('placed_at')->count());
@@ -428,7 +428,7 @@ class ExportPickingVerificationTest extends TestCase
         // A flag retained from an earlier deployment must not change the allocation's origin.
         $f->update(['picking_required' => true]);
         $this->assertFalse(app(ExportPickingService::class)->rows($pallet->id)->sole()->requires_scan);
-        $this->get(route('export.picking.index'))->assertOk()->assertSee('Belum ada tugas pallet campuran');
+        $this->get(route('export.picking.index'))->assertOk()->assertSee('Belum ada transaksi rekomendasi yang menunggu');
         $this->place($first);
         $this->assertNotNull($first->fresh()->fulfillment->placed_at);
         $this->assertDatabaseCount('export_picking_scans', 0); $this->assertDatabaseCount('export_picking_issues', 0);

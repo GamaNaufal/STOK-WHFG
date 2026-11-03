@@ -4,7 +4,7 @@
         return ($minutes<0?'−':'').sprintf('%02d:%02d',intdiv($seconds,60),$seconds%60);
     };
 @endphp
-<section class="od-panel" id="processing-time">
+<section class="od-panel" id="processing-time" data-detail-panel="processing">
     <div class="od-panel-header"><h2>Durasi proses pengiriman</h2><span class="od-muted">Berdasarkan waktu mulai pada periode ini</span></div>
     <div class="od-scroll" tabindex="0" role="region" aria-label="Durasi proses per lingkup">
         <table class="od-table"><thead><tr><th>Lingkup / rencana</th><th>Nama customer</th><th>Proses yang diukur</th><th>Mulai</th><th>Selesai</th><th>Proses (menit:detik)</th><th>Scan (menit:detik)</th><th>Petugas</th></tr></thead><tbody>

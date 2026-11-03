@@ -214,7 +214,7 @@ class ExportStockReceivingTest extends TestCase
         $this->assertSame($source, $old->fresh()->current_pallet_id);
         $this->post(route('export.pallet-plans.acknowledge-stock', ['deliveryPlan' => $delivery->id,
             'notice' => $old->fresh()->fulfillment->allocation_notice_id]), ['revision' => $delivery->palletPlan->revision])->assertRedirect();
-        $this->get(route('export.receiving.index'))->assertOk()->assertViewHas('transactions', fn ($p) => $p->contains(fn ($transaction) => $transaction->kind === 'legacy' && (int) $transaction->transaction_id === $old->id));
+        $this->get(route('export.receiving.index'))->assertOk()->assertViewHas('transactions', fn ($p) => $p->contains(fn ($transaction) => $transaction->kind === 'recommendation' && (int) $transaction->transaction_id === $old->fresh()->fulfillment->allocation_notice_id));
         $this->placement($old)->assertRedirect();
         $this->assertSame($receivedAt, $old->fresh()->first_received_at->toDateTimeString());
         $this->assertNotNull(ExportStockPallet::find($source)->retired_at);

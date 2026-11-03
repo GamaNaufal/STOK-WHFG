@@ -132,7 +132,8 @@ class OperationalDashboardScopeTest extends TestCase
         $this->assertSame(1, (int) $ex->fulfilled);
         $this->assertSame(1, (int) $ex->reserved);
         $this->assertSame(0.0, (float) $d['fulfillmentRate']);
-        $this->get(route('dashboard'))->assertOk()->assertSee('Domestik · grafik dalam PCS')->assertSee('Ekspor · grafik dalam box');
+        $this->get(route('dashboard'))->assertOk()->assertSee('aria-label="Grafik Domestik"', false)->assertSee('aria-label="Grafik Ekspor"', false)
+            ->assertSee('Domestik dalam PCS. Ekspor dalam box.')->assertSee('data-unit="PCS"', false)->assertSee('data-unit="box"', false);
     }
 
     public function test_scope_filters_every_source_and_ajax_has_no_layout_or_external_charts(): void
@@ -141,7 +142,7 @@ class OperationalDashboardScopeTest extends TestCase
         $this->plan();
         $this->receive();
         $this->getJson(route('dashboard', ['scope' => 'export', 'period' => 'today']))->assertOk()->assertHeader('Cache-Control', 'no-store, private')
-            ->assertJsonPath('title', 'Dashboard Operasional - Warehouse FG');
+            ->assertJsonPath('title', 'Dashboard Analitik - Warehouse FG');
         $response = $this->getJson(route('dashboard', ['scope' => 'export', 'period' => 'today']));
         $html = $response->json('html');
         $this->assertStringContainsString('EXPORT CUSTOMER', $html);

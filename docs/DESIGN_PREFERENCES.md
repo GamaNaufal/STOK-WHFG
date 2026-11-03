@@ -37,3 +37,14 @@ Aturan khusus halaman harus memakai token ini atau menjelaskan pengecualiannya.
 
 Verifikasi perubahan dengan data kosong/berisi, keyboard, desktop, viewport
 ponsel, dan tes regresi relevan. Bedakan simulasi browser dari perangkat nyata.
+
+## Dashboard analitik — 3 November 2026
+
+Pengguna meminta dashboard Admin Utama/Supervisi lebih hidup dan interaktif.
+Khusus dashboard ini, gunakan animasi terbatas untuk angka KPI, penggambaran
+garis, ring pemenuhan, komposisi stok dan pergantian rincian. Interaksi pointer
+horizontal pada grafik meninjau titik data; klik menahan titik, keyboard memberi
+alternatif yang setara. Hindari gerakan dekoratif tanpa akhir, angka tren fiktif
+dan penggabungan satuan PCS domestik dengan box ekspor. Animasi dapat dimatikan
+dan tetap menghormati prefers-reduced-motion. Preferensi operasional/scanner
+dan navigasi halaman lain tetap berlaku.

@@ -20,7 +20,7 @@ class DashboardController extends Controller
         $data = array_merge(app(OperationalDashboardService::class)->build($request), $extra);
         $response = $request->expectsJson()
             ? response()->json(['html' => view('shared.partials.operational-dashboard-content', $data)->render(),
-                'title' => 'Dashboard Operasional - Warehouse FG', 'url' => $request->fullUrl()])
+                'title' => 'Dashboard Analitik - Warehouse FG', 'url' => $request->fullUrl()])
             : response()->view('shared.operational-dashboard', $data);
         return $response->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
     }

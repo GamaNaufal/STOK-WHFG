@@ -62,6 +62,8 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::get('receiving/transactions/{batch}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printBatch'])->whereNumber('batch')->name('receiving.transactions.print');
         Route::get('receiving/transactions/box/{stockBox}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'legacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy');
         Route::get('receiving/transactions/box/{stockBox}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printLegacy'])->whereNumber('stockBox')->name('receiving.transactions.legacy-print');
+        Route::get('receiving/recommendations/{notice}/pallets/{pallet}', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'recommendation'])->whereNumber(['notice', 'pallet'])->name('receiving.transactions.recommendation');
+        Route::get('receiving/recommendations/{notice}/pallets/{pallet}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printRecommendation'])->whereNumber(['notice', 'pallet'])->name('receiving.transactions.recommendation-print');
         Route::get('stock', [\App\Http\Controllers\ExportStockController::class, 'index'])->name('stock.index');
         Route::get('picking-verification', [\App\Http\Controllers\ExportPickingController::class, 'index'])->name('picking.index');
         Route::get('picking-verification/{pallet}', [\App\Http\Controllers\ExportPickingController::class, 'helper'])->whereNumber('pallet')->name('picking.show');

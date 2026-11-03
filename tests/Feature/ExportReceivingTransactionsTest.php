@@ -94,7 +94,7 @@ class ExportReceivingTransactionsTest extends TestCase
         $this->get(route('export.receiving.index'))->assertViewHas('transactions', fn ($p) => $p->total() === 1 && $p[0]->kind === 'batch');
     }
 
-    public function test_new_reservation_reopens_the_original_receipt_for_stored_spare_stock(): void
+    public function test_new_reservation_creates_a_separate_recommendation_transaction_for_stored_spare_stock(): void
     {
         $batch = $this->batch(1); $box = $this->boxes($batch)->first(); $firstReceived = $box->first_received_at->toDateTimeString();
         $source = ExportMasterLocation::create(['code' => 'TX-SOURCE']); $this->place($box, $source->id);
@@ -108,8 +108,9 @@ class ExportReceivingTransactionsTest extends TestCase
         $this->post(route('export.pallet-plans.acknowledge-stock', ['deliveryPlan' => $delivery->id,
             'notice' => $box->fresh()->fulfillment->allocation_notice_id]), ['revision' => $delivery->palletPlan->revision])->assertRedirect();
         $this->get(route('export.receiving.index'))->assertViewHas('transactions', fn ($p) =>
-            $p->total() === 1 && (int) $p[0]->transaction_id === $batch->id && (int) $p[0]->pending_boxes === 1);
+            $p->total() === 1 && $p[0]->kind === 'recommendation' && (int) $p[0]->transaction_id === $box->fresh()->fulfillment->allocation_notice_id && (int) $p[0]->pending_boxes === 1);
         $this->get(route('export.receiving.transactions.show', $batch))->assertSee('Pallet cadangan · TX-SOURCE')->assertSee('Pallet 1 · TX-TARGET');
+        $this->get(route('export.receiving.transactions.show', $batch))->assertViewHas('receipt', fn ($r) => $r['pending'] === 0 && $r['redirected'] === 1);
         $this->assertSame($firstReceived, $box->fresh()->first_received_at->toDateTimeString());
     }
 

@@ -2,8 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\{ExportReceivingBatch, ExportReceivingBatchItem, ExportStockBox};
-use App\Services\{ExportPlacementGuideService, ExportReceivingTransactionService, ExportStockViewService};
+use App\Models\ExportPlannedPallet;
+use App\Models\ExportReceivingBatch;
+use App\Models\ExportReceivingBatchItem;
+use App\Models\ExportStockAllocationNotice;
+use App\Models\ExportStockBox;
+use App\Services\ExportPlacementGuideService;
+use App\Services\ExportReceivingTransactionService;
+use App\Services\ExportStockViewService;
 use Illuminate\Http\Request;
 
 class ExportReceivingTransactionController extends Controller
@@ -12,6 +18,7 @@ class ExportReceivingTransactionController extends Controller
     {
         abort_unless($batch->status === 'processed', 404);
         $batch->load('creator');
+
         return $this->detail($service->batchBoxes($batch), [
             'code' => $service::code('batch', $batch->id), 'received_at' => $batch->processed_at ?? $batch->created_at,
             'operator' => $batch->creator?->name ?? 'Operator',
@@ -24,6 +31,7 @@ class ExportReceivingTransactionController extends Controller
     {
         abort_if(ExportReceivingBatchItem::where('export_stock_box_id', $stockBox->id)->exists(), 404);
         $stockBox->load([...$view::RELATIONS, 'receiver']);
+
         return $this->detail(collect([$stockBox]), [
             'code' => ExportReceivingTransactionService::code('legacy', $stockBox->id),
             'received_at' => $stockBox->first_received_at, 'operator' => $stockBox->receiver?->name ?? 'Operator',
@@ -32,14 +40,34 @@ class ExportReceivingTransactionController extends Controller
         ], $view, null, $stockBox->id);
     }
 
+    public function recommendation(ExportStockAllocationNotice $notice, ExportPlannedPallet $pallet, ExportReceivingTransactionService $service, ExportStockViewService $view)
+    {
+        $boxes = $service->recommendationBoxes($notice, $pallet);
+        abort_if($boxes->isEmpty(), 404, 'Rekomendasi tidak lagi aktif. Periksa antrean terbaru.');
+        $notice->load('palletPlan.deliveryPlan');
+        $parameters = ['notice' => $notice->id, 'pallet' => $pallet->id];
+
+        return $this->detail($boxes, [
+            'code' => $service::code('recommendation', $notice->id, $pallet->id),
+            'received_at' => $notice->acknowledged_at ?? $notice->created_at,
+            'operator' => \App\Models\User::find($notice->acknowledged_by ?? $notice->created_by)?->name ?? 'Operator',
+            'notice_id' => $notice->id, 'pallet_id' => $pallet->id,
+            'print_url' => route('export.receiving.transactions.recommendation-print', $parameters),
+            'detail_url' => route('export.receiving.transactions.recommendation', $parameters),
+            'delivery' => $notice->palletPlan->deliveryPlan,
+        ], $view, null);
+    }
+
     private function detail($boxes, array $receipt, ExportStockViewService $view, ?ExportReceivingBatch $batch, ?int $returnBox = null)
     {
-        $groups = $view->groups($boxes);
+        $groups = $view->groups($boxes, empty($receipt['notice_id']));
         $receipt['total'] = $boxes->count();
         $receipt['pending'] = $groups->sum(fn ($group) => $group['pending']->count());
-        $receipt['placed'] = $receipt['total'] - $receipt['pending'];
-        $needsChoices = $groups->contains(fn ($group) => !$group['planned'] && $group['pending']->isNotEmpty());
+        $receipt['redirected'] = $groups->sum(fn ($group) => $group['redirected']->count());
+        $receipt['placed'] = $receipt['total'] - $receipt['pending'] - $receipt['redirected'];
+        $needsChoices = $groups->contains(fn ($group) => ! $group['planned'] && $group['pending']->isNotEmpty());
         $choices = $needsChoices ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
+
         return view('export.receiving.transaction', compact('batch', 'groups', 'receipt', 'returnBox') + $choices);
     }
 
@@ -53,9 +81,15 @@ class ExportReceivingTransactionController extends Controller
         return $this->printGuide($request, $this->legacy($stockBox, $view)->getData(), $guide);
     }
 
+    public function printRecommendation(Request $request, ExportStockAllocationNotice $notice, ExportPlannedPallet $pallet, ExportReceivingTransactionService $service, ExportStockViewService $view, ExportPlacementGuideService $guide)
+    {
+        return $this->printGuide($request, $this->recommendation($notice, $pallet, $service, $view)->getData(), $guide);
+    }
+
     private function printGuide(Request $request, array $data, ExportPlacementGuideService $guide)
     {
         $input = $request->validate(['spare_destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/']]);
+
         return response()->view('export.receiving.print-guide', $data + $guide->prepare($data, $input['spare_destination'] ?? null))
             ->header('Cache-Control', 'private, no-store');
     }

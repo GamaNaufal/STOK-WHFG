@@ -2,6 +2,83 @@
 
 Terakhir diverifikasi dari source code: 3 November 2026 (pembaruan inkremental).
 
+Dashboard analitik Admin Utama/Supervisi 3 November 2026:
+- Atas permintaan pengguna, shared.operational-dashboard kini menonjolkan KPI,
+  arus stok, komposisi stok dan tiga tautan perhatian. Filter lingkup/periode
+  berbentuk pilihan cepat AJAX; tanggal, pengelompokan dan status pada panel
+  Sesuaikan analisis. Tabel pemenuhan/stok/pallet/durasi/issue/audit tetap ada
+  pada partial operational-dashboard-details, ditampilkan bergantian melalui
+  tab agar halaman tidak menjadi tumpukan laporan. Tanpa JS, semua rincian dan
+  grafik tetap tersedia dengan navigasi anchor dan filter GET native.
+- OperationalDashboardService/Sources dan ekspor Excel tidak berubah. Stok tetap
+  snapshot seluruh periode; KPI pemenuhan berbasis jumlah permintaan penuh dan
+  tidak menganggap reservasi sebagai penempatan. Issue terbuka memakai is_open
+  periode existing. Grafik domestik PCS dan ekspor box tetap terpisah, masing-
+  masing berskala sendiri. Tidak ada SLA, pembanding periode atau delta buatan.
+- SVG lokal kini garis/area dengan tampilan Arus stok/Pemenuhan/Per jam. Modul
+  public/js/pages/operational-analytics.js menambahkan inspeksi titik melalui
+  pointer/geser, klik tahan/lepas, panah/Home/End/Enter/Escape dan legenda seri
+  (minimal satu seri terlihat). Angka pasti dan tabel data tetap tersedia.
+  JSON grafik memakai HEX escaping; readout memakai textContent.
+- Animasi angka/garis/ring/bar/tab terbatas, tanpa dependency/CDN. Toggle animasi
+  disimpan di whfg.dashboard.motion; reduced-motion selalu diutamakan. Observer
+  hanya memantau penggantian langsung root AJAX; listener/frame lama dibersihkan,
+  state tab/view/seri/filter terbuka dipertahankan. Mendukung pemulihan BFCache;
+  fokus filter kembali sesudah panel fallback dibuka. Tidak mengubah sidebar,
+  role, izin reports, expiry admin, reservasi/picking atau operasi inventory.
+- HTML dan JSON menggunakan judul Dashboard Analitik - Warehouse FG. Deploy
+  view, CSS, modul analytics serta DashboardController terbaru; tidak ada schema,
+  seeder atau konfigurasi PC tambahan. Skill apple-design tetap tidak tersedia;
+  mengikuti DESIGN_PREFERENCES.md (pengecualian motion dashboard sesuai pengguna).
+- Verifikasi: 535 backend (4.959 assertions), 106 frontend dan Vite build lulus.
+  Preview analytics-preview-20261103.sqlite/cookie terpisah memeriksa Admin Utama,
+  filter AJAX/Back, tab/audit pagination, keyboard titik/legenda, pointer klik,
+  rentang kosong, 422/pemulihan, toggle animasi/reload dan fokus filter. Database
+  MySQL pengguna tidak diubah. Browser desktop 1265px dan simulasi mobile 375px
+  memeriksa tab, filter Supervisi, batas tabel dan lebar halaman tanpa overflow.
+  Label sumbu mobile diringkas menjadi tiga agar tidak bertabrakan. Target
+  sentuh 44px; pengujian bukan pada perangkat sentuh/scanner fisik. Console
+  pengujian akhir tanpa error JS; respons 422 sebelumnya adalah skenario uji.
+  Bukti: storage/app/previews/analytics-20261103/.
+
+Transaksi rekomendasi stok per pallet tujuan 3 November 2026:
+- Setelah Oke pada hasil FIFO, antrean penerimaan transfer menampilkan satu
+  transaksi per pasangan allocation_notice_id dan pallet tujuan, berkode
+  FIFO-<notice 6 digit>-<planned pallet 6 digit>. Beberapa part, pallet sumber,
+  dan transaksi penerimaan asal digabung jika tujuan serta gelombang rekomendasi
+  sama. Rekomendasi tambahan setelah revisi memakai notice/transaksi baru.
+- Pengelompokan dihitung dari fulfillment existing; tanpa migration/backfill,
+  tanpa membuat penerimaan baru atau mengubah tanggal FIFO/reservasi/posisi fisik.
+  Penerimaan scan massal tetap TRX dan legacy tetap BOX. Box rekomendasi tidak
+  dihitung sebagai tugas penerimaan asal lagi; detail asal menautkan transaksi
+  FIFO, mengurangi hitungan selesai palsu dan tidak mencetak tugas ganda.
+- Detail, cetak panduan dan Picking Verification memakai anggota transaksi
+  yang sama. Rute receiving/recommendations/{notice}/pallets/{pallet} beserta
+  /print berada di izin penerimaan existing. Picking memakai ?notice=<id>;
+  URL pallet lama tetap kompatibel. Scan/replay dan POST penempatan memeriksa
+  keanggotaan notice serta pallet tujuan, bukan hanya nomor part yang cocok.
+- Wajib scan tetap hanya pengambilan stok rekomendasi dari sumber campuran.
+  Sumber satu jenis part ditandai Tanpa scan satuan; input box baru tidak diberi
+  verifikasi tambahan. NG pencarian tetap nonblocking, NG wajib tetap memakai
+  approval/pengembalian existing. Issue dan audit menyimpan konteks notice;
+  setelah pengembalian operator kembali ke transaksi picking terkait.
+- Penempatan boleh bertahap; replay tidak membuat mutasi ganda, kembali ke
+  detail transaksi yang sama, dan transaksi hilang dari antrean setelah selesai.
+  Oke tetap pada halaman planning. Audit acknowledgment mencatat kode, tujuan,
+  lokasi dan jumlah per transaksi; reservation audit juga menyimpan identitasnya.
+- Implementasi utama: ExportReceivingTransactionService, ExportStockViewService,
+  ExportPickingService, ExportReceivingTransactionController,
+  ExportStockReceivingController, ExportPickingController dan view export
+  receiving/picking. ExportRecommendationTransactionsTest mencakup pengelompokan,
+  tambahan gelombang, batas transaksi, replay, penempatan bertahap dan pagination.
+- Verifikasi: 535 tes backend (4.956 assertions), 101 frontend dan Vite build
+  lulus. Query antrean/picking diuji pada MySQL development memakai transaksi
+  READ ONLY lalu ROLLBACK. Uji browser memakai SQLite/cookie terpisah: empat box
+  menjadi dua transaksi (3/1), cetak tepat anggota transaksi, pencarian lintas
+  transaksi NG, scan wajib tiga box campuran dan penempatan tanpa scan untuk
+  sumber satu part; console error kosong. Data MySQL tidak diubah.
+  Bukti: storage/app/previews/recommendation-transactions-20261103/.
+
 Animasi sidebar 3 November 2026:
 - Atas permintaan pengguna, sidebar desktop bergeser 240 ms sambil mengubah
   ruang konten melalui margin sidebar; isi tidak diberi animasi terpisah.
