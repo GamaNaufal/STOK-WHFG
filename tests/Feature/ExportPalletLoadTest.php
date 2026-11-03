@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AuditLog, ExportMasterLocation, ExportPartSetting, ExportStockBox, ExportStockPallet, User};
+use App\Models\{AuditLog, ExportMasterLocation, PartSetting, ExportStockBox, ExportStockPallet, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService, ExportReceivingBatchService, ExportStockReceivingService, ExportStockViewService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -13,14 +13,14 @@ class ExportPalletLoadTest extends TestCase
     use RefreshDatabase;
 
     private User $operator;
-    private ExportPartSetting $part;
+    private PartSetting $part;
     private int $number = 600000;
 
     protected function setUp(): void
     {
         parent::setUp(); $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']); $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number' => 'LOAD-PART', 'qty_box' => 10]);
+        $this->part = PartSetting::create(['part_number' => 'LOAD-PART', 'qty_box' => 10]);
     }
 
     private function pallet(int $count, ?int $plannedId = null, ?ExportMasterLocation $location = null): ExportStockPallet
@@ -50,7 +50,7 @@ class ExportPalletLoadTest extends TestCase
 
     public function test_mixed_part_planning_labels_36_and_72_without_blocking_finalization(): void
     {
-        $b = ExportPartSetting::create(['part_number' => 'LOAD-B', 'qty_box' => 20]);
+        $b = PartSetting::create(['part_number' => 'LOAD-B', 'qty_box' => 20]);
         $delivery = app(ExportDeliveryPlanService::class)->save(['plan_code' => 'LOAD-MIX', 'customer_name' => 'Load Customer',
             'delivery_deadline' => '2026-11-15', 'source_type' => 'manual', 'items' => [
                 ['part_number' => $this->part->part_number, 'pcs_quantity' => 360], ['part_number' => $b->part_number, 'pcs_quantity' => 1440],

@@ -1,14 +1,14 @@
--- MASTER EKSPOR: NOMOR PART, PCS PER BOX, DAN 20 LOKASI
+-- MASTER PART BERSAMA, PCS PER BOX, DAN 20 LOKASI EKSPOR
 -- Disiapkan 2026-10-29 dari Test 1.xlsx / YR Seminggu 4.
 -- Sumber part: B7:B284; kapasitas PCS per box: G7:G284 (Qty/Bx).
 -- Seluruh part berkapasitas valid disertakan, termasuk yang jumlah delivery-nya kosong/0.
--- Prasyarat: migration 2026_10_28_000002_add_scope_to_master_data sudah diterapkan,
--- sehingga scope tersedia dan unique key menjadi (scope, part_number)/(scope, code).
+-- Prasyarat: migration 2026_11_03_000001_unify_part_master_and_box_identity.
+-- Part unik global; lokasi tetap unik menurut scope dan code.
 -- Gunakan database aplikasi yang benar dan jalankan seluruh file pada satu koneksi.
 -- Jika ada error SQL: hentikan eksekusi, jalankan ROLLBACK, lalu periksa penyebabnya.
--- Query hanya INSERT untuk data export yang belum ada. Tidak ada UPDATE/DELETE.
+-- Query hanya INSERT part bersama/lokasi ekspor yang belum ada. Tidak ada UPDATE/DELETE.
 -- Kapasitas, ID, timestamp, occupancy dan pallet lokasi existing dipertahankan.
--- Tidak mengubah scope/data domestic. Tidak menjalankan observer/audit aplikasi.
+-- Kapasitas master domestik existing tetap menjadi acuan bersama. Tidak menjalankan observer/audit aplikasi.
 -- Format INSERT ... SELECT dengan target pada JOIN luar mengikuti dokumentasi MySQL:
 -- https://dev.mysql.com/doc/refman/8.4/en/insert-select.html
 -- Tiga part belum dimasukkan karena Qty/Bx kosong; jangan menebak kapasitasnya:
@@ -18,9 +18,9 @@
 
 START TRANSACTION;
 
--- 1. Tambah maksimal 275 master part ekspor.
-INSERT INTO `part_settings` (`scope`, `part_number`, `qty_box`, `created_at`, `updated_at`)
-SELECT 'export', incoming.part_number, incoming.qty_box, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+-- 1. Tambah maksimal 275 master part bersama yang belum ada.
+INSERT INTO `part_settings` (`part_number`, `qty_box`, `created_at`, `updated_at`)
+SELECT incoming.part_number, incoming.qty_box, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
 FROM (
     SELECT '014249-0110' AS part_number, 3000 AS qty_box
     UNION ALL
@@ -573,7 +573,7 @@ FROM (
     SELECT 'ZT120D297H02', 5000
 ) AS incoming
 LEFT JOIN `part_settings` AS existing
-    ON existing.`scope` = 'export' AND existing.part_number = incoming.part_number
+    ON existing.part_number = incoming.part_number
 WHERE existing.id IS NULL;
 SELECT ROW_COUNT() AS master_part_export_ditambahkan;
 
@@ -1185,6 +1185,6 @@ FROM (
     SELECT 'ZT120D297H02', 5000
 ) AS incoming
 INNER JOIN `part_settings` AS existing
-    ON existing.`scope` = 'export' AND existing.part_number = incoming.part_number
+    ON existing.part_number = incoming.part_number
 WHERE existing.qty_box <> incoming.qty_box
 ORDER BY existing.part_number;

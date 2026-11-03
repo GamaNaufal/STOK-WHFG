@@ -2,7 +2,7 @@
 namespace Tests\Feature;
 
 use App\Exports\WarehouseRecordsExport;
-use App\Models\{AuditLog, Box, ExportDeliveryPlan, ExportMasterLocation, ExportPartSetting, ExportStockAllocationNotice, ExportStockBox, RoleFeatureAccess, User};
+use App\Models\{AuditLog, Box, ExportDeliveryPlan, ExportMasterLocation, PartSetting, ExportStockAllocationNotice, ExportStockBox, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportFulfillmentCompletionService, ExportPalletPlanningService, ExportReceivingBatchService, ExportStockAllocationNoticeService, ExportStockReceivingService, WarehouseReportService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -22,7 +22,7 @@ class WarehouseScopedReportsTest extends TestCase
     }
     private function fixture(bool $finish=true): ExportDeliveryPlan
     {
-        $part=ExportPartSetting::create(['part_number'=>'RPT-A','qty_box'=>10]);
+        $part=PartSetting::create(['part_number'=>'RPT-A','qty_box'=>10]);
         $location=ExportMasterLocation::create(['code'=>'RPT-LOC']);$back=ExportMasterLocation::create(['code'=>'RPT-BACK']);
         $delivery=app(ExportDeliveryPlanService::class)->save(['plan_code'=>'RPT-DELIVERY','customer_name'=>'Customer Report','delivery_deadline'=>'2026-11-20','source_type'=>'manual','items'=>[['part_number'=>'RPT-A','pcs_quantity'=>30]]],$this->operator);
         $plan=app(ExportPalletPlanningService::class)->save($delivery->id,['revision'=>0,'delivery_revision'=>1,'action'=>'finalize','pallets'=>[['master_location_id'=>$location->id,'items'=>[['part_setting_id'=>$part->id,'box_quantity'=>3]]]]],$this->operator);
@@ -70,7 +70,7 @@ class WarehouseScopedReportsTest extends TestCase
     public function test_archived_shipments_receipts_spare_stock_returns_and_fulfillment_reconcile_without_double_counting(): void
     {
         $this->fixture();$service=app(WarehouseReportService::class);
-        Box::create(['box_number'=>'00000001','part_number'=>'DOMESTIC-ONLY','pcs_quantity'=>999,'qr_code'=>'DOM-REPORT','user_id'=>$this->operator->id]);
+        Box::create(['box_number'=>'90000001','part_number'=>'DOMESTIC-ONLY','pcs_quantity'=>999,'qr_code'=>'DOM-REPORT','user_id'=>$this->operator->id]);
         foreach(['receipts'=>[3,30],'shipments'=>[2,20],'stock'=>[1,10],'returns'=>[1,10]]as$kind=>[$count,$pcs]){
             $rows=$service->query($this->filters($kind))->get();$this->assertCount($count,$rows);$this->assertSame($pcs,(int)$rows->sum('pcs_quantity'));
             $this->get(route('reports.records',['scope'=>'export','kind'=>$kind]))->assertOk()->assertDontSee('DOMESTIC-ONLY');

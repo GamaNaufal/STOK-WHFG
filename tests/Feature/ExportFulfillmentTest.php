@@ -8,7 +8,7 @@ use App\Models\ExportDeliveryPlan;
 use App\Models\ExportFulfillmentBox;
 use App\Models\ExportMasterLocation;
 use App\Models\ExportPalletPlan;
-use App\Models\ExportPartSetting;
+use App\Models\PartSetting;
 use App\Models\ExportPlannedPalletItem;
 use App\Models\RoleFeatureAccess;
 use App\Models\User;
@@ -24,8 +24,8 @@ class ExportFulfillmentTest extends TestCase
     use RefreshDatabase;
 
     private User $operator;
-    private ExportPartSetting $a;
-    private ExportPartSetting $b;
+    private PartSetting $a;
+    private PartSetting $b;
     private int $sequence = 0;
 
     protected function setUp(): void
@@ -34,8 +34,8 @@ class ExportFulfillmentTest extends TestCase
         $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($this->operator);
-        $this->a = ExportPartSetting::create(['part_number' => 'FUL-A', 'qty_box' => 10]);
-        $this->b = ExportPartSetting::create(['part_number' => 'FUL-B', 'qty_box' => 20]);
+        $this->a = PartSetting::create(['part_number' => 'FUL-A', 'qty_box' => 10]);
+        $this->b = PartSetting::create(['part_number' => 'FUL-B', 'qty_box' => 20]);
     }
 
     private function plan(string $code = 'FUL-001', string $deadline = '2026-11-20', bool $final = true, int $aBoxes = 4): ExportDeliveryPlan
@@ -265,10 +265,10 @@ class ExportFulfillmentTest extends TestCase
             'action' => 'draft', 'pallets' => $rows])->assertRedirect();
         Schema::drop('export_fulfillment_boxes');
         Schema::table('export_pallet_plans', fn ($table) => $table->dropColumn('entered_fulfillment'));
-        $setting = RoleFeatureAccess::create(['role' => 'export_operator', 'permissions' => ['export_parts']]);
+        $setting = RoleFeatureAccess::create(['role' => 'export_operator', 'permissions' => ['parts']]);
         $migration = require database_path('migrations/2026_10_29_000001_create_export_fulfillment_monitoring.php');
         $migration->up();
-        $this->assertSame(['export_parts', 'export_fulfillment'], $setting->fresh()->permissions);
+        $this->assertSame(['parts', 'export_fulfillment'], $setting->fresh()->permissions);
         $this->assertDatabaseCount('export_fulfillment_boxes', 0);
         $this->assertSame(1, AuditLog::where('type', 'role_feature_access')->whereNull('user_id')->count());
         $this->assertTrue($final->palletPlan()->first()->entered_fulfillment);

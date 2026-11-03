@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AuditLog, ExportMasterLocation, ExportPartSetting, ExportStockAllocationNotice, ExportStockBox, RoleFeatureAccess, User};
+use App\Models\{AuditLog, ExportMasterLocation, PartSetting, ExportStockAllocationNotice, ExportStockBox, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService, ExportReceivingBatchService, ExportStockAllocationNoticeService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -13,14 +13,14 @@ class ExportStockAllocationNoticeTest extends TestCase
     use RefreshDatabase;
 
     private User $operator;
-    private ExportPartSetting $part;
+    private PartSetting $part;
     private int $number = 400000;
 
     protected function setUp(): void
     {
         parent::setUp(); $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']); $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number' => 'FIFO-NOTICE','qty_box' => 100]);
+        $this->part = PartSetting::create(['part_number' => 'FIFO-NOTICE','qty_box' => 100]);
     }
 
     private function batch(int $count)

@@ -1,16 +1,17 @@
 # Penerimaan Transfer Box Ekspor
 
-Verifikasi 30 Oktober 2026 pada branch aktif Export-plan.
+Verifikasi identitas/master 3 November 2026; alur penerimaan 30 Oktober 2026 pada branch aktif Export-plan.
 
 ## Keputusan dan alur operator
 
 - Scan nomor box delapan digit, lalu nomor part. PCS diambil ulang di server
-  dari master part ekspor; tidak ada input PCS manual atau box tidak penuh.
+  dari master part bersama; tidak ada input PCS manual atau box tidak penuh.
   Kolom ID box hanya menerima angka 0–9, maksimal delapan digit, dengan angka
   nol di awal tetap dipertahankan. Validasi server tetap mewajibkan tepat delapan.
-- Identitas dipisahkan menurut lingkup. Delapan digit yang sama boleh ada pada
-  domestik dan ekspor. Nomor yang sudah diterima di ekspor tidak dapat diterima
-  lagi. Registry `box_identities` domestik tidak dipakai/diubah oleh modul ini.
+- Identitas delapan digit unik global domestik/ekspor. Kedua model memakai
+  registry `box_identities`; histori yang sudah keluar/dihapus tetap mengunci
+  ID. Lokasi dan tabel stok operasional tetap terpisah. Request Not Full yang
+  sedang disiapkan juga diperiksa sebelum menerima nomor baru.
 - Enter pada nomor box memeriksa duplikat dan memfokuskan nomor part. Enter
   setelah nomor part menambahkan baris ke daftar scan; fokus kembali ke nomor
   box untuk pasangan berikutnya. Tersedia tombol untuk input manual.
@@ -221,7 +222,7 @@ hak mengedit master/perencanaan atau monitoring. Endpoint:
 - POST `/export/receiving/place-bulk`: konfirmasi kelompok; return_batch atau
   return_box memvalidasi anggota transaksi dan kembali ke halaman yang sama.
 - POST `/export/receiving/check-box`: pemeriksaan nomor tanpa mutasi stok.
-- GET `/export/receiving/part`: lookup tepat master ekspor.
+- GET `/export/receiving/part`: lookup tepat master part bersama.
 - POST `/export/receiving`: API penerimaan satu box existing dipertahankan.
 - POST `/export/receiving/{stockBox}/place`: konfirmasi/relokasi stok cadangan.
 

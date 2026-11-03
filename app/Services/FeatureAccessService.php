@@ -11,7 +11,7 @@ class FeatureAccessService
     public function defaults(string $role): array
     {
         return array_keys(array_filter(config('feature_access.features'),
-            fn (array $feature) => ! ($feature['admin_only'] ?? false) && in_array($role, $feature['roles'], true)));
+            fn (array $feature) => ! ($feature['admin_only'] ?? false) && in_array($role, array_merge($feature['roles'], app()->environment(['local','testing']) ? ($feature['debug_roles'] ?? []) : []), true)));
     }
 
     public function permissions(string $role): array

@@ -22,7 +22,7 @@ class ExportFulfillmentBox extends Model
     {
         return $this->allocation_notice_id !== null && !$this->allocationNotice?->acknowledged_at;
     }
-    public function part() { return $this->belongsTo(ExportPartSetting::class, 'part_setting_id'); }
+    public function part() { return $this->belongsTo(PartSetting::class, 'part_setting_id'); }
     public function placedLocation() { return $this->belongsTo(ExportMasterLocation::class, 'placed_location_id'); }
     public function reservedBy() { return $this->belongsTo(User::class, 'reserved_by'); }
     public function placedBy() { return $this->belongsTo(User::class, 'placed_by'); }

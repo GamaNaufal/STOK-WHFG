@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{ExportMasterLocation, ExportPartSetting, ExportStockBox, RoleFeatureAccess, User};
+use App\Models\{ExportMasterLocation, PartSetting, ExportStockBox, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService, ExportStockReceivingService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -12,14 +12,14 @@ class ExportStockModalTest extends TestCase
 {
     use RefreshDatabase;
     private User $operator;
-    private ExportPartSetting $part;
+    private PartSetting $part;
 
     protected function setUp(): void
     {
         parent::setUp(); $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number' => 'EX-MODAL', 'qty_box' => 100]);
+        $this->part = PartSetting::create(['part_number' => 'EX-MODAL', 'qty_box' => 100]);
     }
 
     private function receive(): ExportStockBox

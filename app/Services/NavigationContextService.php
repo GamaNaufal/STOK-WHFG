@@ -18,22 +18,22 @@ class NavigationContextService
         foreach ($items as &$item) {
             $item['active'] = $item['route'] === $activeRoute;
             $item['short_label'] = match ($item['route']) {
-                'export.part-settings.index' => 'Nomor Part',
                 'export.locations.index' => 'Lokasi',
+                'part-settings.index' => 'Nomor Part',
                 default => str_contains($item['group'], 'Ekspor') ? Str::replaceEnd(' Ekspor', '', $item['label']) : $item['label'],
             };
             $item['group_label'] = match ($item['group']) {
                 'Warehouse' => 'Gudang', 'Delivery' => 'Pengiriman', default => $item['group'],
             };
             $scope = str_starts_with($item['key'], 'export_') ? 'ekspor export' : match ($item['key']) {
-                'not_full_request', 'not_full_approval', 'delivery_issues', 'reports', 'audit' => 'domestik lokal ekspor export',
+                'not_full_request', 'not_full_approval', 'delivery_issues', 'reports', 'audit', 'parts' => 'domestik lokal ekspor export',
                 'stock_input', 'stock_view', 'merge_pallet', 'move_pallet', 'expired_box', 'delivery_schedule',
-                'delivery_order', 'delivery_approval', 'delivery_assign', 'delivery_pick', 'locations', 'parts' => 'domestik lokal',
+                'delivery_order', 'delivery_approval', 'delivery_assign', 'delivery_pick', 'locations' => 'domestik lokal',
                 default => '',
             };
             $item['keywords'] = $item['label'].' '.$item['group'].' '.$item['group_label'].' '.$scope.' '.match ($item['key']) {
                 'export_stock_input', 'stock_input' => 'input penerimaan stok stock box transfer',
-                'export_parts', 'parts' => 'master nomor no part part number kapasitas pcs box',
+                'parts' => 'master nomor no part part number kapasitas pcs box',
                 'export_locations', 'locations' => 'master lokasi location tempat',
                 'export_pallet_plans', 'merge_pallet', 'move_pallet' => 'palet pallet rencana planning',
                 'export_delivery_plans', 'delivery_schedule', 'delivery_order' => 'rencana jadwal pengiriman delivery',

@@ -7,7 +7,7 @@ use App\Models\Box;
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportMasterLocation;
 use App\Models\ExportNotFullRequest;
-use App\Models\ExportPartSetting;
+use App\Models\PartSetting;
 use App\Models\ExportStockAllocationNotice;
 use App\Models\ExportStockBox;
 use App\Models\User;
@@ -39,7 +39,7 @@ class ExportNotFullWorkflowTest extends TestCase
 
     private User $operator;
 
-    private ExportPartSetting $part;
+    private PartSetting $part;
 
     private int $sequence = 0;
 
@@ -56,7 +56,7 @@ class ExportNotFullWorkflowTest extends TestCase
         $this->warehouse = User::factory()->create(['role' => 'admin_warehouse']);
         $this->supervisor = User::factory()->create(['role' => 'supervisi']);
         $this->operator = User::factory()->create(['role' => 'export_operator']);
-        $this->part = ExportPartSetting::create(['part_number' => '99', 'qty_box' => 80]);
+        $this->part = PartSetting::create(['part_number' => '99', 'qty_box' => 80]);
         $this->actingAs($this->operator);
     }
 
@@ -292,13 +292,14 @@ class ExportNotFullWorkflowTest extends TestCase
         $this->assertSame($loc->id, $r->fresh()->stockBox->currentPallet->master_location_id);
     }
 
-    public function test_prepared_number_cannot_enter_normal_receiving_and_domestic_identity_remains_separate(): void
+    public function test_prepared_number_cannot_enter_normal_receiving_and_rejects_domestic_identity(): void
     {
         $d = $this->finalize($this->delivery());
         $r = $this->nf($d);
         Box::create(['box_number' => '90000001', 'part_number' => 'LOCAL', 'pcs_quantity' => 80, 'qty_box' => 80, 'qr_code' => 'LOCAL-NF', 'user_id' => $this->admin->id, 'expired_status' => 'active']);
-        $this->prepare($r);
-        $this->invalid(fn () => app(ExportStockReceivingService::class)->receive(['box_number' => '90000001', 'part_number' => '99', 'receive_token' => (string) Str::uuid()], $this->operator), 'sedang disiapkan');
+        $this->invalid(fn () => $this->prepare($r), 'domestik');
+        $this->prepare($r, 'external', '90000002');
+        $this->invalid(fn () => app(ExportStockReceivingService::class)->receive(['box_number' => '90000002', 'part_number' => '99', 'receive_token' => (string) Str::uuid()], $this->operator), 'sedang disiapkan');
         $this->approve($r);
         $this->assertDatabaseCount('boxes', 1);
         $this->assertDatabaseCount('export_stock_boxes', 1);

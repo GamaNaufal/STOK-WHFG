@@ -13,7 +13,7 @@ class ExportPickingIssue extends Model
     public function stockBox() { return $this->belongsTo(ExportStockBox::class, 'export_stock_box_id'); }
     public function returnPallet() { return $this->belongsTo(ExportStockPallet::class, 'return_pallet_id'); }
     public function returnLocation() { return $this->belongsTo(ExportMasterLocation::class, 'return_location_id'); }
-    public function part() { return $this->belongsTo(ExportPartSetting::class, 'part_setting_id'); }
+    public function part() { return $this->belongsTo(PartSetting::class, 'part_setting_id'); }
     public function reporter() { return $this->belongsTo(User::class, 'reported_by'); }
     public function approver() { return $this->belongsTo(User::class, 'approved_by'); }
     public function isClosed(): bool { return in_array($this->status, ['returned', 'input_error'], true); }

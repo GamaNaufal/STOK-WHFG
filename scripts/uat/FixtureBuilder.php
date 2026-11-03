@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Models\{Box, DeliveryOrder, ExportDeliveryPlan, ExportMasterLocation, ExportNotFullRequest,
-    ExportPartSetting, ExportStockAllocationNotice, ExportStockBox, MasterLocation, Pallet,
-    PartSetting, StockInput, User};
+use App\Models\{Box, DeliveryOrder, ExportDeliveryPlan, ExportMasterLocation, ExportNotFullRequest, PartSetting, ExportStockAllocationNotice, ExportStockBox, MasterLocation, Pallet, StockInput, User};
 use App\Services\{AuditService, ExpiredBoxService, ExportBoxRequirements, ExportDeliveryPlanService,
     ExportFulfillmentCompletionService, ExportNotFullService, ExportPalletPlanningService,
     ExportStockAllocationNoticeService, ExportStockReceivingService, LocationAssignmentService};
@@ -45,10 +43,9 @@ final class UatFixtureBuilder
         return $this->manifest;
     }
 
-    private function part(string $name, int $qty, bool $export=false): void
+    private function part(string $name, int $qty): void
     {
-        $class=$export ? ExportPartSetting::class : PartSetting::class;
-        $this->parts[$name]=$class::create(['part_number'=>'UAT26-'.$name, 'qty_box'=>$qty]);
+        $this->parts[$name]=PartSetting::create(['part_number'=>'UAT26-'.$name, 'qty_box'=>$qty]);
     }
 
     private function domesticStock(string $part, array $numbers, string $location, int $days=3): array
@@ -197,10 +194,9 @@ final class UatFixtureBuilder
     {
         foreach (['E-MIX-A'=>80,'E-MIX-B'=>40,'E-MONO'=>20,'E-LOAD36'=>40,'E-RECEIVE'=>80,'E-DEADLINE'=>80,
             'E-SPARE'=>40,'E-NF-EXT'=>80,'E-NF-DRAFT'=>80,'E-NF-SPLIT'=>80,'E-NF-SHORT'=>80,
-            'E-NF-EXIST'=>80,'E-REV'=>50,'E-CANCEL'=>80,'E-WARN'=>10,'E-DUP'=>80,'E-HIST'=>20] as $p=>$q) $this->part($p,$q,true);
-        // Same human-readable part number and box ID across two scopes is deliberate.
-        ExportPartSetting::create(['part_number'=>'UAT26-SHARED','qty_box'=>80]);
-        $this->parts['E-SHARED']=ExportPartSetting::where('part_number','UAT26-SHARED')->firstOrFail();
+            'E-NF-EXIST'=>80,'E-REV'=>50,'E-CANCEL'=>80,'E-WARN'=>10,'E-DUP'=>80,'E-HIST'=>20] as $p=>$q) $this->part($p,$q);
+        // Both workflows use the same part master; box IDs remain globally unique.
+        $this->parts['E-SHARED']=PartSetting::where('part_number','UAT26-SHARED')->firstOrFail();
         $mix=$this->stock('E-MIX-A',[98002101,98002102],'E01',5);
         $s=app(ExportStockReceivingService::class);
         $b=$s->receive(['box_number'=>'98002103','part_number'=>'UAT26-E-MIX-B','receive_token'=>(string)Str::uuid()],$this->users['export_operator'],false,now()->subDays(4));
@@ -214,7 +210,7 @@ final class UatFixtureBuilder
         $this->stock('E-NF-SHORT',[98002271],'E07');
         $this->stock('E-REV',[98002301,98002302,98002303],'E09',6);
         $this->stock('E-CANCEL',[98002311,98002312],'E10');
-        $shared=$s->receive(['box_number'=>'98009999','part_number'=>'UAT26-SHARED','receive_token'=>(string)Str::uuid()],$this->users['export_operator'],false);
+        $shared=$s->receive(['box_number'=>'98009998','part_number'=>'UAT26-SHARED','receive_token'=>(string)Str::uuid()],$this->users['export_operator'],false);
         $s->place($shared->id,['revision'=>$shared->revision,'request_token'=>(string)Str::uuid(),'location_id'=>$this->locations['E11']->id],$this->users['export_operator']);
         $this->delivery('MIX',['E-MIX-A'=>160,'E-MIX-B'=>40]);
         $this->delivery('MONO',['E-MONO'=>720]);

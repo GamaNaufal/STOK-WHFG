@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{ExportDeliveryPlan, ExportPartSetting, ExportStockBox, User};
+use App\Models\{ExportDeliveryPlan, PartSetting, ExportStockBox, User};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -36,7 +36,7 @@ class ExportOperatorUiTest extends TestCase
         $this->withoutVite();
         $actor = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($actor);
-        $part = ExportPartSetting::create(['part_number' => 'UI-QUEUE', 'qty_box' => 10]);
+        $part = PartSetting::create(['part_number' => 'UI-QUEUE', 'qty_box' => 10]);
         foreach (['11110001', '11110002'] as $i => $number) {
             ExportStockBox::create(['box_number' => $number, 'part_setting_id' => $part->id,
                 'part_number' => $part->part_number, 'pcs_quantity' => 10, 'state' => 'received', 'revision' => 1,

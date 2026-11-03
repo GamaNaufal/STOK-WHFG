@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\ExportDeliveryPlan;
-use App\Models\ExportPartSetting;
+use App\Models\PartSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -56,21 +56,21 @@ class ExportDeliveryPlanService
             }
             $before = $id ? $this->snapshot($plan) : [];
             $existing = $id ? $plan->items->keyBy('part_setting_id') : collect();
-            $parts = ExportPartSetting::whereIn('part_number', array_column($data['items'], 'part_number'))
+            $parts = PartSetting::whereIn('part_number', array_column($data['items'], 'part_number'))
                 ->orderBy('id')->lockForUpdate()->get()->keyBy('part_number');
             $items = [];
             $errors = [];
             foreach ($data['items'] as $index => $row) {
                 $part = $parts->get($row['part_number']);
                 if (! $part || (string) $part->part_number !== $row['part_number']) {
-                    $errors["items.{$index}.part_number"] = 'Nomor part belum terdaftar pada master ekspor.';
+                    $errors["items.{$index}.part_number"] = 'Nomor part belum terdaftar pada master bersama.';
                     continue;
                 }
                 // Existing rows keep their capacity snapshot when the master changes.
                 $capacity = (int) ($existing->get($part->id)?->pcs_per_box ?? $part->qty_box);
                 $quantity = (int) $row['pcs_quantity'];
                 if ($capacity < 1) {
-                    $errors["items.{$index}.pcs_quantity"] = 'Kapasitas box pada master ekspor belum valid.';
+                    $errors["items.{$index}.pcs_quantity"] = 'Kapasitas box pada master bersama belum valid.';
                     continue;
                 }
                 $items[] = ['part_setting_id' => $part->id, 'part_number' => $part->part_number,
@@ -80,11 +80,13 @@ class ExportDeliveryPlanService
             if ($errors) {
                 throw ValidationException::withMessages($errors);
             }
-            $code = trim((string) (array_key_exists('plan_code', $data) ? $data['plan_code'] : $plan->plan_code));
-            $duplicate = app(ExportDeliveryPlanDuplicateService::class)->review(
-                array_merge($data, ['plan_code' => $code]), $items, $actor, $id);
+            $code = \App\Support\DeliveryPlanCode::normalize(array_key_exists('plan_code', $data) ? $data['plan_code'] : $plan->plan_code);
+            if ($code === '') throw ValidationException::withMessages(['plan_code' => 'Kode rencana delivery wajib diisi.']);
+            if (DB::table('export_delivery_plan_codes')->where('code',$code)->when($id,fn($q)=>$q->where('export_delivery_plan_id','!=',$id))->exists()) {
+                throw ValidationException::withMessages(['plan_code' => 'Kode rencana delivery sudah pernah digunakan. Gunakan kode lain; kode tetap unik setelah selesai, dibatalkan atau diarsipkan.']);
+            }
             $plan->fill([
-                'plan_code' => $code !== '' ? $code : null,
+                'plan_code' => $code,
                 'customer_name' => trim($data['customer_name']), 'delivery_deadline' => $data['delivery_deadline'],
                 'status' => 'draft', 'revision' => $id ? $plan->revision + 1 : 1,
                 'source_type' => $data['source_type'], 'source_name' => $data['source_name'] ?? null,
@@ -100,8 +102,8 @@ class ExportDeliveryPlanService
             if ($id) app(ExportPalletPlanningService::class)->invalidateForDeliveryRevision($plan, $actor);
             app(ExportNotFullService::class)->sync($plan, $actor);
             AuditService::record('export_delivery_plan', $id ? 'updated' : 'created', 'ExportDeliveryPlan',
-                $plan->id, $actor->id, $before, $this->snapshot($plan) + ($duplicate ?? []),
-                $duplicate ? 'Rencana delivery ekspor disimpan setelah konfirmasi duplikasi dengan alasan.' : 'Rencana delivery ekspor disimpan.');
+                $plan->id, $actor->id, $before, $this->snapshot($plan),
+                'Rencana delivery ekspor disimpan.');
             if ($token) {
                 DB::table('export_delivery_plan_requests')->insert(['request_token' => $token, 'request_hash' => $hash,
                     'export_delivery_plan_id' => $plan->id, 'created_by' => $actor->id,

@@ -1,5 +1,5 @@
 {
-    "database": "whfg_uat_verify_f89f776b0a",
+    "database": "whfg_uat_verify_978e95cd65",
     "source_schema_only": "stock",
     "server_version": "8.4.3",
     "rollback_after_mid_import_failure": "pass",
@@ -15,7 +15,7 @@
     "mixed_pallet_source": "pass",
     "domestic_pending_nf": "pass",
     "password_hash": "pass",
-    "read_only_verification_queries": 22,
+    "read_only_verification_queries": 25,
     "imported_fixture_service_checks": [
         "Not Full split FIFO + PCS conservation",
         "Mixed FIFO finalization, issue approval/return, scan, placement, ready, shipment",
@@ -25,7 +25,7 @@
     ],
     "baseline_counts": {
         "audit_logs": 348,
-        "box_identities": 37,
+        "box_identities": 164,
         "boxes": 37,
         "delivery_order_items": 12,
         "delivery_orders": 12,
@@ -34,6 +34,7 @@
         "expired_box_handlings": 1,
         "expired_box_reports": 5,
         "expired_box_transactions": 1,
+        "export_delivery_plan_codes": 17,
         "export_delivery_plan_items": 18,
         "export_delivery_plans": 17,
         "export_fulfillment_actions": 3,
@@ -55,7 +56,7 @@
         "pallet_items": 16,
         "pallet_number_sequences": 1,
         "pallets": 16,
-        "part_settings": 36,
+        "part_settings": 35,
         "stock_input_boxes": 37,
         "stock_inputs": 16,
         "stock_locations": 13,
@@ -64,11 +65,11 @@
     },
     "fixture_only_counts": {
         "users": 9,
-        "parts": 35,
+        "parts": 34,
         "locations": 100,
         "domestic_boxes": 37,
         "export_boxes": 127
     },
-    "validated_at": "2026-10-31T20:33:25+07:00",
+    "validated_at": "2026-11-03T13:16:40+07:00",
     "application_database_writes": 0
 }

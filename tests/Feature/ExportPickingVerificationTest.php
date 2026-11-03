@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{Box, ExportFulfillmentBox, ExportMasterLocation, ExportPartSetting, ExportPickingIssue, ExportPickingScan, ExportStockBox, ExportStockMovement, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
+use App\Models\{Box, ExportFulfillmentBox, ExportMasterLocation, PartSetting, ExportPickingIssue, ExportPickingScan, ExportStockBox, ExportStockMovement, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService, ExportPickingService, ExportStockAllocationNoticeService, ExportStockReceivingService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -13,7 +13,7 @@ class ExportPickingVerificationTest extends TestCase
     use RefreshDatabase;
     private User $operator;
     private User $admin;
-    private ExportPartSetting $part;
+    private PartSetting $part;
     private int $sequence = 0;
 
     protected function setUp(): void
@@ -22,10 +22,10 @@ class ExportPickingVerificationTest extends TestCase
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->admin = User::factory()->create(['role' => 'admin_warehouse']);
         $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number' => 'PICK-A', 'qty_box' => 10]);
+        $this->part = PartSetting::create(['part_number' => 'PICK-A', 'qty_box' => 10]);
     }
 
-    private function receive(?ExportPartSetting $part = null): ExportStockBox
+    private function receive(?PartSetting $part = null): ExportStockBox
     {
         return app(ExportStockReceivingService::class)->receive(['box_number' => str_pad((string) ++$this->sequence, 8, '0', STR_PAD_LEFT),
             'part_number' => ($part ?? $this->part)->part_number, 'receive_token' => (string) Str::uuid()], $this->operator);
@@ -50,7 +50,7 @@ class ExportPickingVerificationTest extends TestCase
 
     private function mixed(): array
     {
-        $other = ExportPartSetting::create(['part_number' => 'PICK-B', 'qty_box' => 20]);
+        $other = PartSetting::create(['part_number' => 'PICK-B', 'qty_box' => 20]);
         $first = $this->receive(); $second = $this->receive(); $third = $this->receive($other);
         $loc = ExportMasterLocation::create(['code' => 'SOURCE']);
         $this->place($first, ['location_id' => $loc->id]);
@@ -201,7 +201,6 @@ class ExportPickingVerificationTest extends TestCase
     public function test_unknown_eight_digit_box_is_registered_only_on_confirmed_placement_after_admin_supplies_part_and_destination(): void
     {
         [$pallet] = $this->mixed();
-        Box::create(['box_number' => '00999999', 'part_number' => 'LOCAL', 'pcs_quantity' => 99, 'qr_code' => 'local', 'user_id' => $this->operator->id]);
         $this->scan($pallet, '00999999')->assertStatus(423);
         $issue = ExportPickingIssue::sole(); $this->assertSame('unknown_box', $issue->issue_type);
         $this->approve($issue)->assertSessionHasErrors('destination');
@@ -215,7 +214,7 @@ class ExportPickingVerificationTest extends TestCase
         $box = ExportStockBox::where('box_number', '00999999')->sole();
         $this->assertSame(10, $box->pcs_quantity); $this->assertSame('RETURN', $box->currentPallet->location_code);
         $this->assertSame('stored', $box->state); $this->assertSame('returned', $issue->fresh()->status);
-        $this->assertSame(1, Box::where('box_number', '00999999')->count());
+        $this->assertSame(0, Box::where('box_number', '00999999')->count());
         $this->assertSame(1, ExportStockMovement::where('export_stock_box_id', $box->id)->count());
     }
 
@@ -230,6 +229,37 @@ class ExportPickingVerificationTest extends TestCase
         $this->confirm($issue)->assertSessionHasNoErrors();
         $this->assertEquals($original, $missing->fresh()->only(array_keys($original)));
         $this->assertSame('RETURN', $missing->fresh()->currentPallet->location_code);
+    }
+
+    public function test_picking_approval_cannot_register_an_existing_domestic_box_as_new_export_stock(): void
+    {
+        [$pallet]=$this->mixed();
+        Box::create(['box_number'=>'00999999','part_number'=>'PICK-A','pcs_quantity'=>10,'qr_code'=>'DOMESTIC','user_id'=>$this->admin->id]);
+        $this->scan($pallet,'00999999')->assertStatus(423);
+        $issue=ExportPickingIssue::sole();
+        $location=ExportMasterLocation::create(['code'=>'RETURN']);
+        $this->approve($issue,['destination'=>'location:'.$location->id,'part_number'=>'PICK-A'])->assertSessionHasErrors('issue');
+        $this->confirm($issue)->assertSessionHasErrors('issue');
+        $this->assertSame('pending',$issue->fresh()->status);
+        $this->assertFalse(ExportStockBox::where('box_number','00999999')->exists());
+        $this->assertSame(1,Box::where('box_number','00999999')->count());
+    }
+
+    public function test_legacy_export_registration_keeps_identity_and_fifo_date_without_allowing_different_pcs(): void
+    {
+        $pallet=$this->plan();$number='00999999';$date=now()->subDays(40)->startOfSecond();
+        $legacy=ExportFulfillmentBox::create(['box_number'=>$number,'export_planned_pallet_item_id'=>$pallet->items()->sole()->id,
+            'part_setting_id'=>$this->part->id,'pcs_quantity'=>10,'first_received_at'=>$date,'reserved_at'=>now(),'reserved_by'=>$this->operator->id]);
+        \Illuminate\Support\Facades\DB::table('box_identities')->insert(['box_number'=>$number,'origin_scope'=>'export']);
+        $attributes=['box_number'=>$number,'part_setting_id'=>$this->part->id,'part_number'=>'PICK-A','pcs_quantity'=>20,
+            'receive_token'=>(string)Str::uuid(),'first_received_at'=>now(),'received_by'=>$this->operator->id];
+        try { ExportStockBox::registerLegacyIdentity($attributes);$this->fail('Legacy quantity cannot change.'); }
+        catch(\Illuminate\Validation\ValidationException $error){$this->assertArrayHasKey('issue',$error->errors());}
+        $box=ExportStockBox::registerLegacyIdentity(array_replace($attributes,['pcs_quantity'=>10]));
+        $this->assertSame($date->toDateTimeString(),$box->first_received_at->toDateTimeString());
+        $this->assertSame(1,\Illuminate\Support\Facades\DB::table('box_identities')->where('box_number',$number)->count());
+        $legacy->update(['export_stock_box_id'=>$box->id]);
+        $this->assertSame($box->id,$legacy->fresh()->export_stock_box_id);
     }
 
     public function test_other_operator_cannot_confirm_return_and_unapproved_or_stale_confirmation_does_not_unlock(): void
@@ -273,15 +303,15 @@ class ExportPickingVerificationTest extends TestCase
         $this->scan($pallet, $wrong->box_number)->assertForbidden();
     }
 
-    public function test_admin_cannot_use_domestic_master_for_an_unknown_export_box(): void
+    public function test_unknown_export_box_accepts_shared_part_but_rejects_domestic_location(): void
     {
         [$pallet] = $this->mixed(); $this->scan($pallet, '00888888')->assertStatus(423); $issue = ExportPickingIssue::sole();
         $domestic = MasterLocation::create(['code' => 'LOCAL-RETURN']);
         \App\Models\PartSetting::create(['part_number' => 'ONLY-LOCAL', 'qty_box' => 999]);
         $this->approve($issue, ['destination' => 'location:'.$domestic->id, 'part_number' => 'PICK-A'])->assertSessionHasErrors('destination');
         $export = ExportMasterLocation::create(['code' => 'EXPORT-RETURN']);
-        $this->approve($issue, ['destination' => 'location:'.$export->id, 'part_number' => 'ONLY-LOCAL'])->assertSessionHasErrors('part_number');
-        $this->assertSame('pending', $issue->fresh()->status);
+        $this->approve($issue, ['destination' => 'location:'.$export->id, 'part_number' => 'ONLY-LOCAL'])->assertSessionHasNoErrors();
+        $this->assertSame('awaiting_return', $issue->fresh()->status);
         $this->assertFalse(ExportStockBox::where('box_number', '00888888')->exists());
     }
 
@@ -291,7 +321,7 @@ class ExportPickingVerificationTest extends TestCase
         $loc = ExportMasterLocation::create(['code' => 'RETURN']);
         $this->approve($issue, ['destination' => 'location:'.$loc->id, 'part_number' => 'PICK-A'])->assertSessionHasNoErrors();
         $another = User::factory()->create(['role' => 'export_operator']);
-        $otherPart = ExportPartSetting::create(['part_number' => 'OTHER', 'qty_box' => 2]);
+        $otherPart = PartSetting::create(['part_number' => 'OTHER', 'qty_box' => 2]);
         $otherBox = app(ExportStockReceivingService::class)->receive(['box_number' => '00777777', 'part_number' => $otherPart->part_number,
             'receive_token' => (string)Str::uuid()], $another);
         app(ExportStockReceivingService::class)->place($otherBox->id, ['revision' => $otherBox->revision,
@@ -324,7 +354,7 @@ class ExportPickingVerificationTest extends TestCase
         $first = $this->receive(); $loc = ExportMasterLocation::create(['code' => 'SOURCE']);
         $this->place($first, ['location_id' => $loc->id]); $pallet = $this->plan();
         $this->assertFalse($first->fresh()->fulfillment->picking_required);
-        $otherPart = ExportPartSetting::create(['part_number' => 'OTHER', 'qty_box' => 2]);
+        $otherPart = PartSetting::create(['part_number' => 'OTHER', 'qty_box' => 2]);
         $other = $this->receive($otherPart); $this->place($other, ['pallet_id' => $first->fresh()->current_pallet_id]);
         $this->assertTrue($first->fresh()->fulfillment->picking_required);
         $this->blockedPlacement($first);
@@ -397,7 +427,7 @@ class ExportPickingVerificationTest extends TestCase
             $this->assertFalse($box->fulfillment->picking_required);
         }
         $this->place($boxes[0]);
-        $otherPart = ExportPartSetting::create(['part_number' => 'NEW-OTHER', 'qty_box' => 20]);
+        $otherPart = PartSetting::create(['part_number' => 'NEW-OTHER', 'qty_box' => 20]);
         $other = $this->receive($otherPart);
         $this->place($other, ['pallet_id' => $boxes[0]->fresh()->current_pallet_id]);
         $this->assertTrue(ExportStockPallet::whereKey($boxes[0]->fresh()->current_pallet_id)->mixed()->exists());
@@ -414,7 +444,7 @@ class ExportPickingVerificationTest extends TestCase
     {
         $pallet = $this->plan();
         $service = app(ExportStockReceivingService::class);
-        $otherPart = ExportPartSetting::create(['part_number' => 'LATER-OTHER', 'qty_box' => 20]);
+        $otherPart = PartSetting::create(['part_number' => 'LATER-OTHER', 'qty_box' => 20]);
         $first = $service->receive(['box_number' => '00000101', 'part_number' => $this->part->part_number, 'receive_token' => (string)Str::uuid()], $this->operator, false);
         $other = $service->receive(['box_number' => '00000102', 'part_number' => $otherPart->part_number, 'receive_token' => (string)Str::uuid()], $this->operator, false);
         $source = ExportMasterLocation::create(['code' => 'LATER-SOURCE']);

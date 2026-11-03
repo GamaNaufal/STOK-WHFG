@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\ExportDeliveryPlan;
-use App\Models\ExportPartSetting;
 use App\Models\PartSetting;
 use App\Models\RoleFeatureAccess;
 use App\Models\User;
@@ -33,6 +32,7 @@ class ExportDeliveryPlanTest extends TestCase
     private function payload(array $changes = []): array
     {
         return array_replace([
+            'plan_code' => 'TEST-'.\Illuminate\Support\Str::uuid(),
             'request_token' => (string) \Illuminate\Support\Str::uuid(),
             'customer_name' => 'Customer Ekspor', 'delivery_deadline' => '2026-11-15',
             'source_type' => 'manual', 'items' => [['part_number' => 'EXP-001', 'pcs_quantity' => 100]],
@@ -54,7 +54,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_repeated_save_with_same_token_creates_one_plan_and_one_audit(): void
     {
-        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
+        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
         $data=$this->payload(['plan_code'=>'RETRY-RD']);$url=route('export.delivery-plans.store');
         $first=$this->post($url,$data)->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
         $second=$this->post($url,$data)->assertSessionHasNoErrors();
@@ -65,7 +65,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_token_cannot_be_reused_for_changed_content_another_actor_or_an_update(): void
     {
-        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$actor=$this->operator();$this->actingAs($actor);
+        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$actor=$this->operator();$this->actingAs($actor);
         $data=$this->payload();$this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
         $this->postJson(route('export.delivery-plans.store'),array_replace($data,['customer_name'=>'Another customer']))->assertUnprocessable()->assertJsonValidationErrors('request_token');
         $this->putJson(route('export.delivery-plans.update',$plan),$data+['revision'=>1])->assertUnprocessable()->assertJsonValidationErrors('request_token');
@@ -75,7 +75,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_failed_validation_does_not_consume_save_token(): void
     {
-        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
+        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
         $data=$this->payload(['items'=>[['part_number'=>'EXP-001','pcs_quantity'=>101.5]]]);
         $this->postJson(route('export.delivery-plans.store'),$data)->assertUnprocessable()->assertJsonValidationErrors('items.0.pcs_quantity');
         $this->assertDatabaseCount('export_delivery_plan_requests',0);
@@ -86,20 +86,20 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_restored_form_with_changed_content_preserves_edits_and_gets_fresh_token_without_saving(): void
     {
-        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
+        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
         $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors();
         $changed=array_replace($data,['customer_name'=>'New intended customer']);$create=route('export.delivery-plans.create');
         $this->from($create)->post(route('export.delivery-plans.store'),$changed)->assertRedirect($create)->assertSessionHasErrors('request_token')
             ->assertSessionHasInput('customer_name','New intended customer');
         $fresh=session()->getOldInput('request_token');$this->assertNotSame($data['request_token'],$fresh);$this->assertTrue(\Illuminate\Support\Str::isUuid($fresh));
         $this->assertDatabaseCount('export_delivery_plans',1);
-        $this->post(route('export.delivery-plans.store'),array_replace($changed,['request_token'=>$fresh]))->assertSessionHasNoErrors();
+        $this->post(route('export.delivery-plans.store'),array_replace($changed,['request_token'=>$fresh,'plan_code'=>'NEW-RD']))->assertSessionHasNoErrors();
         $this->assertDatabaseCount('export_delivery_plans',2);
     }
 
     public function test_successful_update_retry_does_not_increment_revision_twice_even_after_archive(): void
     {
-        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
+        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
         $this->post(route('export.delivery-plans.store'),$this->payload())->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
         $data=$this->payload(['revision'=>1,'items'=>[['part_number'=>'EXP-001','pcs_quantity'=>120]]]);$url=route('export.delivery-plans.update',$plan);
         $this->put($url,$data)->assertSessionHasNoErrors();$this->put($url,$data)->assertSessionHasNoErrors();
@@ -112,17 +112,17 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_create_retry_resolves_archived_plan_before_rechecking_changed_master_capacity(): void
     {
-        $part=ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
+        $part=PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
         $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
         $this->delete(route('export.delivery-plans.destroy',$plan),['revision'=>1])->assertSessionHasNoErrors();
-        $this->put(route('export.part-settings.update',$part),['part_number'=>$part->part_number,'qty_box'=>30])->assertSessionHasNoErrors();
+        $this->put(route('part-settings.update',$part),['part_number'=>$part->part_number,'qty_box'=>30])->assertSessionHasNoErrors();
         $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors()->assertRedirect(route('export.delivery-plans.index'));
         $this->assertSame(1,ExportDeliveryPlan::withTrashed()->count());$this->assertSame(0,ExportDeliveryPlan::count());
     }
 
     public function test_web_save_requires_a_valid_request_token(): void
     {
-        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
+        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
         unset($data['request_token']);$this->postJson(route('export.delivery-plans.store'),$data)->assertUnprocessable()->assertJsonValidationErrors('request_token');
         $this->postJson(route('export.delivery-plans.store'),$data+['request_token'=>'bad-token'])->assertUnprocessable()->assertJsonValidationErrors('request_token');
         $this->assertDatabaseCount('export_delivery_plans',0);
@@ -130,7 +130,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_audit_failure_rolls_back_plan_and_token_and_allows_retry(): void
     {
-        ExportPartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$actor=$this->operator();$data=$this->payload();$fail=true;
+        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$actor=$this->operator();$data=$this->payload();$fail=true;
         AuditLog::creating(function($log)use(&$fail){if($fail&&$log->type==='export_delivery_plan')throw new \RuntimeException('Audit unavailable');});
         try{app(\App\Services\ExportDeliveryPlanService::class)->save($data,$actor);$this->fail('Audit must persist.');}
         catch(\RuntimeException $e){$this->assertSame('Audit unavailable',$e->getMessage());}
@@ -161,8 +161,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_creation_uses_export_capacity_and_ignores_client_totals_without_mutating_inventory(): void
     {
-        PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 5]);
-        $part = ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        $part = PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $operator = $this->operator();
         $this->actingAs($operator)->post(route('export.delivery-plans.store'), $this->payload([
             'total_boxes' => 999, 'status' => 'approved',
@@ -183,13 +182,13 @@ class ExportDeliveryPlanTest extends TestCase
         $this->get(route('export.delivery-plans.show', $plan))->assertOk()->assertSee('Customer Ekspor');
     }
 
-    public function test_unknown_domestic_only_parts_and_duplicates_cannot_be_saved(): void
+    public function test_unknown_parts_and_duplicate_rows_cannot_be_saved(): void
     {
-        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 30]);
+        PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 30]);
         PartSetting::create(['part_number' => 'LOCAL-ONLY', 'qty_box' => 10]);
         $this->actingAs($this->operator());
         $this->postJson(route('export.delivery-plans.store'), $this->payload([
-            'items' => [['part_number' => 'LOCAL-ONLY', 'pcs_quantity' => 100]],
+            'items' => [['part_number' => 'UNKNOWN', 'pcs_quantity' => 100]],
         ]))->assertUnprocessable()->assertJsonValidationErrors('items.0.part_number');
         $this->postJson(route('export.delivery-plans.store'), $this->payload([
             'items' => [['part_number' => 'EXP-001', 'pcs_quantity' => 90], ['part_number' => 'EXP-001', 'pcs_quantity' => 90]],
@@ -200,7 +199,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_non_positive_fractional_and_overflowing_quantities_are_rejected(): void
     {
-        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 1]);
+        PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 1]);
         $this->actingAs($this->operator());
         foreach ([0, -1, 1.5, '1e3', '4294967296'] as $quantity) {
             $this->postJson(route('export.delivery-plans.store'), $this->payload([
@@ -212,7 +211,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_excel_results_require_explicit_review_before_save(): void
     {
-        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator());
         $this->postJson(route('export.delivery-plans.store'), $this->payload(['source_type' => 'excel']))
             ->assertUnprocessable()->assertJsonValidationErrors('reviewed');
@@ -224,7 +223,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_photo_source_is_rejected_for_new_plans_and_existing_non_photo_plans(): void
     {
-        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator());
         $this->postJson(route('export.delivery-plans.store'), $this->payload([
             'source_type' => 'photo', 'reviewed' => '1',
@@ -241,7 +240,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_historical_photo_plan_can_be_viewed_and_edited_without_losing_provenance(): void
     {
-        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator())->post(route('export.delivery-plans.store'), $this->payload());
         $plan = ExportDeliveryPlan::sole();
         $plan->update(['source_type' => 'photo', 'source_name' => 'historis.jpg']);
@@ -259,7 +258,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_update_keeps_capacity_snapshot_and_rejects_stale_revisions_atomically(): void
     {
-        $part = ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        $part = PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator())->post(route('export.delivery-plans.store'), $this->payload())->assertRedirect();
         $plan = ExportDeliveryPlan::sole();
         $part->update(['qty_box' => 30]);
@@ -277,7 +276,7 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_current_master_is_checked_again_at_save_after_preview(): void
     {
-        $part = ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        $part = PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator())->get(route('export.delivery-plans.create'))->assertOk();
         $part->update(['qty_box' => 30]);
         $this->postJson(route('export.delivery-plans.store'), $this->payload())
@@ -288,17 +287,17 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_archive_keeps_history_and_prevents_master_identity_change_or_delete(): void
     {
-        $part = ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        $part = PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator())->post(route('export.delivery-plans.store'), $this->payload())->assertRedirect();
         $plan = ExportDeliveryPlan::sole();
-        $this->put(route('export.part-settings.update', $part), ['part_number' => 'RENAMED', 'qty_box' => 20])
+        $this->put(route('part-settings.update', $part), ['part_number' => 'RENAMED', 'qty_box' => 20])
             ->assertSessionHas('error');
-        $this->delete(route('export.part-settings.destroy', $part))->assertSessionHas('error');
+        $this->delete(route('part-settings.destroy', $part))->assertSessionHas('error');
         $this->delete(route('export.delivery-plans.destroy', $plan), ['revision' => 1])->assertRedirect();
         $this->assertSoftDeleted('export_delivery_plans', ['id' => $plan->id]);
         $this->assertDatabaseCount('export_delivery_plan_items', 1);
         $this->get(route('export.delivery-plans.show', $plan))->assertNotFound();
-        $this->delete(route('export.part-settings.destroy', $part))->assertSessionHas('error');
+        $this->delete(route('part-settings.destroy', $part))->assertSessionHas('error');
         $this->assertSame(1, AuditLog::where('type', 'export_delivery_plan')->where('action', 'deleted')->count());
     }
 
@@ -386,13 +385,13 @@ class ExportDeliveryPlanTest extends TestCase
         $this->assertDatabaseCount('export_delivery_plans', 0);
     }
 
-    public function test_plan_code_is_saved_audited_searchable_and_editable_while_legacy_plans_remain_valid(): void
+    public function test_plan_code_is_saved_audited_searchable_and_editable(): void
     {
-        ExportPartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
+        PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator());
         $this->post(route('export.delivery-plans.store'), $this->payload())->assertSessionHasNoErrors();
         $legacy = ExportDeliveryPlan::sole();
-        $this->assertNull($legacy->plan_code);
+        $this->assertNotEmpty($legacy->plan_code);
         $this->post(route('export.delivery-plans.store'), $this->payload(['plan_code' => ' RDYR0925 ']))
             ->assertSessionHasNoErrors();
         $plan = ExportDeliveryPlan::latest('id')->first();
@@ -403,7 +402,7 @@ class ExportDeliveryPlanTest extends TestCase
             ->assertViewHas('plans', fn ($plans) => $plans->total() === 1 && $plans->first()->id === $plan->id);
         $this->get(route('export.delivery-plans.show', $plan))->assertOk()->assertSee('RDYR0925');
         $this->get(route('export.delivery-plans.edit', $plan))->assertOk()->assertSee('RDYR0925');
-        $this->put(route('export.delivery-plans.update', $plan), $this->payload(['revision' => 1]))
+        $this->put(route('export.delivery-plans.update', $plan), $this->payload(['revision' => 1,'plan_code'=>'RDYR0925']))
             ->assertSessionHasNoErrors();
         $this->assertSame('RDYR0925', $plan->fresh()->plan_code);
         $this->put(route('export.delivery-plans.update', $plan), $this->payload(['revision' => 2, 'plan_code' => 'RDYR0926']))

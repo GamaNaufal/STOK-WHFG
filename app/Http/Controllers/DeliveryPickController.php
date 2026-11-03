@@ -2312,7 +2312,7 @@ class DeliveryPickController extends Controller
         $issues = $issues->concat($exportIssues)->sortByDesc('created_at')->values();
         $historyIssues = $historyIssues->concat($exportHistory)->sortByDesc(fn ($i) => $i instanceof \App\Models\ExportPickingIssue ? ($i->confirmed_at ?? $i->approved_at) : $i->resolved_at)->take(200)->values();
         $exportChoices = $exportIssues->isNotEmpty() ? app(\App\Services\ExportStockViewService::class)->choices() : ['pallets' => collect(), 'locations' => collect()];
-        $exportParts = $exportIssues->contains('issue_type', 'unknown_box') ? \App\Models\ExportPartSetting::orderBy('part_number')->get(['part_number', 'qty_box']) : collect();
+        $exportParts = $exportIssues->contains('issue_type', 'unknown_box') ? \App\Models\PartSetting::orderBy('part_number')->get(['part_number', 'qty_box']) : collect();
         return view('operator.delivery.scan-issues', compact('issues', 'historyIssues', 'exportChoices', 'exportParts'));
     }
 

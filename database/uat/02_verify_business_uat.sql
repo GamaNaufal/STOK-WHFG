@@ -9,10 +9,10 @@ UNION ALL SELECT 'box domestik termasuk histori', COUNT(*) FROM boxes WHERE part
 UNION ALL SELECT 'box ekspor termasuk histori', COUNT(*) FROM export_stock_boxes WHERE part_number LIKE 'UAT26%'
 UNION ALL SELECT 'delivery domestik termasuk histori', COUNT(*) FROM delivery_orders WHERE customer_name LIKE 'UAT26%'
 UNION ALL SELECT 'delivery ekspor termasuk histori', COUNT(*) FROM export_delivery_plans WHERE plan_code LIKE 'UAT26%';
--- Baseline: akun9, part35, lokasi100, box domestik37, box ekspor127,
+-- Baseline: akun9, part34, lokasi100, box domestik37, box ekspor127,
 -- delivery domestik12, delivery ekspor17. Sebagian sengaja arsip/expired.
 SELECT email, role, is_active FROM users WHERE email LIKE 'uat26.%@whfg.test' ORDER BY role,email;
-SELECT scope,part_number,qty_box FROM part_settings WHERE part_number LIKE 'UAT26%' ORDER BY scope,part_number;
+SELECT part_number,qty_box FROM part_settings WHERE part_number LIKE 'UAT26%' ORDER BY part_number;
 SELECT d.plan_code,d.customer_name,d.delivery_deadline,d.total_pcs,d.total_boxes,d.status,d.deleted_at,
        p.status pallet_plan_status,p.revision,
        (SELECT COUNT(*) FROM export_fulfillment_boxes f JOIN export_planned_pallet_items z ON z.id=f.export_planned_pallet_item_id JOIN export_planned_pallets y ON y.id=z.export_planned_pallet_id WHERE y.export_pallet_plan_id=p.id) reserved_boxes,
@@ -110,10 +110,10 @@ FROM boxes b WHERE b.part_number LIKE 'UAT26%' AND b.deleted_at IS NULL AND b.pc
 UNION ALL SELECT 'I11 stok PCS tidak positif','export',b.box_number,b.pcs_quantity
 FROM export_stock_boxes b WHERE b.part_number LIKE 'UAT26%' AND b.deleted_at IS NULL AND b.pcs_quantity<1;
 
-SELECT 'I12 scope part/lokasi ekspor salah' masalah,b.box_number
+SELECT 'I12 master bersama/lokasi ekspor salah' masalah,b.box_number
 FROM export_stock_boxes b JOIN part_settings s ON s.id=b.part_setting_id
 LEFT JOIN export_stock_pallets p ON p.id=b.current_pallet_id LEFT JOIN master_locations l ON l.id=p.master_location_id
-WHERE b.part_number LIKE 'UAT26%' AND (s.scope<>'export' OR (l.id IS NOT NULL AND l.scope<>'export'));
+WHERE b.part_number LIKE 'UAT26%' AND (s.id IS NULL OR (l.id IS NOT NULL AND l.scope<>'export'));
 
 -- Dijalankan segera setelah NF04 sebelum rencana/receipt lain part itu:
 -- Jumlah PCS harus240, apakah sebelum atau sesudah split; sesudah split fisik4box.
@@ -122,3 +122,13 @@ FROM export_stock_boxes WHERE part_number='UAT26-E-NF-SPLIT' AND deleted_at IS N
 
 -- Hak akses existing sengaja tidak diubah oleh seed. Tidak ada baris berarti default role.
 SELECT * FROM role_feature_access ORDER BY role;
+
+-- Identitas ekspor juga wajib tercatat pada registri global.
+SELECT 'I18 identitas ekspor hilang' masalah,b.id,b.box_number
+FROM export_stock_boxes b LEFT JOIN box_identities i ON i.box_number=b.box_number
+WHERE b.part_number LIKE 'UAT26%' AND i.box_number IS NULL;
+SELECT 'I19 ID box lintas lingkup' masalah,b.box_number
+FROM boxes b JOIN export_stock_boxes e ON e.box_number=b.box_number;
+SELECT 'I20 kode rencana belum diregistrasi' masalah,p.id,p.plan_code
+FROM export_delivery_plans p LEFT JOIN export_delivery_plan_codes c ON c.code=p.plan_code AND c.export_delivery_plan_id=p.id
+WHERE p.plan_code LIKE 'UAT26%' AND c.code IS NULL;

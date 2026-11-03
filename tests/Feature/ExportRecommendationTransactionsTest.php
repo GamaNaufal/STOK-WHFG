@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\ExportMasterLocation;
-use App\Models\ExportPartSetting;
+use App\Models\PartSetting;
 use App\Models\ExportPickingIssue;
 use App\Models\ExportStockAllocationNotice;
 use App\Models\ExportStockBox;
@@ -29,9 +29,9 @@ class ExportRecommendationTransactionsTest extends TestCase
 
     private User $operator;
 
-    private ExportPartSetting $a;
+    private PartSetting $a;
 
-    private ExportPartSetting $b;
+    private PartSetting $b;
 
     private int $sequence = 91000000;
 
@@ -45,11 +45,11 @@ class ExportRecommendationTransactionsTest extends TestCase
         $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($this->operator);
-        $this->a = ExportPartSetting::create(['part_number' => 'TX-FIFO-A', 'qty_box' => 10]);
-        $this->b = ExportPartSetting::create(['part_number' => 'TX-FIFO-B', 'qty_box' => 20]);
+        $this->a = PartSetting::create(['part_number' => 'TX-FIFO-A', 'qty_box' => 10]);
+        $this->b = PartSetting::create(['part_number' => 'TX-FIFO-B', 'qty_box' => 20]);
     }
 
-    private function receive(?ExportPartSetting $part = null): ExportStockBox
+    private function receive(?PartSetting $part = null): ExportStockBox
     {
         return app(ExportStockReceivingService::class)->receive(['box_number' => (string) ++$this->sequence,
             'part_number' => ($part ?? $this->a)->part_number, 'receive_token' => (string) Str::uuid()], $this->operator, false);
@@ -95,7 +95,7 @@ class ExportRecommendationTransactionsTest extends TestCase
         }
         $items = [];
         foreach ($totals as $id => $count) {
-            $part = ExportPartSetting::findOrFail($id);
+            $part = PartSetting::findOrFail($id);
             $items[] = ['part_number' => $part->part_number, 'pcs_quantity' => $count * $part->qty_box];
         }
         $delivery = app(ExportDeliveryPlanService::class)->save(['plan_code' => 'TX-REC-'.++$this->deliveries,

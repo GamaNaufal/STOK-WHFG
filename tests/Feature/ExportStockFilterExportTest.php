@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{ExportMasterLocation, ExportPalletPlan, ExportPartSetting, ExportPlannedPallet, ExportStockBox, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
+use App\Models\{ExportMasterLocation, ExportPalletPlan, PartSetting, ExportPlannedPallet, ExportStockBox, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -16,7 +16,7 @@ class ExportStockFilterExportTest extends TestCase
     use RefreshDatabase;
 
     private User $operator;
-    private ExportPartSetting $part;
+    private PartSetting $part;
 
     protected function setUp(): void
     {
@@ -24,7 +24,7 @@ class ExportStockFilterExportTest extends TestCase
         $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number' => '00123-001', 'qty_box' => 100]);
+        $this->part = PartSetting::create(['part_number' => '00123-001', 'qty_box' => 100]);
     }
 
     private function pallet(string $code): ExportStockPallet

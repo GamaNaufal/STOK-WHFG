@@ -2,6 +2,61 @@
 
 Terakhir diverifikasi dari source code: 3 November 2026 (pembaruan inkremental).
 
+Penyatuan master dan identitas 3 November 2026 (keputusan terbaru pengguna):
+- PartSetting menjadi satu master global tanpa scope; ExportPartSetting, menu/
+  route export.part-settings dan permission export_parts dihapus. Lokasi tetap
+  HasMasterScope domestik/ekspor. Part case-sensitive mengikuti aturan existing.
+  Master domestik menjadi acuan bila nomor sama; master hanya-ekspor dipertahankan.
+- Migration 2026_11_03_000001 remap tujuh FK ekspor ke ID master acuan, menghapus
+  baris duplikat dan scope part, menambah unique part_number. Snapshot PCS/box,
+  jumlah PCS, first_received_at serta audit lama dipertahankan. Perubahan PCS
+  master lewat CRUD tetap diblokir saat ada delivery ekspor aktif, termasuk draft.
+- PartSettingController dan pencarian dipakai kedua alur. Operator Ekspor mendapat
+  default parts hanya pada local/testing untuk debug. Explicit Hak Akses tetap
+  menang; production tidak mendapat perluasan default. Migration membersihkan
+  export_parts, menukar ke parts hanya untuk export_operator lokal/testing yang
+  sebelumnya memiliki izin tersebut. Shared master audit memakai scope shared
+  dan dikelompokkan Umum pada dashboard, bukan Domestik.
+- Box dan ExportStockBox memakai ClaimsGlobalBoxIdentity: registry box_identities
+  ber-PK box_number global, origin_scope hanya provenance. Seluruh box existing,
+  termasuk soft-deleted dan fulfillment legacy tanpa physical stock, dibackfill.
+  Histori hard-delete domestik pada ledger tetap dipertahankan. Insert ledger
+  dan model atomik, identitas tidak dapat diubah. BoxIdentity juga memeriksa
+  pending Not Full lintas lingkup. Penerimaan, scan, Not Full dan approval koreksi
+  picking menolak ID milik lingkup lain. Stok/operasi tetap di tabel masing-masing.
+- registerLegacyIdentity hanya mengadopsi ID asal ekspor dengan fulfillment aktif
+  tanpa stock, part/PCS sesuai, dan tanpa physical box/history stock lain. Tanggal
+  FIFO lama dipertahankan; bukan jalur untuk menduplikasi identitas domestik.
+- Kode delivery wajib, trim dan uppercase, unik sepanjang histori termasuk arsip/
+  cancelled/completed. Generated plan_code_key berindeks unique ditambah ledger
+  export_delivery_plan_codes menjaga alias sesudah rename/hard-delete. Alias audit
+  lama dibackfill. Override duplikat seluruh isi rencana dihapus (service/exception/
+  panel/JS); isi sama dengan kode baru boleh. Token replay penyimpanan dipertahankan,
+  termasuk bentuk hash field duplicate_* hanya untuk request lama yang berhasil.
+- inventory:unification-check hanya baca dan dipakai sebelum DML/DDL. Benturan ID
+  lintas lingkup, kode kosong/reuse histori, FK item yang akan bertabrakan, atau
+  kapasitas berbeda pada rencana aktif menghentikan migration sebelum mutasi.
+  Tidak mengganti ID/menebak kode/menggabungkan jumlah otomatis. DDL MySQL implicit
+  commit; panduan deployment/backup/maintenance: docs/SHARED_INVENTORY_MIGRATION.md.
+- SQL import master sebelumnya sekarang insert-only ke shared parts, mempertahankan
+  kapasitas existing, dan tetap membuat lokasi ekspor. Paket UAT diperbarui: 34
+  master bersama, SHARED=100 PCS, box domestik98009999 dan ekspor98009998. Jangan
+  impor ulang namespace UAT26 yang sudah ada. Panduan/checklist/verifikasi disesuaikan.
+- Migration development MySQL lokal stock diterapkan setelah backup lengkap
+  storage/app/backups/before-shared-master-20261103-131314-0fa1d8.sql (96.562 byte).
+  Saat eksekusi tidak ada box/plan/items; 2 lokasi existing dipertahankan.
+  Pemeriksaan sebelum/sesudah tanpa konflik. Production tidak diakses.
+- Verifikasi: regresi backend 538 tes/4.914 assertions sebelum dua tes tambahan;
+  28 tes fokus/306 assertions termasuk kedua tes tambahan lolos. Frontend 110
+  dan Vite build lulus. Migration populated SQLite 5 tes; MySQL8.4 scratch membuktikan
+  canonical ID, snapshot lama, penolakan konflik sebelum mutasi dan unique code. UAT MySQL scratch
+  menguji rollback/import ulang, 25 query baca, remapping ID serta 5 alur service.
+  Pemeriksaan IAB SQLite terpisah membuktikan menu shared/lookup100 PCS pada form
+  ekspor dan kode wajib, bukti storage/app/previews/shared-master-20261103/.
+
+Bagian historis di bawah mencatat keputusan pada tanggalnya; aturan shared
+master/global identity/kode unik di atas menggantikan pemisahan part dan ID lama.
+
 Penempatan cadangan per part pada penerimaan ekspor 3 November 2026:
 - Transaksi penerimaan tetap satu batch. ExportStockViewService mengelompokkan
   box tanpa fulfillment berdasarkan part_setting_id (spare-<id>); kelompok

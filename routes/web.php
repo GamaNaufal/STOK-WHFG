@@ -25,6 +25,9 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
+    Route::get('part-settings/search', [\App\Http\Controllers\PartSettingController::class, 'search'])->name('part-settings.search');
+    Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
+
     Route::get('/access-management', [\App\Http\Controllers\FeatureAccessController::class, 'index'])->name('access.index');
     Route::put('/access-management', [\App\Http\Controllers\FeatureAccessController::class, 'update'])->name('access.update');
 
@@ -35,10 +38,8 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::resource('users', \App\Http\Controllers\UserController::class);
     });
 
-    // Export masters have independent permissions and server-selected data scope.
+    // Export locations retain independent permissions and server-selected scope.
     Route::prefix('export')->name('export.')->group(function () {
-        Route::get('part-settings/search', [\App\Http\Controllers\PartSettingController::class, 'search'])->name('part-settings.search');
-        Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
         Route::get('locations/search', [\App\Http\Controllers\MasterLocationController::class, 'apiSearchAvailable'])->name('locations.search');
         Route::resource('locations', \App\Http\Controllers\MasterLocationController::class)->except(['show', 'create']);
     });
@@ -100,12 +101,6 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
     Route::group([], function () {
         Route::resource('locations', \App\Http\Controllers\MasterLocationController::class)
             ->except(['show', 'create']);
-    });
-
-    // Admin Warehouse Routes - Master Part & Qty
-    Route::group([], function () {
-        Route::get('part-settings/search', [\App\Http\Controllers\PartSettingController::class, 'search'])->name('part-settings.search');
-        Route::resource('part-settings', \App\Http\Controllers\PartSettingController::class)->except(['show']);
     });
 
     // Stock Input Routes (Warehouse Operator/Admin Warehouse/Admin) - Scan QR Box

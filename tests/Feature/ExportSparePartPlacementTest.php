@@ -4,7 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AuditLog;
 use App\Models\ExportMasterLocation;
-use App\Models\ExportPartSetting;
+use App\Models\PartSetting;
 use App\Models\ExportStockBox;
 use App\Models\RoleFeatureAccess;
 use App\Models\User;
@@ -22,9 +22,9 @@ class ExportSparePartPlacementTest extends TestCase
 
     private User $operator;
 
-    private ExportPartSetting $a;
+    private PartSetting $a;
 
-    private ExportPartSetting $b;
+    private PartSetting $b;
 
     private int $sequence = 96500000;
 
@@ -34,8 +34,8 @@ class ExportSparePartPlacementTest extends TestCase
         $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($this->operator);
-        $this->a = ExportPartSetting::create(['part_number' => 'SPARE-A', 'qty_box' => 10]);
-        $this->b = ExportPartSetting::create(['part_number' => 'SPARE-B', 'qty_box' => 20]);
+        $this->a = PartSetting::create(['part_number' => 'SPARE-A', 'qty_box' => 10]);
+        $this->b = PartSetting::create(['part_number' => 'SPARE-B', 'qty_box' => 20]);
     }
 
     private function batch(array $counts = [5, 3])

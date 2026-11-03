@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AuditLog, ExportMasterLocation, ExportPartSetting, ExportReceivingBatch, ExportStockBox, RoleFeatureAccess, User};
+use App\Models\{AuditLog, ExportMasterLocation, PartSetting, ExportReceivingBatch, ExportStockBox, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService, ExportReceivingBatchService, ExportStockReceivingService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -12,12 +12,12 @@ class ExportReceivingBatchTest extends TestCase
 {
     use RefreshDatabase;
     private User $operator;
-    private ExportPartSetting $part;
+    private PartSetting $part;
     protected function setUp(): void
     {
         parent::setUp(); $this->withoutVite();
         $this->operator = User::factory()->create(['role'=>'export_operator']); $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number'=>'BULK-A','qty_box'=>10]);
+        $this->part = PartSetting::create(['part_number'=>'BULK-A','qty_box'=>10]);
     }
     private function batch(): ExportReceivingBatch { return app(ExportReceivingBatchService::class)->start($this->operator); }
     private function scan(ExportReceivingBatch $batch, string $number, array $replace=[])

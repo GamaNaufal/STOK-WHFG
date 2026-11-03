@@ -759,179 +759,140 @@
     "masters": {
         "parts": [
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-CORRECTION",
                 "qty_box": 10
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-DIRECT",
                 "qty_box": 30
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-EDIT",
                 "qty_box": 30
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-EXPIRED",
                 "qty_box": 10
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-FIFO",
                 "qty_box": 80
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-FREE",
                 "qty_box": 10
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-ISSUE",
                 "qty_box": 40
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-LOCK",
                 "qty_box": 20
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-MERGE",
                 "qty_box": 10
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-MOVE",
                 "qty_box": 25
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-NF",
                 "qty_box": 80
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-NF-ADD",
                 "qty_box": 80
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-PRIORITY",
                 "qty_box": 10
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-REDO",
                 "qty_box": 50
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-SPLIT",
                 "qty_box": 20
             },
             {
-                "scope": "domestic",
                 "part_number": "UAT26-D-WARNING",
                 "qty_box": 10
             },
             {
-                "scope": "domestic",
-                "part_number": "UAT26-SHARED",
-                "qty_box": 100
-            },
-            {
-                "scope": "export",
                 "part_number": "UAT26-E-CANCEL",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-DEADLINE",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-DUP",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-HIST",
                 "qty_box": 20
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-LOAD36",
                 "qty_box": 40
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-MIX-A",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-MIX-B",
                 "qty_box": 40
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-MONO",
                 "qty_box": 20
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-NF-DRAFT",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-NF-EXIST",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-NF-EXT",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-NF-SHORT",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-NF-SPLIT",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-RECEIVE",
                 "qty_box": 80
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-REV",
                 "qty_box": 50
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-SPARE",
                 "qty_box": 40
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-E-WARN",
                 "qty_box": 10
             },
             {
-                "scope": "export",
                 "part_number": "UAT26-SHARED",
-                "qty_box": 80
+                "qty_box": 100
             }
         ],
         "locations": [

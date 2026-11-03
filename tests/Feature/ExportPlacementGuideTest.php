@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AuditLog, ExportMasterLocation, ExportPartSetting, MasterLocation, RoleFeatureAccess, User};
+use App\Models\{AuditLog, ExportMasterLocation, PartSetting, MasterLocation, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService, ExportReceivingBatchService, ExportStockReceivingService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -16,13 +16,13 @@ class ExportPlacementGuideTest extends TestCase
     {
         parent::setUp(); $this->withoutVite();
         $this->actingAs(User::factory()->create(['role' => 'export_operator']));
-        ExportPartSetting::create(['part_number' => 'TX-PART', 'qty_box' => 100]);
+        PartSetting::create(['part_number' => 'TX-PART', 'qty_box' => 100]);
     }
 
     public function test_print_contains_destination_and_checklist_without_mutating_receipt(): void
     {
         $actor = \App\Models\User::where('role', 'export_operator')->firstOrFail();
-        $part = ExportPartSetting::firstOrCreate(['part_number' => 'GUIDE-PART'], ['qty_box' => 20]);
+        $part = PartSetting::firstOrCreate(['part_number' => 'GUIDE-PART'], ['qty_box' => 20]);
         $delivery = app(ExportDeliveryPlanService::class)->save(['plan_code' => 'GUIDE-PLAN', 'customer_name' => 'Customer Guide',
             'delivery_deadline' => '2026-11-05', 'source_type' => 'manual', 'items' => [['part_number' => $part->part_number, 'pcs_quantity' => 40]]], $actor);
         $location = ExportMasterLocation::create(['code' => 'GUIDE-A1']);
@@ -46,7 +46,7 @@ class ExportPlacementGuideTest extends TestCase
     public function test_print_keeps_finished_spare_at_its_real_location_and_uses_selected_target_only_for_pending(): void
     {
         $actor = \App\Models\User::where('role', 'export_operator')->firstOrFail();
-        $part = ExportPartSetting::first();
+        $part = PartSetting::first();
         $service = app(ExportReceivingBatchService::class); $batch = $service->start($actor);
         foreach (['00000201', '00000202'] as $number) $batch = $service->scan($batch->id, ['box_number' => $number,
             'part_number' => $part->part_number, 'revision' => $batch->revision, 'scan_token' => (string) Str::uuid()], $actor);
@@ -66,7 +66,7 @@ class ExportPlacementGuideTest extends TestCase
 
     public function test_guide_marks_unknown_or_unavailable_spare_destinations_and_rejects_malformed_input(): void
     {
-        $actor = \App\Models\User::where('role', 'export_operator')->firstOrFail(); $part = ExportPartSetting::first();
+        $actor = \App\Models\User::where('role', 'export_operator')->firstOrFail(); $part = PartSetting::first();
         $box = app(ExportStockReceivingService::class)->receive(['box_number' => '00000301', 'part_number' => $part->part_number, 'receive_token' => (string) Str::uuid()], $actor);
         $this->get(route('export.receiving.transactions.legacy-print', $box))->assertOk()->assertSee('BELUM DITENTUKAN')
             ->assertViewHas('guideWarning', fn ($message) => is_string($message) && $message !== '');
@@ -81,7 +81,7 @@ class ExportPlacementGuideTest extends TestCase
         $actor = \App\Models\User::where('role', 'export_operator')->firstOrFail();
         $service = app(ExportReceivingBatchService::class); $batch = $service->start($actor);
         $this->get(route('export.receiving.transactions.print', $batch))->assertNotFound();
-        $part = ExportPartSetting::first();
+        $part = PartSetting::first();
         $batch = $service->scan($batch->id, ['box_number' => '00000401', 'part_number' => $part->part_number, 'revision' => $batch->revision, 'scan_token' => (string) Str::uuid()], $actor);
         $batch = $service->process($batch->id, $batch->revision, $actor);
         $this->get(route('export.receiving.transactions.print', $batch))->assertOk();

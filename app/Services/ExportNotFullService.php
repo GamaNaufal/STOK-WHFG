@@ -168,9 +168,9 @@ class ExportNotFullService
             $this->fail('ID box baru wajib tepat 8 angka.');
         }
         app(ExportPickingService::class)->assertReceiptAllowed($number);
-        if (ExportStockBox::withTrashed()->where('box_number', $number)->exists()
+        if (\App\Support\BoxIdentity::unavailable($number,$requestId) || ExportStockBox::withTrashed()->where('box_number', $number)->exists()
             || ExportNotFullRequest::whereKeyNot($requestId)->where('status', 'prepared')->where('preparation->box_number', $number)->exists()) {
-            $this->fail('ID box sudah dipakai pada lingkup ekspor atau sedang disiapkan request lain.');
+            $this->fail('ID box sudah dipakai pada domestik/ekspor atau sedang disiapkan request lain.');
         }
     }
 

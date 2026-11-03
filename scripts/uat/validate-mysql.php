@@ -38,7 +38,7 @@ try {
         }
     }
     $pdo->exec("INSERT INTO users (name,email,password,role,is_active) VALUES ('Existing dev user','existing@example.invalid','untouched','admin',1)");
-    $pdo->exec("INSERT INTO part_settings (scope,part_number,qty_box) VALUES ('domestic','EXISTING-DEV',7)");
+    $pdo->exec("INSERT INTO part_settings (part_number,qty_box) VALUES ('EXISTING-DEV',7)");
     $pdo->exec("INSERT INTO master_locations (scope,code,is_occupied) VALUES ('domestic','EXISTING-DEV',0)");
     $sql=file_get_contents($root.'/database/uat/01_seed_business_uat.sql');
     $sql=str_replace("SET @uat_expected_database = 'stock';","SET @uat_expected_database = '$name';",$sql);

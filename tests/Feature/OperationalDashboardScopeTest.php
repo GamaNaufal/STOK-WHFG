@@ -8,12 +8,11 @@ use App\Models\Box;
 use App\Models\DeliveryOrder;
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportMasterLocation;
-use App\Models\ExportPartSetting;
+use App\Models\PartSetting;
 use App\Models\ExportStockAllocationNotice;
 use App\Models\ExportStockBox;
 use App\Models\MasterLocation;
 use App\Models\Pallet;
-use App\Models\PartSetting;
 use App\Models\RoleFeatureAccess;
 use App\Models\StockInput;
 use App\Models\StockLocation;
@@ -40,9 +39,9 @@ class OperationalDashboardScopeTest extends TestCase
 
     private User $operator;
 
-    private ExportPartSetting $part;
+    private PartSetting $part;
 
-    private int $sequence = 0;
+    private int $sequence = 80000000;
 
     private int $plans = 0;
 
@@ -53,7 +52,7 @@ class OperationalDashboardScopeTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-10-30 10:00:00', 'Asia/Jakarta'));
         $this->monitor = User::factory()->create(['role' => 'admin']);
         $this->operator = User::factory()->create(['role' => 'export_operator']);
-        $this->part = ExportPartSetting::create(['part_number' => 'SAME-PART', 'qty_box' => 10]);
+        $this->part = PartSetting::create(['part_number' => 'SAME-PART', 'qty_box' => 10]);
         $this->actingAs($this->monitor);
     }
 
@@ -70,16 +69,16 @@ class OperationalDashboardScopeTest extends TestCase
 
     private function domestic(): DeliveryOrder
     {
-        PartSetting::create(['part_number' => 'SAME-PART', 'qty_box' => 100]);
+        PartSetting::create(['part_number' => 'DOM-PART', 'qty_box' => 100]);
         MasterLocation::create(['code' => 'DOM-A']);
         $pallet = Pallet::create(['pallet_number' => 'PLT-DOM']);
         StockLocation::create(['pallet_id' => $pallet->id, 'warehouse_location' => 'DOM-A', 'stored_at' => now()]);
-        $box = Box::create(['box_number' => '00000001', 'part_number' => 'SAME-PART', 'pcs_quantity' => 100, 'qty_box' => 100, 'qr_code' => 'DOM-1', 'user_id' => $this->monitor->id, 'expired_status' => 'active']);
+        $box = Box::create(['box_number' => '00000001', 'part_number' => 'DOM-PART', 'pcs_quantity' => 100, 'qty_box' => 100, 'qr_code' => 'DOM-1', 'user_id' => $this->monitor->id, 'expired_status' => 'active']);
         $pallet->boxes()->attach($box->id);
-        StockInput::create(['pallet_id' => $pallet->id, 'user_id' => $this->monitor->id, 'warehouse_location' => 'DOM-A', 'pcs_quantity' => 100, 'box_quantity' => 1, 'stored_at' => now()->setTime(8, 0), 'part_numbers' => ['SAME-PART']]);
-        StockWithdrawal::create(['user_id' => $this->monitor->id, 'part_number' => 'SAME-PART', 'pcs_quantity' => 30, 'box_quantity' => 1, 'withdrawn_at' => now()->setTime(9, 0), 'status' => 'completed', 'warehouse_location' => 'DOM-A']);
+        StockInput::create(['pallet_id' => $pallet->id, 'user_id' => $this->monitor->id, 'warehouse_location' => 'DOM-A', 'pcs_quantity' => 100, 'box_quantity' => 1, 'stored_at' => now()->setTime(8, 0), 'part_numbers' => ['DOM-PART']]);
+        StockWithdrawal::create(['user_id' => $this->monitor->id, 'part_number' => 'DOM-PART', 'pcs_quantity' => 30, 'box_quantity' => 1, 'withdrawn_at' => now()->setTime(9, 0), 'status' => 'completed', 'warehouse_location' => 'DOM-A']);
         $order = DeliveryOrder::create(['sales_user_id' => $this->monitor->id, 'customer_name' => 'DOM CUSTOMER', 'delivery_date' => today(), 'status' => 'processing']);
-        $order->items()->create(['part_number' => 'SAME-PART', 'quantity' => 100, 'fulfilled_quantity' => 40]);
+        $order->items()->create(['part_number' => 'DOM-PART', 'quantity' => 100, 'fulfilled_quantity' => 40]);
 
         return $order;
     }
@@ -122,7 +121,8 @@ class OperationalDashboardScopeTest extends TestCase
         $this->assertSame(1, (int) $d['stockTotals']['domestic']->boxes);
         $this->assertSame(2, (int) $d['stockTotals']['export']->boxes);
         $this->assertSame(1, (int) $d['stockTotals']['export']->unplaced);
-        $this->assertSame(2, $d['stockRows']->where('box_number', '00000001')->count());
+        $this->assertSame(1, $d['stockRows']->where('box_number', '00000001')->count());
+        $this->assertSame(1,$d['stockRows']->where('box_number','80000001')->count());
         $this->assertSame(100, (int) $d['domains']['domestic']['inbound']->pcs);
         $this->assertSame(30, (int) $d['domains']['domestic']['outbound']->pcs);
         $this->assertSame(2, (int) $d['domains']['export']['inbound']->boxes);
@@ -290,7 +290,7 @@ class OperationalDashboardScopeTest extends TestCase
         unlink($file);
         $this->assertCount(3, $charts);
         $this->assertStringContainsString('box', implode('', $charts));
-        $this->assertStringContainsString('00000001', $strings);
+        $this->assertStringContainsString('80000001', $strings);
         $this->assertStringContainsString('=1+1', $strings);
         $this->assertStringNotContainsString('<f>', implode('', $sheets));
         $this->assertMatchesRegularExpression('/<c r="J2"[^>]*><v>0<\/v><\/c>/', $summary);

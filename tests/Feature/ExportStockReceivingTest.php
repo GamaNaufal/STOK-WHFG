@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AuditLog, Box, ExportFulfillmentBox, ExportMasterLocation, ExportPartSetting, ExportStockBox, ExportStockMovement, ExportStockPallet, MasterLocation, PartSetting, RoleFeatureAccess, User};
+use App\Models\{AuditLog, Box, ExportFulfillmentBox, ExportMasterLocation, PartSetting, ExportStockBox, ExportStockMovement, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService, ExportStockReceivingService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
@@ -13,7 +13,7 @@ class ExportStockReceivingTest extends TestCase
 {
     use RefreshDatabase;
     private User $operator;
-    private ExportPartSetting $part;
+    private PartSetting $part;
     private int $sequence = 0;
 
     protected function setUp(): void
@@ -22,7 +22,7 @@ class ExportStockReceivingTest extends TestCase
         $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number' => 'EX-A', 'qty_box' => 10]);
+        $this->part = PartSetting::create(['part_number' => 'EX-A', 'qty_box' => 10]);
     }
 
     private function receive(?string $number = null, array $override = []): ExportStockBox
@@ -64,28 +64,27 @@ class ExportStockReceivingTest extends TestCase
         foreach (['export_stock_boxes', 'export_stock_pallets', 'export_fulfillment_boxes', 'audit_logs'] as $table) $this->assertDatabaseCount($table, 0);
     }
 
-    public function test_domestic_number_is_allowed_but_export_duplicate_is_rejected(): void
+    public function test_domestic_and_export_numbers_are_globally_reserved_including_deleted_history(): void
     {
-        Box::create(['box_number' => '00000001', 'part_number' => 'DOM', 'pcs_quantity' => 20, 'qr_code' => 'TEST', 'user_id' => $this->operator->id]);
-        $this->postJson(route('export.receiving.check-box'), ['box_number' => '00000001'])->assertJsonPath('available', true);
-        $box = $this->receive('00000001');
-        $this->assertSame(10, $box->pcs_quantity);
-        $this->assertNull($box->current_pallet_id);
-        $this->postJson(route('export.receiving.store'), ['box_number' => '00000001', 'part_number' => 'EX-A', 'receive_token' => (string) Str::uuid()])
+        $domestic=Box::create(['box_number'=>'00000001','part_number'=>'DOM','pcs_quantity'=>20,'qr_code'=>'TEST','user_id'=>$this->operator->id]);
+        $domestic->delete();
+        $this->postJson(route('export.receiving.check-box'),['box_number'=>'00000001'])->assertJsonPath('available',false);
+        $this->postJson(route('export.receiving.store'),['box_number'=>'00000001','part_number'=>'EX-A','receive_token'=>(string)Str::uuid()])
             ->assertUnprocessable()->assertJsonValidationErrors('box_number');
-        $this->assertDatabaseCount('boxes', 1);
-        $this->assertDatabaseCount('box_identities', 1);
-        $this->assertDatabaseCount('export_stock_boxes', 1);
-        $this->assertDatabaseCount('pallets', 0);
-        $this->get(route('export.stock.index', ['box' => $box->id]))->assertOk()->assertSee('00000001');
+        $export=$this->receive('00000002');$export->delete();
+        $this->postJson(route('export.receiving.check-box'),['box_number'=>'00000002'])->assertJsonPath('available',false);
+        $this->assertDatabaseCount('box_identities',2);
+        $this->assertDatabaseCount('export_stock_boxes',1);
+        $this->actingAs(User::factory()->create(['role'=>'warehouse_operator']))
+            ->postJson(route('stock-input.scan-barcode'),['barcode'=>'00000002'])->assertStatus(400);
     }
 
-    public function test_invalid_identity_local_part_and_client_quantity_are_rejected(): void
+    public function test_invalid_identity_unknown_part_and_client_quantity_are_rejected(): void
     {
         PartSetting::create(['part_number' => 'DOM-ONLY', 'qty_box' => 50]);
         foreach (['123', '１２３４５６７８', '1234ABCD'] as $number) $this->postJson(route('export.receiving.store'),
             ['box_number' => $number, 'part_number' => 'EX-A', 'receive_token' => (string) Str::uuid()])->assertUnprocessable();
-        $this->postJson(route('export.receiving.store'), ['box_number' => '00000001', 'part_number' => 'DOM-ONLY', 'receive_token' => (string) Str::uuid()])
+        $this->postJson(route('export.receiving.store'), ['box_number' => '00000001', 'part_number' => 'UNKNOWN', 'receive_token' => (string) Str::uuid()])
             ->assertUnprocessable()->assertJsonValidationErrors('part_number');
         $this->postJson(route('export.receiving.store'), ['box_number' => '00000001', 'part_number' => 'EX-A', 'pcs_quantity' => 5, 'receive_token' => (string) Str::uuid()])
             ->assertUnprocessable()->assertJsonValidationErrors('pcs_quantity');
@@ -180,7 +179,7 @@ class ExportStockReceivingTest extends TestCase
         $this->placement($box, 'location:'.$domestic->id)->assertUnprocessable();
         $this->placement($box, 'location:'.$location->id)->assertRedirect();
         $pallet = $box->fresh()->current_pallet_id;
-        ExportPartSetting::create(['part_number' => 'EX-B', 'qty_box' => 25]);
+        PartSetting::create(['part_number' => 'EX-B', 'qty_box' => 25]);
         $other = $this->receive(override: ['part_number' => 'EX-B']);
         $this->placement($other, 'pallet:'.$pallet)->assertRedirect();
         $this->assertSame(2, ExportStockPallet::find($pallet)->boxes()->count());
@@ -191,7 +190,7 @@ class ExportStockReceivingTest extends TestCase
     public function test_spare_cannot_claim_empty_reserved_location_or_an_occupied_location(): void
     {
         $delivery = $this->plan(pallets: 1);
-        ExportPartSetting::create(['part_number' => 'SPARE-PART', 'qty_box' => 5]);
+        PartSetting::create(['part_number' => 'SPARE-PART', 'qty_box' => 5]);
         $box = $this->receive(override: ['part_number' => 'SPARE-PART']);
         $this->placement($box, 'location:'.$delivery->palletPlan->pallets[0]->master_location_id)->assertUnprocessable();
         $occupied = ExportMasterLocation::create(['code' => 'OCCUPIED', 'is_occupied' => true]);
@@ -243,7 +242,7 @@ class ExportStockReceivingTest extends TestCase
         $this->assertDatabaseCount('export_stock_movements', 2);
         $this->actingAs(User::factory()->create(['role' => 'admin']))->delete(route('export.locations.destroy', $a))->assertSessionHas('error');
         $this->assertDatabaseHas('master_locations', ['id' => $a->id]);
-        $this->delete(route('export.part-settings.destroy', $this->part))->assertSessionHas('error');
+        $this->delete(route('part-settings.destroy', $this->part))->assertSessionHas('error');
     }
 
     public function test_failure_to_audit_confirmation_rolls_back_stock_occupancy_and_fulfillment(): void

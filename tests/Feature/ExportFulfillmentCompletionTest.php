@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AuditLog, ExportDeliveryPlan, ExportMasterLocation, ExportPartSetting, ExportStockAllocationNotice, ExportStockBox, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
+use App\Models\{AuditLog, ExportDeliveryPlan, ExportMasterLocation, PartSetting, ExportStockAllocationNotice, ExportStockBox, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportFulfillmentCompletionService, ExportPalletPlanningService, ExportStockAllocationNoticeService, ExportStockReceivingService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -12,7 +12,7 @@ class ExportFulfillmentCompletionTest extends TestCase
 {
     use RefreshDatabase;
     private User $operator;
-    private ExportPartSetting $part;
+    private PartSetting $part;
     private int $sequence = 0;
 
     protected function setUp(): void
@@ -20,10 +20,10 @@ class ExportFulfillmentCompletionTest extends TestCase
         parent::setUp(); $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number' => 'READY-A', 'qty_box' => 10]);
+        $this->part = PartSetting::create(['part_number' => 'READY-A', 'qty_box' => 10]);
     }
 
-    private function receive(?ExportPartSetting $part = null): ExportStockBox
+    private function receive(?PartSetting $part = null): ExportStockBox
     {
         return app(ExportStockReceivingService::class)->receive(['box_number' => str_pad((string) ++$this->sequence,8,'0',STR_PAD_LEFT),
             'part_number' => ($part ?? $this->part)->part_number, 'receive_token' => (string) Str::uuid()], $this->operator,
@@ -369,7 +369,7 @@ class ExportFulfillmentCompletionTest extends TestCase
 
     public function test_mixed_pallet_reduction_can_remove_one_part_completely_and_return_multiple_boxes_to_one_empty_location(): void
     {
-        $b=ExportPartSetting::create(['part_number'=>'READY-B','qty_box'=>20]);
+        $b=PartSetting::create(['part_number'=>'READY-B','qty_box'=>20]);
         $delivery=app(ExportDeliveryPlanService::class)->save(['plan_code'=>'MIXED-REDUCE','customer_name'=>'Customer Mixed','delivery_deadline'=>'2026-11-20','source_type'=>'manual',
             'items'=>[['part_number'=>$this->part->part_number,'pcs_quantity'=>30],['part_number'=>$b->part_number,'pcs_quantity'=>40]]],$this->operator);
         $location=ExportMasterLocation::create(['code'=>'MIXED-FINAL']);

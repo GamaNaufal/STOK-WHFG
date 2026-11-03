@@ -16,6 +16,6 @@ class ExportDeliveryPlanItem extends Model
 
     public function partSetting()
     {
-        return $this->belongsTo(ExportPartSetting::class, 'part_setting_id');
+        return $this->belongsTo(PartSetting::class, 'part_setting_id');
     }
 }

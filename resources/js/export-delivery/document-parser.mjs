@@ -18,7 +18,7 @@ export function checkRows(rows, catalog, snapshots=[]) {
         const capacity=saved.get(row.part_number) ?? master.get(row.part_number);
         let error='';
         if(!row.part_number) error='Pilih nomor part.';
-        else if(!master.has(row.part_number)) error='Nomor part belum terdaftar di master ekspor.';
+        else if(!master.has(row.part_number)) error='Nomor part belum terdaftar di master bersama.';
         else if(counts.get(row.part_number)>1) error='Part berulang. Gabungkan jumlah PCS dalam satu baris.';
         else if(quantity===null) error='Isi jumlah PCS bulat lebih dari nol.';
         else if(!Number.isSafeInteger(capacity) || capacity<1) error='Kapasitas box tidak valid.';

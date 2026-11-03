@@ -4,6 +4,10 @@ Untuk **tes manual khusus ekspor**, mulai dari `docs/EXPORT_MANUAL_TEST_GUIDE.md
 14 rangkaian kasus dengan isian delivery, pembagian pallet, ID scan dan hasil
 yang diharapkan. Data yang sudah diimpor tetap dipakai; tidak perlu impor ulang.
 
+Paket diperbarui 3 November 2026 untuk master part bersama, ID box global,
+dan kode delivery wajib unik sepanjang histori. Paket lama yang sudah diimpor
+tidak perlu diimpor ulang; jalankan migrasi sesuai `docs/SHARED_INVENTORY_MIGRATION.md`.
+
 Urutan penggunaan:
 
 1. Baca `docs/UAT_BUSINESS_GUIDE.md`, terutama persiapan database dan akun.
@@ -13,11 +17,11 @@ Urutan penggunaan:
    Catat hasil pada `docs/UAT_RESULT_TEMPLATE.md` yang sudah menyediakan
    seluruh 116 baris kasus dengan status awal Belum diuji.
 
-Data awal: **9 akun, 35 master part, 100 lokasi, 37 box domestik, 127 box ekspor,
+Data awal: **9 akun, 34 master part bersama, 100 lokasi, 37 box domestik, 127 box ekspor,
 12 delivery domestik dan 17 rencana ekspor**, termasuk histori/arsip.
 Password akun uji `UatWHFG!2026`; Admin Utama `uat26.admin@whfg.test`.
 Seluruh akun dan barcode tercantum di `manifest.json`.
-Panduan memuat **116 skenario manual untuk 32 fitur konfigurasi**, dilengkapi
+Panduan memuat **116 skenario manual untuk 31 fitur konfigurasi**, dilengkapi
 role, langkah input/scan, hasil yang diharapkan dan kasus penolakan.
 
 SQL menambah namespace UAT26 tanpa menimpa data existing. Impor ulang ditolak.
@@ -27,7 +31,7 @@ ke salinan development. Mengulang skenario dari awal dilakukan lewat restore
 backup/salinan DB, bukan menghapus ledger box.
 
 `validation.json` berisi hasil pengujian paket di MySQL sementara: rollback,
-impor berulang, relasi dengan ID existing berbeda, 22 query verifikasi, dan
+impor berulang, relasi dengan ID existing berbeda, query verifikasi integritas, dan
 uji service picking/pengiriman, Not Full, redo, serta expired. Database aplikasi
 tidak diisi oleh proses pembuatan/validasi paket ini. Checklist UI manual masih
 perlu dijalankan oleh penguji.
@@ -46,7 +50,7 @@ Peta cakupan fitur konfigurasi:
 | delivery_pick | D13–D15, D18–D19, D21–D22 |
 | delivery_split / delivery_redo / delivery_delete / delivery_locks | D16, D20–D24 |
 | delivery_issues | D18–D19, V02–V07 |
-| parts / locations / export_parts / export_locations | M01–M04 |
+| parts / locations / export_locations | M01–M04 |
 | export_delivery_plans | E01–E08 |
 | export_pallet_plans | P01–P09 |
 | export_stock_input / export_stock_view | R01–R09 |

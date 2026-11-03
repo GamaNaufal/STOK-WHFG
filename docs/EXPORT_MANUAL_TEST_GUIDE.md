@@ -5,10 +5,15 @@ perlu mengimpor SQL lagi. Langkah di bawah tidak dijalankan oleh agent; penguji
 yang membuat rencana, memindai box, mengonfirmasi fisik, dan menyelesaikan delivery.
 
 Pemeriksaan **baca saja** pada database development lokal tanggal 1 November 2026
-menemukan data UAT26 masih dalam kondisi awal: 18 master part ekspor, 50 lokasi,
+menemukan data UAT26 masih dalam kondisi awal: 18 part yang saat itu berada di master ekspor, 50 lokasi,
 123 box aktif dan 4 box histori. Sebagian box sudah direservasi untuk rencana
 contoh final. Semua ID baru berawalan `9811` yang dipakai di panduan ini belum
 tercatat saat pemeriksaan. Kondisi dapat berubah setelah Anda menjalankan tes.
+
+> Pembaruan 3 November 2026: jalankan migrasi penyatuan master terlebih dahulu.
+> Jangan impor ulang fixture ke database yang sudah memuat UAT26. Data uji lama
+> boleh diteruskan jika `inventory:unification-check` lulus; jika ada konflik,
+> selesaikan sesuai [panduan migrasi](SHARED_INVENTORY_MIGRATION.md).
 
 ## Persiapan
 
@@ -262,7 +267,7 @@ isi satu pallet, ulangi pola ini melalui revisi jumlah 0 pada rencana uji baru.
    Konfirmasi penempatan dan periksa pemenuhan masing-masing.
 5. Pada kasus 1, penempatan 2+1 box menguji urutan pallet 1 sebelum 2 dalam delivery.
    Untuk menguji antrean prioritas sekali lagi, buat part baru lewat master
-   ekspor lalu dua rencana baru dengan tenggat berbeda; jangan menambah rencana
+   bersama lalu dua rencana baru dengan tenggat berbeda; jangan menambah rencana
    part ini tanpa memperhitungkan permintaan impor yang masih aktif.
 
 **Lulus jika:** sistem memilih permintaan sendiri berdasarkan tenggat dan
@@ -291,22 +296,21 @@ nomor pallet, tanpa meminta operator memilih rencana saat penerimaan.
 **Lulus jika:** data baru ada setelah disimpan, kode/customer/tenggat benar,
 hasil review dapat dikoreksi, dan peringatan baris yang diabaikan terlihat.
 
-## Kasus 13 — Duplikat delivery dan submit ganda
+## Kasus 13 — Kode delivery unik dan submit ganda
 
-1. Buat draft baru `TES-EXP-13`, customer `Customer Uji 13`, H+7,
+1. Buat draft `TES-EXP-13`, customer `Customer Uji 13`, H+7,
    part `UAT26-E-DUP`, 80 PCS.
-2. Buat lagi dengan kode/customer/tanggal/part/jumlah sama: harus muncul
-   warning duplikasi sebelum header baru dibuat.
-3. Coba lanjut tanpa alasan/konfirmasi: ditolak. Isi alasan dan konfirmasi
-   tinjauan: rencana kedua boleh tersimpan dan alasan tercatat di audit.
-4. Saat warning tampil, ubah isian: persetujuan sebelumnya tidak boleh berlaku
-   untuk isi yang sudah berubah. Perbedaan spasi/case tidak menghindari deteksi.
-5. Coba klik Simpan cepat dua kali: request yang sama hanya membuat satu hasil.
-6. Untuk pembanding completed, salin data persis `UAT26-EX-HISTORY` termasuk
-   tenggat dari rincian; untuk arsip draft gunakan `UAT26-EX-ARCHIVE`.
+2. Coba simpan lagi kode ` tes-exp-13 ` dengan customer/tanggal/jumlah berbeda:
+   ditolak pada kode rencana; belum ada header baru. Kode wajib diisi.
+3. Gunakan kode baru `TES-EXP-13-B`: isi yang sama boleh disimpan tanpa override.
+4. Ubah kode draft pertama ke `TES-EXP-13-C`. Kode lamanya tetap tidak boleh
+   digunakan oleh rencana lain. Kode milik rencana itu sendiri boleh disimpan.
+5. Klik Simpan cepat dua kali/retry: token sama hanya menghasilkan satu rencana.
+6. Coba kode `UAT26-EX-HISTORY`, `UAT26-EX-ARCHIVE` atau kode permintaan cancelled:
+   semuanya tetap ditolak walaupun rencana asal sudah tidak aktif.
 
-**Lulus jika:** aktif dan completed diperiksa; cancelled/arsip draft diabaikan;
-duplikat sah memerlukan alasan, retry tidak membuat data ganda.
+**Lulus jika:** kode unik sepanjang histori, normalisasi case/spasi berlaku,
+isi serupa dengan kode baru boleh, dan retry tidak membuat data ganda.
 
 ## Kasus 14 — Master, stok, laporan, dashboard dan akses
 
@@ -314,8 +318,11 @@ duplikat sah memerlukan alasan, retry tidak membuat data ganda.
    `TES-EXP-LOC`. Uji edit master yang belum dipakai, duplikat, kapasitas 0.
    Kemudian buat draft delivery memakai part tersebut: perubahan kapasitas
    selama ada rencana aktif harus ditolak. Lokasi occupied/reserved dilindungi.
-2. Cari `UAT26-SHARED`: master ekspor 80, domestik 100. ID 98009999 boleh sama
-   pada dua lingkup; data stok/part/lokasi tetap terpisah.
+2. Cari `UAT26-SHARED` pada **Master Nomor Part Bersama**: hanya satu master
+   untuk kedua alur. Fixture baru memakai 100 PCS/box; pada data lama tanpa
+   pasangan domestik, kapasitas existing dipertahankan. ID box yang tercatat
+   pada satu lingkup harus ditolak jika dicoba pada lingkup lain, termasuk histori.
+   Lokasi tetap terpisah; akses master operator untuk debug hanya default lokal/testing.
 3. Buka **Stok Ekspor**, cari box, part, lokasi dan pallet hasil kasus 1–11.
    Ganti pengelompokan box/pallet dan filter status. Filter harus AJAX tanpa
    klik Cari; Lihat detail pallet membuka popup berisi box, tidak autoexpand.
@@ -358,7 +365,7 @@ pengecekan tambahan setelah satu rangkaian selesai.
 | 10. Pembatalan dan return | Belum diuji | |
 | 11. Prioritas tenggat/pallet | Belum diuji | |
 | 12. Upload Excel | Belum diuji | |
-| 13. Duplikat dan retry | Belum diuji | |
+| 13. Kode unik dan retry | Belum diuji | |
 | 14. Master, stok, laporan, dashboard, akses | Belum diuji | |
 
 Checklist teknis lebih rinci tetap tersedia pada `UAT_BUSINESS_GUIDE.md`.

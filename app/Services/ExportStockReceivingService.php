@@ -7,7 +7,7 @@ use App\Models\ExportFulfillmentBox;
 use App\Models\ExportMasterLocation;
 use App\Models\ExportPalletLocationReservation;
 use App\Models\ExportPalletPlan;
-use App\Models\ExportPartSetting;
+use App\Models\PartSetting;
 use App\Models\ExportStockBox;
 use App\Models\ExportStockMovement;
 use App\Models\ExportStockPallet;
@@ -18,12 +18,12 @@ class ExportStockReceivingService
 {
     private function fail(string $key, string $message): never { throw ValidationException::withMessages([$key => $message]); }
 
-    public function part(string $number, bool $lock = false): ExportPartSetting
+    public function part(string $number, bool $lock = false): PartSetting
     {
-        $query = ExportPartSetting::where('part_number', $number);
+        $query = PartSetting::where('part_number', $number);
         $part = ($lock ? $query->lockForUpdate() : $query)->first();
-        if (!$part || $part->part_number !== $number) $this->fail('part_number', 'Nomor part belum terdaftar pada master ekspor.');
-        if ($part->qty_box < 1) $this->fail('part_number', 'PCS per box pada master ekspor belum valid.');
+        if (!$part || $part->part_number !== $number) $this->fail('part_number', 'Nomor part belum terdaftar pada master bersama.');
+        if ($part->qty_box < 1) $this->fail('part_number', 'PCS per box pada master bersama belum valid.');
         return $part;
     }
 
@@ -40,9 +40,9 @@ class ExportStockReceivingService
             if (\App\Models\ExportNotFullRequest::where('status', 'prepared')->where('preparation->box_number', $data['box_number'])->exists()) {
                 $this->fail('box_number', 'ID ini sedang disiapkan untuk Box Not Full. Selesaikan approval; box hasil tidak perlu diterima ulang.');
             }
-            if (ExportStockBox::withTrashed()->where('box_number', $data['box_number'])->exists()
+            if (\App\Support\BoxIdentity::unavailable($data['box_number']) || ExportStockBox::withTrashed()->where('box_number', $data['box_number'])->exists()
                 || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
-                $this->fail('box_number', 'Nomor box ini sudah tercatat pada ekspor. Periksa daftar penerimaan/penempatannya.');
+                $this->fail('box_number', 'ID box sudah tercatat atau disiapkan pada domestik/ekspor. Gunakan ID box yang belum pernah dipakai.');
             }
             $part = $this->part($data['part_number'], true);
             if (isset($data['expected_pcs_quantity']) && (int) $data['expected_pcs_quantity'] !== (int) $part->qty_box) {

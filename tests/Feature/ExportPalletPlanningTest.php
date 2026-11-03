@@ -6,7 +6,7 @@ use App\Models\AuditLog;
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportMasterLocation;
 use App\Models\ExportPalletPlan;
-use App\Models\ExportPartSetting;
+use App\Models\PartSetting;
 use App\Models\MasterLocation;
 use App\Models\RoleFeatureAccess;
 use App\Models\User;
@@ -21,8 +21,8 @@ class ExportPalletPlanningTest extends TestCase
 {
     use RefreshDatabase;
     private User $operator;
-    private ExportPartSetting $a;
-    private ExportPartSetting $b;
+    private PartSetting $a;
+    private PartSetting $b;
 
     protected function setUp(): void
     {
@@ -30,8 +30,8 @@ class ExportPalletPlanningTest extends TestCase
         $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']);
         $this->actingAs($this->operator);
-        $this->a = ExportPartSetting::create(['part_number' => 'EXP-A', 'qty_box' => 10]);
-        $this->b = ExportPartSetting::create(['part_number' => 'EXP-B', 'qty_box' => 20]);
+        $this->a = PartSetting::create(['part_number' => 'EXP-A', 'qty_box' => 10]);
+        $this->b = PartSetting::create(['part_number' => 'EXP-B', 'qty_box' => 20]);
     }
 
     private function delivery(): ExportDeliveryPlan
@@ -224,7 +224,7 @@ class ExportPalletPlanningTest extends TestCase
         $rows = app(ExportPalletPlanningService::class)->rows($plan);
         $this->save($delivery, $rows)->assertRedirect();
         $this->save($delivery, $rows, 'finalize')->assertUnprocessable();
-        $this->delete(route('export.part-settings.destroy', $this->b))->assertSessionHas('error');
+        $this->delete(route('part-settings.destroy', $this->b))->assertSessionHas('error');
         $this->assertDatabaseHas('export_planned_pallet_items', ['part_setting_id' => $this->b->id, 'box_quantity' => 4]);
         $this->assertDatabaseCount('export_pallet_location_reservations', 2);
     }
@@ -282,10 +282,10 @@ class ExportPalletPlanningTest extends TestCase
     public function test_migration_preserves_saved_role_settings_and_adds_planning_permission(): void
     {
         foreach (['export_pallet_location_reservations', 'export_planned_pallet_items', 'export_planned_pallets', 'export_pallet_plans'] as $table) Schema::drop($table);
-        $access = RoleFeatureAccess::create(['role' => 'export_operator', 'permissions' => ['export_parts']]);
+        $access = RoleFeatureAccess::create(['role' => 'export_operator', 'permissions' => ['parts']]);
         $migration = require database_path('migrations/2026_10_28_000006_create_export_pallet_planning.php');
         $migration->up();
-        $this->assertSame(['export_parts', 'export_pallet_plans'], $access->fresh()->permissions);
+        $this->assertSame(['parts', 'export_pallet_plans'], $access->fresh()->permissions);
         $this->assertSame(1, AuditLog::where('type', 'role_feature_access')->whereNull('user_id')->count());
         $this->assertTrue(Schema::hasTable('export_pallet_plans'));
     }

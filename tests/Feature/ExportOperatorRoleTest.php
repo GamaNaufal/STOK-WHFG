@@ -46,7 +46,7 @@ class ExportOperatorRoleTest extends TestCase
         $this->assertAuthenticatedAs($operator);
 
         $this->get(route('dashboard'))->assertOk()->assertViewIs('export.dashboard')
-            ->assertSee('Operator Export')->assertSee('Master data ekspor')
+            ->assertSee('Operator Export')->assertSee('Master data')
             ->assertDontSee('Ringkasan operasional')->assertDontSee('Total PCS')
             ->assertDontSee(route('stock-input.index'), false)
             ->assertDontSee(route('delivery.index'), false)
@@ -63,9 +63,9 @@ class ExportOperatorRoleTest extends TestCase
     {
         $operator = User::factory()->create(['role' => 'export_operator']);
         $access = app(FeatureAccessService::class);
-        $this->assertSame(['export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_picking_verification', 'export_fulfillment', 'export_parts', 'export_locations'], $access->defaults($operator->role));
+        $this->assertSame(['parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_picking_verification', 'export_fulfillment', 'export_locations'], $access->defaults($operator->role));
         foreach (array_keys(config('feature_access.features')) as $feature) {
-            $this->assertSame(in_array($feature, ['export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_picking_verification', 'export_fulfillment', 'export_parts', 'export_locations'], true), $access->allows($operator, $feature), $feature);
+            $this->assertSame(in_array($feature, ['parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_picking_verification', 'export_fulfillment', 'export_locations'], true), $access->allows($operator, $feature), $feature);
         }
 
         $this->actingAs($operator);
@@ -73,7 +73,7 @@ class ExportOperatorRoleTest extends TestCase
             'delivery.pick.verification', 'reports.stock-input', 'users.index', 'access.index'] as $route) {
             $this->get(route($route))->assertForbidden();
         }
-        foreach (['api.stock.by-part', 'api.locations.search', 'part-settings.search'] as $route) {
+        foreach (['api.stock.by-part', 'api.locations.search'] as $route) {
             $this->getJson(route($route))->assertForbidden();
         }
         $this->postJson(route('stock-input.scan-barcode'), ['barcode' => '12345678'])->assertForbidden();
@@ -88,7 +88,7 @@ class ExportOperatorRoleTest extends TestCase
     {
         $this->actingAs(User::factory()->create(['role' => 'admin']))
             ->get(route('access.index', ['role' => 'export_operator']))
-            ->assertOk()->assertSee('Operator Export')->assertViewHas('selected', ['export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_picking_verification', 'export_fulfillment', 'export_parts', 'export_locations']);
+            ->assertOk()->assertSee('Operator Export')->assertViewHas('selected', ['parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_picking_verification', 'export_fulfillment', 'export_locations']);
         $this->put(route('access.update'), ['role' => 'export_operator', 'permissions' => []])
             ->assertSessionHasNoErrors()->assertRedirect(route('access.index', ['role' => 'export_operator']));
         $this->assertDatabaseHas('role_feature_access', ['role' => 'export_operator', 'permissions' => '[]']);

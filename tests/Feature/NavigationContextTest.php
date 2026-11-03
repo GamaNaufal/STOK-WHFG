@@ -27,7 +27,7 @@ class NavigationContextTest extends TestCase
             'export.delivery-plans.create' => 'export.delivery-plans.index',
             'export.pallet-plans.show' => 'export.pallet-plans.index',
             'export.fulfillment.ready-form' => 'export.fulfillment.index',
-            'export.part-settings.edit' => 'export.part-settings.index',
+            'part-settings.edit' => 'part-settings.index',
             'export.locations.create' => 'export.locations.index',
             'reports.withdrawal.export' => 'reports.withdrawal',
             'reports.records.detail' => 'reports.stock-input',
@@ -75,9 +75,9 @@ class NavigationContextTest extends TestCase
 
     public function test_context_has_readable_breadcrumbs_short_labels_and_administration_last(): void
     {
-        $context = app(NavigationContextService::class)->build(User::factory()->create(['role' => 'admin']), 'export.part-settings.create');
-        $this->assertSame(['Ekspor', 'Nomor Part', 'Tambah'], array_column($context['breadcrumbs'], 'label'));
-        $this->assertSame(route('export.part-settings.index'), $context['breadcrumbs'][1]['url']);
+        $context = app(NavigationContextService::class)->build(User::factory()->create(['role' => 'admin']), 'part-settings.create');
+        $this->assertSame(['Master Data', 'Nomor Part', 'Tambah'], array_column($context['breadcrumbs'], 'label'));
+        $this->assertSame(route('part-settings.index'), $context['breadcrumbs'][1]['url']);
         $this->assertSame('Admin Utama', $context['role_label']);
         $this->assertSame('Administrasi', $context['items'][array_key_last($context['items'])]['group']);
         $receiving = collect($context['items'])->firstWhere('route', 'export.receiving.index');
@@ -89,7 +89,7 @@ class NavigationContextTest extends TestCase
     {
         $this->withoutVite();
         $this->actingAs(User::factory()->create(['role' => 'export_operator']));
-        foreach (['export.receiving.index' => 'export.receiving.index', 'export.part-settings.create' => 'export.part-settings.index'] as $page => $parent) {
+        foreach (['export.receiving.index' => 'export.receiving.index', 'part-settings.create' => 'part-settings.index'] as $page => $parent) {
             $response = $this->get(route($page))->assertOk()
                 ->assertSee('aria-label="Jejak navigasi"', false)
                 ->assertSee('id="globalSearchClear"', false)

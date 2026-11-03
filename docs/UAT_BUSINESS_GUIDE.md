@@ -138,9 +138,9 @@ tidak berubah; muncul pesan sukses saja belum cukup.
 | A03 | Admin buat user `UAT26 Tester`, edit role, nonaktifkan; coba login lagi. | Validasi email duplikat; perubahan berlaku dan audit dapat ditelusuri. |
 | A04 | Pada salinan DB, admin ubah Hak Akses satu role lalu login ulang. Uji dependensi picking/split/redo ke jadwal, edit/hapus ke stok. | UI dan endpoint mengikuti akses; dependensi dijaga; admin tetap dapat mengelola akses. Pulihkan konfigurasi setelah uji. |
 | A05 | Ubah profil/password akun uji jika tersedia; coba field tidak valid. | Validasi jelas, perubahan tersimpan, password lama tidak berlaku setelah diganti. Catat password baru. |
-| M01 | Cari `UAT26-SHARED` di kedua master. | Domestik 100 PCS/box, ekspor 80 PCS/box; tidak tercampur walau nomor part sama. `98009999` ada independen pada kedua stok. |
-| M02 | Tambah part baru `UAT26-CRUD` kapasitas 25 di tiap lingkup; coba duplikat dalam lingkup, nol/negatif. | Dua lingkup boleh berbeda; duplikat satu lingkup dan kapasitas tidak valid ditolak. |
-| M03 | Edit/hapus master yang belum dipakai; lalu coba master ekspor E-NF-DRAFT atau E-MIX-A yang dipakai rencana aktif/draft. | Master bebas dapat dikelola; perubahan kapasitas part dengan rencana aktif ditolak, data rencana/box lama tetap. |
+| M01 | Cari `UAT26-SHARED` pada master bersama. | Satu master 100 PCS/box dipakai kedua alur. Box domestik `98009999` dan ekspor `98009998` berbeda; mencoba ID lintas lingkup harus ditolak. |
+| M02 | Tambah part `UAT26-CRUD` kapasitas 25 di master bersama; coba duplikat dari role lain, nol/negatif. | Part unik global; kedua alur melihat kapasitas yang sama. Kapasitas tidak valid ditolak. |
+| M03 | Edit/hapus master yang belum dipakai; lalu coba master bersama E-NF-DRAFT atau E-MIX-A yang dipakai rencana aktif/draft. | Master bebas dapat dikelola; perubahan kapasitas part dengan rencana aktif ditolak, data rencana/box lama tetap. |
 | M04 | Kelola lokasi baru `UAT26-CRUD-LOC`; coba duplikat, ubah/hapus lokasi occupied/reserved. | Validasi per lingkup; lokasi dipakai tetap dilindungi. Lokasi domestik tidak muncul pada pilihan ekspor. |
 
 ## 5. Domestik: penerimaan dan stok
@@ -193,14 +193,14 @@ tidak berubah; muncul pesan sukses saja belum cukup.
 | X06 | Buka sumber packing lama `98000606`; terima sebagai `98010606`, part D-EXPIRED, 10 PCS, label D−35, lokasi D26. | Label setelah serah D−60 tetapi usia label lebih satu bulan: box hasil tetap expired, tidak aktif satu bulan dari tanggal penerimaan. |
 | X07 | Gunakan `98000603` dan `98000604` untuk transaksi bulk kedua; cek pilih semua, cetak, QA/packing/terima semua baris yang diwajibkan; coba pilih satu anggota transaksi di tahap lanjut. | Keanggotaan transaksi dan limit 50 dijaga; hasil QA campuran benar; trace memperlihatkan rantai ID lama→baru dan petugas/waktu. |
 
-## 8. Ekspor: rencana delivery, Excel dan duplikasi
+## 8. Ekspor: rencana delivery, Excel dan kode unik
 
 Ada dua layout untuk diuji. Pada **template sederhana yang diunduh dari aplikasi**,
 isi customer di B1, tenggat `YYYY-MM-DD` di B2, kode di B3; part mulai A5 dan
 jumlah PCS mulai B5. Pada **layout dokumen produksi yang sebelumnya dilampirkan**,
 jumlah permintaan mengikuti kolom C, bukan Qty/Bx kolom G. Pertahankan header dan
 struktur masing-masing layout. Satu file mewakili satu customer. Kapasitas hasil
-selalu mengikuti master ekspor.
+selalu mengikuti master part bersama.
 
 | Part | PCS (B pada template / C pada dokumen produksi) | Qty/Bx pembanding pada dokumen produksi | Harapan |
 | --- | --- | --- | --- |
@@ -219,9 +219,9 @@ uji, atau buat part khusus `UAT26-IMPORT` untuk pengujian lanjutan.
 | E02 | Impor Excel layout tetap sesuai contoh di atas, lihat pratinjau sebelum simpan. | Header/kode/customer/tanggal/baris terbaca; zero/kosong diabaikan dengan warning; NF ditandai. Stok/request belum dibuat sebelum simpan. |
 | E03 | Ubah hasil review sebelum simpan; coba part tidak dikenal, PCS negatif/desimal tidak valid, file bukan Excel, file rusak/kosong. | Koreksi dapat dilakukan; input salah tidak menjadi rencana; pesan jelas. Deteksi foto/OCR tidak tersedia. Bulk multi-customer belum dianggap fitur siap pakai. |
 | E04 | Edit rencana NF-DRAFT yang sudah ada dan simpan tetap 100 PCS. Pada rencana percobaan baru, uji penyimpanan pertama 100 PCS part yang sama. Periksa alert, kebutuhan 20 PCS, dan antrean NF pada admin. | Request wajib otomatis satu per item; master tetap 80 PCS; operator dihimbau hubungi admin. Save ulang/edit tidak membuat request yang sama ganda. Arsipkan rencana percobaan setelah uji. |
-| E05 | Buat salinan identik UAT26-EX-DUP: customer UAT26 EXP DUP, part `UAT26-E-DUP`, jumlah 80 PCS, tanggal persis dari data. Ubah case/spasi dan urutan baris pada kasus multipart. | Warning duplikasi, pembanding aktif tampil; belum ada header baru. Alasan kosong/checkbox tidak dicentang ditolak. |
-| E06 | Isi alasan wajib dan konfirmasi; simpan duplikat. Lalu ubah isian setelah warning atau gunakan form lama di tab lain. | Duplikat sah boleh dibuat dengan audit alasan; persetujuan lama tidak berlaku untuk isi/pembanding yang berubah. |
-| E07 | Salin identik HISTORY termasuk tanggal D−1; lalu ARCHIVE yang draft arsip. | Selesai ikut pembanding, draft arsip/cancelled diabaikan. Kode saja sama tetapi isi berbeda tidak otomatis dianggap identik. |
+| E05 | Coba kode ` uat26-ex-dup `, lalu ubah customer/part/jumlahnya. Coba kode kosong. | Kode wajib dan unik setelah trim/case; semua percobaan kode terpakai ditolak tanpa membuat header baru. |
+| E06 | Buat isi sama dengan kode baru. Rename kode draft, lalu coba kode lamanya pada rencana lain. | Kode baru boleh; kode lama tetap dikunci sepanjang histori. Override duplikat sudah dihapus. |
+| E07 | Coba kode HISTORY, ARCHIVE dan permintaan cancelled, dengan isi sama maupun berbeda. | Seluruh kode tetap tidak dapat digunakan ulang setelah selesai, dibatalkan atau diarsipkan. |
 | E08 | Klik simpan cepat dua kali/retry request yang sama pada rencana percobaan. | Satu header, satu kebutuhan NF, tidak menggandakan stok/audit mutasi; tombol pulih setelah Back/error. |
 
 ## 9. Ekspor: perencanaan, FIFO dan cetak
@@ -242,7 +242,7 @@ uji, atau buat part khusus `UAT26-IMPORT` untuk pengujian lanjutan.
 
 | ID | Langkah | Hasil yang harus terlihat |
 | --- | --- | --- |
-| R01 | Setelah RECEIVE final, buka Penerimaan transfer box ekspor. Scan `98010001`, `98010002`, `98010003`, semuanya E-RECEIVE. Klik Proses penerimaan satu kali. | Draft scan OK dengan standar 80 PCS; satu transaksi 3 box, lalu rincian atur penempatan berupa halaman. ID yang sama dengan domestik D01 boleh, lingkup terpisah. |
+| R01 | Setelah RECEIVE final, scan `98110001`, `98110002`, `98110003`, semuanya E-RECEIVE. Klik Proses penerimaan satu kali. Coba juga box domestik D01. | Satu transaksi 3 box, standar 80 PCS, rincian penempatan berupa halaman. ID domestik yang sudah tercatat ditolak dengan NG. |
 | R02 | Coba 123, huruf, 9 digit, ID duplikat satu draft/yang tersimpan, part tidak dikenal. | Input ID dibatasi 8 angka, NG/validasi; tidak ada stok ganda. PCS bukan input bebas. |
 | R03 | Buka transaksi R01; tinjau tujuan dan cetak guide per transaksi. Konfirmasi satu box dahulu, refresh, kemudian sisanya. | Tujuan Pallet 1 E17 untuk dua box, Pallet 2 E18 satu box; highlight jelas, jumlah pending turun, refresh tidak menempatkan ulang. Box penerimaan baru tidak perlu scan picking campuran. |
 | R04 | Terima `98010011`,`98010012` part E-DEADLINE dalam satu proses. | Otomatis satu ke EARLY E13 D+2, kemudian LATER E14 D+3. Pada delivery yang sama, pallet nomor terkecil yang masih butuh diprioritaskan. |
@@ -322,7 +322,7 @@ tidak habis. Catat kedua respons dan cek DB, bukan hanya toast.
 
 | ID | Kondisi bersamaan | Harapan |
 | --- | --- | --- |
-| C01 | Dua sesi operator ekspor menyimpan ID box sama dengan token berbeda. | Satu berhasil, satunya ditolak; satu stok dan satu identitas per scope. |
+| C01 | Dua sesi operator ekspor menyimpan ID box sama dengan token berbeda. | Satu berhasil, satunya ditolak; satu stok dan satu identitas global domestik/ekspor. |
 | C02 | Dua finalisasi memakai lokasi kosong sama. | Hanya satu claim; tidak ada dua pallet aktif pada satu lokasi. |
 | C03 | Dua rencana membutuhkan spare box yang sama. | Hanya satu reservasi; prioritas deadline dan FIFO konsisten. |
 | C04 | Place/reduce/approve NF memakai revision lama dari tab kedua. | Conflict/replay aman; tidak ada kehilangan PCS atau box ganda. |

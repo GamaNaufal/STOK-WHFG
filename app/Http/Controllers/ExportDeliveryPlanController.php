@@ -3,8 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExportDeliveryPlan;
-use App\Models\ExportPartSetting;
-use App\Exceptions\DuplicateExportDeliveryPlan;
+use App\Models\PartSetting;
 use App\Services\AuditService;
 use App\Services\ExportDeliveryPlanImportService;
 use App\Services\ExportDeliveryPlanService;
@@ -30,7 +29,7 @@ class ExportDeliveryPlanController extends Controller
 
     private function form(?ExportDeliveryPlan $plan = null)
     {
-        $parts = ExportPartSetting::orderBy('part_number')->get(['id', 'part_number', 'qty_box']);
+        $parts = PartSetting::orderBy('part_number')->get(['id', 'part_number', 'qty_box']);
         $rows = $plan?->items->map(fn ($item) => $item->only(['part_number', 'pcs_quantity', 'pcs_per_box']))->all() ?? [];
 
         return view('export.delivery-plans.form', compact('plan', 'parts', 'rows'));
@@ -67,9 +66,10 @@ class ExportDeliveryPlanController extends Controller
 
         return $request->validate([
             'request_token' => 'required|uuid',
+            // Preserve historical request hashes on replay; these fields cannot bypass code uniqueness.
             'duplicate_review_token' => 'nullable|string|size:64',
             'duplicate_confirmed' => 'nullable|in:1', 'duplicate_reason' => 'nullable|string|max:500',
-            'plan_code' => 'nullable|string|max:100',
+            'plan_code' => 'required|string|max:100',
             'customer_name' => 'required|string|max:255',
             'delivery_deadline' => 'required|date_format:Y-m-d',
             'source_type' => 'required|in:'.implode(',', $sources),
@@ -89,7 +89,6 @@ class ExportDeliveryPlanController extends Controller
     public function store(Request $request, ExportDeliveryPlanService $service)
     {
         try { $plan = $service->save($this->validated($request), $request->user()); }
-        catch (DuplicateExportDeliveryPlan $error) { return $this->duplicateResponse($request, $error); }
         catch (ValidationException $error) { return $this->validationResponse($request, $error); }
 
         return ($plan->trashed() ? redirect()->route('export.delivery-plans.index') : redirect()->route('export.delivery-plans.show', $plan))
@@ -100,7 +99,6 @@ class ExportDeliveryPlanController extends Controller
     {
         $existing = ExportDeliveryPlan::withTrashed()->findOrFail($deliveryPlan);
         try { $plan = $service->save($this->validated($request, $existing), $request->user(), $deliveryPlan); }
-        catch (DuplicateExportDeliveryPlan $error) { return $this->duplicateResponse($request, $error); }
         catch (ValidationException $error) { return $this->validationResponse($request, $error); }
 
         return ($plan->trashed() ? redirect()->route('export.delivery-plans.index') : redirect()->route('export.delivery-plans.show', $plan))
@@ -112,13 +110,6 @@ class ExportDeliveryPlanController extends Controller
         $needs = $plan->items->where('not_full_pcs', '>', 0);
         return 'Rencana delivery berhasil disimpan.'.($needs->isNotEmpty()
             ? ' Terdapat '.$needs->count().' part membutuhkan Box Not Full. Request wajib sudah dicatat otomatis. Hubungi Admin Warehouse/Admin Utama untuk penyiapan setelah perencanaan pallet final, lalu approval Admin Utama/Supervisi. Kebutuhan ini harus terpenuhi sebelum pallet siap dan permintaan selesai.' : '');
-    }
-
-    private function duplicateResponse(Request $request, DuplicateExportDeliveryPlan $error)
-    {
-        $errors = ['duplicate' => [$error->getMessage()]];
-        if ($request->expectsJson()) return response()->json(['message' => $error->getMessage(), 'errors' => $errors, 'duplicate_review' => $error->review], 422);
-        return redirect()->back()->withInput()->withErrors($errors)->with('delivery_duplicate_review', $error->review);
     }
 
     private function validationResponse(Request $request, ValidationException $error)

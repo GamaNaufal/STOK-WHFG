@@ -43,7 +43,7 @@ $read=new PDO('mysql:host='.$envFile['DB_HOST'].';port='.($envFile['DB_PORT'] ??
     $envFile['DB_USERNAME'],$envFile['DB_PASSWORD'] ?? '',[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);
 $host=(string)$read->query('SELECT @@hostname')->fetchColumn();
 (new UatSqlExporter)->write($out.'/01_seed_business_uat.sql',$host);
-$manifest['masters']['parts']=DB::table('part_settings')->orderBy('scope')->orderBy('part_number')->get(['scope','part_number','qty_box'])->all();
+$manifest['masters']['parts']=DB::table('part_settings')->orderBy('part_number')->get(['part_number','qty_box'])->all();
 $manifest['masters']['locations']=DB::table('master_locations')->orderBy('scope')->orderBy('code')->get(['scope','code','is_occupied'])->all();
 foreach ($manifest['export']['plans'] as &$entry) {
     $row=DB::table('export_delivery_plans')->where('plan_code',$entry['code'])->first();

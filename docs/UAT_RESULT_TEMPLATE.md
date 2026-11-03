@@ -23,8 +23,8 @@ berada pada kasus dengan ID yang sama dalam panduan.
 | A03 | Admin buat user `UAT26 Tester`, edit role, nonaktifkan; coba login lagi. | Belum diuji | | |
 | A04 | Pada salinan DB, admin ubah Hak Akses satu role lalu login ulang. Uji dependensi picking/split/redo ke jadwal, edit/hapus ke stok. | Belum diuji | | |
 | A05 | Ubah profil/password akun uji jika tersedia; coba field tidak valid. | Belum diuji | | |
-| M01 | Cari `UAT26-SHARED` di kedua master. | Belum diuji | | |
-| M02 | Tambah part baru `UAT26-CRUD` kapasitas 25 di tiap lingkup; coba duplikat dalam lingkup, nol/negatif. | Belum diuji | | |
+| M01 | Master part bersama dan identitas box global | Belum diuji | | |
+| M02 | CRUD master bersama dan validasi kapasitas | Belum diuji | | |
 | M03 | Edit/hapus master yang belum dipakai; lalu coba master ekspor E-NF-DRAFT atau E-MIX-A yang dipakai rencana aktif/draft. | Belum diuji | | |
 | M04 | Kelola lokasi baru `UAT26-CRUD-LOC`; coba duplikat, ubah/hapus lokasi occupied/reserved. | Belum diuji | | |
 | D01 | Operator buka Stock Input. Scan box `98010001` dan part `UAT26-D-FREE`; tambah `98010002`. Simpan ke lokasi kosong D23. | Belum diuji | | |
@@ -66,9 +66,9 @@ berada pada kasus dengan ID yang sama dalam panduan.
 | E02 | Impor Excel layout tetap sesuai contoh di atas, lihat pratinjau sebelum simpan. | Belum diuji | | |
 | E03 | Ubah hasil review sebelum simpan; coba part tidak dikenal, PCS negatif/desimal tidak valid, file bukan Excel, file rusak/kosong. | Belum diuji | | |
 | E04 | Edit rencana NF-DRAFT yang sudah ada dan simpan tetap 100 PCS. Pada rencana percobaan baru, uji penyimpanan pertama 100 PCS part yang sama. Periksa alert, kebutuhan 20 PCS, dan antrean NF pada admin. | Belum diuji | | |
-| E05 | Buat salinan identik UAT26-EX-DUP: customer UAT26 EXP DUP, part `UAT26-E-DUP`, jumlah 80 PCS, tanggal persis dari data. Ubah case/spasi dan urutan baris pada kasus multipart. | Belum diuji | | |
-| E06 | Isi alasan wajib dan konfirmasi; simpan duplikat. Lalu ubah isian setelah warning atau gunakan form lama di tab lain. | Belum diuji | | |
-| E07 | Salin identik HISTORY termasuk tanggal D−1; lalu ARCHIVE yang draft arsip. | Belum diuji | | |
+| E05 | Kode wajib unik setelah trim dan normalisasi kapital | Belum diuji | | |
+| E06 | Kode baru untuk isi sama; kode lama tetap dikunci setelah rename | Belum diuji | | |
+| E07 | Kode histori selesai/arsip/batal tidak dapat digunakan ulang | Belum diuji | | |
 | E08 | Klik simpan cepat dua kali/retry request yang sama pada rencana percobaan. | Belum diuji | | |
 | P01 | Buka RECEIVE; buat 2 pallet: pallet 1 E17 berisi 2 box part E-RECEIVE (80 PCS/box), pallet 2 E18 berisi 1 box. Simpan draft belum lengkap dulu. | Belum diuji | | |
 | P02 | Coba final kurang/lebih; lokasi sama dua pallet; lokasi domestic/occupied/reserved. Kemudian final alokasi2+1 benar. | Belum diuji | | |

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{ExportMasterLocation, ExportPartSetting, ExportReceivingBatch, ExportStockBox, RoleFeatureAccess, User};
+use App\Models\{ExportMasterLocation, PartSetting, ExportReceivingBatch, ExportStockBox, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService, ExportReceivingBatchService, ExportStockReceivingService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -12,14 +12,14 @@ class ExportReceivingTransactionsTest extends TestCase
 {
     use RefreshDatabase;
     private User $operator;
-    private ExportPartSetting $part;
+    private PartSetting $part;
     private int $number = 1000;
 
     protected function setUp(): void
     {
         parent::setUp(); $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']); $this->actingAs($this->operator);
-        $this->part = ExportPartSetting::create(['part_number' => 'TX-PART', 'qty_box' => 100]);
+        $this->part = PartSetting::create(['part_number' => 'TX-PART', 'qty_box' => 100]);
     }
 
     private function number(): string { return str_pad((string) ++$this->number, 8, '0', STR_PAD_LEFT); }

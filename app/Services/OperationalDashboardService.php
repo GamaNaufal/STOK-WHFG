@@ -135,6 +135,7 @@ class OperationalDashboardService
         $json = fn ($col) => DB::getDriverName() === 'sqlite' ? "CASE WHEN json_valid($col) THEN json_extract($col,'$.scope') ELSE NULL END"
             : "CASE WHEN JSON_VALID($col) THEN JSON_UNQUOTE(JSON_EXTRACT($col,'$.scope')) ELSE NULL END";
         $scope = "CASE WHEN SUBSTR(a.type,1,7)='export_' OR a.model LIKE 'Export%' OR ({$json('a.new_values')})='export' OR ({$json('a.old_values')})='export' THEN 'export'
+            WHEN ({$json('a.new_values')})='shared' OR ({$json('a.old_values')})='shared' THEN 'general'
             WHEN a.type IN ('user_management','profile','role_feature_access','system') THEN 'general' ELSE 'domestic' END";
         $source = DB::table('audit_logs as a')->leftJoin('users as actor', 'actor.id', '=', 'a.user_id')
             ->selectRaw("a.id, a.type, a.action, a.model, a.model_id, a.description, a.user_id, actor.name AS user_name, a.created_at AS occurred_at, $scope AS scope");

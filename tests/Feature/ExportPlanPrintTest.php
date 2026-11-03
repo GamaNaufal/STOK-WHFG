@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\{AuditLog, ExportDeliveryPlan, ExportMasterLocation, ExportPartSetting, RoleFeatureAccess, User};
+use App\Models\{AuditLog, ExportDeliveryPlan, ExportMasterLocation, PartSetting, RoleFeatureAccess, User};
 use App\Services\{ExportDeliveryPlanService, ExportPalletPlanningService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -12,15 +12,15 @@ class ExportPlanPrintTest extends TestCase
     use RefreshDatabase;
 
     private User $operator;
-    private ExportPartSetting $a;
-    private ExportPartSetting $b;
+    private PartSetting $a;
+    private PartSetting $b;
 
     protected function setUp(): void
     {
         parent::setUp(); $this->withoutVite();
         $this->operator = User::factory()->create(['role' => 'export_operator']); $this->actingAs($this->operator);
-        $this->a = ExportPartSetting::create(['part_number' => 'PRINT-A','qty_box' => 20]);
-        $this->b = ExportPartSetting::create(['part_number' => 'PRINT-B','qty_box' => 50]);
+        $this->a = PartSetting::create(['part_number' => 'PRINT-A','qty_box' => 20]);
+        $this->b = PartSetting::create(['part_number' => 'PRINT-B','qty_box' => 50]);
     }
 
     private function delivery()

@@ -174,7 +174,7 @@ class NotFullBoxRequestController extends Controller
             'box_number.regex' => 'ID Box hanya boleh berisi angka.',
         ]);
 
-        if (DB::table('box_identities')->where('box_number', $request->box_number)->exists()
+        if (\App\Support\BoxIdentity::unavailable($request->box_number)
             || Box::withTrashed()->where('box_number', $request->box_number)->exists()) {
             return redirect()->back()->with('error', 'ID Box sudah terdaftar di sistem.')->withInput();
         }

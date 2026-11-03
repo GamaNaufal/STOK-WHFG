@@ -1,9 +1,4 @@
 @extends('shared.layouts.app')
-@php
-    $isExport = $isExport ?? false;
-    $routePrefix = $routePrefix ?? 'part-settings';
-@endphp
-
 @section('title', 'Master No Part & Qty')
 
 @section('styles')
@@ -12,16 +7,16 @@
 
 @section('content')
 <div class="part-page" id="master-parts"
-    data-search-url="{{ route($routePrefix.'.search') }}"
-    data-base-url="{{ route($routePrefix.'.index') }}"
+    data-search-url="{{ route('part-settings.search') }}"
+    data-base-url="{{ route('part-settings.index') }}"
     data-csrf-token="{{ csrf_token() }}">
     <header class="part-page-header">
         <div>
-            <span class="part-page-eyebrow">{{ $isExport ? 'Master data / Ekspor' : 'Master data / Domestik' }}</span>
-            <h1>Master No Part & Qty{{ $isExport ? " Ekspor" : "" }}</h1>
-            <p>Kelola nomor part dan kapasitas standar PCS untuk setiap box.</p>
+            <span class="part-page-eyebrow">Master data / Bersama</span>
+            <h1>Master No Part & Qty</h1>
+            <p>Satu master nomor part dan PCS standar per box untuk domestik dan ekspor.</p>
         </div>
-        <a href="{{ route($routePrefix.'.create') }}" class="btn btn-primary part-primary-action">
+        <a href="{{ route('part-settings.create') }}" class="btn btn-primary part-primary-action">
             <i class="bi bi-plus-lg" aria-hidden="true"></i> Tambah nomor part
         </a>
     </header>
@@ -66,11 +61,11 @@
                             <td><span class="part-quantity"><strong>{{ number_format($part->qty_box, 0, ',', '.') }}</strong> PCS / box</span></td>
                             <td>
                                 <div class="part-row-actions">
-                                    <a href="{{ route($routePrefix.'.edit', $part) }}" class="btn btn-sm btn-outline-primary" aria-label="Edit nomor part {{ $part->part_number }}">
+                                    <a href="{{ route('part-settings.edit', $part) }}" class="btn btn-sm btn-outline-primary" aria-label="Edit nomor part {{ $part->part_number }}">
                                         <i class="bi bi-pencil" aria-hidden="true"></i> Edit
                                     </a>
                                     <button type="button" class="btn btn-sm btn-outline-danger js-delete-part"
-                                        data-delete-url="{{ route($routePrefix.'.destroy', $part) }}"
+                                        data-delete-url="{{ route('part-settings.destroy', $part) }}"
                                         data-part-number="{{ $part->part_number }}"
                                         aria-label="Hapus nomor part {{ $part->part_number }}">
                                         <i class="bi bi-trash" aria-hidden="true"></i> Hapus
@@ -85,11 +80,11 @@
                                 @if($parts->total() > 0)
                                     <strong>Halaman ini kosong</strong>
                                     <span>Nomor part tersedia di halaman sebelumnya.</span>
-                                    <a href="{{ route($routePrefix.'.index') }}">Kembali ke halaman pertama</a>
+                                    <a href="{{ route('part-settings.index') }}">Kembali ke halaman pertama</a>
                                 @else
                                     <strong>Belum ada nomor part</strong>
                                     <span>Tambahkan nomor part beserta kapasitas PCS per box untuk memulai.</span>
-                                    <a href="{{ route($routePrefix.'.create') }}">Tambah nomor part</a>
+                                    <a href="{{ route('part-settings.create') }}">Tambah nomor part</a>
                                 @endif
                             </td>
                         </tr>

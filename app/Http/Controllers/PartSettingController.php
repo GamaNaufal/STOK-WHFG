@@ -2,160 +2,115 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ExportPartSetting;
 use App\Models\PartSetting;
 use App\Services\AuditService;
+use App\Services\ExportInventoryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class PartSettingController extends Controller
 {
-    private function modelClass(): string
-    {
-        return request()->routeIs('export.*') ? ExportPartSetting::class : PartSetting::class;
-    }
-
-    private function context(): array
-    {
-        $isExport = $this->modelClass() === ExportPartSetting::class;
-
-        return ['isExport' => $isExport, 'routePrefix' => $isExport ? 'export.part-settings' : 'part-settings'];
-    }
-
     private function isPartReferenced(PartSetting $part): bool
     {
-        if ($part->scope === 'export') {
-            return DB::table('export_delivery_plan_items')->where('part_setting_id', $part->id)->exists()
-                || DB::table('export_receiving_batch_items')->where('part_setting_id', $part->id)->exists()
-                || DB::table('export_stock_boxes')->where('part_setting_id', $part->id)->exists()
-                || DB::table('export_planned_pallet_items')->where('part_setting_id', $part->id)->exists();
+        foreach (\App\Support\InventoryUnificationCheck::PART_REFERENCES as $table) {
+            if (DB::table($table)->where('part_setting_id', $part->id)->exists()) {
+                return true;
+            }
+        }
+        foreach (['boxes', 'pallet_items', 'delivery_order_items', 'not_full_box_requests', 'stock_withdrawals'] as $table) {
+            if (DB::table($table)->where('part_number', $part->part_number)->exists()) {
+                return true;
+            }
         }
 
-        $partNumber = $part->part_number;
-
-        return DB::table('boxes')->where('part_number', $partNumber)->exists()
-            || DB::table('pallet_items')->where('part_number', $partNumber)->exists()
-            || DB::table('delivery_order_items')->where('part_number', $partNumber)->exists()
-            || DB::table('not_full_box_requests')->where('part_number', $partNumber)->exists()
-            || DB::table('stock_withdrawals')->where('part_number', $partNumber)->exists();
+        return false;
     }
 
     public function index()
     {
-        $model = $this->modelClass();
-        $parts = $model::orderBy('part_number')->paginate(10);
-
-        return view('operator.part-settings.index', $this->context() + compact('parts'));
-    }
-
-    public function search(Request $request)
-    {
-        $query = trim((string) $request->get('q', ''));
-        $model = $this->modelClass();
-        $parts = $model::query()
-            ->when($query !== '', fn ($builder) => $builder->where('part_number', 'like', '%'.$query.'%'))
-            ->orderBy('part_number')->limit(50)->get(['id', 'part_number', 'qty_box']);
-
-        return response()->json(['data' => $parts]);
+        return view('operator.part-settings.index', ['parts' => PartSetting::orderBy('part_number')->paginate(10)]);
     }
 
     public function create()
     {
-        return view('operator.part-settings.create', $this->context());
-    }
-
-    public function store(Request $request)
-    {
-        $model = $this->modelClass();
-        $validated = $request->validate([
-            'part_number' => ['required', 'string', 'max:100', Rule::unique('part_settings', 'part_number')->where('scope', $model::MASTER_SCOPE)],
-            'qty_box' => 'required|integer|min:1|max:4294967295',
-        ]);
-
-        DB::transaction(function () use ($validated, $request, $model) {
-            $part = $model::create($validated);
-            AuditService::record('master_part', 'created', class_basename($part), $part->id, $request->user()->id,
-                [], ['scope' => $part->scope, 'part_number' => $part->part_number, 'qty_box' => (int) $part->qty_box],
-                "Master part {$part->part_number} ({$part->scope}) dibuat.");
-        });
-
-        return redirect()->route($this->context()['routePrefix'].'.index')->with('success', 'No Part berhasil ditambahkan.');
+        return view('operator.part-settings.create');
     }
 
     public function edit(string $partSetting)
     {
-        $model = $this->modelClass();
-        $partSetting = $model::findOrFail($partSetting);
+        return view('operator.part-settings.edit', ['partSetting' => PartSetting::findOrFail($partSetting)]);
+    }
 
-        return view('operator.part-settings.edit', $this->context() + compact('partSetting'));
+    public function search(Request $request)
+    {
+        $search = trim((string) $request->get('q', ''));
+
+        return response()->json(['data' => PartSetting::when($search !== '', fn ($q) => $q->where('part_number', 'like', '%'.$search.'%'))->orderBy('part_number')->limit(50)->get(['id', 'part_number', 'qty_box'])]);
+    }
+
+    private function validatePart(Request $request, ?int $id = null): array
+    {
+        return $request->validate(['part_number' => ['required', 'string', 'max:100', Rule::unique('part_settings', 'part_number')->ignore($id)], 'qty_box' => 'required|integer|min:1|max:4294967295']);
+    }
+
+    private function snapshot(PartSetting $part): array
+    {
+        return ['scope' => 'shared', 'part_number' => $part->part_number, 'qty_box' => (int) $part->qty_box];
+    }
+
+    public function store(Request $request)
+    {
+        $data = $this->validatePart($request);
+        app(ExportInventoryService::class)->transaction(function () use ($data, $request) {
+            $part = PartSetting::create($data);
+            AuditService::record('master_part', 'created', 'PartSetting', $part->id, $request->user()->id, [], $this->snapshot($part), 'Master part bersama dibuat.');
+        });
+
+        return redirect()->route('part-settings.index')->with('success', 'No Part berhasil ditambahkan.');
     }
 
     public function update(Request $request, string $partSetting)
     {
-        $model = $this->modelClass();
-        $partSetting = $model::findOrFail($partSetting);
-        $validated = $request->validate([
-            'part_number' => ['required', 'string', 'max:100', Rule::unique('part_settings', 'part_number')->where('scope', $model::MASTER_SCOPE)->ignore($partSetting->id)],
-            'qty_box' => 'required|integer|min:1|max:4294967295',
-        ]);
-
-        $work = function () use ($partSetting, $validated, $request, $model) {
-            $partSetting = $model::whereKey($partSetting->id)->lockForUpdate()->firstOrFail();
-            if ($partSetting->scope === 'export' && (int) $partSetting->qty_box !== (int) $validated['qty_box']) {
-                $active = DB::table('export_delivery_plan_items as item')
-                    ->join('export_delivery_plans as plan', 'plan.id', '=', 'item.export_delivery_plan_id')
-                    ->where('item.part_setting_id', $partSetting->id)->where('item.box_quantity', '>', 0)
-                    ->whereNull('plan.deleted_at')->whereNotIn('plan.status', ['completed', 'cancelled'])->exists();
-                if ($active) {
-                    throw \Illuminate\Validation\ValidationException::withMessages(['qty_box' =>
-                        'PCS per box belum dapat diubah karena part masih dipakai rencana delivery ekspor aktif, termasuk draft. Selesaikan atau batalkan permintaan terkait terlebih dahulu.']);
-                }
+        $part = PartSetting::findOrFail($partSetting);
+        $data = $this->validatePart($request, $part->id);
+        $updated = app(ExportInventoryService::class)->transaction(function () use ($part, $data, $request) {
+            $part = PartSetting::whereKey($part->id)->lockForUpdate()->firstOrFail();
+            if ((int) $part->qty_box !== (int) $data['qty_box'] && DB::table('export_delivery_plan_items as item')->join('export_delivery_plans as plan', 'plan.id', '=', 'item.export_delivery_plan_id')
+                ->where('item.part_setting_id', $part->id)->where('item.box_quantity', '>', 0)->whereNull('plan.deleted_at')->whereNotIn('plan.status', ['completed', 'cancelled'])->exists()) {
+                throw ValidationException::withMessages(['qty_box' => 'PCS per box belum dapat diubah karena part masih dipakai rencana delivery ekspor aktif, termasuk draft. Selesaikan atau batalkan permintaan terkait terlebih dahulu.']);
             }
-            if ((string) $partSetting->part_number !== $validated['part_number'] && $this->isPartReferenced($partSetting)) {
+            if ($part->part_number !== $data['part_number'] && $this->isPartReferenced($part)) {
                 return false;
             }
-            $before = ['scope' => $partSetting->scope, 'part_number' => $partSetting->part_number, 'qty_box' => (int) $partSetting->qty_box];
-            $partSetting->update($validated);
-            AuditService::record('master_part', 'updated', class_basename($partSetting), $partSetting->id, $request->user()->id,
-                $before, ['scope' => $partSetting->scope, 'part_number' => $partSetting->part_number, 'qty_box' => (int) $partSetting->qty_box],
-                "Master part {$partSetting->part_number} ({$partSetting->scope}) diperbarui.");
+            $before = $this->snapshot($part);
+            $part->update($data);
+            AuditService::record('master_part', 'updated', 'PartSetting', $part->id, $request->user()->id, $before, $this->snapshot($part), 'Master part bersama diperbarui.');
 
             return true;
-        };
-        $updated = $model === ExportPartSetting::class
-            ? app(\App\Services\ExportInventoryService::class)->transaction($work)
-            : DB::transaction($work);
+        });
         if (! $updated) {
-            return redirect()->back()->withInput()
-                ->with('error', $model === ExportPartSetting::class
-                    ? 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat diganti.'
-                    : 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat diganti. Qty per box tetap dapat diperbarui.');
+            return back()->withInput()->with('error', 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat diganti.');
         }
 
-        return redirect()->route($this->context()['routePrefix'].'.index')->with('success', 'No Part berhasil diperbarui.');
+        return redirect()->route('part-settings.index')->with('success', 'No Part berhasil diperbarui.');
     }
 
     public function destroy(string $partSetting)
     {
-        $model = $this->modelClass();
-        $partSetting = $model::findOrFail($partSetting);
-        $deleted = DB::transaction(function () use ($partSetting, $model) {
-            $partSetting = $model::whereKey($partSetting->id)->lockForUpdate()->firstOrFail();
-            if ($this->isPartReferenced($partSetting)) {
+        $deleted = app(ExportInventoryService::class)->transaction(function () use ($partSetting) {
+            $part = PartSetting::whereKey($partSetting)->lockForUpdate()->firstOrFail();
+            if ($this->isPartReferenced($part)) {
                 return false;
             }
-            $partSetting->delete();
-            AuditService::record('master_part', 'deleted', class_basename($partSetting), $partSetting->id, request()->user()->id,
-                ['scope' => $partSetting->scope, 'part_number' => $partSetting->part_number, 'qty_box' => (int) $partSetting->qty_box], [],
-                "Master part {$partSetting->part_number} ({$partSetting->scope}) dihapus.");
+            $before = $this->snapshot($part);
+            $part->delete();
+            AuditService::record('master_part', 'deleted', 'PartSetting', $part->id, request()->user()->id, $before, [], 'Master part bersama dihapus.');
 
             return true;
         });
-        if (! $deleted) {
-            return redirect()->back()->with('error', 'No Part sudah dipakai dalam transaksi/histori dan tidak dapat dihapus.');
-        }
 
-        return redirect()->route($this->context()['routePrefix'].'.index')->with('success', 'No Part berhasil dihapus.');
+        return $deleted ? redirect()->route('part-settings.index')->with('success','No Part berhasil dihapus.') : back()->with('error','No Part sudah dipakai dalam transaksi/histori dan tidak dapat dihapus.');
     }
 }
