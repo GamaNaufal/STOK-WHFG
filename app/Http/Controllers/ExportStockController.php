@@ -16,15 +16,17 @@ class ExportStockController extends Controller
     {
         $filters = $stock->filters($request);
         $boxes = $palletGroups = null;
+        $reservationGroups = collect();
         if ($filters['mode'] === 'pallet') {
             $palletGroups = $stock->groups($filters)->paginate(10, ['*'], 'stock_page')->withQueryString();
             $resultCount = $stock->boxes($filters)->count();
+            $reservationGroups = $stock->reservations($filters, $palletGroups->pluck('current_pallet_id')->all());
         } else {
             $boxes = $stock->boxes($filters)->paginate(20, ['*'], 'stock_page')->withQueryString();
             $resultCount = $boxes->total();
         }
-        $hasFilters = $filters['q'] !== '' || $filters['status'] !== '' || $filters['location_id'];
-        $results = compact('filters', 'boxes', 'palletGroups', 'resultCount', 'hasFilters');
+        $hasFilters = $filters['q'] !== '' || $filters['part_number'] !== '' || $filters['status'] !== '' || $filters['location_id'];
+        $results = compact('filters', 'boxes', 'palletGroups', 'reservationGroups', 'resultCount', 'hasFilters');
         if ($request->expectsJson()) {
             return response()->json(['html' => view('export.stock.results', $results)->render(), 'count' => $resultCount])
                 ->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
@@ -33,12 +35,12 @@ class ExportStockController extends Controller
         $data = $request->validate(['box' => 'nullable|integer|min:1']);
         $search = $filters['q']; $status = $filters['status'];
         $selected = !empty($data['box']) ? ExportStockBox::with($view::RELATIONS)->findOrFail($data['box']) : null;
-        $pendingCount = $view->pendingQuery()->count();
         $filterLocations = $stock->locationOptions();
-        $storedCount = ExportStockBox::where('state', 'stored')->count();
+        $storedCount = ExportStockBox::stockCategory('stored')->count();
+        $spareCount = ExportStockBox::stockCategory('spare')->count();
         $choices = $selected && !$selected->fulfillment ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
         $selectedLoad = $selected?->fulfillment ? $view->groups(collect([$selected]))->first()['load'] : null;
-        return response()->view('export.stock.index', $results + compact('selected', 'selectedLoad', 'pendingCount', 'storedCount', 'search', 'status', 'filterLocations') + $choices)
+        return response()->view('export.stock.index', $results + compact('selected', 'selectedLoad', 'storedCount', 'spareCount', 'search', 'status', 'filterLocations') + $choices)
             ->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
     }
 

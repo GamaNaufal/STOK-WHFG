@@ -14,6 +14,10 @@ return [
     ],
     // Order matters: specific actions must precede wildcard routes.
     'features' => [
+        'stock_opname_local_manage' => ['label' => 'Jalankan Stock Opname Lokal', 'group' => 'Warehouse', 'routes' => ['stock-opname.start', 'stock-opname.scan', 'stock-opname.refresh', 'stock-opname.finish'], 'roles' => $warehouse, 'requires' => ['stock_opname_local']],
+        'stock_opname_export_manage' => ['label' => 'Jalankan Stock Opname Ekspor', 'group' => 'Pengiriman Ekspor', 'routes' => ['export.stock-opname.start', 'export.stock-opname.scan', 'export.stock-opname.refresh', 'export.stock-opname.finish'], 'roles' => ['export_operator', 'admin_warehouse'], 'requires' => ['stock_opname_export']],
+        'stock_opname_local' => ['label' => 'Stock Opname Lokal', 'group' => 'Warehouse', 'icon' => 'clipboard-check', 'route' => 'stock-opname.index', 'routes' => ['stock-opname.*'], 'roles' => [...$warehouse, ...$supervisor]],
+        'stock_opname_export' => ['label' => 'Stock Opname Ekspor', 'group' => 'Pengiriman Ekspor', 'icon' => 'clipboard-check', 'route' => 'export.stock-opname.index', 'routes' => ['export.stock-opname.*'], 'roles' => ['export_operator', 'admin_warehouse', ...$supervisor]],
         'stock_input' => ['label' => 'Input Stok', 'group' => 'Warehouse', 'icon' => 'plus-circle', 'route' => 'stock-input.index', 'routes' => ['stock-input.*'], 'roles' => $warehouse],
         'not_full_request' => ['label' => 'Request Box Not Full', 'group' => 'Warehouse', 'icon' => 'exclamation-circle', 'route' => 'box-not-full.create', 'routes' => ['box-not-full.create', 'box-not-full.store', 'box-not-full.export.prepare'], 'roles' => $warehouse],
         'not_full_approval' => ['label' => 'Approval Box Not Full', 'group' => 'Warehouse', 'icon' => 'clipboard-check', 'route' => 'box-not-full.approvals', 'routes' => ['box-not-full.approvals', 'box-not-full.approve', 'box-not-full.reject', 'box-not-full.export.approve', 'box-not-full.export.reject'], 'roles' => $supervisor],

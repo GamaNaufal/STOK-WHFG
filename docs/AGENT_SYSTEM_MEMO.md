@@ -2,6 +2,63 @@
 
 Terakhir diverifikasi dari source code: 4 November 2026 (pembaruan inkremental).
 
+Stock Opname Lokal / Ekspor 4 November 2026:
+- Menu terpisah Stock Opname Lokal (Warehouse) dan Stock Opname Ekspor
+  (Pengiriman Ekspor), menggunakan StockOpnameController/Service/Inventory.
+  Permission stock_opname_local/export untuk baca, masing-masing _manage
+  untuk mulai/scan/perbarui/selesai. Operator sesuai lingkup, Admin Warehouse
+  dan Admin Utama mengelola; Supervisi default hanya membaca.
+- Migration 2026_11_04_000002 membuat sessions/items/scans. active_scope unique
+  menjamin maksimal satu sesi aktif per lingkup. Operator berizin dapat
+  melanjutkan sesi bersama; first_scanned_by dan log setiap percobaan menyimpan
+  petugas/waktu. Token scan idempotent, duplikat terpisah dari OK unik.
+- Acuan awal semua box belum keluar/diarsipkan. Lokal termasuk expired,
+  orphan dan handled dengan proses QA/packing aktif; handled lama tanpa proses
+  aktif serta ID sumber yang sudah diganti dikecualikan. Ekspor mencakup
+  received/stored, cadangan, reservasi dan pallet Siap. Scan salah lingkup,
+  histori keluar, tidak dikenal, dan ID selain tepat 8 angka menjadi NG.
+  NG tidak memblokir opname dan tidak mengajukan approval atau mengubah stok.
+- Operasional tetap berjalan. Perbandingan merekam kondisi awal, kondisi saat
+  scan, dan kondisi terbaru saat Perbarui perbandingan stok/penyelesaian.
+  Ini rekonsiliasi snapshot, bukan ledger setiap perpindahan antara dua
+  pembacaan. Masuk selama sesi dan keluar/diarsipkan/ID diganti terpisah dari
+  belum terscan. source_max_id mengenali penerimaan yang mewarisi tanggal FIFO
+  lama serta receipt baru yang sudah soft-delete selama sesi.
+- Sesi selesai menyimpan summary dan snapshot akhir permanen tanpa FK box
+  sehingga history tetap terbaca sesudah box dikirim atau dihapus. Daftar
+  history, tab belum terscan/NG/sesuai/perubahan/semua scan/semua box dan
+  pagination memakai scope server. Audit start/complete wajib dalam transaksi.
+- UI mengikuti apple-design dan DESIGN_PREFERENCES: fokus scanner stabil,
+  indikator OK/NG/duplikat dengan teks, audio OK.mp3/NG.mp3 melalui ScanFeedback,
+  antrean scan serial + retry token sama, AJAX rincian, konfirmasi sebelum
+  selesai. Antrean belum terkirim ditampilkan dan menahan refresh/selesai;
+  beforeunload memperingatkan bila ada scan belum tersimpan.
+- Verifikasi: 8 tes opname lulus (152 assertions), 70 tes regresi izin,
+  navigasi, expiry, identitas dan stok lulus, seluruh 113 tes frontend lulus,
+  serta Vite build lulus. Migration baru belum diterapkan ke database kerja.
+
+Kategori Stok Ekspor 4 November 2026:
+- Filter stok hanya Tersimpan dan Stok cadangan. Tersimpan mengikuti ready_at
+  pada pallet permintaan setelah Konfirmasi Pallet siap. Semua box aktif lain
+  termasuk stok cadangan, termasuk box berreservasi atau sudah ditempatkan
+  tetapi pallet belum dikonfirmasi Siap. Revisi/pembukaan status Siap
+  mengembalikan kategorinya ke Stok cadangan secara otomatis.
+- Label kategori, ringkasan jumlah box, detail popup dan Excel memakai aturan
+  yang sama. Reservasi ditampilkan bersama kode RD, nomor pallet tujuan,
+  lokasi tujuan dan jumlah box pada tampilan kelompok pallet.
+- Nomor part, ID Box dan pallet dicari melalui satu field pencarian. Toolbar
+  ringkas memakai pilihan Box/Pallet, kategori dan lokasi. Penjelasan kategori
+  dapat dibuka melalui Arti kategori. URL part_number terdahulu ditampilkan
+  sebagai chip yang bisa dihapus agar filter aktif tetap terlihat.
+  AJAX, pagination, popup pallet,
+  riwayat browser dan Excel mengikuti seluruh filter. URL lama pending/reserved
+  dinormalisasi ke kategori spare.
+- Verifikasi tabel/filter/Excel/modal: 17 tes (274 assertions) lulus;
+  6 tes AJAX stok dan Vite build lulus, termasuk pencarian gabungan, radio
+  Box/Pallet, reset dan riwayat browser. Pemeriksaan visual native browser
+  dihentikan computer-use karena URL browser tidak dapat diverifikasi.
+  Regresi penerimaan dan penyelesaian pallet turut diperiksa.
+
 Istilah lingkup 4 November 2026:
 - Tampilan, filter, pesan validasi, laporan Excel, dan panduan memakai istilah
   Lokal/Ekspor. Nilai teknis scope lokal tetap `domestic`. Pencarian navigasi

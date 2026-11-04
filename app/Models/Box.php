@@ -111,6 +111,11 @@ class Box extends Model
         return $this->belongsTo(User::class, 'handled_by');
     }
 
+    public function expiredHandling()
+    {
+        return $this->hasOne(ExpiredBoxHandling::class, 'source_box_id');
+    }
+
     // Scope helper
     public static function applyUsableExpiryFilter($query, string $prefix = 'boxes'): void
     {

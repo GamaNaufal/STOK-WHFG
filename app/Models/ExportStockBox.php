@@ -59,6 +59,21 @@ class ExportStockBox extends Model
         return $this->hasOne(ExportFulfillmentBox::class);
     }
 
+    public function scopeStockCategory($query, string $category)
+    {
+        $confirmed = fn ($pallet) => $pallet->whereNotNull('ready_at');
+        if ($category === 'stored') {
+            return $query->whereHas('fulfillment.plannedItem.pallet', $confirmed);
+        }
+
+        return $query->whereDoesntHave('fulfillment.plannedItem.pallet', $confirmed);
+    }
+
+    public function getStockCategoryLabelAttribute(): string
+    {
+        return $this->fulfillment?->plannedItem?->pallet?->ready_at ? 'Tersimpan' : 'Stok cadangan';
+    }
+
     public function getStatusLabelAttribute(): string
     {
         return match (true) {

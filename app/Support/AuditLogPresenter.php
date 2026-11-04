@@ -73,6 +73,7 @@ class AuditLogPresenter
         return match ($type) {
             'stock_input' => 'Input stok', 'stock_withdrawal' => 'Pengambilan stok',
             'export_fulfillment' => 'Pemenuhan permintaan ekspor',
+            'stock_opname' => 'Stock opname lokal', 'export_stock_opname' => 'Stock opname ekspor',
             'export_picking_issue' => 'Issue scan ekspor',
             'export_not_full' => 'Box Not Full ekspor',
             'export_delivery_plan' => 'Rencana delivery ekspor', 'export_pallet_plan' => 'Perencanaan pallet ekspor',

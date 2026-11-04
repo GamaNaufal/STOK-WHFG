@@ -4,9 +4,16 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const blade = readFileSync(new URL('../../resources/views/operator/move-pallet/index.blade.php', import.meta.url), 'utf8');
+const domesticRoutes = {
+    'move-pallet.search': '/move-pallet/search',
+    'move-pallet.store': '/move-pallet/store',
+    'api.locations.search': '/api/locations/search',
+};
 const script = blade.match(/<script>([\s\S]*?)<\/script>/)[1]
-    .replace("{{ route('move-pallet.search') }}", '/move-pallet/search')
-    .replace("{{ route('move-pallet.store') }}", '/move-pallet/store')
+    .replace(/\{\{\s*route\((.*?)\)\s*\}\}/g, (template, expression) => {
+        const route = expression.match(/'([^']+)'\s*$/)?.[1];
+        return domesticRoutes[route] ?? template;
+    })
     .replace('{{ csrf_token() }}', 'test-token');
 const flush = () => new Promise(setImmediate);
 

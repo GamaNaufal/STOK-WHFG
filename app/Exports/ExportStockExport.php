@@ -18,7 +18,7 @@ class ExportStockExport extends DefaultValueBinder implements FromQuery, WithMap
     public function headings(): array
     {
         return ['ID Box', 'Nomor part', 'Qty (PCS)', 'Pertama diterima', 'Pallet fisik', 'Lokasi fisik',
-            'Status', 'Rencana delivery (reservasi)', 'Pallet tujuan', 'Lokasi tujuan'];
+            'Kategori stok', 'Rencana delivery (reservasi)', 'Pallet tujuan', 'Lokasi tujuan'];
     }
 
     public function map($box): array
@@ -26,7 +26,7 @@ class ExportStockExport extends DefaultValueBinder implements FromQuery, WithMap
         $target = $box->fulfillment?->plannedItem?->pallet;
         return [$box->box_number, $box->part_number, $box->pcs_quantity, Date::dateTimeToExcel($box->first_received_at),
             $box->currentPallet?->display_name ?? 'Menunggu penempatan', $box->currentPallet?->location_code ?? '-',
-            $box->status_label, $target?->palletPlan?->deliveryPlan?->plan_code ?? '-',
+            $box->stock_category_label, $target?->palletPlan?->deliveryPlan?->plan_code ?? '-',
             $target ? 'Pallet '.$target->position : '-', $target?->location_code ?? '-'];
     }
 

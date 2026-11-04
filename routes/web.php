@@ -21,6 +21,18 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware(['auth', 'active', 'features'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
+    foreach (['domestic' => ['stock-opname', 'stock-opname.'], 'export' => ['export/stock-opname', 'export.stock-opname.']] as $scope => [$prefix, $name]) {
+        Route::prefix($prefix)->name($name)->group(function () use ($scope) {
+            $controller = \App\Http\Controllers\StockOpnameController::class;
+            Route::get('/', [$controller, 'index'])->defaults('scope', $scope)->name('index');
+            Route::post('/', [$controller, 'start'])->defaults('scope', $scope)->name('start');
+            Route::get('{opname}', [$controller, 'show'])->whereNumber('opname')->defaults('scope', $scope)->name('show');
+            Route::post('{opname}/scan', [$controller, 'scan'])->whereNumber('opname')->defaults('scope', $scope)->name('scan');
+            Route::post('{opname}/refresh', [$controller, 'refresh'])->whereNumber('opname')->defaults('scope', $scope)->name('refresh');
+            Route::post('{opname}/finish', [$controller, 'finish'])->whereNumber('opname')->defaults('scope', $scope)->name('finish');
+        });
+    }
+
     // Profile Routes - Available to all authenticated users
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');

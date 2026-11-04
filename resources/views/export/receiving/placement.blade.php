@@ -9,7 +9,7 @@
             $waitingForReview = $commitment?->awaitsQueueAcknowledgment() ?? false;
             $needsPicking = $needsPlacement && $selected->current_pallet_id && ($commitment?->requires_scan ?? $commitment?->picking_required) && !$commitment?->picking_ready;
         @endphp
-        <div class="receiving-box-heading"><div><span class="plan-eyebrow">Box ekspor</span><h3>{{ $selected->box_number }}</h3><p>{{ $selected->part_number }} · {{ number_format($selected->pcs_quantity, 0, ',', '.') }} PCS</p></div>@include('export.receiving.box-status', ['box' => $selected])</div>
+        <div class="receiving-box-heading"><div><span class="plan-eyebrow">Box ekspor</span><h3>{{ $selected->box_number }}</h3><p>{{ $selected->part_number }} · {{ number_format($selected->pcs_quantity, 0, ',', '.') }} PCS</p></div><div>@include(($stockContext ?? false) ? 'export.stock.box-status' : 'export.receiving.box-status', ['box' => $selected])</div></div>
         @if($selected->currentPallet)<p class="plan-help mb-3">Posisi saat ini: {{ $selected->currentPallet->display_name }} · lokasi {{ $selected->currentPallet->location_code }}.</p>@endif
         @if($commitment && $needsPlacement)
             <div class="receiving-target"><span>Letakkan box ke</span><strong>Pallet {{ $planned->position }} · {{ $planned->location_code }}</strong><p>{{ $delivery?->plan_code ?? 'Rencana delivery' }} · {{ $delivery?->customer_name }}@if($delivery) · Tenggat {{ $delivery->delivery_deadline->format('d/m/Y') }}@endif</p></div>

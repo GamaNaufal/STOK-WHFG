@@ -43,6 +43,7 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
     const status = documentRef.getElementById('stock-request-status');
     const retry = documentRef.getElementById('stock-request-retry');
     const count = documentRef.getElementById('stock-result-count');
+    const partFilter = form.querySelector('[data-stock-part-filter]');
     let timer, lastUrl = windowRef.location.href, historyMode = 'replace';
     const format = value => Number(value).toLocaleString('id-ID');
     const state = ({busy, error}) => {
@@ -73,13 +74,27 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
     };
     const syncForm = url => {
         const params = new URL(url).searchParams;
-        for (const name of ['q', 'status', 'location_id', 'mode']) form.elements.namedItem(name).value = params.get(name) ?? (name === 'mode' ? 'box' : '');
+        for (const name of ['q', 'part_number', 'status', 'location_id', 'mode']) {
+            let value = params.get(name) ?? (name === 'mode' ? 'box' : '');
+            if (name === 'status' && ['pending', 'reserved'].includes(value)) value = 'spare';
+            form.elements.namedItem(name).value = value;
+        }
+        const part = form.elements.namedItem('part_number').value;
+        partFilter.hidden = part === '';
+        partFilter.querySelector('[data-stock-part-label]').textContent = part;
     };
 
     form.addEventListener('input', event => { if (event.target.name === 'q') apply(true); });
-    form.addEventListener('change', event => { if (event.target.matches('select')) apply(false); });
+    form.addEventListener('change', event => { if (event.target.matches('select') || event.target.name === 'mode') apply(false); });
     form.addEventListener('keydown', event => {
         if (event.key === 'Enter' && event.target.name === 'q') { event.preventDefault(); apply(false); }
+    });
+    form.addEventListener('click', event => {
+        if (event.target.closest('[data-stock-clear-part]')) {
+            form.elements.namedItem('part_number').value = '';
+            partFilter.hidden = true;
+            apply(false);
+        }
     });
     form.addEventListener('submit', event => {
         if (event.submitter?.matches('[data-stock-export]')) return;

@@ -65,6 +65,7 @@ class NavigationContextService
             };
             $item['keywords'] = $item['label'].' '.$item['group'].' '.$item['group_label'].' '.$scope.' '.match ($item['key']) {
                 'export_stock_input', 'stock_input' => 'input penerimaan stok stock box transfer',
+                'stock_opname_local', 'stock_opname_export' => 'stock stok opname cek cocok pemeriksaan history inventaris',
                 'parts' => 'master nomor no part part number kapasitas pcs box',
                 'export_locations', 'locations' => 'master lokasi location tempat',
                 'merge_pallet', 'export_merge_pallet' => 'gabung palet pallet'.(count($mergeRoutes) === 2 ? ' lokal ekspor export' : ''),

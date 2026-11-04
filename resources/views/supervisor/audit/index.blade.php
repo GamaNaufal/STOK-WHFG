@@ -96,6 +96,8 @@
                 <select id="audit-type" class="form-select" name="type">
                     <option value="">Semua jenis</option>
                     <option value="stock_input" {{ $filters['type'] === 'stock_input' ? 'selected' : '' }}>Input Stok</option>
+                    <option value="stock_opname" {{ $filters['type'] === 'stock_opname' ? 'selected' : '' }}>Stock Opname Lokal</option>
+                    <option value="export_stock_opname" {{ $filters['type'] === 'export_stock_opname' ? 'selected' : '' }}>Stock Opname Ekspor</option>
                     <option value="stock_withdrawal" {{ $filters['type'] === 'stock_withdrawal' ? 'selected' : '' }}>Pengambilan Stok</option>
                     <option value="delivery_assignment" {{ $filters['type'] === 'delivery_assignment' ? 'selected' : '' }}>Assignment Delivery</option>
                     <option value="delivery_pickup" {{ $filters['type'] === 'delivery_pickup' ? 'selected' : '' }}>Pengiriman</option>

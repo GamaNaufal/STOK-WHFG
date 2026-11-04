@@ -2,25 +2,32 @@
 
 namespace App\Services;
 
-use App\Models\{ExportMasterLocation, ExportStockBox};
+use App\Models\{ExportMasterLocation, ExportPlannedPalletItem, ExportStockBox};
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class ExportStockQueryService
 {
-    public const LIST_RELATIONS = ['currentPallet.plannedPallet', 'fulfillment.allocationNotice', 'fulfillment.plannedItem.pallet'];
+    public const LIST_RELATIONS = ['currentPallet.plannedPallet', 'fulfillment.allocationNotice', 'fulfillment.plannedItem.pallet.palletPlan.deliveryPlan'];
 
     public function filters(Request $request): array
     {
         $data = $request->validate([
             'q' => 'nullable|string|max:100',
+            'part_number' => 'nullable|string|max:100',
             'status' => ['nullable', Rule::in(['stored', 'pending', 'spare', 'reserved'])],
             'mode' => ['nullable', Rule::in(['box', 'pallet'])],
             'location_id' => ['nullable', 'integer', 'min:1', Rule::exists('master_locations', 'id')->where('scope', ExportMasterLocation::MASTER_SCOPE)],
         ]);
 
-        return ['q' => trim($data['q'] ?? ''), 'status' => $data['status'] ?? '',
+        // Older bookmarked reservation/placement filters belong to spare stock.
+        $status = $data['status'] ?? '';
+        if (in_array($status, ['pending', 'reserved'], true)) {
+            $status = 'spare';
+        }
+
+        return ['q' => trim($data['q'] ?? ''), 'part_number' => trim($data['part_number'] ?? ''), 'status' => $status,
             'mode' => $data['mode'] ?? 'box',
             'location_id' => !empty($data['location_id']) ? (int) $data['location_id'] : null];
     }
@@ -41,11 +48,8 @@ class ExportStockQueryService
                         }
                     });
             }))
-            ->when($filters['status'] === 'stored', fn ($q) => $q->where('state', 'stored'))
-            ->when($filters['status'] === 'pending', fn ($q) => $q->where(fn ($s) => $s->where('state', 'received')
-                ->orWhereHas('fulfillment', fn ($f) => $f->whereNull('placed_at')))->queueReady())
-            ->when($filters['status'] === 'spare', fn ($q) => $q->where('state', 'stored')->whereDoesntHave('fulfillment'))
-            ->when($filters['status'] === 'reserved', fn ($q) => $q->whereHas('fulfillment'))
+            ->when(($filters['part_number'] ?? '') !== '', fn ($q) => $q->where('part_number', 'like', '%'.$filters['part_number'].'%'))
+            ->when($filters['status'] !== '', fn ($q) => $q->stockCategory($filters['status']))
             // A reservation is a future destination; it must not change physical stock filters.
             ->when($filters['location_id'], fn ($q, $id) => $q->whereHas('currentPallet', fn ($p) => $p->where('master_location_id', $id)))
             ->orderBy('first_received_at')->orderBy('id');
@@ -58,6 +62,26 @@ class ExportStockQueryService
             ->groupBy('current_pallet_id')
             ->with(['currentPallet' => fn ($p) => $p->withCount('boxes')->with('plannedPallet.palletPlan.deliveryPlan')])
             ->orderByRaw('CASE WHEN current_pallet_id IS NULL THEN 1 ELSE 0 END')->orderBy('current_pallet_id');
+    }
+
+    public function reservations(array $filters, array $physicalPalletIds)
+    {
+        $stockIds = $this->boxes($filters)->withoutEagerLoads()->reorder()
+            ->where(function ($query) use ($physicalPalletIds) {
+                $query->whereIn('current_pallet_id', array_filter($physicalPalletIds));
+                if (in_array(null, $physicalPalletIds, true)) {
+                    $query->orWhereNull('current_pallet_id');
+                }
+            })->select('export_stock_boxes.id');
+
+        return ExportPlannedPalletItem::join('export_fulfillment_boxes as reservation', 'reservation.export_planned_pallet_item_id', '=', 'export_planned_pallet_items.id')
+            ->join('export_stock_boxes as stock', 'stock.id', '=', 'reservation.export_stock_box_id')
+            ->whereIn('stock.id', $stockIds)
+            ->select('stock.current_pallet_id', 'export_planned_pallet_items.export_planned_pallet_id')
+            ->selectRaw('COUNT(*) AS reserved_box_count')
+            ->groupBy('stock.current_pallet_id', 'export_planned_pallet_items.export_planned_pallet_id')
+            ->with('pallet.palletPlan.deliveryPlan')->get()
+            ->groupBy(fn ($reservation) => $reservation->current_pallet_id ?? 'unplaced');
     }
 
     public function locationOptions()
