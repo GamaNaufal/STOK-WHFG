@@ -46,7 +46,7 @@ duplikat dan finalisasi. Tampilan diperiksa pada 1440x900, 1366x768 serta simula
 - Satu lokasi untuk satu pallet aktif. Draft baru belum mereservasi lokasi.
   Finalisasi mereservasi lokasi secara atomik; constraint database mencegah
   lokasi yang sama diklaim perencanaan lain. Reservasi tidak mengubah occupancy
-  stok fisik pada master atau membuat box/pallet pada inventory domestik.
+  stok fisik pada master atau membuat box/pallet pada inventory lokal.
 - Buka revisi mengubah status final menjadi draft dengan reservasi tetap ditahan.
   Saat draft disimpan, lokasi yang dikeluarkan dari susunan dilepas; lokasi baru
   direservasi setelah finalisasi. Pembatalan mempertahankan pembagian sebagai
@@ -103,7 +103,7 @@ Kesepakatan penerimaan dan tahap berikutnya:
 - Box tanpa kebutuhan yang cocok boleh diterima sebagai stok cadangan dengan
   memilih lokasi/pallet yang tersedia.
 - Pemeriksaan stok ekspor memakai FIFO dan reservasi unik per box. Inventory
-  ekspor tersendiri; jangan memakai stok domestik sebagai stok ekspor otomatis.
+  ekspor tersendiri; jangan memakai stok lokal sebagai stok ekspor otomatis.
 - FIFO memakai tanggal pertama box diterima gudang. Pemindahan/pengembalian
   mempertahankan tanggal asal. Jika kebutuhan turun, keluarkan box terbaru dahulu
   agar box tertua tetap diprioritaskan untuk pengiriman.

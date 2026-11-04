@@ -13,7 +13,7 @@
 @section('content')
 <div class="location-page">
     <header class="location-page-header">
-        <span class="location-page-eyebrow">{{ $isExport ? 'Master data / Ekspor' : 'Master data / Domestik' }}</span>
+        <span class="location-page-eyebrow">{{ $isExport ? 'Master data / Ekspor' : 'Master data / Lokal' }}</span>
         <h1>Lokasi penyimpanan{{ $isExport ? " ekspor" : "" }}</h1>
         <p>Kelola kode posisi gudang dan lihat pallet yang sedang menempatinya.</p>
     </header>

@@ -55,18 +55,18 @@ Seeder ini juga dipanggil oleh `UserSeeder`. Seeding ulang mempertahankan akun
 existing, termasuk password dan status aktif yang sudah diperbarui. Perintah
 khusus di atas tidak menjalankan seeder master data atau stok.
 
-## Pemisahan master domestik dan ekspor
+## Pemisahan master lokal dan ekspor
 
 Jalankan migration terbaru sebelum menggunakan halaman master. Data master lama
 mendapat lingkup `domestic` dengan ID dan relasi tetap; master `export` dimulai
 kosong. Nomor part yang sama bisa mempunyai kapasitas berbeda per lingkup.
-Lokasi domestik dan ekspor mewakili area fisik yang terpisah.
+Lokasi lokal dan ekspor mewakili area fisik yang terpisah.
 
 Operator Export mendapat menu Master Nomor Part Ekspor dan Master Lokasi Ekspor.
 Admin Utama dapat mengelola keduanya dari menu terpisah. Master ekspor tidak
-muncul di pencarian atau transaksi domestik. Migration izin menambahkan dua fitur
+muncul di pencarian atau transaksi lokal. Migration izin menambahkan dua fitur
 master pada pengaturan Operator Export existing; pencabutan berikutnya tetap
-dilakukan melalui Hak Akses. Seeder master yang sudah ada tetap mengisi domestik.
+dilakukan melalui Hak Akses. Seeder master yang sudah ada tetap mengisi lokal.
 
 Catatan deployment: setelah master ekspor mulai diisi, gunakan versi aplikasi
 yang memahami lingkup data. Rollback ke query lama yang belum memfilter scope
@@ -154,7 +154,7 @@ npm run build
 
 Sertakan public/build dan CSS halaman baru pada deployment. Migration menambah
 empat tabel inventory ekspor, FK komitmen nullable dan izin export_stock_input;
-stok domestik tidak disalin. Modul memakai scan ID Box lalu part, PCS dari
+stok lokal tidak disalin. Modul memakai scan ID Box lalu part, PCS dari
 master part bersama, konfirmasi penempatan, serta FIFO stok lama. ID Box unik
 lintas lingkup. Tidak perlu konfigurasi PC/layanan baru. Migration ini sudah
 teramati tersedia pada MySQL lokal stock saat verifikasi. Detail dan batas alur:

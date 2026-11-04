@@ -16,7 +16,7 @@
 <div class="container-fluid move-pallet-page" id="movePalletPage">
     <header class="move-pallet-header warehouse-scope-header">
         <div class="warehouse-scope-heading">
-            <span class="move-pallet-eyebrow">Inventory / Lokasi pallet {{ $exportMove ? 'ekspor' : 'domestik' }}</span>
+            <span class="move-pallet-eyebrow">Inventory / Lokasi pallet {{ $exportMove ? 'ekspor' : 'lokal' }}</span>
             <h1><i class="bi bi-arrow-left-right" aria-hidden="true"></i> Pemindahan Pallet</h1>
             <p>Pilih pallet aktif, tentukan lokasi kosong, lalu periksa perpindahan sebelum menyimpan. Nomor dan isi pallet tetap sama.</p>
         </div>

@@ -127,7 +127,7 @@ Perubahan ini memakai schema/izin yang sama, tanpa migration/dependency baru.
 
 Migration sudah diterapkan pada MySQL lokal 127.0.0.1 / stock (APP_ENV local).
 Jumlah data existing dan isi seluruh baris fulfillment diverifikasi tetap utuh:
-8 box/8 komitmen ekspor, 1 pallet/3 pergerakan ekspor; data domestik/master tetap.
+8 box/8 komitmen ekspor, 1 pallet/3 pergerakan ekspor; data lokal/master tetap.
 Tabel tinjauan baru kosong, tidak ada reservasi lama yang ditahan. Query antrean
 dan pendingQuery valid di MySQL. Backup sebelum migration:
 storage/app/backups/stock_allocation_notice_20261030_140820_3df0d6.json.

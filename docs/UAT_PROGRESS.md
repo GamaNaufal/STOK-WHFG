@@ -23,16 +23,16 @@ Sudah tersedia:
 Validasi terakhir lulus: impor dengan ID target berbeda dan allocator meloncat,
 rollback kegagalan di tengah impor, penolakan impor kedua, data sentinel existing
 tetap, hash login, ledger/pivot/ringkasan/reservasi, 22 query, serta service FIFO
-domestik/ekspor, mixed picking issue→approval→return, placement→ready→shipment,
-split Not Full menjaga PCS, redo histori domestik dan penerimaan packing terlambat.
+lokal/ekspor, mixed picking issue→approval→return, placement→ready→shipment,
+split Not Full menjaga PCS, redo histori lokal dan penerimaan packing terlambat.
 Semua skrip PHP sudah lint; peta 32 fitur/116 kasus dan manifest diperiksa;
 `git diff --check` tidak menemukan whitespace error. Checklist UI manual belum
 dijalankan seluruhnya dan tidak diklaim lulus.
 
 Database aplikasi `stock` hanya dibaca skemanya selama tugas ini. **Fixture belum
 diimpor ke database pengguna.** Database MySQL sementara validator sudah dihapus.
-Isi awal: 9 akun, 35 part, 100 lokasi, 37 box domestik, 127 box ekspor,
-12 delivery domestik dan 17 rencana ekspor, termasuk histori/arsip.
+Isi awal: 9 akun, 35 part, 100 lokasi, 37 box lokal, 127 box ekspor,
+12 delivery lokal dan 17 rencana ekspor, termasuk histori/arsip.
 
 Penyelesaian setelah dilanjutkan:
 

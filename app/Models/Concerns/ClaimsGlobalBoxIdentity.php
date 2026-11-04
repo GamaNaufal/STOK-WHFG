@@ -22,12 +22,12 @@ trait ClaimsGlobalBoxIdentity
             if (! $this->adoptsLegacyIdentity()) {
                 $registry = $this->getConnection()->table('box_identities');
                 if ($registry->where('box_number', $this->box_number)->exists()) {
-                    throw new \RuntimeException('ID Box sudah pernah digunakan pada domestik atau ekspor, termasuk histori yang dihapus.');
+                    throw new \RuntimeException('ID Box sudah pernah digunakan pada lokal atau ekspor, termasuk histori yang dihapus.');
                 }
                 try {
                     $this->getConnection()->table('box_identities')->insert(['box_number' => $this->box_number, 'origin_scope' => static::INVENTORY_SCOPE]);
                 } catch (UniqueConstraintViolationException $error) {
-                    throw new \RuntimeException('ID Box sudah digunakan pada domestik atau ekspor.', 0, $error);
+                    throw new \RuntimeException('ID Box sudah digunakan pada lokal atau ekspor.', 0, $error);
                 }
             }
 

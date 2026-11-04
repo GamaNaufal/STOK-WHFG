@@ -58,22 +58,22 @@ class NavigationContextService
                 'Warehouse' => 'Warehouse', 'Delivery' => 'Pengiriman Lokal', default => $item['group'],
             };
             $scope = str_starts_with($item['key'], 'export_') ? 'ekspor export' : match ($item['key']) {
-                'not_full_request', 'not_full_approval', 'delivery_issues', 'reports', 'audit', 'parts' => 'domestik lokal ekspor export',
+                'not_full_request', 'not_full_approval', 'delivery_issues', 'reports', 'audit', 'parts' => 'lokal ekspor export',
                 'stock_input', 'stock_view', 'merge_pallet', 'move_pallet', 'expired_box', 'delivery_schedule',
-                'delivery_order', 'delivery_approval', 'delivery_assign', 'delivery_pick', 'locations' => 'domestik lokal',
+                'delivery_order', 'delivery_approval', 'delivery_assign', 'delivery_pick', 'locations' => 'lokal',
                 default => '',
             };
             $item['keywords'] = $item['label'].' '.$item['group'].' '.$item['group_label'].' '.$scope.' '.match ($item['key']) {
                 'export_stock_input', 'stock_input' => 'input penerimaan stok stock box transfer',
                 'parts' => 'master nomor no part part number kapasitas pcs box',
                 'export_locations', 'locations' => 'master lokasi location tempat',
-                'merge_pallet', 'export_merge_pallet' => 'gabung palet pallet'.(count($mergeRoutes) === 2 ? ' domestik lokal ekspor export' : ''),
+                'merge_pallet', 'export_merge_pallet' => 'gabung palet pallet'.(count($mergeRoutes) === 2 ? ' lokal ekspor export' : ''),
                 'export_pallet_plans' => 'palet pallet rencana planning',
-                'move_pallet', 'export_move_pallet' => 'palet pallet pindah lokasi'.(count($moveRoutes) === 2 ? ' domestik lokal ekspor export' : ''),
+                'move_pallet', 'export_move_pallet' => 'palet pallet pindah lokasi'.(count($moveRoutes) === 2 ? ' lokal ekspor export' : ''),
                 'export_delivery_plans', 'delivery_schedule', 'delivery_order' => 'rencana jadwal pengiriman delivery',
                 'not_full_request', 'not_full_approval' => 'box not full nf pengajuan persetujuan approval',
                 'reports' => 'laporan report excel ekspor export unduh',
-                'stock_view' => 'stock stok lokal domestik',
+                'stock_view' => 'stock stok lokal',
                 default => '',
             };
         }

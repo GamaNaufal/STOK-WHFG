@@ -23,7 +23,7 @@ return new class extends Migration
                 }
                 DB::table('part_settings')->where('id', $merge['source_id'])->delete();
                 DB::table('audit_logs')->insert(['type' => 'master_part', 'action' => 'merged', 'model' => 'PartSetting', 'model_id' => $merge['target_id'], 'user_id' => null,
-                    'description' => 'Master part digabung ke sumber bersama; kapasitas domestik menjadi acuan dan snapshot transaksi dipertahankan.',
+                    'description' => 'Master part digabung ke sumber bersama; kapasitas lokal menjadi acuan dan snapshot transaksi dipertahankan.',
                     'old_values' => json_encode($merge), 'new_values' => json_encode(['scope' => 'shared', 'canonical_id' => $merge['target_id']]), 'created_at' => now(), 'updated_at' => now()]);
             }
             DB::table('export_delivery_plans')->orderBy('id')->chunkById(500, function ($plans) {

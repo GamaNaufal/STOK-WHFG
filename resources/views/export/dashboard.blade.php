@@ -35,7 +35,7 @@
     @if(auth()->user()->canAccess('parts') || auth()->user()->canAccess('export_locations'))
         <h2 class="dashboard-section-title">Master data</h2>
         <ul class="dashboard-actions" aria-label="Master data">
-            @if(auth()->user()->canAccess('parts'))<x-dashboard-action icon="list-check" title="Master Nomor Part Bersama" description="Sumber nomor part dan PCS standar untuk domestik dan ekspor" route-name="part-settings.index" label="Kelola nomor part" />@endif
+            @if(auth()->user()->canAccess('parts'))<x-dashboard-action icon="list-check" title="Master Nomor Part Bersama" description="Sumber nomor part dan PCS standar untuk lokal dan ekspor" route-name="part-settings.index" label="Kelola nomor part" />@endif
             @if(auth()->user()->canAccess('export_locations'))<x-dashboard-action icon="geo-alt" title="Master Lokasi Ekspor" description="Kelola lokasi pada area penyimpanan ekspor" route-name="export.locations.index" label="Kelola lokasi" />@endif
         </ul>
     @endif

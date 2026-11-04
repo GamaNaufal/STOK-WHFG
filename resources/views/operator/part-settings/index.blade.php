@@ -14,7 +14,7 @@
         <div>
             <span class="part-page-eyebrow">Master data / Bersama</span>
             <h1>Master No Part & Qty</h1>
-            <p>Satu master nomor part dan PCS standar per box untuk domestik dan ekspor.</p>
+            <p>Satu master nomor part dan PCS standar per box untuk lokal dan ekspor.</p>
         </div>
         <a href="{{ route('part-settings.create') }}" class="btn btn-primary part-primary-action">
             <i class="bi bi-plus-lg" aria-hidden="true"></i> Tambah nomor part

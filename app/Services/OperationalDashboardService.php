@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 
 class OperationalDashboardService
 {
-    public const SCOPES = ['all' => 'Semua', 'domestic' => 'Domestik', 'export' => 'Ekspor'];
+    public const SCOPES = ['all' => 'Semua', 'domestic' => 'Lokal', 'export' => 'Ekspor'];
 
     public function filters(Request $request): array
     {

@@ -45,7 +45,7 @@ role, revision, token dan audit tetap diperiksa pada backend.
 Perubahan PCS per box master ekspor ditolak jika part memiliki kebutuhan positif
 pada rencana delivery aktif, termasuk draft. Simpan nilai yang sama tetap boleh.
 Setelah semua request terkait selesai, dibatalkan atau diarsipkan, kapasitas baru
-boleh disimpan. Snapshot histori/rencana terdahulu tetap. Master domestik independen.
+boleh disimpan. Snapshot histori/rencana terdahulu tetap. Master lokal independen.
 Mutex ekspor mendahului lock part agar perubahan tidak berlomba dengan rencana baru.
 
 ## Verifikasi dan deployment

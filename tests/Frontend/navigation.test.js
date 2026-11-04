@@ -14,7 +14,8 @@ test('search matches separated words, their order, partial terms and familiar al
     assert.equal(searchNavigation(features, 'stock export')[0]?.route, '/stock');
     assert.equal(searchNavigation(features, 'no part')[0]?.route, '/parts');
     assert.deepEqual(searchNavigation(features, 'tidak tersedia'), []);
-    assert.equal(normalizeNavigationQuery('  PALÉT / lokal '), 'pallet domestik');
+    assert.equal(normalizeNavigationQuery('  PALÉT / lokal '), 'pallet lokal');
+    assert.equal(normalizeNavigationQuery('  PALÉT / domestik '), 'pallet lokal');
     const planning = {label:'Perencanaan Pallet Ekspor',group:'Pengiriman Ekspor',route:'/pallets',keywords:'rencana'};
     assert.equal(searchNavigation([...features, planning], 'rencana ekspor')[0].route, '/plans');
 });

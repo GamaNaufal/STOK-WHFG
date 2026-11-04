@@ -17,7 +17,7 @@
         <a href="{{ route($routePrefix.'.index') }}" class="location-back-link">
             <i class="bi bi-arrow-left" aria-hidden="true"></i> Daftar lokasi
         </a>
-        <span class="location-page-eyebrow">{{ $isExport ? 'Master data / Ekspor' : 'Master data / Domestik' }}</span>
+        <span class="location-page-eyebrow">{{ $isExport ? 'Master data / Ekspor' : 'Master data / Lokal' }}</span>
         <h1>Ubah kode lokasi{{ $isExport ? " ekspor" : "" }}</h1>
         <p>Periksa kondisi lokasi sebelum menyimpan perubahan kode.</p>
     </header>

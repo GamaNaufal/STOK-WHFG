@@ -18,5 +18,5 @@
         @empty<tr><td colspan="8" class="od-empty">Belum ada proses pada periode ini.</td></tr>@endforelse
         </tbody></table>
     </div>
-    <p class="od-note">Maksimal 200 proses. Durasi ekspor dihitung dari finalisasi terakhir hingga permintaan selesai, terpisah dari durasi picking domestik. Scan ekspor tidak memiliki durasi sesi.</p>
+    <p class="od-note">Maksimal 200 proses. Durasi ekspor dihitung dari finalisasi terakhir hingga permintaan selesai, terpisah dari durasi picking lokal. Scan ekspor tidak memiliki durasi sesi.</p>
 </section>

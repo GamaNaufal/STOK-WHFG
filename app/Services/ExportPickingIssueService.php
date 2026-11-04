@@ -37,7 +37,7 @@ class ExportPickingIssueService
             if (!$box && ExportStockBox::onlyTrashed()->where('box_number', $issue->box_number)->exists()) $this->fail('issue', 'ID Box ini sudah keluar gudang pada permintaan yang selesai. Periksa identitas box; riwayat tidak dapat didaftarkan ulang.');
             $part = !$box ? app(ExportStockReceivingService::class)->part(trim($data['part_number'] ?? ''), true) : null;
             $legacy = !$box ? ExportFulfillmentBox::where('box_number', $issue->box_number)->first() : null;
-            if (!$box && \App\Support\BoxIdentity::registered($issue->box_number) && (!$legacy || !\Illuminate\Support\Facades\DB::table('box_identities')->where('box_number',$issue->box_number)->where('origin_scope','export')->exists())) $this->fail('issue','ID Box sudah digunakan pada domestik/ekspor dan tidak dapat didaftarkan ulang.');
+            if (!$box && \App\Support\BoxIdentity::registered($issue->box_number) && (!$legacy || !\Illuminate\Support\Facades\DB::table('box_identities')->where('box_number',$issue->box_number)->where('origin_scope','export')->exists())) $this->fail('issue','ID Box sudah digunakan pada lokal/ekspor dan tidak dapat didaftarkan ulang.');
             if ($legacy && ((int) $legacy->part_setting_id !== $part->id || $legacy->pcs_quantity !== (int) $part->qty_box)) $this->fail('part_number', 'Nomor ini memiliki komitmen ekspor lama. Part dan kapasitas harus sesuai histori komitmen tersebut.');
             $before = $issue->only(['status', 'revision', 'return_pallet_id', 'return_location_id', 'part_setting_id', 'pcs_quantity']);
             $issue->update(['export_stock_box_id' => $box?->id, 'issue_type' => !$box ? 'unknown_box' : ($knownSource ? 'wrong_box' : 'missing_location'),

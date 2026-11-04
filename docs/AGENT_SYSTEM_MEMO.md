@@ -2,9 +2,14 @@
 
 Terakhir diverifikasi dari source code: 4 November 2026 (pembaruan inkremental).
 
+Istilah lingkup 4 November 2026:
+- Tampilan, filter, pesan validasi, laporan Excel, dan panduan memakai istilah
+  Lokal/Ekspor. Nilai teknis scope lokal tetap `domestic`. Pencarian navigasi
+  menerima istilah lama dan menormalkannya ke lokal.
+
 Pemindahan Pallet Ekspor 4 November 2026:
 - Warehouse > Pemindahan Pallet memakai tampilan bersama dan pemilih lingkup
-  Domestik/Ekspor sesuai izin. Endpoint export.move-pallet.* memakai izin
+  Lokal/Ekspor sesuai izin. Endpoint export.move-pallet.* memakai izin
   export_move_pallet untuk Operator Ekspor, Admin Warehouse, dan Admin Utama.
 - ExportPalletMoveService memindahkan pallet fisik utuh ke lokasi ekspor kosong
   yang tidak direservasi, di dalam transaksi inventory. Lokasi rencana final,
@@ -38,10 +43,10 @@ Picking Verification Ekspor 4 November 2026:
 
 Navigasi Merge Pallet 4 November 2026:
 - Warehouse menampilkan satu menu Merge Pallet. Akun yang memiliki kedua izin
-  masuk ke Domestik dari halaman lain dan bisa memilih Ekspor lewat tombol geser.
+  masuk ke Lokal dari halaman lain dan bisa memilih Ekspor lewat tombol geser.
   Pada halaman merge, menu tetap aktif dan mengarah ke lingkup yang sedang dibuka.
 - Akun dengan satu izin langsung masuk ke lingkupnya. Endpoint dan pemeriksaan
-  izin domestik dan ekspor tetap terpisah.
+  izin lokal dan ekspor tetap terpisah.
 - Verifikasi: 45 tes navigasi dan merge, 7 tes navigasi setelah penyesuaian posisi
   menu, serta perpindahan klik dan keyboard di browser dan viewport 390px.
 
@@ -91,7 +96,7 @@ Merge Pallet Ekspor 3 November 2026:
   perubahan demand, status siap, sidebar, pencarian kosong dan keyboard.
 - MySQL development lokal stock sudah dimigrasi setelah backup
   storage/app/backups/before-export-merge-20261103-200810-c4aaab.sql (295.809 byte).
-  Sebelum migrasi: 0 box domestik, 0 box ekspor, 0 delivery ekspor; tidak ada seed
+  Sebelum migrasi: 0 box lokal, 0 box ekspor, 0 delivery ekspor; tidak ada seed
   atau merge inventory pada DB pengguna. Production tidak diakses. Server/tab
   preview terisolasi dihentikan setelah pemeriksaan.
 
@@ -118,7 +123,7 @@ Cloudflare Tunnel / HTTPS 3 November 2026:
 
 Istilah ID Box 3 November 2026:
 - Seluruh label identitas box memakai "ID Box" dengan spasi dan kapitalisasi
-  tersebut pada alur domestik/ekspor, placeholder, validasi, audit, panduan cetak,
+  tersebut pada alur lokal/ekspor, placeholder, validasi, audit, panduan cetak,
   header Excel/laporan, serta dokumentasi operator. Jumlah box dan nama fitur
   fisik tetap menggunakan "box". Tidak mengubah field box_number/box_id, route,
   struktur database, aturan scan delapan angka, FIFO, atau hak akses.
@@ -135,8 +140,8 @@ Istilah ID Box 3 November 2026:
 Penyatuan master dan identitas 3 November 2026 (keputusan terbaru pengguna):
 - PartSetting menjadi satu master global tanpa scope; ExportPartSetting, menu/
   route export.part-settings dan permission export_parts dihapus. Lokasi tetap
-  HasMasterScope domestik/ekspor. Part case-sensitive mengikuti aturan existing.
-  Master domestik menjadi acuan bila nomor sama; master hanya-ekspor dipertahankan.
+  HasMasterScope lokal/ekspor. Part case-sensitive mengikuti aturan existing.
+  Master lokal menjadi acuan bila nomor sama; master hanya-ekspor dipertahankan.
 - Migration 2026_11_03_000001 remap tujuh FK ekspor ke ID master acuan, menghapus
   baris duplikat dan scope part, menambah unique part_number. Snapshot PCS/box,
   jumlah PCS, first_received_at serta audit lama dipertahankan. Perubahan PCS
@@ -146,17 +151,17 @@ Penyatuan master dan identitas 3 November 2026 (keputusan terbaru pengguna):
   menang; production tidak mendapat perluasan default. Migration membersihkan
   export_parts, menukar ke parts hanya untuk export_operator lokal/testing yang
   sebelumnya memiliki izin tersebut. Shared master audit memakai scope shared
-  dan dikelompokkan Umum pada dashboard, bukan Domestik.
+  dan dikelompokkan Umum pada dashboard, bukan Lokal.
 - Box dan ExportStockBox memakai ClaimsGlobalBoxIdentity: registry box_identities
   ber-PK box_number global, origin_scope hanya provenance. Seluruh box existing,
   termasuk soft-deleted dan fulfillment legacy tanpa physical stock, dibackfill.
-  Histori hard-delete domestik pada ledger tetap dipertahankan. Insert ledger
+  Histori hard-delete lokal pada ledger tetap dipertahankan. Insert ledger
   dan model atomik, identitas tidak dapat diubah. BoxIdentity juga memeriksa
   pending Not Full lintas lingkup. Penerimaan, scan, Not Full dan approval koreksi
   picking menolak ID milik lingkup lain. Stok/operasi tetap di tabel masing-masing.
 - registerLegacyIdentity hanya mengadopsi ID asal ekspor dengan fulfillment aktif
   tanpa stock, part/PCS sesuai, dan tanpa physical box/history stock lain. Tanggal
-  FIFO lama dipertahankan; bukan jalur untuk menduplikasi identitas domestik.
+  FIFO lama dipertahankan; bukan jalur untuk menduplikasi identitas lokal.
 - Kode delivery wajib, trim dan uppercase, unik sepanjang histori termasuk arsip/
   cancelled/completed. Generated plan_code_key berindeks unique ditambah ledger
   export_delivery_plan_codes menjaga alias sesudah rename/hard-delete. Alias audit
@@ -170,7 +175,7 @@ Penyatuan master dan identitas 3 November 2026 (keputusan terbaru pengguna):
   commit; panduan deployment/backup/maintenance: docs/SHARED_INVENTORY_MIGRATION.md.
 - SQL import master sebelumnya sekarang insert-only ke shared parts, mempertahankan
   kapasitas existing, dan tetap membuat lokasi ekspor. Paket UAT diperbarui: 34
-  master bersama, SHARED=100 PCS, box domestik98009999 dan ekspor98009998. Jangan
+  master bersama, SHARED=100 PCS, box lokal98009999 dan ekspor98009998. Jangan
   impor ulang namespace UAT26 yang sudah ada. Panduan/checklist/verifikasi disesuaikan.
 - Migration development MySQL lokal stock diterapkan setelah backup lengkap
   storage/app/backups/before-shared-master-20261103-131314-0fa1d8.sql (96.562 byte).
@@ -240,7 +245,7 @@ Dashboard analitik Admin Utama/Supervisi 3 November 2026:
 - OperationalDashboardService/Sources dan ekspor Excel tidak berubah. Stok tetap
   snapshot seluruh periode; KPI pemenuhan berbasis jumlah permintaan penuh dan
   tidak menganggap reservasi sebagai penempatan. Issue terbuka memakai is_open
-  periode existing. Grafik domestik PCS dan ekspor box tetap terpisah, masing-
+  periode existing. Grafik lokal PCS dan ekspor box tetap terpisah, masing-
   masing berskala sendiri. Tidak ada SLA, pembanding periode atau delta buatan.
 - SVG lokal kini garis/area dengan tampilan Arus stok/Pemenuhan/Per jam. Modul
   public/js/pages/operational-analytics.js menambahkan inspeksi titik melalui
@@ -340,7 +345,7 @@ Navbar dan sidebar bersama 3 November 2026 (8 usulan UI/UX disetujui pengguna):
   tersembunyi memakai inert, toggle aria-expanded/label sesuai keadaan, submenu
   memakai button native untuk Enter/Space.
 - Pencarian mencocokkan setiap kata/alias (stock/stok, export/ekspor, lokal/
-  domestik, palet/pallet), mendahulukan kecocokan label; default 8 hasil dengan
+  lokal, palet/pallet), mendahulukan kecocokan label; default 8 hasil dengan
   hitungan dan Lihat semua yang dapat diakses lewat Tab. Ada tombol hapus,
   ArrowUp dari posisi awal memilih hasil terakhir, Enter/Escape/fokus luar
   konsisten. Render memakai textContent; riwayat 5 route difilter terhadap izin
@@ -367,7 +372,7 @@ Navbar dan sidebar bersama 3 November 2026 (8 usulan UI/UX disetujui pengguna):
 Feedback scan picking ekspor 2 November 2026:
 - Halaman pencarian dan verifikasi wajib memakai shared.partials.scan-feedback,
   dengan aset public/audio/OK.mp3 dan NG.mp3. Form diberi data-scan-feedback
-  agar audio disiapkan saat interaksi scanner/keyboard, mengikuti pola domestik.
+  agar audio disiapkan saat interaksi scanner/keyboard, mengikuti pola lokal.
 - Scan yang berhasil mencocokkan rekomendasi menandai baris hijau dan teks
   "Sudah di-scan". NG/input tidak valid/gagal jaringan tidak menandai box lain.
   Tanda pencarian hanya pada halaman yang terbuka, tidak mengesahkan picking.
@@ -401,7 +406,7 @@ Revisi UI ekspor 2 November 2026:
 - Sidebar menandai semua subroute delivery/planning dan halaman picking/receiving
   sesuai kelompoknya, dengan aria-current. Logika izin FeatureAccess tidak diubah.
 - Daftar serta layar scan Picking Verification ekspor memakai fondasi CSS
-  domestik: header/konteks, kartu scan/progres, tabel rekomendasi. Backend seek,
+  lokal: header/konteks, kartu scan/progres, tabel rekomendasi. Backend seek,
   scan blocking, approval dan return tidak berubah. Lookup NG tetap nonblocking;
   scan wajib salah tetap blocked sampai penempatan return dikonfirmasi.
 - Verifikasi: 106 tes backend terkait (1.204 assertions; 61 + 45), 90 frontend,
@@ -412,7 +417,7 @@ Revisi UI ekspor 2 November 2026:
   NG dan scan wajib OK/NG serta viewport390px tanpa overflow horizontal halaman.
   Bukti gambar di storage/app/previews/export-ui-20261102/. Bukan uji scanner fisik.
 - Skill apple-design tidak ditemukan di folder skill yang tersedia; mengikuti
-  docs/DESIGN_PREFERENCES.md, token teal dan komponen Bootstrap/CSS domestik.
+  docs/DESIGN_PREFERENCES.md, token teal dan komponen Bootstrap/CSS lokal.
 
 Panduan manual ekspor 1 November 2026:
 - Pengguna mengklarifikasi bahwa pengujian dilakukan sendiri lewat aplikasi,
@@ -433,7 +438,7 @@ Panduan manual ekspor 1 November 2026:
 
 Paket UAT bisnis 31 Oktober 2026:
 - SQL aditif development di database/uat/01_seed_business_uat.sql; 9 akun uji,
-  35 part, 100 lokasi, 37 box domestik, 127 box ekspor, 12 delivery domestik
+  35 part, 100 lokasi, 37 box lokal, 127 box ekspor, 12 delivery lokal
   dan 17 rencana ekspor (termasuk histori/arsip). Namespace UAT26, ID Box
   9800xxxx baseline dan 9801xxxx untuk langkah input; tanggal relatif impor.
 - Dibangun melalui model/service pada SQLite baru, lalu diekspor beserta ledger
@@ -443,7 +448,7 @@ Paket UAT bisnis 31 Oktober 2026:
   tidak menimpa role permissions atau master/data existing, impor ulang ditolak.
 - MySQL 8.4.3 sementara memverifikasi rollback gagal di tengah impor, penolakan
   impor ulang, data existing tetap, 22 query baca/integritas, dan runtime service
-  FIFO picking/pengiriman domestik/ekspor, issue approval + konfirmasi return,
+  FIFO picking/pengiriman lokal/ekspor, issue approval + konfirmasi return,
   split NF menjaga PCS, redo histori, serta penerimaan packing label kedaluwarsa.
   DB sementara dihapus; database aplikasi hanya dibaca skemanya, tidak diisi.
 - Panduan manual semua fitur: docs/UAT_BUSINESS_GUIDE.md; peta cakupan,
@@ -467,7 +472,7 @@ Box Not Full ekspor 31 Oktober 2026:
   Unique planned item menjadi pallet+part+PCS. Selector, sisa alokasi, total box,
   cetak dan revisi membedakan kapasitas. Not Full tetap satu box pada warning 36/72.
 - ExportNotFullService/ExportNotFullRequest menambah antrean ekspor pada fitur
-  Box Not Full existing, dengan filter Domestik/Ekspor, badge kebutuhan belum
+  Box Not Full existing, dengan filter Lokal/Ekspor, badge kebutuhan belum
   terpenuhi untuk Admin Warehouse/Admin Utama/Supervisi, rincian dan audit.
   Admin Warehouse/Admin Utama boleh menyiapkan; hanya Admin Utama/Supervisi
   boleh approve/reject. Hak fitur existing tetap diperiksa, termasuk guard role
@@ -511,11 +516,11 @@ Box Not Full ekspor 31 Oktober 2026:
 Dashboard Admin Utama dan Supervisi lintas lingkup 31 Oktober 2026:
 - Kedua role memakai shared.operational-dashboard melalui
   OperationalDashboardService dan OperationalDashboardSources. Default Semua;
-  filter Semua/Domestik/Ekspor, periode/tanggal, pengelompokan grafik, status
+  filter Semua/Lokal/Ekspor, periode/tanggal, pengelompokan grafik, status
   pemenuhan dan audit memakai AJAX report-browser.js existing. Role lain tetap
   pada dashboard masing-masing. Izin reports existing mengendalikan tautan
   rincian dan Excel; tidak memberi Supervisi akses mutasi operasi ekspor.
-- Grafik domestik memakai PCS; grafik ekspor memakai box, selalu terpisah.
+- Grafik lokal memakai PCS; grafik ekspor memakai box, selalu terpisah.
   Masuk ekspor memakai first_received_at, keluar hanya completed_at permintaan.
   Reservasi/pemindahan/pengembalian cadangan tidak dihitung sebagai barang baru
   masuk atau barang keluar. Arsip pengiriman tetap masuk histori.
@@ -525,17 +530,17 @@ Dashboard Admin Utama dan Supervisi lintas lingkup 31 Oktober 2026:
   pernah final serta cancelled dikecualikan. Pallet siap tetap stok sampai
   Selesaikan permintaan. Tenggat menjadi dasar periode kebutuhan/pemenuhan.
 - Stok dan pallet aktif adalah posisi saat ini, tidak dibatasi periode. Total
-  mencakup semua data walaupun rincian dibatasi 200 baris. Identitas domestik/
-  ekspor tetap terpisah. Domestik mempertahankan guard expiry/legacy; box dengan
+  mencakup semua data walaupun rincian dibatasi 200 baris. Identitas lokal/
+  ekspor tetap terpisah. Lokal mempertahankan guard expiry/legacy; box dengan
   tautan dua pallet dihitung sekali pada KPI dan diberi peringatan posisi ganda,
   sedangkan daftar pallet menampilkan kedua tautan untuk pemeriksaan. Parent
   delivery split tidak menggandakan kebutuhan leaf delivery aktif.
 - Issue scan dihitung per created_at pada periode, termasuk histori input_error
-  yang sudah ditutup. Audit diberi label Domestik/Ekspor/Umum; lingkup dikenali
+  yang sudah ditutup. Audit diberi label Lokal/Ekspor/Umum; lingkup dikenali
   dari type/model/snapshot scope. Audit global hanya tampil pada Semua. JSON
   lama yang tidak valid tidak menggagalkan dashboard. Audit 20 baris/halaman,
   issue 50 terbaru, tabel lain 200; Excel memuat seluruh hasil sesuai filter.
-- Durasi domestik tetap picking/sesi scan, ekspor finalisasi terakhir sampai
+- Durasi lokal tetap picking/sesi scan, ekspor finalisasi terakhir sampai
   permintaan selesai; fase ditulis terpisah, tidak dirata-rata atau membuat
   durasi scan ekspor fiktif. Nilai nol dan menit:detik tetap terbaca.
 - Excel memakai OperationalDashboardExport dan native PhpSpreadsheet charts,
@@ -640,7 +645,7 @@ Koreksi FIFO pengurangan pallet 30 Oktober 2026:
   perubahan database asli atau migration.
 
 Verifikasi AJAX Filter Laporan 30 Oktober 2026:
-- Laporan domestik/ekspor dan rincian kini memakai public/js/report-browser.js.
+- Laporan lokal/ekspor dan rincian kini memakai public/js/report-browser.js.
   Lingkup/jenis/select/tanggal langsung diterapkan; teks debounce 300 ms. GET
   biasa tetap berfungsi; tombol Terapkan/Tampilkan disembunyikan saat JS aktif.
 - ReportPageResponse mengirim JSON html/title/url berisi partial tanpa layout
@@ -650,20 +655,20 @@ Verifikasi AJAX Filter Laporan 30 Oktober 2026:
 - AbortController/versi mengabaikan respons lama sejak awal edit/debounce.
   Gagal/422 mempertahankan hasil, menampilkan Coba lagi dan menahan export/
   pagination hingga filter berhasil. Pilihan operator/status tidak hilang pada
-  hasil kosong. Export pengambilan domestik kini mengikuti filter part/operator
+  hasil kosong. Export pengambilan lokal kini mengikuti filter part/operator
   juga. Izin, pencatatan inventory dan dashboard tidak berubah.
 - 454 tes backend lulus (4.191 assertions), 87 tes frontend lulus. Browser
-  memeriksa pencarian domestik, perpindahan ekspor, 27 hasil/pagination, Back,
+  memeriksa pencarian lokal, perpindahan ekspor, 27 hasil/pagination, Back,
   satu box, reset/retry tanggal salah, Excel URL, fokus dan viewport 390px tanpa
   overflow halaman atau exception JS. Fixture hanya SQLite preview khusus;
   tidak ada migration/dependency/build baru atau perubahan MySQL/production.
   Detail: docs/WAREHOUSE_SCOPED_REPORTS.md.
 
-Verifikasi Laporan Gabungan Domestik/Ekspor 30 Oktober 2026:
+Verifikasi Laporan Gabungan Lokal/Ekspor 30 Oktober 2026:
 - Fitur Laporan dan Export Operasional existing memiliki pemilih scope
   domestic/export dan jenis penerimaan, pengiriman, stok aktif/cadangan,
-  pemenuhan serta revisi/pengembalian. Tanpa scope tetap domestik. Halaman dan
-  export penerimaan/pengambilan domestik dipertahankan, dengan pemilih tambahan.
+  pemenuhan serta revisi/pengembalian. Tanpa scope tetap lokal. Halaman dan
+  export penerimaan/pengambilan lokal dipertahankan, dengan pemilih tambahan.
 - Default reports untuk Admin Warehouse/Supervisi; Admin utama tetap akses
   existing. Izin role tersimpan/revokasi tetap dihormati; operator ekspor tidak
   diberi akses default. Rincian report baca sendiri tanpa izin operasi ekspor.
@@ -671,7 +676,7 @@ Verifikasi Laporan Gabungan Domestik/Ekspor 30 Oktober 2026:
   Histori penerimaan per box termasuk arsip dan lokasi movement pertama;
   pengiriman hanya completed_at; stok hanya aktif dan posisi fisik. Pemenuhan
   mencakup arsip selesai (overview includeArchived opsional, default tetap
-  aktif), terpisah dari metrik PCS domestik. Retur ekspor berasal dari snapshot
+  aktif), terpisah dari metrik PCS lokal. Retur ekspor berasal dari snapshot
   audit reduced, tidak dihitung inbound baru. Riwayat selesai tetap terbaca.
 - Filter tanggal inklusif, referensi/box/part/customer/lokasi/operator/status;
   tabel 25 baris, rincian 50. Excel seluruh filter/halaman, leading zero dan
@@ -733,7 +738,7 @@ Verifikasi Picking Verification Ekspor dan Approval Pengembalian 30 Oktober 2026
 - Input selain tepat 8 digit ASCII (termasuk 123) ditolak tanpa issue. Salah
   box delapan digit membuat ExportPickingIssue pending yang persisten, menahan
   operator/tujuan terkait dan box salah. Refresh/POST langsung tidak melepasnya.
-- Scan Issues dan Approval existing kini memuat Lokal/Domestik dan Ekspor,
+- Scan Issues dan Approval existing kini memuat Lokal dan Ekspor,
   berlabel per baris. Approval ekspor hanya menjadi awaiting_return. Asal
   diketahui tetap asalnya; lokasi hilang wajib dipilih admin; box baru juga
   wajib part master ekspor dengan PCS default. Data lokal tidak dipakai.
@@ -1039,9 +1044,9 @@ Verifikasi Penerimaan Bulk dan Stok Ekspor terpisah 29 Oktober 2026:
 Verifikasi Penerimaan Box Ekspor 29 Oktober 2026:
 - Rincian: docs/EXPORT_STOCK_RECEIVING.md. Izin export_stock_input, menu
   /export/receiving. Sesuai jawaban pengguna: scan ID Box lalu nomor part,
-  PCS otomatis dari master ekspor; nomor delapan digit boleh sama dengan domestik.
+  PCS otomatis dari master ekspor; nomor delapan digit boleh sama dengan lokal.
 - Penerimaan mencatat export_stock_boxes sebagai received dan melakukan alokasi
-  otomatis, tanpa menulis boxes/box_identities domestik. Konfirmasi penempatan
+  otomatis, tanpa menulis boxes/box_identities lokal. Konfirmasi penempatan
   menghasilkan export_stock_pallets, export_stock_movements, status stored,
   occupancy lokasi ekspor dan placed_at pada komitmen. Reservasi belum terpenuhi.
 - Finalisasi planning dan penerimaan memeriksa stock tersedia. Kebutuhan diurut
@@ -1052,7 +1057,7 @@ Verifikasi Penerimaan Box Ekspor 29 Oktober 2026:
   boleh part campuran; relokasi cadangan tidak mengubah tanggal FIFO. Sumber
   dibebaskan setelah box terakhir berpindah. Pallet rencana bernomor 1..N berbeda
   dari pallet fisik berlabel EX-000001. Jangan menulis ID fisik ekspor ke kolom
-  current_pallet_id master yang merupakan FK pallet domestik.
+  current_pallet_id master yang merupakan FK pallet lokal.
 - Semua mutasi inventory/planning/delivery ekspor mengunci row mutex ekspor
   sebelum lock lain agar FIFO/finalisasi/receipt tidak berlomba. Token unik
   mencegah double submit; revision dan tujuan server menolak instruksi stale.
@@ -1068,14 +1073,14 @@ Verifikasi Penerimaan Box Ekspor 29 Oktober 2026:
 - MySQL lokal stock sudah teramati memiliki migration/izin/query yang sesuai,
   dengan 0 stock ekspor dan 0 pending. Verifikasi lokal baca saja; agent tidak
   menjalankan ulang migration/menambahkan contoh ke MySQL. Transaksi contoh
-  hanya pada SQLite preview, tidak mengubah inventory domestik/production remote.
+  hanya pada SQLite preview, tidak mengubah inventory lokal/production remote.
 
 Verifikasi Pemenuhan Permintaan Ekspor 29 Oktober 2026:
 - Detail implementasi/tahap berikutnya ada di docs/EXPORT_FULFILLMENT.md. Menu
   /export/fulfillment memakai izin export_fulfillment, bawaan Operator Export,
   independen dari hak mengubah perencanaan. Halaman daftar dan detail bersifat
   pemantauan; belum ada input/scan, penerimaan inventory ekspor, FIFO alokasi
-  otomatis, atau alur pengembalian. Jangan menghitung stok domestik di sini.
+  otomatis, atau alur pengembalian. Jangan menghitung stok lokal di sini.
 - Finalisasi mengisi entered_fulfillment pada export_pallet_plans. Rencana yang
   pernah final tetap muncul saat revisi, meski seluruh lokasi sudah dilepas.
   Draft awal tidak ditampilkan; cancelled/arsip dikeluarkan dari daftar aktif.
@@ -1121,7 +1126,7 @@ Verifikasi database lokal 29 Oktober 2026 (import master ekspor): atas permintaa
 pengguna, 275 part dengan Qty/Bx valid dari Test 1.xlsx ditambahkan ke MySQL
 127.0.0.1:3306, database stock (APP_ENV local). A1-A20 sudah ada sebagai lokasi
 ekspor sehingga tidak ditambahkan ulang. Seluruh data master existing, termasuk
-domestik, kapasitas, ID dan occupancy lokasi, diverifikasi tetap utuh. Import
+lokal, kapasitas, ID dan occupancy lokasi, diverifikasi tetap utuh. Import
 memakai transaksi dan menambahkan 275 audit master_part bertipe created dengan
 aktor sistem. Tiga part G kosong belum diimpor: 7105-0477, 7210-4285, BR-139.
 Backup sebelum import dan receipt tersimpan di storage/app/backups dengan prefix
@@ -1152,7 +1157,7 @@ Verifikasi tambahan 28 Oktober 2026 (Perencanaan Pallet Ekspor):
   Arsip delivery aktif mensyaratkan pembatalan perencanaan terlebih dahulu.
 - Input box, stok ekspor/cadangan, reservasi ID Box, FIFO dan pengembalian
   fisik merupakan tahap Pemenuhan Permintaan berikutnya. Jangan mengambil stok
-  domestik otomatis. Keputusan pengguna: FIFO tanggal penerimaan pertama,
+  lokal otomatis. Keputusan pengguna: FIFO tanggal penerimaan pertama,
   prioritas tenggat lalu pallet terkecil; saat kebutuhan turun, box terbaru
   dikembalikan ke lokasi/pallet pilihan dengan tanggal FIFO asal dipertahankan.
 - Verifikasi: regresi 324 tes backend (2.685 assertions) lulus, dilanjutkan 32 tes
@@ -1239,15 +1244,15 @@ Verifikasi tambahan 28 Oktober 2026 (Master ekspor): tabel `part_settings` dan
 existing tanpa mengganti ID, kapasitas, occupancy, atau foreign key; unique
 menjadi (scope, part_number) dan (scope, code). Kapasitas part yang sama dapat
 berbeda lintas lingkup, dan kode lokasi dapat dipakai di area fisik yang terpisah.
-Master ekspor dimulai kosong; migration/seeder tidak menyalin master domestik.
+Master ekspor dimulai kosong; migration/seeder tidak menyalin master lokal.
 
-Model PartSetting/MasterLocation memakai scope domestik secara otomatis;
+Model PartSetting/MasterLocation memakai scope lokal secara otomatis;
 ExportPartSetting/ExportMasterLocation memakai scope ekspor pada tabel yang sama.
 Lingkup tetap ditentukan oleh model dan nama route, bukan role/login atau input
 request. Endpoint ekspor terpisah di /export/part-settings dan /export/locations;
 CRUD, pencarian, validasi unik dan akses ID semuanya dibatasi sesuai lingkup.
-API/validasi lokasi pada transaksi domestik dan LocationAssignmentService tetap
-hanya menerima master domestik. Master ekspor belum terhubung ke inventory fisik.
+API/validasi lokasi pada transaksi lokal dan LocationAssignmentService tetap
+hanya menerima master lokal. Master ekspor belum terhubung ke inventory fisik.
 Rencana Delivery dan Perencanaan Pallet Ekspor memakai master ekspor. Pemeriksaan
 referensi mencakup kedua modul, termasuk rencana yang diarsipkan/dibatalkan.
 
@@ -1262,7 +1267,7 @@ jalankan seluruh migration baru; production belum dimigrasikan oleh agent.
 Verifikasi master ekspor pada 28 Oktober 2026: seluruh suite lulus 263 tes
 (2.079 assertions) menggunakan SQLite sementara, termasuk migrasi skema legacy,
 isolasi ID/API, kapasitas part lintas lingkup, penolakan assignment lokasi ekspor
-pada transaksi domestik, dan pengaturan ulang hak akses. Browser diperiksa pada
+pada transaksi lokal, dan pengaturan ulang hak akses. Browser diperiksa pada
 viewport desktop 1440x900 dan ponsel 390x844, kondisi kosong/berisi, pencarian dan
 navigasi keyboard. Database preview terpisah dipakai untuk data uji antarmuka;
 database operasional/production tidak diubah. Cabang MySQL migration belum
@@ -1271,7 +1276,7 @@ dijalankan pada database production.
 Verifikasi tambahan 28 Oktober 2026 (Operator Export): role `export_operator`
 tersedia pada tambah/edit/filter user dan pengaturan Hak Akses. Akses fitur
 saat ini mencakup Rencana Delivery, Perencanaan Pallet dan dua master ekspor; login, profil, logout,
-dan dashboard ekspor tetap tersedia. Dashboard role ini tidak memuat statistik atau transaksi domestik.
+dan dashboard ekspor tetap tersedia. Dashboard role ini tidak memuat statistik atau transaksi lokal.
 Migration `2026_10_28_000001_add_export_operator_role_to_users` memperluas enum
 `users.role` tanpa mengubah akun atau inventory existing; wajib dijalankan saat
 deployment sebelum membuat akun Operator Export. Alur ekspor dan alih peruntukan
@@ -1335,7 +1340,7 @@ child split aktif juga tidak boleh dihapus sebelum semua child dipulihkan.
 Verifikasi tambahan 16 Oktober 2026 (presentasi dashboard): role `admin` (Admin Utama)
 dan `supervisi` mulai menggunakan dashboard laporan operasional yang sama.
 Pada 31 Oktober 2026 jalur dashboard diganti dengan OperationalDashboardService
-dan shared.operational-dashboard untuk lingkup domestik/ekspor; lihat catatan
+dan shared.operational-dashboard untuk lingkup lokal/ekspor; lihat catatan
 di awal memo. OperationalReportService/operator.reports.operational tetap untuk
 laporan operasional legacy. Statistik stok serta sinkronisasi expiry pada load
 HTML Admin Utama tetap dijalankan; hak akses dan proses transaksi tidak berubah.

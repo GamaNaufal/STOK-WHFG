@@ -71,7 +71,7 @@ final class UatFixtureBuilder
             app(LocationAssignmentService::class)->assign($this->locations[$location]->id, $p, $at);
             $input->timestamps=false; $input->created_at=$at; $input->updated_at=$at; $input->save();
             AuditService::record('stock_input','created','StockInput',$input->id,$this->users['warehouse_operator']->id,[],
-                ['pallet_id'=>$p->id,'part_number'=>'UAT26-'.$part,'pcs_quantity'=>$qty*count($numbers)], 'UAT26 baseline penerimaan domestik.');
+                ['pallet_id'=>$p->id,'part_number'=>'UAT26-'.$part,'pcs_quantity'=>$qty*count($numbers)], 'UAT26 baseline penerimaan lokal.');
             $this->manifest['domestic']['stock'][]=['part'=>'UAT26-'.$part,'pcs_per_box'=>$qty,'boxes'=>array_map('strval',$numbers),
                 'pallet'=>$p->pallet_number,'location'=>$this->locations[$location]->code,'age_days'=>$days];
             return $boxes;
@@ -132,7 +132,7 @@ final class UatFixtureBuilder
                 'request_type'=>$type,'target_type'=>'location','target_location_id'=>$this->locations[$loc]->id]);
             $request->setUserResolver(fn ()=>$this->users['warehouse_operator']);
             app(App\Http\Controllers\NotFullBoxRequestController::class)->store($request);
-            if (!DB::table('not_full_box_requests')->where('box_number',$number)->exists()) throw new RuntimeException('Gagal membuat NF domestik.');
+            if (!DB::table('not_full_box_requests')->where('box_number',$number)->exists()) throw new RuntimeException('Gagal membuat NF lokal.');
         }
         Auth::login($this->users['admin']);
         // A real completed domestic shipment, immediately available for reports/redo.

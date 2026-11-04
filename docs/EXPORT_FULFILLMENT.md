@@ -6,7 +6,7 @@ Verifikasi 29 Oktober 2026, branch aktif Export-plan.
 
 Halaman pemantauan terhubung ke Penerimaan Transfer Box Ekspor sejak 29 Oktober 2026 (nama menu diperbarui 30 Oktober).
 Scan dua langkah, stok ekspor, reservasi FIFO dan konfirmasi penempatan dijelaskan
-di docs/EXPORT_STOCK_RECEIVING.md. Tidak ada penghitungan stok domestik sebagai
+di docs/EXPORT_STOCK_RECEIVING.md. Tidak ada penghitungan stok lokal sebagai
 pemenuhan ekspor dan tidak ada tombol untuk menaikkan jumlah secara manual.
 Pengembalian karena revisi/pembatalan masih tahap berikutnya.
 
@@ -80,7 +80,7 @@ Kesepakatan berikutnya tetap: pilih delivery final bertenggat terdekat lalu nomo
 pallet terkecil; FIFO berdasarkan tanggal pertama diterima; reservasi box stok
 tersedia; stok cadangan memakai lokasi/pallet pilihan. Revisi harus mempertahankan
 FIFO dan mengembalikan box terbaru terlebih dahulu ke lokasi/pallet pilihan.
-Identitas box sudah diputuskan terpisah lintas domestik/ekspor; scan box lalu
+Identitas box sudah diputuskan terpisah lintas lokal/ekspor; scan box lalu
 nomor part dengan PCS master ekspor. Pemantauan tidak mengalihkan peruntukan box.
 
 ## Deployment dan verifikasi
@@ -98,7 +98,7 @@ otomatis ditolak karena harus meninjau komitmen/penempatan terlebih dahulu.
 
 Regresi 338 tes backend lulus (2.806 assertions). Pemeriksaan terakhir 13 tes
 pemenuhan lulus (110 assertions), termasuk backfill histori final/revisi dan
-preservasi izin. Cakupan meliputi isolasi inventory domestik, hak akses/revokasi,
+preservasi izin. Cakupan meliputi isolasi inventory lokal, hak akses/revokasi,
 snapshot kapasitas, reservasi vs penempatan, data tidak sesuai, kelebihan lintas
 part, revisi atomik, identitas unik, pagination, serta urutan tenggat/FIFO tampilan.
 Browser Chromium memeriksa pencarian/status/reset/hasil kosong, rincian pallet

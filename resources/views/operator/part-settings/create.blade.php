@@ -35,7 +35,7 @@
                             value="{{ old('part_number') }}" placeholder="Contoh: ABC123XYZ"
                             maxlength="100" required aria-invalid="{{ $errors->has('part_number') ? 'true' : 'false' }}"
                             aria-describedby="part-number-help @error('part_number') part-number-error @enderror">
-                        <p class="part-form-help" id="part-number-help">Nomor part harus unik dan dipakai bersama oleh domestik dan ekspor.</p>
+                        <p class="part-form-help" id="part-number-help">Nomor part harus unik dan dipakai bersama oleh lokal dan ekspor.</p>
                         @error('part_number')
                             <div class="invalid-feedback" id="part-number-error" role="alert">{{ $message }}</div>
                         @enderror
@@ -66,7 +66,7 @@
             <aside class="part-context" aria-labelledby="part-context-title">
                 <span class="part-page-eyebrow">Acuan operasional</span>
                 <h2 id="part-context-title">Kapasitas box penuh</h2>
-                <p>Satu kapasitas standar berlaku untuk domestik dan ekspor. Snapshot transaksi lama tetap dipertahankan.</p>
+                <p>Satu kapasitas standar berlaku untuk lokal dan ekspor. Snapshot transaksi lama tetap dipertahankan.</p>
             </aside>
         </div>
     </div>

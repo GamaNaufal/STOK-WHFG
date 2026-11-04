@@ -3,7 +3,7 @@
 Diverifikasi 4 November 2026. Buka **Warehouse → Merge Pallet**, lalu pilih
 **Ekspor** jika akun memiliki akses ke kedua lingkup.
 Operator Ekspor, Admin Warehouse, dan Admin Utama dapat menjalankannya sesuai
-Hak Akses. Izin `export_merge_pallet` terpisah dari merge domestik.
+Hak Akses. Izin `export_merge_pallet` terpisah dari merge lokal.
 
 ## Cara menggunakan
 

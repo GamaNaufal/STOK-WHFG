@@ -44,7 +44,7 @@ BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='UAT26: namespace/ID uji sudah digunakan. Tidak ada fixture yang ditambahkan.';
   END IF;
   IF EXISTS (SELECT 1 FROM delivery_pick_sessions WHERE status IN ('scanning','blocked')) THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='UAT26: selesaikan/batalkan sesi picking domestik aktif melalui aplikasi dahulu.';
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='UAT26: selesaikan/batalkan sesi picking lokal aktif melalui aplikasi dahulu.';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM export_inventory_locks WHERE id=1)
      OR NOT EXISTS (SELECT 1 FROM pallet_number_sequences WHERE id=1) THEN

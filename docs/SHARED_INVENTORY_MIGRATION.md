@@ -2,8 +2,8 @@
 
 Perubahan 3 November 2026. Berlaku pada branch aktif tanpa membuat branch baru.
 
-- `part_settings` menjadi satu master untuk domestik dan ekspor. Jika nomor sama
-  memiliki dua master, ID dan kapasitas domestik menjadi acuan. Part yang hanya
+- `part_settings` menjadi satu master untuk lokal dan ekspor. Jika nomor sama
+  memiliki dua master, ID dan kapasitas lokal menjadi acuan. Part yang hanya
   ada pada ekspor tetap dipertahankan. Seluruh foreign key ekspor dipindahkan ke
   ID acuan; PCS transaksi, kapasitas snapshot, tanggal FIFO, stok dan audit lama
   tidak ditulis ulang. Lokasi tetap memiliki scope masing-masing.
@@ -15,7 +15,7 @@ Perubahan 3 November 2026. Berlaku pada branch aktif tanpa membuat branch baru.
   mencatat asal, bukan namespace keunikan. Penerimaan, Not Full dan registrasi
   koreksi picking memeriksa identitas lintas lingkup. Histori yang dihapus tetap
   mengunci ID. Identitas box tidak dapat diganti setelah tercatat. Tabel stok dan
-  seluruh alur operasional domestik/ekspor tetap terpisah.
+  seluruh alur operasional lokal/ekspor tetap terpisah.
 - Kode delivery wajib, dinormalisasi trim/huruf besar, dan unik sepanjang histori.
   Indeks database menjaga kode aktif; `export_delivery_plan_codes` juga menjaga
   kode lama setelah rename, arsip atau penghapusan. Migrasi membaca alias dari
@@ -63,7 +63,7 @@ Jangan menjalankan `migrate:fresh`, fixture atau seeder UAT pada production.
 ## Data uji
 
 Paket UAT diperbarui menjadi 34 master bersama. `UAT26-SHARED` memakai 100
-PCS/box pada fixture baru, box domestik `98009999` dan ekspor `98009998`.
+PCS/box pada fixture baru, box lokal `98009999` dan ekspor `98009998`.
 Data lama yang hanya memiliki salah satu master mempertahankan kapasitasnya.
 SQL import master lama tetap tersedia pada nama file sebelumnya tetapi kini
 hanya menambah part bersama yang belum ada, tanpa menimpa kapasitas existing;

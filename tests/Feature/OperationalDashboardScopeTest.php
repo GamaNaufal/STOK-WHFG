@@ -132,8 +132,8 @@ class OperationalDashboardScopeTest extends TestCase
         $this->assertSame(1, (int) $ex->fulfilled);
         $this->assertSame(1, (int) $ex->reserved);
         $this->assertSame(0.0, (float) $d['fulfillmentRate']);
-        $this->get(route('dashboard'))->assertOk()->assertSee('aria-label="Grafik Domestik"', false)->assertSee('aria-label="Grafik Ekspor"', false)
-            ->assertSee('Domestik dalam PCS. Ekspor dalam box.')->assertSee('data-unit="PCS"', false)->assertSee('data-unit="box"', false);
+        $this->get(route('dashboard'))->assertOk()->assertSee('aria-label="Grafik Lokal"', false)->assertSee('aria-label="Grafik Ekspor"', false)
+            ->assertSee('Lokal dalam PCS. Ekspor dalam box.')->assertSee('data-unit="PCS"', false)->assertSee('data-unit="box"', false);
     }
 
     public function test_scope_filters_every_source_and_ajax_has_no_layout_or_external_charts(): void
@@ -151,7 +151,7 @@ class OperationalDashboardScopeTest extends TestCase
         $this->assertStringNotContainsString('code.highcharts.com', $html);
         $this->assertStringNotContainsString('cdn.jsdelivr.net', $html);
         $this->assertStringNotContainsString('@else', $html);
-        $this->assertStringNotContainsString('Pemenuhan mengikuti realisasi order domestik', $html);
+        $this->assertStringNotContainsString('Pemenuhan mengikuti realisasi order lokal', $html);
         foreach (['domestic', 'export'] as $scope) {
             $d = $this->data(['scope' => $scope]);
             $this->assertSame([$scope], array_keys($d['domains']));

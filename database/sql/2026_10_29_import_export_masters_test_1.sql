@@ -8,7 +8,7 @@
 -- Jika ada error SQL: hentikan eksekusi, jalankan ROLLBACK, lalu periksa penyebabnya.
 -- Query hanya INSERT part bersama/lokasi ekspor yang belum ada. Tidak ada UPDATE/DELETE.
 -- Kapasitas, ID, timestamp, occupancy dan pallet lokasi existing dipertahankan.
--- Kapasitas master domestik existing tetap menjadi acuan bersama. Tidak menjalankan observer/audit aplikasi.
+-- Kapasitas master lokal existing tetap menjadi acuan bersama. Tidak menjalankan observer/audit aplikasi.
 -- Format INSERT ... SELECT dengan target pada JOIN luar mengikuti dokumentasi MySQL:
 -- https://dev.mysql.com/doc/refman/8.4/en/insert-select.html
 -- Tiga part belum dimasukkan karena Qty/Bx kosong; jangan menebak kapasitasnya:

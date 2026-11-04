@@ -17,8 +17,8 @@ Urutan penggunaan:
    Catat hasil pada `docs/UAT_RESULT_TEMPLATE.md` yang sudah menyediakan
    seluruh 116 baris kasus dengan status awal Belum diuji.
 
-Data awal: **9 akun, 34 master part bersama, 100 lokasi, 37 box domestik, 127 box ekspor,
-12 delivery domestik dan 17 rencana ekspor**, termasuk histori/arsip.
+Data awal: **9 akun, 34 master part bersama, 100 lokasi, 37 box lokal, 127 box ekspor,
+12 delivery lokal dan 17 rencana ekspor**, termasuk histori/arsip.
 Password akun uji `UatWHFG!2026`; Admin Utama `uat26.admin@whfg.test`.
 Seluruh akun dan barcode tercantum di `manifest.json`.
 Panduan memuat **116 skenario manual untuk 31 fitur konfigurasi**, dilengkapi

@@ -71,7 +71,7 @@
                 <span class="part-page-eyebrow">Data saat ini</span>
                 <h2 id="part-context-title">{{ $partSetting->part_number }}</h2>
                 <span class="part-quantity"><strong>{{ number_format($partSetting->qty_box, 0, ',', '.') }}</strong> PCS / box</span>
-                <p>PCS per box dipakai bersama domestik dan ekspor. Perubahan diblokir selama part masih dipakai rencana delivery ekspor aktif, termasuk draft. Snapshot transaksi lama tetap disimpan.</p>
+                <p>PCS per box dipakai bersama lokal dan ekspor. Perubahan diblokir selama part masih dipakai rencana delivery ekspor aktif, termasuk draft. Snapshot transaksi lama tetap disimpan.</p>
             </aside>
         </div>
     </div>

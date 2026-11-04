@@ -297,7 +297,7 @@ class ExportNotFullWorkflowTest extends TestCase
         $d = $this->finalize($this->delivery());
         $r = $this->nf($d);
         Box::create(['box_number' => '90000001', 'part_number' => 'LOCAL', 'pcs_quantity' => 80, 'qty_box' => 80, 'qr_code' => 'LOCAL-NF', 'user_id' => $this->admin->id, 'expired_status' => 'active']);
-        $this->invalid(fn () => $this->prepare($r), 'domestik');
+        $this->invalid(fn () => $this->prepare($r), 'lokal');
         $this->prepare($r, 'external', '90000002');
         $this->invalid(fn () => app(ExportStockReceivingService::class)->receive(['box_number' => '90000002', 'part_number' => '99', 'receive_token' => (string) Str::uuid()], $this->operator), 'sedang disiapkan');
         $this->approve($r);

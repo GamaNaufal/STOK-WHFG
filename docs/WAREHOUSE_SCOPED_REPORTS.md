@@ -1,11 +1,11 @@
-# Laporan gabungan Domestik dan Ekspor
+# Laporan gabungan Lokal dan Ekspor
 
 Terakhir diverifikasi: 30 Oktober 2026.
 
 ## Akses dan navigasi
 
 Laporan tetap berada dalam fitur **Laporan dan Export Operasional** existing,
-bukan menu ekspor terpisah. Pemilih lingkup Domestik/Lokal atau Ekspor dan lima
+bukan menu ekspor terpisah. Pemilih lingkup Lokal atau Ekspor dan lima
 jenis laporan tersedia pada halaman input/pengambilan existing maupun laporan
 baru. Pergantian lingkup/jenis mengatur ulang filter catatan; tidak ada opsi
 penggabungan jumlah kedua lingkup.
@@ -37,12 +37,12 @@ master part atau stok aktif. Pengembalian revisi bukan penerimaan atau pengirima
 baru. Rincian FIFO dan lokasi pengembalian dibaca dari snapshot audit, termasuk
 fallback nomor pallet header untuk snapshot lama yang belum memilikinya per box.
 
-Laporan domestik penerimaan/pengambilan tetap memakai controller, tampilan dan
+Laporan lokal penerimaan/pengambilan tetap memakai controller, tampilan dan
 export existing. Tiga pilihan tambahan memakai stok fisik layak pakai existing,
 PCS kebutuhan/terpenuhi DeliveryOrder, dan StockWithdrawal reversed. Laporan
-pengembalian domestik menyatakan waktu perubahan terakhir dan operator catatan
+pengembalian lokal menyatakan waktu perubahan terakhir dan operator catatan
 asal; tidak mengarang waktu konfirmasi retur yang tidak tersimpan. Kebutuhan
-domestik memakai PCS, sedangkan pemenuhan ekspor memakai box; keduanya terpisah.
+lokal memakai PCS, sedangkan pemenuhan ekspor memakai box; keduanya terpisah.
 
 ## Filter, rincian, dan Excel
 
@@ -54,7 +54,7 @@ pemenuhan dan retur ekspor memilih seluruh permintaan/transaksi yang memuat
 part; angka tetap mencakup seluruh isi, sesuai keterangan pada halaman.
 
 Laporan utama memakai 25 baris/halaman. Rincian pemenuhan/retur ekspor dan
-kebutuhan domestik memakai 50 baris/halaman. Pembaca tidak diarahkan ke halaman
+kebutuhan lokal memakai 50 baris/halaman. Pembaca tidak diarahkan ke halaman
 operasi yang memerlukan izin lain. Riwayat tetap terbaca setelah stok/delivery
 diarsipkan, tanpa membuka kembali reservasi, mengubah audit atau inventory.
 
@@ -62,7 +62,7 @@ WarehouseRecordsExport membaca semua hasil query filter, termasuk halaman lain,
 dan mencantumkan lingkup pada setiap baris. ID Box/referensi/teks disimpan
 sebagai teks (leading zero tetap, teks mirip formula tidak dieksekusi). Tanggal
 dan jumlah bertipe numerik dengan format tanggal Excel; header teal, freeze
-dan autofilter tersedia. Export pengambilan domestik juga menerapkan filter
+dan autofilter tersedia. Export pengambilan lokal juga menerapkan filter
 nomor part dan operator, sehingga seluruh filter sama dengan tabel.
 
 ## AJAX filter dan pencarian
@@ -97,7 +97,7 @@ Route baru memakai reports.* existing:
 - GET reports/records/{record}
 
 URL reports/stock-input, reports/withdrawal dan kedua export existing juga
-mendukung scope=export. Tanpa scope, tetap domestik. ExportFulfillmentService
+mendukung scope=export. Tanpa scope, tetap lokal. ExportFulfillmentService
 overview menerima includeArchived opsional untuk laporan saja; default operasional
 tetap mengecualikan arsip. Tidak ada perubahan pencatatan atau dashboard.
 
@@ -105,17 +105,17 @@ tetap mengecualikan arsip. Tidak ada perubahan pencatatan atau dashboard.
 
 Regresi backend akhir: 450 tes lulus (4.100 assertions).
 
-31 tes laporan/izin/regresi domestik lulus (474 assertions), termasuk lima
+31 tes laporan/izin/regresi lokal lulus (474 assertions), termasuk lima
 laporan, identitas box sama lintas lingkup, pengarsipan, pengembalian, batas
 tanggal, lokasi awal, akses langsung, revokasi izin, rincian tanpa izin operasi,
 30 baris melewati pagination, workbook Excel numerik/ID teks dan formula teks.
 
 Query MySQL lokal stock diverifikasi secara baca saja, termasuk filter part
 JSON retur dan tanggal. Hasil saat pemeriksaan: ekspor 8 penerimaan/8 stok aktif/
-0 pengiriman/1 pemenuhan/0 revisi; domestik 4 stok aktif/2 permintaan/0 retur.
+0 pengiriman/1 pemenuhan/0 revisi; lokal 4 stok aktif/2 permintaan/0 retur.
 Tidak ada fixture MySQL, migration atau perubahan production remote.
 
-Browser SQLite preview memeriksa perpindahan lingkup dari halaman domestik,
+Browser SQLite preview memeriksa perpindahan lingkup dari halaman lokal,
 pengiriman arsip empat box, filter satu box, unduhan Excel, rincian pemenuhan
 empat box, retur stok cadangan, viewport 390px dan konsol tanpa error. Data
 contoh hanya memakai export-fulfillment-preview.sqlite.
@@ -124,7 +124,7 @@ Pembaruan AJAX: 454 tes backend (4.191 assertions), 87 tes frontend lulus;
 23 tes terkait backend (258 assertions) dan 7 tes khusus loader meliputi respons
 parsial, pemisahan lingkup, pagination/rincian arsip, pilihan pada hasil kosong,
 validasi, kesesuaian Excel, race respons, pembatalan debounce dan retry.
-Browser memeriksa pencarian domestik 6 dari 16 catatan, perpindahan ke ekspor,
+Browser memeriksa pencarian lokal 6 dari 16 catatan, perpindahan ke ekspor,
 27 hasil/pagination, Back, pencarian satu box, reset dan Coba lagi setelah
 tanggal salah, fokus pencarian, Excel URL dan viewport 390px tanpa overflow
 halaman atau exception JavaScript. Mutasi fixture hanya SQLite preview khusus;

@@ -1,6 +1,6 @@
 // Shared navigation: presentation and preferences only; server permissions remain authoritative.
 export function normalizeNavigationQuery(value) {
-    const aliases = {stock: 'stok', export: 'ekspor', import: 'impor', palet: 'pallet', lokal: 'domestik'};
+    const aliases = {stock: 'stok', export: 'ekspor', import: 'impor', palet: 'pallet', domestik: 'lokal'};
     return String(value ?? '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
         .replace(/[^\p{L}\p{N}]+/gu, ' ').trim().split(/\s+/).filter(Boolean)
         .map(word => aliases[word] ?? word).join(' ');

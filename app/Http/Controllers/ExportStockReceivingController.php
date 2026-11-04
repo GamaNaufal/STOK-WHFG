@@ -61,7 +61,7 @@ class ExportStockReceivingController extends Controller
         $exists = $box || $inDraft || $held || \App\Support\BoxIdentity::unavailable($data['box_number']) || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists();
 
         return response()->json(['available' => ! $exists, 'box_id' => $box?->id,
-            'message' => $held ? 'Box sedang ditahan oleh issue picking ekspor; selesaikan pengembalian.' : ($inDraft ? 'ID Box sudah ada dalam daftar scan.' : ($exists ? 'ID Box sudah tercatat atau disiapkan pada domestik/ekspor.' : 'ID Box siap. Scan nomor part.'))]);
+            'message' => $held ? 'Box sedang ditahan oleh issue picking ekspor; selesaikan pengembalian.' : ($inDraft ? 'ID Box sudah ada dalam daftar scan.' : ($exists ? 'ID Box sudah tercatat atau disiapkan pada lokal/ekspor.' : 'ID Box siap. Scan nomor part.'))]);
     }
 
     public function part(Request $request, ExportStockReceivingService $service)

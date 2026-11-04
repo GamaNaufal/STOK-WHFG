@@ -1,6 +1,6 @@
 <nav class="warehouse-scope-switch" data-scope="{{ $scope }}" aria-label="{{ $scopeLabel }}">
     <span class="warehouse-scope-thumb" aria-hidden="true"></span>
-    @foreach(['domestic' => 'Domestik', 'export' => 'Ekspor'] as $key => $label)
+    @foreach(['domestic' => 'Lokal', 'export' => 'Ekspor'] as $key => $label)
         <a href="{{ $scopeUrls[$key] }}" data-warehouse-scope="{{ $key }}" @if($scope === $key) aria-current="page" @endif>
             <span>{{ $label }}</span>
             @if($key === 'export' && isset($exportPending))

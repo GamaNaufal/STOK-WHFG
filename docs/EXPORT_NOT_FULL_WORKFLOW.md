@@ -48,11 +48,11 @@ sumber bebas, request menunggu stok atau menggunakan opsi datang sudah dikemas.
 Mutasi sumber, pencatatan anak, penempatan, status dan audit berada dalam satu
 transaksi/mutex inventory. Kegagalan penempatan membatalkan seluruh perubahan.
 Versi request menolak tinjauan lama dan retry approval tidak memecah ulang.
-ID sumber/hasil tetap terpisah dari identitas domestik.
+ID sumber/hasil tetap terpisah dari identitas lokal.
 
 ## Akses, histori dan revisi
 
-- Menu Box Not Full existing mempunyai pilihan Domestik/Ekspor. Badge menunjukkan
+- Menu Box Not Full existing mempunyai pilihan Lokal/Ekspor. Badge menunjukkan
   kebutuhan ekspor belum terpenuhi, termasuk yang menunggu planning/approval.
   Kebutuhan terbuka tampil sebelum histori, diurutkan dari tenggat terdekat.
 - Admin Warehouse/Admin Utama menyiapkan; Admin Utama/Supervisi approve/reject.

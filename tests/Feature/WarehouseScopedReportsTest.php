@@ -50,7 +50,7 @@ class WarehouseScopedReportsTest extends TestCase
     {
         foreach(array_keys(WarehouseReportService::KINDS)as$kind)$this->get(route('reports.records',['scope'=>'export','kind'=>$kind]))->assertOk()->assertDontSee('highcharts.js',false);
         foreach(['stock','fulfillment','returns']as$kind)$this->get(route('reports.records',['scope'=>'domestic','kind'=>$kind]))->assertOk();
-        $this->get(route('reports.stock-input'))->assertOk()->assertSee('Lingkup laporan')->assertSee('Domestik / Lokal');
+        $this->get(route('reports.stock-input'))->assertOk()->assertSee('Lingkup laporan')->assertSee('Lokal');
         $this->get(route('reports.withdrawal'))->assertOk()->assertSee('Lingkup laporan');
     }
 

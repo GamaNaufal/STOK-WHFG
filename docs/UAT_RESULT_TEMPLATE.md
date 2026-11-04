@@ -19,7 +19,7 @@ berada pada kasus dengan ID yang sama dalam panduan.
 | ID | Ringkasan langkah | Hasil | Penguji / tanggal | ID transaksi / hasil aktual / bukti |
 | --- | --- | --- | --- | --- |
 | A01 | Login setiap akun aktif; logout; coba password salah dan akun inactive. | Belum diuji | | |
-| A02 | Operator domestik buka URL ekspor dari profil export; export buka approval/admin user; Warehouse coba approve NF ekspor. | Belum diuji | | |
+| A02 | Operator lokal buka URL ekspor dari profil export; export buka approval/admin user; Warehouse coba approve NF ekspor. | Belum diuji | | |
 | A03 | Admin buat user `UAT26 Tester`, edit role, nonaktifkan; coba login lagi. | Belum diuji | | |
 | A04 | Pada salinan DB, admin ubah Hak Akses satu role lalu login ulang. Uji dependensi picking/split/redo ke jadwal, edit/hapus ke stok. | Belum diuji | | |
 | A05 | Ubah profil/password akun uji jika tersedia; coba field tidak valid. | Belum diuji | | |
@@ -40,7 +40,7 @@ berada pada kasus dengan ID yang sama dalam panduan.
 | D11 | PPC proses customer CORRECTION dengan koreksi, Sales perbaiki dan ajukan lagi. PPC proses REJECT dengan reject. | Belum diuji | | |
 | D12 | PPC approve UAT26 DOM NEW; kosongkan catatan lebih dahulu. Review PRIORITY-LATER saat stok 50 PCS tetapi dua order masing-masing 40 PCS. | Belum diuji | | |
 | D13 | Buka FIFO dan mulai picking/verifikasi; cetak daftar rekomendasi. | Belum diuji | | |
-| D14 | Pada **Picking Verification domestik**, scan `98000103` yang tidak direkomendasikan, lalu dua ID benar. | Belum diuji | | |
+| D14 | Pada **Picking Verification lokal**, scan `98000103` yang tidak direkomendasikan, lalu dua ID benar. | Belum diuji | | |
 | D15 | Lanjutkan scan pengiriman FIFO, scan `98000101` dan `98000102`; coba selesai saat baru satu box, lalu setelah lengkap; klik/retry selesai lagi. | Belum diuji | | |
 | D16 | Admin Warehouse buka HISTORY-REDO pada riwayat selesai D−1; tinjau opsi redo dan lakukan satu redo dengan tujuan yang valid. | Belum diuji | | |
 | D17 | Untuk DIRECT 60 PCS, input langsung box baru `98010011`, `98010012` part D-DIRECT lewat alur assignment/input delivery yang tersedia; tinjau dan konfirmasi. | Belum diuji | | |
@@ -90,7 +90,7 @@ berada pada kasus dengan ID yang sama dalam panduan.
 | R09 | Coba konfirmasi penempatan dari tab lama, tujuan reserved orang lain, tombol doubleclick/retry. | Belum diuji | | |
 | V01 | Buka Picking Verification ekspor, tinjau MIX vs MONO; gunakan fitur pencarian/lookup dengan box salah. | Belum diuji | | |
 | V02 | Dalam scan mandatory MIX, scan salah `98002104` dari E02. | Belum diuji | | |
-| V03 | Admin Warehouse buka Approval Scan Salah bersama domestik, filter Ekspor, approve issue `98002104`. Operator coba lanjut sebelum konfirmasi pengembalian; kemudian konfirmasi fisik di tujuan. | Belum diuji | | |
+| V03 | Admin Warehouse buka Approval Scan Salah bersama lokal, filter Ekspor, approve issue `98002104`. Operator coba lanjut sebelum konfirmasi pengembalian; kemudian konfirmasi fisik di tujuan. | Belum diuji | | |
 | V04 | Scan ID tidak dikenal 8 digit `98019998` sebagai box fisik salah ambil. Admin isi part E-SPARE dan tujuan cadangan kosong E24. Coba approve tanpa part/tujuan. | Belum diuji | | |
 | V05 | Scan `98019999` sebagai typo tanpa box fisik; Admin Warehouse tutup sebagai Salah input dengan alasan wajib. Ulangi menggunakan ID sudah dikirim `98002901`. | Belum diuji | | |
 | V06 | Coba 123 pada mandatory scan, bukan lookup. | Belum diuji | | |
@@ -118,10 +118,10 @@ berada pada kasus dengan ID yang sama dalam panduan.
 | F08 | RECEIVE semua pallet ready: klik Selesaikan permintaan. Baca alert bahwa seluruh box telah keluar gudang; batalkan popup dulu, lalu konfirmasi. | Belum diuji | | |
 | F09 | Refresh/retry selesai, buka URL lama, coba scan ID yang sudah shipped. | Belum diuji | | |
 | F10 | Coba selesai/reduce/cancel saat issue picking terkait masih open. | Belum diuji | | |
-| L01 | Warehouse/Supervisi/Admin buka laporan existing; pilih Domestik/Ekspor, rentang tanggal, part, lokasi, user, search dan pagination yang tersedia. | Belum diuji | | |
+| L01 | Warehouse/Supervisi/Admin buka laporan existing; pilih Lokal/Ekspor, rentang tanggal, part, lokasi, user, search dan pagination yang tersedia. | Belum diuji | | |
 | L02 | Unduh Excel/CSV laporan dan stok setelah filter. Bandingkan detail dan total, termasuk histori D−1. | Belum diuji | | |
 | L03 | Audit: filter transaksi UAT26, user, aksi, tanggal, scope; rincian before/after dan export. | Belum diuji | | |
-| L04 | Admin Utama/Supervisi: dashboard default Semua; ubah Domestik/Ekspor dan tanggal via AJAX, Back/Forward, reset. | Belum diuji | | |
+| L04 | Admin Utama/Supervisi: dashboard default Semua; ubah Lokal/Ekspor dan tanggal via AJAX, Back/Forward, reset. | Belum diuji | | |
 | L05 | Bandingkan NF-SPLIT/REV yang baru reserved dengan placed; RECEIVE ready dengan complete. | Belum diuji | | |
 | L06 | Lihat stok/pallet aktif sambil mengganti periode, lalu issue/histori durasi. | Belum diuji | | |
 | L07 | Unduh dashboard Excel; buka sheet/grafik/rincian audit, bandingkan angka web. | Belum diuji | | |

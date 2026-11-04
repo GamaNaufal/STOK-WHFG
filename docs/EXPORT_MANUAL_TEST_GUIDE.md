@@ -320,7 +320,7 @@ isi serupa dengan kode baru boleh, dan retry tidak membuat data ganda.
    selama ada rencana aktif harus ditolak. Lokasi occupied/reserved dilindungi.
 2. Cari `UAT26-SHARED` pada **Master Nomor Part Bersama**: hanya satu master
    untuk kedua alur. Fixture baru memakai 100 PCS/box; pada data lama tanpa
-   pasangan domestik, kapasitas existing dipertahankan. ID Box yang tercatat
+   pasangan lokal, kapasitas existing dipertahankan. ID Box yang tercatat
    pada satu lingkup harus ditolak jika dicoba pada lingkup lain, termasuk histori.
    Lokasi tetap terpisah; akses master operator untuk debug hanya default lokal/testing.
 3. Buka **Stok Ekspor**, cari box, part, lokasi dan pallet hasil kasus 1–11.
@@ -330,8 +330,8 @@ isi serupa dengan kode baru boleh, dan retry tidak membuat data ganda.
 5. Admin Warehouse/Supervisi/Admin buka laporan existing, pilih scope Ekspor,
    periode pengujian dan part. Cocokkan inbound, perpindahan, return, shipment.
    Split kasus 6 tidak menambah inbound PCS; external kasus 5 menambah 20 PCS.
-6. Admin/Supervisi buka dashboard, ganti Semua/Domestik/Ekspor dengan AJAX.
-   Grafik ekspor BOX terpisah dari domestik PCS. Reserved belum pemenuhan;
+6. Admin/Supervisi buka dashboard, ganti Semua/Lokal/Ekspor dengan AJAX.
+   Grafik ekspor BOX terpisah dari lokal PCS. Reserved belum pemenuhan;
    placed valid baru terpenuhi; ready masih stok; complete baru berkurang.
 7. Periksa audit kasus salah scan, approval, return, Not Full, revisi, cancel,
    dan shipment: aktor/waktu/alasan/rincian benar. Coba filter dan ekspor.

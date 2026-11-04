@@ -5,12 +5,12 @@ SELECT DATABASE() database_uji, @@hostname server_uji,
 SELECT 'akun UAT26' objek, COUNT(*) jumlah FROM users WHERE email LIKE 'uat26.%@whfg.test'
 UNION ALL SELECT 'master part', COUNT(*) FROM part_settings WHERE part_number LIKE 'UAT26%'
 UNION ALL SELECT 'master lokasi', COUNT(*) FROM master_locations WHERE code LIKE 'UAT26%'
-UNION ALL SELECT 'box domestik termasuk histori', COUNT(*) FROM boxes WHERE part_number LIKE 'UAT26%'
+UNION ALL SELECT 'box lokal termasuk histori', COUNT(*) FROM boxes WHERE part_number LIKE 'UAT26%'
 UNION ALL SELECT 'box ekspor termasuk histori', COUNT(*) FROM export_stock_boxes WHERE part_number LIKE 'UAT26%'
-UNION ALL SELECT 'delivery domestik termasuk histori', COUNT(*) FROM delivery_orders WHERE customer_name LIKE 'UAT26%'
+UNION ALL SELECT 'delivery lokal termasuk histori', COUNT(*) FROM delivery_orders WHERE customer_name LIKE 'UAT26%'
 UNION ALL SELECT 'delivery ekspor termasuk histori', COUNT(*) FROM export_delivery_plans WHERE plan_code LIKE 'UAT26%';
--- Baseline: akun9, part34, lokasi100, box domestik37, box ekspor127,
--- delivery domestik12, delivery ekspor17. Sebagian sengaja arsip/expired.
+-- Baseline: akun9, part34, lokasi100, box lokal37, box ekspor127,
+-- delivery lokal12, delivery ekspor17. Sebagian sengaja arsip/expired.
 SELECT email, role, is_active FROM users WHERE email LIKE 'uat26.%@whfg.test' ORDER BY role,email;
 SELECT part_number,qty_box FROM part_settings WHERE part_number LIKE 'UAT26%' ORDER BY part_number;
 SELECT d.plan_code,d.customer_name,d.delivery_deadline,d.total_pcs,d.total_boxes,d.status,d.deleted_at,
@@ -33,17 +33,17 @@ FROM export_not_full_requests r JOIN export_delivery_plans d ON d.id=r.export_de
 WHERE d.plan_code LIKE 'UAT26%' ORDER BY r.id;
 
 -- INTEGRITAS: setiap SELECT berikut seharusnya mengembalikan 0 baris.
-SELECT 'I01 identitas domestik hilang' masalah,b.id,b.box_number
+SELECT 'I01 identitas lokal hilang' masalah,b.id,b.box_number
 FROM boxes b LEFT JOIN box_identities i ON i.box_number=b.box_number
 WHERE b.part_number LIKE 'UAT26%' AND i.box_number IS NULL;
 
-SELECT 'I02 satu box domestik beberapa pallet aktif' masalah,b.box_number,COUNT(*) jumlah
+SELECT 'I02 satu box lokal beberapa pallet aktif' masalah,b.box_number,COUNT(*) jumlah
 FROM pallet_boxes pb JOIN boxes b ON b.id=pb.box_id JOIN pallets p ON p.id=pb.pallet_id
 WHERE b.part_number LIKE 'UAT26%' AND b.deleted_at IS NULL AND b.is_withdrawn=0
 AND (b.expired_status IS NULL OR b.expired_status NOT IN ('expired','handled')) AND p.deleted_at IS NULL
 GROUP BY b.id,b.box_number HAVING COUNT(*)>1;
 
-SELECT 'I03 ringkasan pallet domestik tidak cocok' masalah,p.pallet_number,i.part_number,
+SELECT 'I03 ringkasan pallet lokal tidak cocok' masalah,p.pallet_number,i.part_number,
        i.box_quantity ringkasan_box,COALESCE(x.n,0) box_fisik,i.pcs_quantity ringkasan_pcs,COALESCE(x.pcs,0) pcs_fisik
 FROM pallet_items i JOIN pallets p ON p.id=i.pallet_id
 LEFT JOIN (SELECT pb.pallet_id,b.part_number,COUNT(*) n,SUM(b.pcs_quantity) pcs
@@ -54,7 +54,7 @@ ON x.pallet_id=i.pallet_id AND x.part_number=i.part_number
 WHERE p.pallet_number LIKE 'UAT26%' AND p.deleted_at IS NULL
 AND (i.box_quantity<>COALESCE(x.n,0) OR i.pcs_quantity<>COALESCE(x.pcs,0));
 
-SELECT 'I04 box domestik usable tanpa posisi aktif' masalah,b.id,b.box_number
+SELECT 'I04 box lokal usable tanpa posisi aktif' masalah,b.id,b.box_number
 FROM boxes b LEFT JOIN pallet_boxes x ON x.box_id=b.id
 LEFT JOIN pallets p ON p.id=x.pallet_id AND p.deleted_at IS NULL
 LEFT JOIN stock_locations s ON s.pallet_id=p.id

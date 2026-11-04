@@ -24,7 +24,7 @@
             <div>
                 <span class="scan-issues-eyebrow">Perlu keputusan</span>
                 <h2 id="pendingIssuesTitle">Menunggu approval</h2>
-                <p>Domestik: approval membuka blokir sesi. Ekspor: setelah approval, operator wajib mengonfirmasi penempatan pengembalian sebelum blokir dibuka.</p>
+                <p>Lokal: approval membuka blokir sesi. Ekspor: setelah approval, operator wajib mengonfirmasi penempatan pengembalian sebelum blokir dibuka.</p>
             </div>
             <span class="scan-issues-count scan-issues-count-pending">{{ $issues->count() }} pending</span>
         </div>
@@ -46,7 +46,7 @@
                         @else
                         <tr>
                             <td class="scan-issues-order">
-                                <span class="badge text-bg-secondary mb-2">Domestik / Lokal</span>
+                                <span class="badge text-bg-secondary mb-2">Lokal</span>
                                 <strong>#{{ $issue->session->delivery_order_id }}</strong>
                                 <small>{{ $issue->session->order?->customer_name ?? 'Customer tidak tersedia' }}</small>
                             </td>
@@ -115,7 +115,7 @@
                         @else
                         <tr>
                             <td class="scan-issues-order">
-                                <span class="badge text-bg-secondary mb-2">Domestik / Lokal</span>
+                                <span class="badge text-bg-secondary mb-2">Lokal</span>
                                 <strong>#{{ $issue->session->delivery_order_id }}</strong>
                                 <small>{{ $issue->session->order?->customer_name ?? 'Customer tidak tersedia' }}</small>
                             </td>

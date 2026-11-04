@@ -25,7 +25,7 @@
 
     <header class="warehouse-scope-header mb-4">
         <div class="warehouse-scope-heading">
-            <span class="warehouse-scope-eyebrow">Warehouse / Domestik</span>
+            <span class="warehouse-scope-eyebrow">Warehouse / Lokal</span>
             <h1>Request Box Not Full</h1>
         </div>
         @if(in_array(auth()->user()->role, ['admin', 'admin_warehouse'], true))

@@ -385,7 +385,7 @@ class ExportPickingVerificationTest extends TestCase
             'delivery_date' => now()->addDay()->toDateString(), 'status' => 'processing']);
         $session = \App\Models\DeliveryPickSession::create(['delivery_order_id' => $order->id, 'created_by' => $this->admin->id, 'status' => 'blocked', 'started_at' => now()]);
         $localIssue = \App\Models\DeliveryIssue::create(['pick_session_id' => $session->id, 'scanned_code' => 'LOCAL-NG', 'issue_type' => 'scan_mismatch', 'status' => 'pending']);
-        $this->actingAs($this->admin)->get(route('delivery.pick.issues'))->assertOk()->assertSee('Domestik / Lokal')->assertSee('Ekspor')->assertSee('Customer Lokal')->assertSee('PICK-PLAN');
+        $this->actingAs($this->admin)->get(route('delivery.pick.issues'))->assertOk()->assertSee('Lokal')->assertSee('Ekspor')->assertSee('Customer Lokal')->assertSee('PICK-PLAN');
         $this->get(route('dashboard'))->assertOk()->assertViewHas('stats', fn ($stats) => $stats['pending_scan_issues'] === 2);
         $this->post(route('delivery.pick.issue.approve', $localIssue), ['notes' => 'Koreksi lokal'])->assertRedirect();
         $this->assertSame('scanning', $session->fresh()->status);

@@ -2,9 +2,9 @@
 
 Untuk menjalankan alur ekspor sendiri dari membuat delivery sampai selesai,
 gunakan `EXPORT_MANUAL_TEST_GUIDE.md` (14 rangkaian kasus). Checklist di bawah
-tetap menjadi referensi rinci lintas fitur domestik/ekspor.
+tetap menjadi referensi rinci lintas fitur lokal/ekspor.
 
-Paket `UAT26` untuk source yang diverifikasi 31 Oktober 2026. Mencakup domestik,
+Paket `UAT26` untuk source yang diverifikasi 31 Oktober 2026. Mencakup lokal,
 ekspor, Box Not Full ekspor terbaru, pelaporan, dashboard, dan hak akses.
 Ini panduan UAT manual: SQL menyiapkan kondisi awal, penguji menjalankan tindakan
 melalui aplikasi dan mencatat hasilnya. Hasil validasi paket ada di
@@ -17,7 +17,7 @@ di bawah sudah dijalankan oleh agent.
    `2026_10_31_000001_support_export_not_full_boxes`. Buat backup sebelum impor.
    Untuk pengujian bebas dan mudah mengulang, gunakan salinan database development.
 2. Hentikan sementara aktivitas operator dan scheduler yang memutasi inventory
-   selama impor. Selesaikan/batalkan sesi picking domestik scanning/blocked
+   selama impor. Selesaikan/batalkan sesi picking lokal scanning/blocked
    melalui aplikasi; SQL menolak impor jika masih ada sesi tersebut.
 3. Pilih database tujuan di MySQL Workbench/phpMyAdmin. Buka dan jalankan seluruh
    `database/uat/01_seed_business_uat.sql` sebagai **SQL script**, bukan per baris.
@@ -60,12 +60,12 @@ Password semua akun baru: **`UatWHFG!2026`**.
 | --- | --- | --- |
 | `uat26.admin@whfg.test` | Admin Utama | Semua menu, user, akses, lock, approval |
 | `uat26.supervisi@whfg.test` | Supervisi | Approval Not Full, expired, laporan, dashboard, audit |
-| `uat26.admin_warehouse@whfg.test` | Admin Warehouse | Master domestik, operasi gudang, issue, penyiapan Not Full |
-| `uat26.warehouse_operator@whfg.test` | Operator Warehouse | Input/picking domestik, pengajuan Not Full |
+| `uat26.admin_warehouse@whfg.test` | Admin Warehouse | Master lokal, operasi gudang, issue, penyiapan Not Full |
+| `uat26.warehouse_operator@whfg.test` | Operator Warehouse | Input/picking lokal, pengajuan Not Full |
 | `uat26.warehouse_operator2@whfg.test` | Operator Warehouse | Konflik kepemilikan sesi dan konkurensi |
 | `uat26.export_operator@whfg.test` | Operator Export | Master dan operasi ekspor |
-| `uat26.sales@whfg.test` | Sales | Permintaan domestik dan koreksi |
-| `uat26.ppc@whfg.test` | PPC | Review/approval domestik |
+| `uat26.sales@whfg.test` | Sales | Permintaan lokal dan koreksi |
+| `uat26.ppc@whfg.test` | PPC | Review/approval lokal |
 | `uat26.inactive@whfg.test` | Sales nonaktif | Login harus ditolak |
 
 Gunakan profil Chrome berbeda/incognito untuk dua role bersamaan. Akses mengikuti
@@ -77,11 +77,11 @@ semua user dalam role yang sama.
 ## 3. Data acuan dan urutan
 
 Daftar lengkap part, kapasitas, ID Box, umur penerimaan, rencana, dan akun ada
-di `database/uat/manifest.json`. Lokasi tersedia `UAT26-D01`–`D50` untuk domestik
+di `database/uat/manifest.json`. Lokasi tersedia `UAT26-D01`–`D50` untuk lokal
 dan `UAT26-E01`–`E50` untuk ekspor. Lokasi yang sudah ditempati/direservasi tidak
 boleh dipilih sebagai lokasi kosong.
 
-| Skenario domestik | Customer / part | Kondisi awal |
+| Skenario lokal | Customer / part | Kondisi awal |
 | --- | --- | --- |
 | FIFO | `UAT26 DOM FIFO` / `UAT26-D-FIFO` | Minta 160; 3 box ×80: `98000101`–`103`, urut tertua |
 | Input langsung | `UAT26 DOM DIRECT` / `UAT26-D-DIRECT` | Minta 60 PCS; standar 30 PCS/box; belum ada stok |
@@ -120,8 +120,8 @@ dari nomor part.
 | DUP / ARCHIVE | E-DUP (80) | Pembanding draft aktif dan draft arsip |
 | HISTORY | E-HIST (20) | Selesai D−1, 4 box = 80 PCS, tersedia pada histori/arsip |
 
-Jalankan berurutan: akses/master → domestik → ekspor → laporan/dashboard →
-konkurensi. Selesaikan atau batalkan sesi domestik sebelum skenario berikutnya.
+Jalankan berurutan: akses/master → lokal → ekspor → laporan/dashboard →
+konkurensi. Selesaikan atau batalkan sesi lokal sebelum skenario berikutnya.
 Untuk cabang yang saling menghabiskan data (misalnya NF approve vs reject),
 buat rencana/request baru dengan kode dan ID baru, atau ulangi pada salinan awal.
 
@@ -134,16 +134,16 @@ tidak berubah; muncul pesan sukses saja belum cukup.
 | ID | Langkah | Hasil yang harus terlihat |
 | --- | --- | --- |
 | A01 | Login setiap akun aktif; logout; coba password salah dan akun inactive. | Role/menu sesuai; kredensial salah/nonaktif ditolak; halaman privat setelah logout tidak bisa digunakan. |
-| A02 | Operator domestik buka URL ekspor dari profil export; export buka approval/admin user; Warehouse coba approve NF ekspor. | Akses ditolak meskipun URL diketahui. Admin Warehouse hanya menyiapkan NF ekspor; Admin/Supervisi approve. |
+| A02 | Operator lokal buka URL ekspor dari profil export; export buka approval/admin user; Warehouse coba approve NF ekspor. | Akses ditolak meskipun URL diketahui. Admin Warehouse hanya menyiapkan NF ekspor; Admin/Supervisi approve. |
 | A03 | Admin buat user `UAT26 Tester`, edit role, nonaktifkan; coba login lagi. | Validasi email duplikat; perubahan berlaku dan audit dapat ditelusuri. |
 | A04 | Pada salinan DB, admin ubah Hak Akses satu role lalu login ulang. Uji dependensi picking/split/redo ke jadwal, edit/hapus ke stok. | UI dan endpoint mengikuti akses; dependensi dijaga; admin tetap dapat mengelola akses. Pulihkan konfigurasi setelah uji. |
 | A05 | Ubah profil/password akun uji jika tersedia; coba field tidak valid. | Validasi jelas, perubahan tersimpan, password lama tidak berlaku setelah diganti. Catat password baru. |
-| M01 | Cari `UAT26-SHARED` pada master bersama. | Satu master 100 PCS/box dipakai kedua alur. Box domestik `98009999` dan ekspor `98009998` berbeda; mencoba ID lintas lingkup harus ditolak. |
+| M01 | Cari `UAT26-SHARED` pada master bersama. | Satu master 100 PCS/box dipakai kedua alur. Box lokal `98009999` dan ekspor `98009998` berbeda; mencoba ID lintas lingkup harus ditolak. |
 | M02 | Tambah part `UAT26-CRUD` kapasitas 25 di master bersama; coba duplikat dari role lain, nol/negatif. | Part unik global; kedua alur melihat kapasitas yang sama. Kapasitas tidak valid ditolak. |
 | M03 | Edit/hapus master yang belum dipakai; lalu coba master bersama E-NF-DRAFT atau E-MIX-A yang dipakai rencana aktif/draft. | Master bebas dapat dikelola; perubahan kapasitas part dengan rencana aktif ditolak, data rencana/box lama tetap. |
-| M04 | Kelola lokasi baru `UAT26-CRUD-LOC`; coba duplikat, ubah/hapus lokasi occupied/reserved. | Validasi per lingkup; lokasi dipakai tetap dilindungi. Lokasi domestik tidak muncul pada pilihan ekspor. |
+| M04 | Kelola lokasi baru `UAT26-CRUD-LOC`; coba duplikat, ubah/hapus lokasi occupied/reserved. | Validasi per lingkup; lokasi dipakai tetap dilindungi. Lokasi lokal tidak muncul pada pilihan ekspor. |
 
-## 5. Domestik: penerimaan dan stok
+## 5. Lokal: penerimaan dan stok
 
 | ID | Langkah | Hasil yang harus terlihat |
 | --- | --- | --- |
@@ -157,7 +157,7 @@ tidak berubah; muncul pesan sukses saja belum cukup.
 | D08 | Merge dua pallet D08/D09 part D-MERGE; tentukan tujuan yang valid. | Total 4 box 40 PCS, identitas/umur asli tetap, lokasi sumber yang kosong dilepas; histori perpindahan tercatat. |
 | D09 | Ulangi input ID `98000902` setelah dihapus dan ID `98001101` yang sudah dikirim. | Ditolak berdasarkan histori/ledger, bukan hanya daftar stok aktif. |
 
-## 6. Domestik: permintaan sampai keluar gudang
+## 6. Lokal: permintaan sampai keluar gudang
 
 | ID | Langkah | Hasil yang harus terlihat |
 | --- | --- | --- |
@@ -165,19 +165,19 @@ tidak berubah; muncul pesan sukses saja belum cukup.
 | D11 | PPC proses customer CORRECTION dengan koreksi, Sales perbaiki dan ajukan lagi. PPC proses REJECT dengan reject. | Status dan catatan terlihat untuk Sales; hanya pending yang dapat diputuskan ulang. |
 | D12 | PPC approve UAT26 DOM NEW; kosongkan catatan lebih dahulu. Review PRIORITY-LATER saat stok 50 PCS tetapi dua order masing-masing 40 PCS. | Catatan approval wajib; informasi ketersediaan/impact ke order lain konsisten dengan tenggat. Jangan mengasumsikan approved berarti stok sudah keluar. |
 | D13 | Buka FIFO dan mulai picking/verifikasi; cetak daftar rekomendasi. | Rekomendasi `98000101`, `98000102` = 160 PCS, bukan `98000103`; lokasi D01 terlihat. |
-| D14 | Pada **Picking Verification domestik**, scan `98000103` yang tidak direkomendasikan, lalu dua ID benar. | NG untuk pencarian yang salah, tidak membuat issue blocking; OK sesuai daftar. Tidak ada stock withdrawal sebelum selesai pengiriman. |
+| D14 | Pada **Picking Verification lokal**, scan `98000103` yang tidak direkomendasikan, lalu dua ID benar. | NG untuk pencarian yang salah, tidak membuat issue blocking; OK sesuai daftar. Tidak ada stock withdrawal sebelum selesai pengiriman. |
 | D15 | Lanjutkan scan pengiriman FIFO, scan `98000101` dan `98000102`; coba selesai saat baru satu box, lalu setelah lengkap; klik/retry selesai lagi. | Belum lengkap ditolak; lengkap selesai 160 PCS sekali; dua box tidak di stok aktif, box `98000103` tetap; laporan keluar dan audit ada, retry tidak menggandakan. |
 | D16 | Admin Warehouse buka HISTORY-REDO pada riwayat selesai D−1; tinjau opsi redo dan lakukan satu redo dengan tujuan yang valid. | Pilihan box/lokasi jelas; stok, pemenuhan dan histori dikoreksi sesuai redo, bukan membuat penerimaan produksi palsu. Uji redo setelah jendela5hari menggunakan salinan yang waktunya dikendalikan atau tes otomatis, bukan mengubah jam PC utama. |
 | D17 | Untuk DIRECT 60 PCS, input langsung box baru `98010011`, `98010012` part D-DIRECT lewat alur assignment/input delivery yang tersedia; tinjau dan konfirmasi. | Dua box 30 PCS memenuhi 60 PCS. Coba box ketiga `98010013`: kelebihan kebutuhan tidak boleh diam-diam masuk assignment. Gunakan opsi stok normal/cadangan yang disediakan. |
 | D18 | Pada ISSUE 80 PCS, scan final `98000203` padahal rekomendasi `98000201` dan `98000202`. | NG, issue pending dan sesi blocked; scan benar/selesai tetap tertahan. |
-| D19 | Admin Warehouse buka Approval Scan Salah, tinjau box/lokasi, lakukan approval yang sah; operator lanjut sesuai arahan. | Issue domestik berlabel Domestik; unblock mengikuti alur domestik existing, tidak membuat issue ekspor. Selesaikan/cancel sesi sebelum D20. |
+| D19 | Admin Warehouse buka Approval Scan Salah, tinjau box/lokasi, lakukan approval yang sah; operator lanjut sesuai arahan. | Issue lokal berlabel Lokal; unblock mengikuti alur lokal existing, tidak membuat issue ekspor. Selesaikan/cancel sesi sebelum D20. |
 | D20 | Pada SPLIT 80 PCS, Admin Warehouse split menjadi 40 dan 40 PCS; uji quantity tidak valid; tinjau anak/parent dan cetak. Gunakan restore split sebelum dipicking jika tersedia. | Jumlah anak tetap 80 PCS; parent tidak dihitung ganda; restore eligible menjaga kebutuhan dan stok. Setelah ada picking, tindakan yang merusak histori ditolak. |
-| D21 | Operator 1 mulai LOCK. Operator 2 mencoba order/sesi sama dan order lain. Coba batalkan/mulai ulang dengan pemilik. | Sesi pemilik lain dilindungi; hanya satu scanning/blocked domestik secara global; cancel melepas lock/reservasi yang sah. |
+| D21 | Operator 1 mulai LOCK. Operator 2 mencoba order/sesi sama dan order lain. Coba batalkan/mulai ulang dengan pemilik. | Sesi pemilik lain dilindungi; hanya satu scanning/blocked lokal secara global; cancel melepas lock/reservasi yang sah. |
 | D22 | Mulai verifikasi lalu hentikan aktivitas browser lebih dari 10 menit; jalankan scheduler/command `php artisan delivery:expire-verifications` pada DB uji. Muat ulang. | Sesi kedaluwarsa tidak dapat scan/complete memakai halaman lama; harus mulai ulang. Heartbeat/scan aktif mencegah expired keliru. |
 | D23 | Admin Utama buka Pengelolaan Lock, tinjau sesi LOCK, terminate dengan alasan jika diperlukan. | Lock lepas secara teraudit, halaman lama operator tidak dapat melanjutkan sesi yang dibatalkan. Role selain admin tidak bisa memaksa terminate. |
 | D24 | Admin Utama buat lalu hapus delivery percobaan yang belum memiliki picking/mutasi. Coba hapus order dengan sesi aktif/completed. | Delivery bebas mengikuti aturan hapus; delivery berhistori/aktif tidak boleh meninggalkan stok atau relasi picking yatim. Role tanpa delivery_delete ditolak. |
 
-## 7. Domestik: Box Not Full dan expired
+## 7. Lokal: Box Not Full dan expired
 
 | ID | Langkah | Hasil yang harus terlihat |
 | --- | --- | --- |
@@ -242,7 +242,7 @@ uji, atau buat part khusus `UAT26-IMPORT` untuk pengujian lanjutan.
 
 | ID | Langkah | Hasil yang harus terlihat |
 | --- | --- | --- |
-| R01 | Setelah RECEIVE final, scan `98110001`, `98110002`, `98110003`, semuanya E-RECEIVE. Klik Proses penerimaan satu kali. Coba juga box domestik D01. | Satu transaksi 3 box, standar 80 PCS, rincian penempatan berupa halaman. ID domestik yang sudah tercatat ditolak dengan NG. |
+| R01 | Setelah RECEIVE final, scan `98110001`, `98110002`, `98110003`, semuanya E-RECEIVE. Klik Proses penerimaan satu kali. Coba juga box lokal D01. | Satu transaksi 3 box, standar 80 PCS, rincian penempatan berupa halaman. ID lokal yang sudah tercatat ditolak dengan NG. |
 | R02 | Coba 123, huruf, 9 digit, ID duplikat satu draft/yang tersimpan, part tidak dikenal. | Input ID dibatasi 8 angka, NG/validasi; tidak ada stok ganda. PCS bukan input bebas. |
 | R03 | Buka transaksi R01; tinjau tujuan dan cetak guide per transaksi. Konfirmasi satu box dahulu, refresh, kemudian sisanya. | Tujuan Pallet 1 E17 untuk dua box, Pallet 2 E18 satu box; highlight jelas, jumlah pending turun, refresh tidak menempatkan ulang. Box penerimaan baru tidak perlu scan picking campuran. |
 | R04 | Terima `98010011`,`98010012` part E-DEADLINE dalam satu proses. | Otomatis satu ke EARLY E13 D+2, kemudian LATER E14 D+3. Pada delivery yang sama, pallet nomor terkecil yang masih butuh diprioritaskan. |
@@ -261,7 +261,7 @@ Jangan menghabiskan ketiga scan benar sebelum menyelesaikan cabang salah scan.
 | --- | --- | --- |
 | V01 | Buka Picking Verification ekspor, tinjau MIX vs MONO; gunakan fitur pencarian/lookup dengan box salah. | MIX dari sumber campuran wajib scan box; MONO tidak. Lookup/pencarian NG tidak memblokir proses mandatory. |
 | V02 | Dalam scan mandatory MIX, scan salah `98002104` dari E02. | NG dan blocked; arahan kembalikan ke pallet asal E02 tampil. Scan benar/penempatan tidak dapat melewati issue. |
-| V03 | Admin Warehouse buka Approval Scan Salah bersama domestik, filter Ekspor, approve issue `98002104`. Operator coba lanjut sebelum konfirmasi pengembalian; kemudian konfirmasi fisik di tujuan. | Approval saja belum unblock; baru konfirmasi penempatan asal membuka blokir. Tidak membuat penerimaan baru. |
+| V03 | Admin Warehouse buka Approval Scan Salah bersama lokal, filter Ekspor, approve issue `98002104`. Operator coba lanjut sebelum konfirmasi pengembalian; kemudian konfirmasi fisik di tujuan. | Approval saja belum unblock; baru konfirmasi penempatan asal membuka blokir. Tidak membuat penerimaan baru. |
 | V04 | Scan ID tidak dikenal 8 digit `98019998` sebagai box fisik salah ambil. Admin isi part E-SPARE dan tujuan cadangan kosong E24. Coba approve tanpa part/tujuan. | Data wajib; setelah approval masih blocked; konfirmasi pengembalian baru mendaftarkan box ke stok yang benar dan unblock. Jangan memakai aksi Salah input untuk box fisik yang benar-benar ada. |
 | V05 | Scan `98019999` sebagai typo tanpa box fisik; Admin Warehouse tutup sebagai Salah input dengan alasan wajib. Ulangi menggunakan ID sudah dikirim `98002901`. | Tidak membuat stok atau pengembalian fiktif; histori issue/alasan ada; proses unblock setelah resolusi sah. |
 | V06 | Coba 123 pada mandatory scan, bukan lookup. | Ditolak sebagai format human error; tidak membuat stok/issue 8 digit fiktif atau meminta lokasi untuk angka 123. |
@@ -304,12 +304,12 @@ Jangan menghabiskan ketiga scan benar sebelum menyelesaikan cabang salah scan.
 
 | ID | Langkah | Hasil yang harus terlihat |
 | --- | --- | --- |
-| L01 | Warehouse/Supervisi/Admin buka laporan existing; pilih Domestik/Ekspor, rentang tanggal, part, lokasi, user, search dan pagination yang tersedia. | Filter AJAX langsung, scope tidak bocor; histori masuk/keluar/pindah/revisi bisa dirinci. Warehouse hanya mendapat laporan sesuai izin. |
+| L01 | Warehouse/Supervisi/Admin buka laporan existing; pilih Lokal/Ekspor, rentang tanggal, part, lokasi, user, search dan pagination yang tersedia. | Filter AJAX langsung, scope tidak bocor; histori masuk/keluar/pindah/revisi bisa dirinci. Warehouse hanya mendapat laporan sesuai izin. |
 | L02 | Unduh Excel/CSV laporan dan stok setelah filter. Bandingkan detail dan total, termasuk histori D−1. | Seluruh hasil sesuai filter, bukan hanya halaman aktif; satuan PCS/box benar, ID Box teks 8 digit, file dapat dibuka. |
 | L03 | Audit: filter transaksi UAT26, user, aksi, tanggal, scope; rincian before/after dan export. | Semua mutasi penting/approval/reject/return/ship/redo/QA ada aktor, waktu, alasan; tidak ada audit sukses untuk transaksi gagal rollback. |
-| L04 | Admin Utama/Supervisi: dashboard default Semua; ubah Domestik/Ekspor dan tanggal via AJAX, Back/Forward, reset. | Default Semua; label scope jelas; grafik domestik PCS, ekspor BOX terpisah; tidak dijumlahkan sebagai satuan campuran. |
+| L04 | Admin Utama/Supervisi: dashboard default Semua; ubah Lokal/Ekspor dan tanggal via AJAX, Back/Forward, reset. | Default Semua; label scope jelas; grafik lokal PCS, ekspor BOX terpisah; tidak dijumlahkan sebagai satuan campuran. |
 | L05 | Bandingkan NF-SPLIT/REV yang baru reserved dengan placed; RECEIVE ready dengan complete. | Reservasi belum pemenuhan; placed valid menaikkan pemenuhan; ready masih stok; shipment baru setelah complete. Draft belum final/cancelled tidak masuk KPI pemenuhan. |
-| L06 | Lihat stok/pallet aktif sambil mengganti periode, lalu issue/histori durasi. | Stok aktif posisi sekarang, bukan dibatasi tanggal penerimaan; periode memfilter arus/KPI terkait; durasi domestik/ekspor tidak dicampur. |
+| L06 | Lihat stok/pallet aktif sambil mengganti periode, lalu issue/histori durasi. | Stok aktif posisi sekarang, bukan dibatasi tanggal penerimaan; periode memfilter arus/KPI terkait; durasi lokal/ekspor tidak dicampur. |
 | L07 | Unduh dashboard Excel; buka sheet/grafik/rincian audit, bandingkan angka web. | Data sesuai scope/filter, grafik native dan unit benar, total tidak berhenti pada limit rincian 200 baris. |
 | L08 | Coba rentang tanggal terbalik, hasil kosong, mengetik search cepat, koneksi lambat/error lalu retry. | Pesan validasi/pemulihan jelas; respons lama tidak menimpa filter baru; tidak menampilkan data lama dari scope lain sebagai hasil baru. |
 | UI01 | Chrome desktop, layar sempit, keyboard Tab/Enter, scanner USB dengan Enter; tutup modal Esc, cetak A4. | Fokus scan kembali, tombol/label terbaca, tabel dapat digulir, modal tidak terselip, cetak tidak terpotong. |
@@ -322,7 +322,7 @@ tidak habis. Catat kedua respons dan cek DB, bukan hanya toast.
 
 | ID | Kondisi bersamaan | Harapan |
 | --- | --- | --- |
-| C01 | Dua sesi operator ekspor menyimpan ID Box sama dengan token berbeda. | Satu berhasil, satunya ditolak; satu stok dan satu identitas global domestik/ekspor. |
+| C01 | Dua sesi operator ekspor menyimpan ID Box sama dengan token berbeda. | Satu berhasil, satunya ditolak; satu stok dan satu identitas global lokal/ekspor. |
 | C02 | Dua finalisasi memakai lokasi kosong sama. | Hanya satu claim; tidak ada dua pallet aktif pada satu lokasi. |
 | C03 | Dua rencana membutuhkan spare box yang sama. | Hanya satu reservasi; prioritas deadline dan FIFO konsisten. |
 | C04 | Place/reduce/approve NF memakai revision lama dari tab kedua. | Conflict/replay aman; tidak ada kehilangan PCS atau box ganda. |

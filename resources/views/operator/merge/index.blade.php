@@ -11,7 +11,7 @@
 <div class="container-fluid merge-pallet-page" id="mergePalletPage">
     <header class="merge-pallet-header warehouse-scope-header">
         <div class="warehouse-scope-heading">
-            <span class="warehouse-scope-eyebrow">Warehouse / Domestik</span>
+            <span class="warehouse-scope-eyebrow">Warehouse / Lokal</span>
             <h1><i class="bi bi-intersect" aria-hidden="true"></i> Merge Pallet</h1>
         </div>
         @include('shared.merge-scope-switch', ['scope' => 'domestic'])

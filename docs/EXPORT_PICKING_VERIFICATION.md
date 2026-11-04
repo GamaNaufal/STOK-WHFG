@@ -53,8 +53,8 @@ verifikasi lama milik box yang salah dibatalkan agar tidak digunakan kembali.
 | `input_error` | Admin menutup salah input tanpa box fisik dengan alasan dan pernyataan wajib | Issue ini dilepas |
 
 Approval memakai halaman **Scan Issues dan Approval** yang sama dengan lokal.
-Setiap baris pending/riwayat memiliki label **Ekspor** atau **Domestik / Lokal**.
-Alur approval domestik tetap seperti sebelumnya.
+Setiap baris pending/riwayat memiliki label **Ekspor** atau **Lokal**.
+Alur approval lokal tetap seperti sebelumnya.
 Untuk ID historis yang sudah dikirim atau salah ketik delapan digit tanpa box
 fisik yang diambil, Admin/Admin Warehouse dapat memilih **Salah input tanpa box
 fisik**. Alasan dan checkbox pernyataan wajib; bukan pengembalian. Tindakan ini
@@ -63,7 +63,7 @@ sebagai input_error_closed pada audit. Izin approval saja pada role lain tidak
 memberi hak penutupan khusus ini. Box yang benar-benar diambil tetap memakai
 approval arahan serta konfirmasi penempatan oleh operator pelapor.
 Indikator issue pending pada sidebar dan dashboard Admin Warehouse menghitung
-approval domestik dan ekspor yang masih menunggu keputusan.
+approval lokal dan ekspor yang masih menunggu keputusan.
 
 - Box diketahui dan lokasi asal valid: tujuan tetap pallet/lokasi asal.
 - Box diketahui tetapi lokasi asal belum tersedia: admin wajib memilih lokasi
@@ -71,7 +71,7 @@ approval domestik dan ekspor yang masih menunggu keputusan.
   tetap dipertahankan.
 - Box belum tercatat pada stok ekspor: admin wajib memilih nomor part dari
   master part bersama dan tujuan pengembalian. PCS mengikuti kapasitas master dan
-  disimpan sebagai snapshot approval. ID Box yang sudah terdaftar di domestik
+  disimpan sebagai snapshot approval. ID Box yang sudah terdaftar di lokal
   ditolak untuk registrasi stok ekspor.
 
 Approval hanya menyimpan arahan. Box baru didaftarkan dan posisi fisik box yang
@@ -145,5 +145,5 @@ ditahan karena issue, bukti scan, dan pengembalian harus direkonsiliasi dahulu.
 - Migration diterapkan pada MySQL lokal `stock`, host `127.0.0.1`, APP_ENV local.
   Backup `storage/app/backups/stock_export_picking_20261030_173847_0c056a.json`.
   Hash seluruh kolom existing dan jumlah baris inventory lama tetap sama,
-  termasuk 12 box domestik, 8 box ekspor dan 8 komitmen. Tabel issue/scan baru
+  termasuk 12 box lokal, 8 box ekspor dan 8 komitmen. Tabel issue/scan baru
   kosong; tidak ada contoh data di MySQL atau perubahan production remote.

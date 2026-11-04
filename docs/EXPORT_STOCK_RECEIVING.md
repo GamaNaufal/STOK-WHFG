@@ -8,14 +8,14 @@ Verifikasi identitas/master 3 November 2026; alur penerimaan 30 Oktober 2026 pad
   dari master part bersama; tidak ada input PCS manual atau box tidak penuh.
   Kolom ID Box hanya menerima angka 0–9, maksimal delapan digit, dengan angka
   nol di awal tetap dipertahankan. Validasi server tetap mewajibkan tepat delapan.
-- Identitas delapan digit unik global domestik/ekspor. Kedua model memakai
+- Identitas delapan digit unik global lokal/ekspor. Kedua model memakai
   registry `box_identities`; histori yang sudah keluar/dihapus tetap mengunci
   ID. Lokasi dan tabel stok operasional tetap terpisah. Request Not Full yang
   sedang disiapkan juga diperiksa sebelum menerima nomor baru.
 - Enter pada ID Box memeriksa duplikat dan memfokuskan nomor part. Enter
   setelah nomor part menambahkan baris ke daftar scan; fokus kembali ke ID Box untuk pasangan berikutnya. Tersedia tombol untuk input manual.
 - Scan memberi indikator OK/NG dan memakai audio OK.mp3/NG.mp3 yang sama dengan
-  Stock Input domestik. Part tidak dikenal, format salah, dan duplikat mendapat
+  Stock Input lokal. Part tidak dikenal, format salah, dan duplikat mendapat
   NG tanpa menambah baris. Chrome HTTP intranet mempunyai fallback UUID aman
   melalui crypto.getRandomValues jika randomUUID belum tersedia.
 - Daftar maksimal 1.000 box tersimpan sebagai draft milik operator di database,
@@ -137,7 +137,7 @@ stok fisik, unik per stock box. Data monitoring existing tetap disimpan dengan
 relasi null; migration tidak mengarang penerimaan/stock dari histori tersebut.
 
 Master lokasi ekspor memakai is_occupied untuk stok fisik, tetapi current_pallet_id
-tetap null karena kolom tersebut milik pallet domestik. Master lokasi menampilkan
+tetap null karena kolom tersebut milik pallet lokal. Master lokasi menampilkan
 relasi pallet ekspor tersendiri. Part/lokasi yang memiliki histori ekspor tidak
 dapat diganti identitasnya/dihapus; kapasitas master tetap boleh diperbarui untuk
 penerimaan baru. Stok dan rencana existing mempertahankan snapshot masing-masing.
@@ -168,7 +168,7 @@ penerimaan baru. Stok dan rencana existing mempertahankan snapshot masing-masing
 Mutasi ekspor memakai satu row lock `export_inventory_locks` sebelum lock parent,
 part, stok atau lokasi. Ini sengaja menserialkan penerimaan, penempatan, perubahan
 delivery dan finalisasi agar prioritas FIFO tidak berlomba; sesuai volume awal
-yang kecil. Mutasi domestik tidak memakai lock ini. Perubahan future harus
+yang kecil. Mutasi lokal tidak memakai lock ini. Perubahan future harus
 mempertahankan urutan lock dan memanggil alokasi setelah availability berubah.
 
 Receive token dan request token penempatan unik mencegah penggandaan akibat
@@ -226,7 +226,7 @@ hak mengedit master/perencanaan atau monitoring. Endpoint:
 
 Migration `2026_10_29_000002_create_export_stock_receiving.php` membuat empat tabel,
 menambah FK nullable ke komitmen, dan menambahkan izin ke pengaturan operator
-existing beserta audit. Tidak menyalin stok domestik atau mengubah master.
+existing beserta audit. Tidak menyalin stok lokal atau mengubah master.
 Jalankan setelah migration pemenuhan, build aset, serta sertakan CSS halaman baru
 dan public/build saat deployment. Tidak perlu library, layanan atau konfigurasi
 scanner PC tambahan selain scanner yang mengirim teks dan Enter. Rollback
@@ -253,7 +253,7 @@ konsol. Scanner fisik belum diuji.
 
 MySQL lokal stock pada 29 Oktober: agent menerapkan hanya migration 000003;
 kedua tabel baru kosong. Jumlah existing dipertahankan: 12 boxes, 12 identities,
-16 pallets dan 3 stock_locations domestik; 276 part, 27 lokasi, 2 delivery dan
+16 pallets dan 3 stock_locations lokal; 276 part, 27 lokasi, 2 delivery dan
 2 planning ekspor, 2 stock box/komitmen ekspor, 0 pallet/pergerakan ekspor.
 Tidak menambahkan data uji pada MySQL. Seluruh transaksi uji browser memakai
 SQLite preview; production remote tidak diubah. Preflight/receipt, helper,

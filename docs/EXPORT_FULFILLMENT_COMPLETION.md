@@ -106,7 +106,7 @@ direkonsiliasi dahulu.
 Migration sudah diterapkan ke MySQL lokal stock (APP_ENV local, 127.0.0.1), setelah
 backup storage/app/backups/stock_export_fulfillment_20261030_193906_977c63.json.
 Hash seluruh kolom lama pada 24 tabel yang diperiksa tetap sama, termasuk 12 box
-domestik/8 ekspor, 26 planned pallet dan 16 reservasi; tabel aksi baru kosong.
+lokal/8 ekspor, 26 planned pallet dan 16 reservasi; tabel aksi baru kosong.
 Tidak ada contoh data pada MySQL atau perubahan production remote.
 
 Regresi backend akhir: 438 tes lulus (3.969 assertions). Verifikasi khusus

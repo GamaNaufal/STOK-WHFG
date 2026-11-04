@@ -181,7 +181,7 @@ class ExportNotFullService
         app(ExportPickingService::class)->assertReceiptAllowed($number);
         if (\App\Support\BoxIdentity::unavailable($number,$requestId) || ExportStockBox::withTrashed()->where('box_number', $number)->exists()
             || ExportNotFullRequest::whereKeyNot($requestId)->where('status', 'prepared')->where('preparation->box_number', $number)->exists()) {
-            $this->fail('ID Box sudah dipakai pada domestik/ekspor atau sedang disiapkan request lain.');
+            $this->fail('ID Box sudah dipakai pada lokal/ekspor atau sedang disiapkan request lain.');
         }
     }
 

@@ -20,7 +20,7 @@ class WarehouseRecordsExport extends DefaultValueBinder implements FromQuery, Wi
     public function headings(): array{return array_merge(['Lingkup'],array_values($this->columns));}
     public function map($row): array
     {
-        $values=[$this->filters['scope']==='export'?'Ekspor':'Domestik'];
+        $values=[$this->filters['scope']==='export'?'Ekspor':'Lokal'];
         foreach($this->columns as$key=>$label){
             $value=app(WarehouseReportService::class)->value($row,$key,$this->filters);
             if(in_array($key,['occurred_at','completed_at'])&&$value)$value=Date::dateTimeToExcel(\Illuminate\Support\Carbon::parse($value));
