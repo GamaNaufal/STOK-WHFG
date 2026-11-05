@@ -81,20 +81,27 @@ class ExportReceivingBatchService
         });
     }
 
-    public function process(int $id, int $revision, User $actor): ExportReceivingBatch
+    public function process(int $id, int $revision, User $actor, ?\DateTimeInterface $receivedAt = null): ExportReceivingBatch
     {
-        return app(ExportInventoryService::class)->transaction(function () use ($id, $revision, $actor) {
+        return app(ExportInventoryService::class)->transaction(function () use ($id, $revision, $actor, $receivedAt) {
             $batch = $this->owned($id, $actor, true);
             if ($batch->status === 'processed') return $batch;
             $this->editable($batch, $revision);
             $items = $batch->items()->get();
             if ($items->isEmpty()) $this->fail('batch', 'Scan setidaknya satu box sebelum memproses penerimaan.');
-            $boxes = app(ExportStockReceivingService::class)->receiveMany($items->map(fn ($item) =>
-                $item->only(['box_number', 'part_number', 'receive_token']) + ['expected_pcs_quantity' => $item->pcs_quantity, 'scanned_at' => $item->created_at])->all(), $actor);
-            foreach ($items as $index => $item) $item->update(['export_stock_box_id' => $boxes[$index]->id]);
-            $batch->update(['status' => 'processed', 'processed_at' => now(), 'revision' => $batch->revision + 1]);
+            $processedAt = now();
+            $receivedAt ??= $processedAt;
+            $rows = $items->map(fn ($item) => $item->only(['box_number', 'part_number', 'receive_token'])
+                + ['expected_pcs_quantity' => $item->pcs_quantity])->all();
+            $boxes = app(ExportStockReceivingService::class)->receiveMany($rows, $actor, $receivedAt);
+            foreach ($items as $index => $item) {
+                $item->update(['export_stock_box_id' => $boxes[$index]->id]);
+            }
+            $batch->update(['status' => 'processed', 'processed_at' => $processedAt, 'revision' => $batch->revision + 1]);
             AuditService::record('export_receiving_batch', 'processed', 'ExportReceivingBatch', $batch->id, $actor->id,
-                [], ['box_count' => $items->count(), 'stock_box_ids' => $boxes->modelKeys()], 'Daftar scan ekspor diterima sekaligus; tujuan sudah dihitung berdasarkan FIFO.');
+                [], ['box_count' => $items->count(), 'stock_box_ids' => $boxes->modelKeys(), 'first_received_at' => $receivedAt->format('Y-m-d H:i:s'),
+                    'processed_at' => $processedAt->toDateTimeString()], 'Daftar scan ekspor diterima sekaligus; tujuan sudah dihitung berdasarkan FIFO.');
+
             return $batch;
         });
     }

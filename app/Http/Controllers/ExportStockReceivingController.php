@@ -10,6 +10,7 @@ use App\Services\ExportReceivingBatchService;
 use App\Services\ExportReceivingTransactionService;
 use App\Services\ExportStockReceivingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class ExportStockReceivingController extends Controller
@@ -109,8 +110,16 @@ class ExportStockReceivingController extends Controller
 
     public function process(Request $request, int $batch, ExportReceivingBatchService $service)
     {
-        $data = $request->validate(['revision' => 'required|integer|min:1']);
-        $result = $service->process($batch, (int) $data['revision'], $request->user());
+        $data = $request->validate([
+            'revision' => 'required|integer|min:1',
+            'input_date' => ['bail', 'nullable', 'date_format:Y-m-d', 'after:1970-01-01', 'before_or_equal:'.today()->toDateString()],
+        ], [
+            'input_date.date_format' => 'Pilih tanggal masuk yang valid.',
+            'input_date.after' => 'Tanggal masuk harus 2 Januari 1970 atau sesudahnya.',
+            'input_date.before_or_equal' => 'Tanggal masuk tidak boleh melewati hari ini.',
+        ]);
+        $receivedAt = isset($data['input_date']) ? Carbon::createFromFormat('!Y-m-d', $data['input_date']) : null;
+        $result = $service->process($batch, (int) $data['revision'], $request->user(), $receivedAt);
 
         return redirect()->route('export.receiving.transactions.show', $result)
             ->with('success', 'Daftar scan diterima. Periksa pembagian lokasi dan konfirmasikan penempatan box.');

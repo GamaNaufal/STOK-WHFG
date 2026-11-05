@@ -55,6 +55,8 @@
 .receiving-draft-part { overflow-wrap:anywhere; max-width:15rem; }
 .receiving-draft-empty { padding:2rem 1rem; text-align:center; font-size:.85rem; color:var(--ui-muted,#595d65); }
 .receiving-bulk-actions { display:flex; flex-wrap:wrap; gap:.6rem; padding:1rem 1.25rem 0; border-top:1px solid var(--ui-border,#dfe1e5); }
+.receiving-batch-date { flex-basis:100%; margin-bottom:.25rem; }
+.receiving-batch-date .form-control { max-width:16rem; min-height:44px; }
 .receiving-section-title { font-size:1.05rem; font-weight:700; margin:1.5rem 0 .8rem; }
 .receiving-result-group .plan-panel-heading h3 { font-size:1rem; font-weight:700; margin:0; }
 .receiving-group-form .form-select { max-width:38rem; }

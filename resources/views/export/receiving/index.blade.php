@@ -3,7 +3,7 @@
 @section('styles')
 <link rel="stylesheet" href="{{ asset('css/pages/export-delivery-plans.css') }}">
 <link rel="stylesheet" href="{{ asset('css/pages/export-fulfillment.css') }}">
-<link rel="stylesheet" href="{{ asset('css/pages/export-receiving.css') }}">
+<link rel="stylesheet" href="{{ asset('css/pages/export-receiving.css') }}?v={{ filemtime(public_path('css/pages/export-receiving.css')) }}">
 @endsection
 @section('content')
 <div class="delivery-plan-page receiving-page" id="export-receiving">
@@ -12,7 +12,7 @@
 
         <div class="receiving-workspace receiving-bulk-workspace">
             <section class="plan-panel" aria-labelledby="receiving-scan-title"><div class="plan-panel-heading"><h2 id="receiving-scan-title">Scan box dan part</h2><span class="plan-help">PCS otomatis</span></div><div class="plan-panel-body">
-                <form id="export-bulk-scan-form" novalidate data-scan-feedback data-batches-url="{{ route('export.receiving.batches.start') }}" data-check-url="{{ route('export.receiving.check-box') }}" data-stock-url="{{ route('export.stock.index') }}">
+                <form id="export-bulk-scan-form" novalidate data-scan-feedback data-progress-user="{{ auth()->id() }}" data-batches-url="{{ route('export.receiving.batches.start') }}" data-check-url="{{ route('export.receiving.check-box') }}" data-stock-url="{{ route('export.stock.index') }}">
                     @csrf
                     <div class="mb-3"><label class="form-label" for="receive-box-number">1. Scan ID Box</label><div class="receiving-field-action"><input class="form-control" id="receive-box-number" type="text" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{8}" aria-describedby="receive-box-help"><button class="btn btn-outline-primary" type="button" id="scan-box-button">Cek box</button></div><p class="plan-help" id="receive-box-help">ID Box 8 digit. Enter untuk lanjut ke nomor part.</p></div>
                     <div class="mb-3"><label class="form-label" for="receive-part-number">2. Scan nomor part</label><input class="form-control" id="receive-part-number" type="text" autocomplete="off" maxlength="256"><p class="plan-help">Enter menambahkan box ke daftar, lalu scan box berikutnya.</p></div>
@@ -25,10 +25,19 @@
             <section class="plan-panel" aria-labelledby="receiving-draft-title"><div class="plan-panel-heading"><h2 id="receiving-draft-title">Daftar scan</h2><strong><span id="scan-count">{{ count($state['items']) }}</span> / 1.000 box</strong></div>
                 <p class="plan-help receiving-table-note" id="scan-summary">Daftar tersimpan sebagai draft sampai diproses.</p>
                 <div class="receiving-draft-scroll" role="region" tabindex="0" aria-label="Daftar box yang sudah di-scan"><table class="table plan-table receiving-draft-table"><thead><tr><th>No.</th><th>ID Box</th><th>Nomor part</th><th>PCS</th><th>Aksi</th></tr></thead><tbody id="scan-items"></tbody></table><p class="receiving-draft-empty" id="scan-empty">Belum ada box dalam daftar scan.</p></div>
-                <div class="receiving-bulk-actions">
-                    <form method="POST" id="process-batch-form" action="{{ $batch ? route('export.receiving.batches.process', $batch) : '#' }}">@csrf<input type="hidden" name="revision" id="batch-revision" value="{{ $state['revision'] }}"><button class="btn btn-primary" type="submit" id="process-batch-button" disabled>Proses penerimaan</button></form>
+                <form method="POST" class="receiving-bulk-actions" id="process-batch-form" action="{{ $batch ? route('export.receiving.batches.process', $batch) : '#' }}">
+                    @csrf
+                    <input type="hidden" name="revision" id="batch-revision" value="{{ $state['revision'] }}">
+                    <div class="receiving-batch-date">
+                        <label class="form-label" for="receiving-input-date">Tanggal masuk <span class="text-muted fw-normal">(opsional)</span></label>
+                        <input class="form-control @error('input_date') is-invalid @enderror" id="receiving-input-date" type="date" name="input_date"
+                            min="1970-01-02" max="{{ today()->toDateString() }}" value="{{ is_string(old('input_date')) ? old('input_date') : '' }}"
+                            aria-describedby="receiving-date-help" @error('input_date') aria-invalid="true" @enderror>
+                        <p class="plan-help mb-0" id="receiving-date-help">Berlaku untuk semua box dalam daftar. Kosongkan untuk memakai waktu saat diproses.</p>
+                    </div>
+                    <button class="btn btn-primary" type="submit" id="process-batch-button" disabled>Proses penerimaan</button>
                     <button class="btn btn-outline-danger" type="button" id="discard-batch-button" disabled>Kosongkan daftar</button>
-                </div>
+                </form>
                 <p class="plan-help receiving-table-note">Tujuan lokasi/pallet muncul setelah Proses penerimaan. Scan belum menambah stok fisik atau pemenuhan.</p>
             </section>
         </div>

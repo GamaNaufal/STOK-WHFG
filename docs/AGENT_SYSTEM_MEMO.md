@@ -2,6 +2,36 @@
 
 Terakhir diverifikasi dari source code: 5 November 2026 (pembaruan inkremental).
 
+Pemulihan otomatis scan Penerimaan Transfer Box Ekspor 5 November 2026:
+- Draft box yang sudah diterima scan dimuat kembali dari server. ID Box yang
+  belum ditambahkan, fase cek, nomor part dan tanggal pilihan dipulihkan
+  otomatis dari localStorage per operator di browser yang sama.
+- Snapshot dikaitkan dengan batch aktif. Pemulihan mengabaikan ID Box yang
+  sudah muncul di draft server agar permintaan scan yang berhasil saat
+  navigasi tidak diulang. Saat kembali melalui cache navigasi browser,
+  halaman scan mengambil draft server terbaru dan memulihkan input lokal.
+- Pengosongan draft membersihkan input, termasuk tanggal. Saat batch
+  sebelumnya telah diproses, input batch lama tidak dibawa ke batch baru.
+- 22 tes Laravel terkait penerimaan, 130 tes JavaScript, dan build Vite lulus.
+  Chrome headless memverifikasi navigasi keluar dan kembali dengan draft
+  berisi, fokus nomor part, tanggal, serta kelanjutan scan pada 1.366/390 px.
+
+Tanggal masuk Penerimaan Transfer Box Ekspor 5 November 2026:
+- Form proses menerima input_date opsional untuk seluruh daftar scan.
+  Jika kosong, semua box memakai satu waktu saat batch diproses. Jika diisi,
+  first_received_at memakai pukul 00.00 WIB pada tanggal pilihan. Tanggal
+  mendatang ditolak dan draft tetap tersedia untuk koreksi.
+- Tanggal efektif menjadi acuan FIFO, umur stok, dan laporan penerimaan.
+  Waktu proses tetap dicatat di processed_at dan ditampilkan terpisah di
+  rincian transaksi. Audit penerimaan menyimpan kedua waktu.
+- Backdate yang membuat stok langsung expired mengikuti alur QA. Box ini
+  tetap terlihat pada transaksi penerimaan, dengan status QA dan tanpa
+  instruksi penempatan. Tanggal dan audit transaksi yang sudah diproses
+  dipertahankan saat permintaan diulang.
+- Regresi 608 tes Laravel dengan SQLite in-memory, 125 tes JavaScript, dan
+  build Vite lulus. Chrome headless memeriksa form kosong dan berisi pada
+  viewport 1.366 dan 390 piksel, termasuk reset tanggal saat draft dibatalkan.
+
 Revisi jumlah pallet ekspor 5 November 2026:
 - Pemenuhan Permintaan > Revisi pallet menyediakan target baru per part,
   termasuk menambah atau mengurangi jumlah yang ada dan mencari nomor part
@@ -1204,8 +1234,9 @@ Verifikasi Penerimaan Bulk dan Stok Ekspor terpisah 29 Oktober 2026:
   scan, hapus baris, batal draft, token retry, revision/tab lama, serta kepemilikan
   operator. Model memberi default status/revision pada respons draft pertama.
 - Proses penerimaan memvalidasi seluruh baris dan kapasitas ulang dalam satu
-  transaksi, membuat stock boxes, lalu alokasi FIFO sekali. Tanggal scan server
-  menjadi first_received_at. Hasil berkelompok per pallet/lokasi dan cadangan;
+  transaksi, membuat stock boxes, lalu alokasi FIFO sekali. Pada saat rilis ini,
+  waktu scan server menjadi first_received_at; aturan terbaru ada di awal memo.
+  Hasil berkelompok per pallet/lokasi dan cadangan;
   tugas stok lama didahulukan. Konfirmasi kelompok atomik, cadangan satu lokasi
   memakai satu pallet fisik. Pemenuhan tetap menunggu konfirmasi fisik.
 - /export/stock (ExportStockController) memisahkan daftar/filter/antrean/detail

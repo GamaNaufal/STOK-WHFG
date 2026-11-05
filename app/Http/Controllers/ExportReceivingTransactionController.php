@@ -20,8 +20,12 @@ class ExportReceivingTransactionController extends Controller
         abort_unless($batch->status === 'processed', 404);
         $batch->load('creator');
 
-        return $this->detail($service->batchBoxes($batch), [
+        $boxes = $service->batchBoxes($batch);
+        $receivedDates = array_filter([$boxes->first()?->first_received_at->format('d/m/Y'), $boxes->last()?->first_received_at->format('d/m/Y')]);
+
+        return $this->detail($boxes, [
             'code' => $service::code('batch', $batch->id), 'received_at' => $batch->processed_at ?? $batch->created_at,
+            'box_received_dates' => implode(' – ', array_unique($receivedDates)),
             'operator' => $batch->creator?->name ?? 'Operator',
             'print_url' => route('export.receiving.transactions.print', $batch),
             'detail_url' => route('export.receiving.transactions.show', $batch),
@@ -78,8 +82,9 @@ class ExportReceivingTransactionController extends Controller
         $receipt['total'] = $boxes->count();
         $receipt['pending'] = $groups->sum(fn ($group) => $group['pending']->count());
         $receipt['redirected'] = $groups->sum(fn ($group) => $group['redirected']->count());
-        $receipt['placed'] = $receipt['total'] - $receipt['pending'] - $receipt['redirected'];
-        $needsChoices = $groups->contains(fn ($group) => ! $group['planned'] && $group['pending']->isNotEmpty());
+        $receipt['qa'] = $groups->sum(fn ($group) => $group['qa']->count());
+        $receipt['placed'] = $receipt['total'] - $receipt['pending'] - $receipt['redirected'] - $receipt['qa'];
+        $needsChoices = $groups->contains(fn ($group) => ! $group['planned'] && $group['actionable']->isNotEmpty());
         $choices = $needsChoices ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
 
         return view('export.receiving.transaction', compact('batch', 'groups', 'receipt', 'returnBox') + $choices);

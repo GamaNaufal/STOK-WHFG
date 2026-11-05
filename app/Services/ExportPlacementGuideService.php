@@ -42,9 +42,12 @@ class ExportPlacementGuideService
         if (($data['receipt']['redirected'] ?? 0) > 0) {
             $warnings[] = $data['receipt']['redirected'].' box mempunyai panduan tersendiri pada transaksi rekomendasi FIFO. Buka transaksi rekomendasi dari halaman penerimaan.';
         }
+        if ($data['receipt']['qa'] > 0) {
+            $warnings[] = $data['receipt']['qa'].' box terkait penanganan QA. Lihat rincian box pada transaksi.';
+        }
         foreach ($data['groups'] as $group) {
             foreach ($group['boxes'] as $box) {
-                if (($group['redirected'] ?? collect())->contains('id', $box->id)) {
+                if ($group['qa']->has($box->id) || ($group['redirected'] ?? collect())->contains('id', $box->id)) {
                     continue;
                 }
                 $pending = $group['pending']->contains('id', $box->id);

@@ -75,13 +75,13 @@ class ExportStockReceivingService
         });
     }
 
-    /** Batch rows originate from the server's validated scan draft, never client PCS/dates. */
-    public function receiveMany(array $rows, User $actor): \Illuminate\Database\Eloquent\Collection
+    /** Receive the validated draft at one effective timestamp before allocating stock. */
+    public function receiveMany(array $rows, User $actor, \DateTimeInterface $receivedAt): \Illuminate\Database\Eloquent\Collection
     {
-        return app(ExportInventoryService::class)->transaction(function () use ($rows, $actor) {
+        return app(ExportInventoryService::class)->transaction(function () use ($rows, $actor, $receivedAt) {
             $boxes = new \Illuminate\Database\Eloquent\Collection;
             foreach ($rows as $row) {
-                $boxes->push($this->receive($row, $actor, false, $row['scanned_at'] ?? null));
+                $boxes->push($this->receive($row, $actor, false, $receivedAt));
             }
             app(ExportStockAllocationService::class)->allocate($actor, $boxes->pluck('part_setting_id')->map(fn ($id) => (int) $id)->unique()->values()->all());
             $boxes->each(fn ($box) => $box->refresh());

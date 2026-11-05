@@ -44,7 +44,9 @@ class ExportStockViewService
                 $pending = $rows->filter(fn ($box) => $box->state === 'received' || ($box->fulfillment && ! $box->fulfillment->placed_at))->values();
                 $redirected = $receiptOnly ? $pending->filter(fn ($box) => $box->fulfillment?->allocation_notice_id !== null
                     && ! $box->fulfillment->awaitsQueueAcknowledgment())->values() : collect();
-                $pending = $pending->reject(fn ($box) => $redirected->contains('id', $box->id))->values();
+                $qa = $receiptOnly && ! $planned ? $rows->filter(fn ($box) => $box->state === 'handling'
+                    || ($box->state === 'received' && $box->expiry_label === 'Expired'))->keyBy('id') : collect();
+                $pending = $pending->reject(fn ($box) => $qa->has($box->id) || $redirected->contains('id', $box->id))->values();
                 $waiting = $pending->filter(fn ($box) => $box->fulfillment?->awaitsQueueAcknowledgment())->values();
                 $actionable = $pending->reject(fn ($box) => $box->fulfillment?->awaitsQueueAcknowledgment())->values();
                 $target = $planned ? $targets->get($planned->id) : null;
@@ -58,7 +60,7 @@ class ExportStockViewService
                     'physical_pallet_id' => $target?->id, 'planned' => $planned, 'delivery' => $planned?->palletPlan->deliveryPlan,
                     'picking_required' => $requiresPicking->count(), 'picking_remaining' => $needsPicking->count(), 'picking_issue' => $pickingIssue,
                     'load' => $planned ? ['current' => $current, 'incoming' => $incoming, 'total' => $current + $incoming] : null,
-                    'boxes' => $rows->values(), 'pending' => $pending, 'waiting' => $waiting, 'actionable' => $actionable, 'redirected' => $redirected,
+                    'boxes' => $rows->values(), 'pending' => $pending, 'waiting' => $waiting, 'qa' => $qa, 'actionable' => $actionable, 'redirected' => $redirected,
                     'placements' => $actionable->map(fn ($box) => ['id' => $box->id, 'revision' => $box->revision,
                         'request_token' => (string) \Illuminate\Support\Str::uuid()])->all()];
             })->values();

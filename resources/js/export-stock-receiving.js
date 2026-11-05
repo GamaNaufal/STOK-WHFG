@@ -5,6 +5,7 @@ import {initDestinationLoads} from './export-stock/pallet-load.mjs';
 import {initStockBrowser} from './export-stock/stock-browser.mjs';
 import {initExportPicking} from './export-stock/picking.mjs';
 import {initSparePlacements} from './export-stock/spare-placement.mjs';
+import {receivingScanProgress} from './export-stock/receiving-scan-progress.mjs';
 
 initBoxModal();
 initSparePlacements();
@@ -34,6 +35,9 @@ if (form) {
     const base = form.dataset.batchesUrl, csrf = form.querySelector('[name="_token"]').value;
     let state = JSON.parse(document.getElementById('receiving-batch-bootstrap').textContent);
     let busy = false, pendingBox = null;
+    const inputDate = processForm.elements.input_date;
+    const progress = receivingScanProgress(form.dataset.progressUser);
+    const persist = () => progress.save(state, {box: box.value, part: part.value, checked: pendingBox !== null, inputDate: inputDate.value});
     const format = value => Number(value).toLocaleString('id-ID');
     const feedback = (ok, message) => {
         label.textContent = ok ? 'OK' : 'NG';
@@ -87,6 +91,7 @@ if (form) {
     const resetInput = () => {
         pendingBox = null; box.value = ''; part.value = ''; box.readOnly = busy;
         existing.hidden = true;
+        persist();
         box.focus({preventScroll: true});
     };
     const recover = async error => {
@@ -97,6 +102,7 @@ if (form) {
                     const url = new URL(location.href); url.search = ''; url.searchParams.set('batch', state.id);
                     location.assign(url.href); return;
                 }
+                persist();
             } catch (_) { /* Keep the visible list if refresh is unavailable. */ }
         }
         feedback(false, error.message);
@@ -117,6 +123,7 @@ if (form) {
                 }
             } else {
                 pendingBox = number; box.value = number; feedback(true, result.message);
+                persist();
                 part.focus({preventScroll: true}); part.select();
             }
         } catch (error) { await recover(error); box.focus({preventScroll: true}); }
@@ -129,7 +136,10 @@ if (form) {
         if (!numberPart || numberPart.length > 100) { feedback(false, 'Scan nomor part yang valid, maksimal 100 karakter.'); part.focus(); part.select(); return; }
         setBusy(true);
         try {
-            if (!state.id) state = await request(base, 'POST', {});
+            if (!state.id) {
+                state = await request(base, 'POST', {});
+                persist();
+            }
             state = await request(base + '/' + state.id + '/scan', 'POST', {
                 box_number: number, part_number: numberPart, revision: state.revision, scan_token: scanToken(),
             });
@@ -156,7 +166,10 @@ if (form) {
             }
         }
         existing.hidden = true;
+        persist();
     });
+    part.addEventListener('input', persist);
+    inputDate.addEventListener('input', persist);
     items.addEventListener('click', async event => {
         const button = event.target.closest('[data-remove-scan]');
         if (!button || busy) return;
@@ -171,6 +184,7 @@ if (form) {
             setBusy(true);
             try {
                 state = await request(base + '/' + state.id, 'DELETE', {revision: state.revision});
+                inputDate.value = '';
                 resetInput(); label.textContent = 'Siap scan'; outcome.classList.remove('is-ok', 'is-ng');
                 status.textContent = 'Daftar dikosongkan. Mulai scan box berikutnya.';
             } catch (error) { await recover(error); }
@@ -185,6 +199,21 @@ if (form) {
         }
         setBusy(true);
     });
+    const saved = progress.restore(state);
+    if (saved) {
+        box.value = saved.box;
+        part.value = saved.part;
+        if (!inputDate.value) inputDate.value = saved.inputDate;
+        if (saved.checked) {
+            pendingBox = saved.box;
+            box.readOnly = true;
+            label.textContent = 'Siap scan part';
+            status.textContent = 'ID Box ' + saved.box + ' siap. Lanjutkan scan nomor part.';
+        }
+    }
     render();
-    (document.getElementById('receiving-errors') ?? box).focus({preventScroll: true});
+    (document.getElementById('receiving-errors') ?? (pendingBox ? part : box)).focus({preventScroll: true});
+    window.addEventListener('pageshow', event => {
+        if (event.persisted) location.reload();
+    });
 }

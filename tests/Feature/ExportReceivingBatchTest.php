@@ -26,9 +26,9 @@ class ExportReceivingBatchTest extends TestCase
             'box_number'=>$number,'part_number'=>'BULK-A','revision'=>$batch->fresh()->revision,'scan_token'=>(string)Str::uuid(),
         ],$replace));
     }
-    private function process(ExportReceivingBatch $batch)
+    private function process(ExportReceivingBatch $batch, array $data = [])
     {
-        return $this->postJson(route('export.receiving.batches.process',$batch),['revision'=>$batch->fresh()->revision]);
+        return $this->postJson(route('export.receiving.batches.process', $batch), $data + ['revision' => $batch->fresh()->revision]);
     }
     private function plan(int $quantity=2)
     {
@@ -81,15 +81,17 @@ class ExportReceivingBatchTest extends TestCase
         $this->process($batch)->assertUnprocessable()->assertJsonValidationErrors('batch');
         $this->assertDatabaseCount('export_stock_boxes',0);
     }
-    public function test_process_receives_all_then_allocates_and_preserves_server_scan_dates(): void
+    public function test_process_without_input_date_uses_one_process_time_then_allocates(): void
     {
         $delivery=$this->plan(); $batch=$this->batch();
-        $this->travelTo(now()->subDay()); $scannedAt=now()->toDateTimeString();
+        $processedAt = now()->startOfSecond();
+        $this->travelTo($processedAt->copy()->subDay());
         foreach(['00000001','00000002','00000003'] as $number)$this->scan($batch,$number,['first_received_at'=>'1990-01-01','pcs_quantity'=>999])->assertOk();
-        $this->travelBack();
+        $this->travelTo($processedAt);
         $this->process($batch)->assertRedirect(route('export.receiving.transactions.show',$batch));
         $this->assertDatabaseCount('export_stock_boxes',3); $this->assertDatabaseCount('export_fulfillment_boxes',2);
-        $this->assertSame($scannedAt,ExportStockBox::first()->first_received_at->toDateTimeString());
+        $this->assertSame($processedAt->toDateTimeString(), $batch->fresh()->processed_at->toDateTimeString());
+        $this->assertSame([$processedAt->toDateTimeString()], ExportStockBox::all()->map(fn ($box) => $box->first_received_at->toDateTimeString())->unique()->all());
         $this->assertSame(10,ExportStockBox::first()->pcs_quantity);
         $this->get(route('export.receiving.transactions.show',$batch))->assertOk()->assertSee('Penerimaan Transfer Box Ekspor')
             ->assertViewHas('groups',fn($g)=>$g->count()===2);
@@ -97,6 +99,65 @@ class ExportReceivingBatchTest extends TestCase
         $this->assertSame($audits,AuditLog::count()); $this->assertDatabaseCount('export_stock_boxes',3);
         $this->get(route('export.fulfillment.show',$delivery))->assertViewHas('metrics',fn($m)=>$m['fulfilled']===0&&$m['reserved']===2);
     }
+    public function test_one_selected_date_is_used_for_the_entire_batch_and_fifo(): void
+    {
+        $spare = app(ExportStockReceivingService::class)->receive(['box_number' => '00000999', 'part_number' => 'BULK-A',
+            'receive_token' => (string) Str::uuid()], $this->operator);
+        $batch = $this->batch();
+        $this->scan($batch, '00000001')->assertOk();
+        $this->scan($batch, '00000002')->assertOk();
+        $this->get(route('export.receiving.index'))->assertOk()->assertSee('Tanggal masuk')->assertSee('name="input_date"', false);
+        $date = today()->subDays(3);
+        $input = ['input_date' => $date->toDateString()];
+        $this->process($batch, $input)->assertRedirect();
+        $boxes = ExportStockBox::where('id', '!=', $spare->id)->orderBy('id')->get();
+        $this->assertSame([$date->toDateTimeString(), $date->toDateTimeString()], $boxes->map(fn ($box) => $box->first_received_at->toDateTimeString())->all());
+        $this->assertTrue($batch->fresh()->processed_at->isToday());
+        $audit = AuditLog::where('type', 'export_receiving_batch')->where('action', 'processed')->sole();
+        $this->assertSame($date->toDateTimeString(), $audit->getNewValuesArray()['first_received_at']);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()->assertSee('Tanggal masuk box')->assertSee($date->format('d/m/Y'));
+
+        $this->plan(1);
+        $this->assertNotNull($boxes->first()->fresh()->fulfillment);
+        $this->assertNull($boxes->last()->fresh()->fulfillment);
+        $this->assertNull($spare->fresh()->fulfillment);
+
+        $this->process($batch, ['input_date' => today()->toDateString()])->assertRedirect();
+        $this->assertSame($date->toDateTimeString(), $boxes->first()->fresh()->first_received_at->toDateTimeString());
+        $this->assertDatabaseCount('export_stock_boxes', 3);
+    }
+
+    public function test_invalid_receiving_dates_leave_the_draft_intact(): void
+    {
+        $batch = $this->batch();
+        $this->scan($batch, '00000001')->assertOk();
+        foreach ([today()->addDay()->toDateString(), '2026-02-30', '1969-12-31'] as $date) {
+            $this->process($batch, ['input_date' => $date])->assertUnprocessable()->assertJsonValidationErrors('input_date');
+        }
+        $this->assertSame('draft', $batch->fresh()->status);
+        $this->assertSame(1, $batch->items()->count());
+        $this->assertDatabaseCount('export_stock_boxes', 0);
+    }
+
+    public function test_backdated_expired_receipt_goes_to_qa_instead_of_normal_placement(): void
+    {
+        $this->plan(1);
+        $batch = $this->batch();
+        $this->scan($batch, '00000001')->assertOk();
+        $this->process($batch, ['input_date' => today()->subMonthsNoOverflow(13)->toDateString()])->assertRedirect();
+        $box = ExportStockBox::sole();
+        $this->assertSame('Expired', $box->expiry_label);
+        $this->assertNull($box->fulfillment);
+        $detail = route('export.receiving.transactions.show', $batch);
+        $this->get($detail)->assertOk()->assertSee('Expired · Perlu penanganan QA')
+            ->assertDontSee('data-placement-form', false)->assertViewHas('receipt', fn ($receipt) => $receipt['qa'] === 1 && $receipt['placed'] === 0);
+        $this->get(route('export.receiving.transactions.print', $batch))->assertOk()->assertSee('penanganan QA')
+            ->assertDontSee('00000001')->assertDontSee('Seluruh box pada transaksi ini sudah ditempatkan.');
+        $admin = User::factory()->create(['role' => 'admin_warehouse']);
+        app(\App\Services\ExportExpiredBoxHandlingService::class)->start($box->id, $admin->id);
+        $this->get($detail)->assertOk()->assertSee('Dalam penanganan QA')->assertViewHas('receipt', fn ($receipt) => $receipt['placed'] === 0);
+    }
+
     public function test_conflicting_receipt_rolls_back_the_entire_batch(): void
     {
         $batch=$this->batch(); $this->scan($batch,'00000001')->assertOk(); $this->scan($batch,'00000002')->assertOk();
