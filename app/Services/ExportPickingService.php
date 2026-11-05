@@ -92,6 +92,9 @@ class ExportPickingService
         app(ExportInventoryService::class)->transaction(function () use ($palletId, $noticeId, $fingerprint, $actor) {
             $this->assertTarget(ExportPlannedPallet::findOrFail($palletId));
             $rows = $this->rows($palletId, $noticeId, recommendationsOnly: true);
+            foreach ($rows as $row) {
+                $row->stockBox->assertEligible();
+            }
             if ($rows->isEmpty() || ! hash_equals($this->startFingerprint($rows), $fingerprint)) {
                 $this->fail('Daftar atau lokasi picking berubah. Muat ulang panduan sebelum mulai.');
             }
@@ -181,6 +184,7 @@ class ExportPickingService
             return ['success' => false, 'blocked' => false, 'message' => 'NG · Box tidak termasuk rekomendasi pengambilan ini. Silakan scan ulang.'];
         }
         $source = $row->stockBox->currentPallet;
+        $row->stockBox->assertEligible();
 
         return ['success' => true, 'blocked' => false, 'message' => 'OK · '.$number.' · '.$row->stockBox->part_number.' · ambil dari '.$source->display_name.' di lokasi '.$source->location_code.'.',
             'box_number' => $number, 'source' => $source->display_name.' · '.$source->location_code];
@@ -213,6 +217,7 @@ class ExportPickingService
             $row = $rows->firstWhere('box_number', $data['box_number']);
             if ($row) {
                 $box = $row->stockBox;
+                $box->assertEligible();
                 if ($box->state !== 'stored' || ! $box->currentPallet || $box->currentPallet->retired_at
                     || (int) $row->part_setting_id !== (int) $box->part_setting_id || $row->pcs_quantity !== $box->pcs_quantity) {
                     $this->fail('Identitas atau posisi box berubah. Periksa kembali stok dan rekomendasi.');

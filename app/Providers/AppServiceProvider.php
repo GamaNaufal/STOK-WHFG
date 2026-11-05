@@ -51,6 +51,12 @@ class AppServiceProvider extends ServiceProvider
 
         StockLocation::observe(StockLocationObserver::class);
 
+        View::composer('warehouse.expired-box.*', function ($view) {
+            $export = request()->routeIs('export.expired-box.*');
+            $view->with('expiredRoutePrefix', $export ? 'export.expired-box.' : 'expired-box.')
+                ->with('scope', $export ? 'export' : 'domestic')->with('scopeLabel', $export ? 'Ekspor' : 'Lokal');
+        });
+
         // Share notification counts for sidebar badges
         View::composer('shared.layouts.app', function ($view) {
             $avatarInitials = 'UU';
@@ -74,7 +80,7 @@ class AppServiceProvider extends ServiceProvider
                     'route' => route($item['route']), 'keywords' => $item['keywords'],
                 ], $featureNavigation));
                 $cacheTtlSeconds = 30;
-                if (in_array(Auth::user()->role, ['admin','admin_warehouse','supervisi'], true)
+                if (in_array(Auth::user()->role, ['admin', 'admin_warehouse', 'supervisi'], true)
                     && (Auth::user()->canAccess('not_full_request') || Auth::user()->canAccess('not_full_approval'))) {
                     $view->with('exportNotFullPending', app(\App\Services\ExportNotFullService::class)->pending()->count());
                 }

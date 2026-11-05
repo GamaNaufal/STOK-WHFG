@@ -7,11 +7,28 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ExpiredBoxTransaction extends Model
 {
+    use \App\Models\Concerns\HasMasterScope;
+
+    public const MASTER_SCOPE = 'domestic';
+
+    public const HANDLING_MODEL = ExpiredBoxHandling::class;
+
+    public const RECEIPT_MODEL = ExpiredBoxReceipt::class;
+
+    protected $table = 'expired_box_transactions';
+
+    protected $attributes = ['scope' => 'domestic'];
+
     protected $guarded = ['id'];
 
     public function handlings(): HasMany
     {
-        return $this->hasMany(ExpiredBoxHandling::class, 'transaction_id')->orderBy('id');
+        return $this->hasMany(static::HANDLING_MODEL, 'transaction_id')->orderBy('id');
+    }
+
+    public function receipts(): HasMany
+    {
+        return $this->hasMany(static::RECEIPT_MODEL, 'transaction_id')->orderByDesc('id');
     }
 
     public function getReferenceAttribute(): string

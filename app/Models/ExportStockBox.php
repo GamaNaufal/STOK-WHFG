@@ -42,7 +42,41 @@ class ExportStockBox extends Model
 
     protected $casts = ['box_number' => 'string', 'pcs_quantity' => 'integer', 'revision' => 'integer', 'is_not_full' => 'boolean',
         'standard_pcs_quantity' => 'integer', 'receipt_pcs_quantity' => 'integer',
-        'first_received_at' => 'datetime', 'stored_at' => 'datetime'];
+        'first_received_at' => 'datetime', 'stored_at' => 'datetime', 'reactivated_until' => 'datetime'];
+
+    public function expiredHandling()
+    {
+        return $this->hasOne(ExportExpiredBoxHandling::class, 'source_box_id');
+    }
+
+    public function scopeEligible($query)
+    {
+        return $query->whereIn('state', ['received', 'stored'])->where(fn ($q) => $q
+            ->where(fn ($r) => $r->whereNotNull('reactivated_until')->where('reactivated_until', '>', now()))
+            ->orWhere(fn ($r) => $r->whereNull('reactivated_until')->where('first_received_at', '>', now()->subMonthsNoOverflow(12))));
+    }
+
+    public function getExpiryLabelAttribute(): string
+    {
+        if ($this->expired_status === 'handled') {
+            return 'Dalam penanganan QA / packing';
+        }
+        if ($this->reactivated_until) {
+            return $this->reactivated_until->gt(now()) ? 'Aktif · hasil packing' : 'Expired';
+        }
+        if ($this->first_received_at->lte(now()->subMonthsNoOverflow(12))) {
+            return 'Expired';
+        }
+
+        return $this->first_received_at->lte(now()->subMonthsNoOverflow(9)) ? 'Warning' : 'Aktif';
+    }
+
+    public function assertEligible(): void
+    {
+        if (! in_array($this->state, ['received', 'stored'], true) || $this->expiry_label === 'Expired' || $this->expired_status === 'handled') {
+            throw \Illuminate\Validation\ValidationException::withMessages(['box' => 'ID Box '.$this->box_number.' tidak aktif atau expired. Lepaskan reservasi melalui revisi lalu proses QA/packing.']);
+        }
+    }
 
     public function part()
     {

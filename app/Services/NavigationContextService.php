@@ -44,6 +44,20 @@ class NavigationContextService
         }
         unset($item);
 
+        $expiredKeys = ['expired_box' => 'expired-box.index', 'export_expired_box' => 'export.expired-box.index'];
+        $expiredRoutes = array_filter($expiredKeys, fn ($route, $key) => $user->canAccess($key), ARRAY_FILTER_USE_BOTH);
+        $expiredAnchor = reset($expiredRoutes) ?: null;
+        $expiredRoute = Str::is('export.expired-box.*', $routeName ?? '') ? ($expiredRoutes['export_expired_box'] ?? $expiredAnchor) : $expiredAnchor;
+        $items = array_filter($items, fn ($item) => ! isset($expiredKeys[$item['key']]) || $item['route'] === $expiredAnchor);
+        foreach ($items as &$item) {
+            if ($item['route'] === $expiredAnchor) {
+                $item['route'] = $expiredRoute;
+                $item['key'] = $expiredRoute === 'export.expired-box.index' ? 'export_expired_box' : 'expired_box';
+                $item['label'] = 'Expired Box dan Handle';
+            }
+        }
+        unset($item);
+
         $order = array_flip(['Warehouse', 'Delivery', 'Pengiriman Ekspor', 'Master Data', 'Master Data Ekspor', 'Laporan', 'Administrasi']);
         usort($items, fn ($a, $b) => ($order[$a['group']] ?? 99) <=> ($order[$b['group']] ?? 99));
         $activeRoute = $this->activeRoute($items, $routeName, $access);

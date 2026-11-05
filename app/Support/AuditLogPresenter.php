@@ -22,6 +22,8 @@ class AuditLogPresenter
         'total_pcs_quantity' => 'Total PCS', 'total_box_quantity' => 'Total box',
         'total_boxes' => 'Total box', 'completed_boxes' => 'Box selesai', 'box_count' => 'Jumlah box',
         'returned_box_quantity' => 'Box dikembalikan fisik', 'returned_pcs_quantity' => 'PCS dikembalikan fisik',
+        'added_box_quantity' => 'Box ditambahkan ke kebutuhan', 'reduced_box_quantity' => 'Box dikurangi dari kebutuhan',
+        'recommended_box_quantity' => 'Box stok direkomendasikan FIFO',
         'warehouse_location' => 'Lokasi gudang', 'location' => 'Lokasi gudang',
         'pallet' => 'Pallet', 'stored_at' => 'Tanggal masuk', 'withdrawn_at' => 'Tanggal pengambilan',
         'age_months' => 'Umur stok (bulan)', 'handled_at' => 'Tanggal Handle',
@@ -49,7 +51,7 @@ class AuditLogPresenter
             'reversed' => 'Dibatalkan / dikembalikan', 'redo' => 'Ulangi delivery',
             'moved' => 'Dipindahkan', 'merged' => 'Pallet digabung',
             'handled' => 'Box di-Handle',
-            'ready' => 'Pallet siap', 'reduced' => 'Pengurangan box pallet', 'reopened' => 'Dibuka untuk revisi',
+            'ready' => 'Pallet siap', 'reduced' => 'Pengurangan box pallet', 'revised' => 'Revisi box pallet', 'reopened' => 'Dibuka untuk revisi',
             'approved' => 'Disetujui', 'rejected' => 'Ditolak',
             'input_error_closed' => 'Salah input tanpa box fisik ditutup',
             'started' => 'Dimulai', 'cancelled' => 'Dibatalkan',
@@ -84,6 +86,7 @@ class AuditLogPresenter
             'delivery_pickup' => 'Pengiriman', 'delivery_assignment' => 'Assignment delivery',
             'delivery_redo' => 'Redo delivery', 'box_pallet_moved' => 'Pemindahan box',
             'expired_box' => 'Penanganan box expired',
+            'export_expired_box' => 'Penanganan box expired ekspor',
             'not_full_box' => 'Box Not Full', 'delivery_pick' => 'Picking delivery',
             'delivery_issue' => 'Issue scan delivery',
             'master_location' => 'Master lokasi', 'master_part' => 'Master part',
@@ -99,15 +102,17 @@ class AuditLogPresenter
         // Read historical snapshots only; current inventory may have changed or been deleted.
         $old = self::normalize($log->old_values);
         $new = self::normalize($log->new_values);
-        if ($log->model === 'DeliveryOrder' && !isset($new['delivery_order_id'])) {
+        if ($log->model === 'DeliveryOrder' && ! isset($new['delivery_order_id'])) {
             $new['delivery_order_id'] = $log->model_id;
         }
         $changes = $facts = $tables = [];
         foreach (self::FIELDS as $key => $label) {
-            if ($log->type === 'export_fulfillment' && $key === 'pallets') continue;
+            if ($log->type === 'export_fulfillment' && $key === 'pallets') {
+                continue;
+            }
             $hasOld = array_key_exists($key, $old);
             $hasNew = array_key_exists($key, $new);
-            if (!$hasOld && !$hasNew) {
+            if (! $hasOld && ! $hasNew) {
                 continue;
             }
             $before = self::format($key, $old[$key] ?? null);
@@ -116,29 +121,43 @@ class AuditLogPresenter
                 $changes[] = compact('label', 'before', 'after');
             } else {
                 // Missing keys in partial snapshots do not mean the field was cleared.
-                $facts[] = ['label' => $label.(!$hasNew ? ' (sebelum aksi)' : ''), 'value' => $hasNew ? $after : $before];
+                $facts[] = ['label' => $label.(! $hasNew ? ' (sebelum aksi)' : ''), 'value' => $hasNew ? $after : $before];
             }
         }
 
         foreach (['old' => $old, 'new' => $new] as $side => $values) {
             foreach (['boxes', 'released_boxes', 'items', 'pallets', 'overage_adjustments', 'requirements'] as $key) {
-                if ($key === 'pallets' && !in_array($log->type, ['export_fulfillment', 'export_pallet_merge'], true)) continue;
-                if (!is_array($values[$key] ?? null) || !$values[$key]) {
+                if ($key === 'pallets' && ! in_array($log->type, ['export_fulfillment', 'export_pallet_merge'], true)) {
+                    continue;
+                }
+                if (! is_array($values[$key] ?? null) || ! $values[$key]) {
                     continue;
                 }
                 $isAdjustment = $key === 'overage_adjustments';
                 $columns = $isAdjustment
                     ? ['part_number' => 'Nomor part', 'old_quantity' => 'Sebelum (PCS)', 'new_quantity' => 'Sesudah (PCS)', 'increased_by' => 'Tambahan (PCS)']
                     : ['box_number' => 'ID Box', 'part_number' => 'Nomor part', 'pcs_quantity' => 'Jumlah PCS', 'warehouse_location' => 'Lokasi gudang'];
-                if ($log->type === 'export_fulfillment' && in_array($key, ['boxes', 'released_boxes'], true)) $columns += ['pallet_number' => 'Nomor pallet', 'first_received_at' => 'Pertama diterima'];
-                if ($log->type === 'export_fulfillment' && $key === 'items') $columns = ['part_number' => 'Nomor part', 'pcs_per_box' => 'PCS per box', 'box_quantity' => 'Jumlah box', 'pcs_quantity' => 'Total PCS'];
-                if ($log->type === 'export_fulfillment' && $key === 'pallets') $columns = ['pallet_number' => 'Nomor pallet', 'location' => 'Lokasi', 'total_boxes' => 'Jumlah box', 'ready_at' => 'Dikonfirmasi siap', 'ready_by' => 'ID operator'];
-                if ($log->type === 'export_pallet_merge' && $key === 'pallets') $columns = ['id' => 'ID pallet stok', 'pallet_number' => 'Nomor pallet', 'location_code' => 'Lokasi sumber', 'box_quantity' => 'Jumlah box'];
-                if ($log->type === 'export_pallet_merge' && $key === 'requirements') $columns = ['part_number' => 'Nomor part', 'pcs_per_box' => 'PCS / box', 'before' => 'Semula (box)', 'incoming' => 'Cadangan masuk', 'added' => 'Tambahan', 'after' => 'Hasil (box)'];
-                if ($log->type === 'export_pallet_merge' && $key === 'boxes') $columns += ['first_received_at' => 'Pertama diterima'];
+                if ($log->type === 'export_fulfillment' && in_array($key, ['boxes', 'released_boxes'], true)) {
+                    $columns += ['pallet_number' => 'Nomor pallet', 'first_received_at' => 'Pertama diterima'];
+                }
+                if ($log->type === 'export_fulfillment' && $key === 'items') {
+                    $columns = ['part_number' => 'Nomor part', 'pcs_per_box' => 'PCS per box', 'box_quantity' => 'Jumlah box', 'pcs_quantity' => 'Total PCS'];
+                }
+                if ($log->type === 'export_fulfillment' && $key === 'pallets') {
+                    $columns = ['pallet_number' => 'Nomor pallet', 'location' => 'Lokasi', 'total_boxes' => 'Jumlah box', 'ready_at' => 'Dikonfirmasi siap', 'ready_by' => 'ID operator'];
+                }
+                if ($log->type === 'export_pallet_merge' && $key === 'pallets') {
+                    $columns = ['id' => 'ID pallet stok', 'pallet_number' => 'Nomor pallet', 'location_code' => 'Lokasi sumber', 'box_quantity' => 'Jumlah box'];
+                }
+                if ($log->type === 'export_pallet_merge' && $key === 'requirements') {
+                    $columns = ['part_number' => 'Nomor part', 'pcs_per_box' => 'PCS / box', 'before' => 'Semula (box)', 'incoming' => 'Cadangan masuk', 'added' => 'Tambahan', 'after' => 'Hasil (box)'];
+                }
+                if ($log->type === 'export_pallet_merge' && $key === 'boxes') {
+                    $columns += ['first_received_at' => 'Pertama diterima'];
+                }
                 $rows = [];
                 foreach ($values[$key] as $item) {
-                    if (!is_array($item)) {
+                    if (! is_array($item)) {
                         continue;
                     }
                     $row = [];
@@ -171,16 +190,18 @@ class AuditLogPresenter
     private static function normalize(mixed $json): array
     {
         $values = is_string($json) ? json_decode($json, true) : $json;
-        if (!is_array($values)) {
+        if (! is_array($values)) {
             return [];
         }
         if (is_array($values['preparation'] ?? null)) {
             $preparation = $values['preparation'];
-            foreach (['box_number'=>'box_number', 'source_box_number'=>'source_box_number', 'location_code'=>'warehouse_location', 'mode'=>'preparation_mode'] as $key=>$field) {
-                if (array_key_exists($key,$preparation) && !array_key_exists($field,$values)) $values[$field]=$preparation[$key];
+            foreach (['box_number' => 'box_number', 'source_box_number' => 'source_box_number', 'location_code' => 'warehouse_location', 'mode' => 'preparation_mode'] as $key => $field) {
+                if (array_key_exists($key, $preparation) && ! array_key_exists($field, $values)) {
+                    $values[$field] = $preparation[$key];
+                }
             }
         }
-        if (!isset($values['part_number']) && is_array($values['part_numbers'] ?? null)) {
+        if (! isset($values['part_number']) && is_array($values['part_numbers'] ?? null)) {
             $values['part_number'] = implode(', ', array_filter($values['part_numbers'], 'is_scalar'));
         }
         foreach (['assigned_box', 'assigned_existing_box', 'created_new_box'] as $prefix) {
@@ -193,6 +214,7 @@ class AuditLogPresenter
                 $values['pallet'] = $values[$key];
             }
         }
+
         return $values;
     }
 
@@ -201,13 +223,18 @@ class AuditLogPresenter
         if ($value === null || $value === '') {
             return 'Belum diisi';
         }
-        if (in_array($key,['origin','preparation_mode'],true) && is_string($value)) return ['external'=>'Datang sudah dikemas', 'split'=>'Pemecahan stok penuh'][$value] ?? $value;
-        if ($key === 'spare_mode') return ['fill' => 'Penuhi kebutuhan lebih dahulu', 'add' => 'Tambahkan sebagai kebutuhan baru'][$value] ?? (string) $value;
+        if (in_array($key, ['origin', 'preparation_mode'], true) && is_string($value)) {
+            return ['external' => 'Datang sudah dikemas', 'split' => 'Pemecahan stok penuh'][$value] ?? $value;
+        }
+        if ($key === 'spare_mode') {
+            return ['fill' => 'Penuhi kebutuhan lebih dahulu', 'add' => 'Tambahkan sebagai kebutuhan baru'][$value] ?? (string) $value;
+        }
         if (in_array($key, ['pallets', 'auto_deleted_pallets'], true) && is_array($value)) {
             $numbers = array_filter(array_map(fn ($item) => is_array($item) ? ($item['pallet_number'] ?? null) : null, $value), 'is_scalar');
+
             return $numbers ? implode(', ', $numbers) : (count($value) ? count($value).' pallet (nomor tidak tercatat)' : 'Tidak ada');
         }
-        if (!is_scalar($value)) {
+        if (! is_scalar($value)) {
             return 'Tidak tercatat';
         }
         if ($key === 'deleted') {
@@ -240,6 +267,7 @@ class AuditLogPresenter
         if (is_numeric($value) && (str_contains($key, 'quantity') || str_ends_with($key, '_count') || in_array($key, ['total_boxes', 'completed_boxes', 'increased_by'], true))) {
             return number_format((float) $value, 0, ',', '.');
         }
+
         return (string) $value;
     }
 }

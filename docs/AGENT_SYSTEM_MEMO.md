@@ -1,6 +1,132 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 4 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 5 November 2026 (pembaruan inkremental).
+
+Revisi jumlah pallet ekspor 5 November 2026:
+- Pemenuhan Permintaan > Revisi pallet menyediakan target baru per part,
+  termasuk menambah atau mengurangi jumlah yang ada dan mencari nomor part
+  tambahan dari master bersama. Baris baru memakai PCS/box standar. Baris
+  Not Full yang sudah ada tetap dikelola menurut komposisi PCS yang tepat.
+- Tinjauan menampilkan target sebelum dan sesudah, stok FIFO yang cocok,
+  kebutuhan tambahan yang belum tersedia, serta daftar box terbaru untuk
+  pengembalian/pelepasan. Tujuan pengembalian adalah pallet cadangan atau
+  lokasi kosong. Peringatan kapasitas berlaku mulai 36 dan 72 box.
+- Revisi mengubah kebutuhan delivery yang sama, menyesuaikan Not Full dan
+  membuka kembali status siap pallet yang direvisi. Rencana tetap final selama
+  masih memiliki pallet. Perubahan ditangani secara atomik, dengan pemeriksaan
+  revisi, fingerprint stok, token idempotensi dan audit.
+- Stok bebas dan aktif dialokasikan FIFO menurut nomor part dan PCS per box,
+  dengan prioritas tenggat dan urutan pallet. Tombol simpan dari tinjauan
+  mengaktifkan transaksi antrean baru untuk tambahan yang direkomendasikan.
+  Jika stok belum cukup, sisa kebutuhan tetap dapat disimpan. Transfer antar
+  delivery di luar lingkup revisi.
+- Tidak memerlukan migration. Regresi SQLite in-memory lulus 605 tes
+  (5.724 assertions) dan regresi JavaScript lulus 125 tes. Chrome headless
+  memverifikasi pencarian, fokus input, hapus part, dan peringatan kapasitas
+  pada viewport 1.366 dan 390 piksel.
+
+Expired Box dan Handle Lokal / Ekspor 5 November 2026:
+- UI disetujui pengguna: satu menu Warehouse dengan pemilih Lokal/Ekspor,
+  tab Perlu ditangani/Dalam proses/Riwayat/Warning, grup part + PCS, serta
+  AJAX pencarian, filter, pagination dan pergantian lingkup. Header transaksi
+  selalu menampilkan lingkup; rincian box asal dan riwayat dapat dibuka.
+  Scanner dan tujuan penyimpanan berdampingan di desktop, bertumpuk di ponsel.
+- Default akses kedua lingkup: Supervisi, Admin Warehouse, Admin Utama.
+  Operator Lokal/Ekspor tidak mendapat default akses QA. Menu sidebar digabung
+  tetapi endpoint/otorisasi tetap per lingkup. Izin Supervisi yang dicabut
+  secara eksplisit tetap dihormati saat migration; Admin Warehouse ditambahkan
+  sesuai persetujuan pengguna.
+- Tiga tabel penanganan/transaction/receipt memakai scope default domestic.
+  Model lokal memakai HasMasterScope; subclass ExportExpiredBox* menetapkan
+  export. Unique source/replacement PK menjadi per scope karena PK stok lokal
+  dan ekspor dapat sama. ID Box tetap unik global dan tidak dapat dipakai ulang.
+  Route/payload tidak dapat memindahkan histori atau keanggotaan lintas lingkup.
+- ExportExpiredBoxService memakai first_received_at asli: warning >=9 bulan,
+  expired >=12 bulan, atau mengikuti reactivated_until jika pernah packing.
+  Expiry label dan eligibility dihitung dari tanggal, tidak bergantung scheduler.
+  Command expired-box:sync-statuses juga menyinkronkan label ekspor.
+- ExportStockBox::eligible/assertEligible melindungi reservasi FIFO, penempatan
+  normal, mulai/scan/cari picking, penyiapan Not Full, merge ke permintaan,
+  konfirmasi Siap dan penyelesaian pengiriman. Not Full hasil split mewarisi
+  deadline sumber. Box expired tetap terlihat sebagai stok fisik dengan label;
+  box dalam QA/packing tidak masuk tabel stok/antrean operasional biasa.
+- Box berreservasi wajib dilepas melalui revisi sebelum QA. Pallet Siap perlu
+  dibuka ulang; picking/issue aktif dan penyiapan Not Full sumber memblokir QA.
+  Reopen dan pengembalian lewat revisi secara khusus mengizinkan box expired
+  dipindah ke cadangan, sehingga jalan keluar menuju QA tidak buntu. Pengecualian
+  ini merupakan argumen internal service, bukan flag yang bisa dikirim browser.
+- ExportExpiredBoxHandlingService memakai mutex inventory. Saat QA, stok menjadi
+  handling, current_pallet_id dilepas dan pallet kosong retired/melepas okupansi.
+  Penolakan mengarsipkan stok operasional dengan snapshot dan ID global tetap
+  tersimpan; soft-delete menjaga FK movement/Not Full ekspor. Alur lokal tetap
+  mempertahankan implementasi force-delete dengan snapshot yang sudah ada.
+- Hasil packing diterima bertahap melalui service receipt bersama. ID berasal
+  dari scan packing, PCS aktual/Not Full dan FIFO asal tertua diwarisi, deadline
+  received_at server + satu bulan kalender. Hasil ekspor langsung ditempatkan
+  sebagai cadangan ke pallet existing/lokasi ekspor kosong; alokasi selanjutnya
+  mengikuti FIFO normal. Token, jumlah tersisa, lokasi, ID global, audit dan
+  penempatan divalidasi atomik. Warning 36/72 box juga tampil di tujuan penerimaan.
+- Stock Opname ekspor mencakup QA/packing aktif dan mengenali ID asal yang sudah
+  diganti/ditolak sebagai keluar/arsip. Histori dan audit export_expired_box
+  menyimpan lingkup, acuan FIFO otomatis, penerimaan dan tujuan.
+- Migration 2026_11_05_000001 dan 000002 diterapkan pada MySQL development stock
+  setelah backup storage/app/backups/before-expired-workspace-20261105-093738-b12dd2.sql
+  (193.067 byte). Jumlah stok, master dan histori sebelum/sesudah tetap sama.
+  Production tidak diakses. Error 500 karena schema scope belum diterapkan serta
+  manifest Vite ber-key absolut sudah ditangani. Build harus dari path project
+  sebenarnya; alias W: hanya dipakai untuk pengujian PHP, bukan npm build.
+- Verifikasi: seluruh 601 tes backend lulus (5.674 assertions), 125 frontend
+  dan Vite build lulus. Manifest diverifikasi mempunyai key resources/js/* relatif
+  dan tes tambahan rollback schema kosong/grant izin migration lulus (4 assertions).
+  File aset tersedia dan HTTP localhost port 8000 merespons 200 setelah perbaikan.
+  Pratinjau browser desktop dan viewport 390px memakai
+  HTML hasil render SQLite in-memory; pilihan pallet existing/baru diverifikasi.
+  Belum merupakan pengujian scanner fisik atau E2E browser dengan DB pengguna.
+  File preview di storage/app/previews/expired-workspace-20261105; server dan
+  tab preview dihentikan setelah pemeriksaan.
+
+Catatan penerimaan lokal berikut bersifat historis; status penerapan migration
+dan lingkup ekspor terbaru mengikuti bagian di atas.
+
+Penerimaan hasil packing expired box 5 November 2026:
+- Transaksi baru wajib satu nomor part dan PCS aktual per box yang sama.
+  Pemilihan awal dikelompokkan part + PCS, termasuk pemisahan Box Not Full;
+  filter pencarian mempertahankan pilihan dalam kelompok. Pergantian kelompok
+  mengosongkan pilihan. Review dan service menolak campuran sebelum mutasi.
+- Hasil QA tetap passed/rejected per box. Ditolak wajib alasan, dihapus dari
+  inventory dengan snapshot histori. Hanya yang lolos diserahkan ke packing.
+  Penerimaan boleh bertahap; sisanya at_packing dan transaksi baru selesai jika
+  seluruh anggota completed/rejected. QA dan penyerahan packing tetap satu tahap
+  penuh per transaksi seperti sebelumnya.
+- UI penerimaan hanya scan ID Box baru dari divisi packing dan pilih satu
+  pallet existing/lokasi kosong untuk penerimaan itu. Part, PCS, atribut Not Full
+  dan umur FIFO diwarisi otomatis; jumlah tidak boleh melebihi sisa kelompok.
+  Daftar scan diperiksa AJAX, audio OK/NG, dapat hapus/periksa ulang, menahan
+  simpan saat pemeriksaan/NG, dan memperingatkan jika daftar belum disimpan.
+  Pemeriksaan tidak menciptakan stok/reservasi; semua divalidasi ulang saat simpan.
+- Acuan sumber dipilih original_stored_at tertua, source_box_id lalu handling ID;
+  urutan scan mendapat acuan tersebut. replacement_mapping=automatic_fifo
+  ditampilkan dan diaudit sebagai acuan data, bukan konfirmasi pasangan fisik
+  ID lama-baru. Tidak ada ID yang diterbitkan/dibuat otomatis oleh sistem.
+- Penerimaan baru menggunakan received_at server + satu bulan kalender
+  (addMonthNoOverflow), bukan tanggal penerbitan label. Tidak perlu memasukkan
+  tanggal label/dokumen pengantar. Deadline transaksi lama tidak diubah.
+  Route cetak lama dipertahankan untuk kompatibilitas, tanpa kewajiban pengantar
+  atau tombol pengantar pada alur operasional baru.
+- ExpiredBoxPackingReceiptService mengunci header/anggota; token UUID unik dan
+  hash payload/aktor memastikan retry tidak menggandakan atau memperpanjang stok.
+  Seluruh mutasi box/identitas/pallet/lokasi/audit atomik. Lokasi tetap lokal,
+  assignment/picking lock dan registri ID Box global termasuk Not Full dilindungi.
+- Migration 2026_11_05_000001 membuat expired_box_receipts (waktu, petugas, tujuan)
+  dan receipt_id/replacement_mapping pada handling. Riwayat penerimaan bertahap
+  tampil pada transaksi; rollback ditolak jika sudah ada receipt. Transaksi lama
+  dengan campuran part/PCS tetap utuh dan dapat diterima per kelompok yang dipilih.
+- Verifikasi: 123 tes backend terkait expiry, penerimaan, opname, identitas,
+  izin, Stock Input dan Not Full lulus (1.388 assertions). Enam tes frontend baru
+  meliputi scan cepat, NG/retry, batas jumlah, grup dan pencegahan kehilangan scan.
+  Seluruh 119 tes frontend dan Vite production build lulus. Belum diverifikasi
+  dengan perangkat scanner fisik atau pemeriksaan visual browser.
+  Migration belum diterapkan ke database kerja; tes menggunakan SQLite in-memory.
 
 Stock Opname Lokal / Ekspor 4 November 2026:
 - Menu terpisah Stock Opname Lokal (Warehouse) dan Stock Opname Ekspor
@@ -1988,6 +2114,10 @@ File utama:
 
 ### 17. Expired box, QA, dan penggantian ID melalui packing (23 Oktober 2026)
 
+Catatan historis: aturan penerimaan wajib sekaligus, pasangan label fisik,
+pengantar packing, transaksi campuran dan deadline sejak penerbitan di bawah
+digantikan revisi 5 November 2026 di awal memo. Riwayat lama tetap dipertahankan.
+
 Implementasi branch `codex/expired-qa-packing`; migration belum diterapkan pada database kerja saat pengembangan. QA dan packing tetap di luar sistem. Hak akses seluruh endpoint mengikuti fitur `expired_box` (default Supervisi/Admin, dapat diatur Admin Utama).
 
 Umur dan FIFO menggunakan `boxes.created_at` sebagai tanggal masuk asli. Box pengganti mewarisi tanggal tersebut; penerimaan hasil packing dan penerbitan ID dicatat terpisah. Umur normal: active <9 bulan, warning 9–<12 bulan, expired >=12 bulan. Warning tetap eligible FIFO dan tidak dapat di-Handle.
@@ -2163,7 +2293,7 @@ Status yang digunakan:
 - Status delivery `partial` tetap dipakai khusus untuk parent order yang memiliki child hasil split.
 - Semua box not full wajib melalui request dan approval Supervisi; Stock Input dan Delivery Assignment tidak boleh membuat box not full secara langsung.
 - PCS direct input wajib sama dengan fixed qty Master Part.
-- Warning tetap dapat masuk FIFO dan tidak dapat di-Handle. Handle expired berarti penyerahan QA. QA ditolak menghapus box permanen dengan snapshot histori; QA lolos dikembalikan ke warehouse lalu packing menerbitkan ID baru. Stok pengganti aktif satu bulan sejak penerbitan ID, dengan umur/FIFO mengikuti tanggal asli. Assignment dan picking lock tetap dilindungi.
+- Warning tetap dapat masuk FIFO dan tidak dapat di-Handle. Handle expired berarti penyerahan QA. QA ditolak menghapus box permanen dengan snapshot histori; QA lolos dikembalikan ke warehouse lalu packing menerbitkan ID baru. Sejak revisi 5 November 2026, stok pengganti aktif satu bulan sejak penerimaan, dengan umur/FIFO mengikuti tanggal asli; deadline historis tidak diubah. Assignment dan picking lock tetap dilindungi.
 
 ## Status Schema dan Validasi Terakhir
 
@@ -2180,7 +2310,7 @@ Status yang digunakan:
 
 ## Catatan yang Belum Diputuskan
 
-Alur QA/packing memakai pencatatan internal dan pengantar fisik; metode informasi hasil QA serta keterjagaan pengantar perlu diverifikasi operasional. Jalankan migration hanya saat cutover karena masa aktif Handle lama dihentikan. Rincian keputusan ada pada bagian 17.
+Alur QA/packing memakai pencatatan internal; revisi 5 November 2026 tidak mewajibkan pengantar fisik ke packing. Metode penyampaian hasil QA tetap perlu diverifikasi operasional. Migration QA awal memiliki cutover masa aktif Handle lama; migration penerimaan bertahap hanya menambah riwayat tanpa mengubah deadline existing. Rincian keputusan ada pada bagian 17 dan revisi di awal memo.
 
 ## Panduan Agent Saat Menerima Tugas
 

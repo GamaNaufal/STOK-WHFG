@@ -66,6 +66,9 @@ class NavigationContextTest extends TestCase
             if (in_array('move-pallet.index', $expected, true)) {
                 $expected = array_values(array_diff($expected, ['export.move-pallet.index']));
             }
+            if (in_array('expired-box.index', $expected, true)) {
+                $expected = array_values(array_diff($expected, ['export.expired-box.index']));
+            }
             $context = app(NavigationContextService::class)->build($user, 'profile.edit');
             $actual = array_column($context['items'], 'route');
             sort($expected);

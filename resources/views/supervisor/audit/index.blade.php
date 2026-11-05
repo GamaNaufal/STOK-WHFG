@@ -110,6 +110,7 @@
                     <option value="box_pallet_moved" {{ $filters['type'] === 'box_pallet_moved' ? 'selected' : '' }}>Pemindahan Box</option>
                     <option value="pallet_merged" {{ $filters['type'] === 'pallet_merged' ? 'selected' : '' }}>Penggabungan Pallet</option>
                     <option value="expired_box" {{ $filters['type'] === 'expired_box' ? 'selected' : '' }}>Penanganan Box Expired</option>
+                    <option value="export_expired_box" {{ $filters['type'] === 'export_expired_box' ? 'selected' : '' }}>Penanganan Box Expired Ekspor</option>
                     <option value="not_full_box" {{ $filters['type'] === 'not_full_box' ? 'selected' : '' }}>Box Not Full</option>
                     <option value="delivery_pick" {{ $filters['type'] === 'delivery_pick' ? 'selected' : '' }}>Picking Delivery</option>
                     <option value="delivery_issue" {{ $filters['type'] === 'delivery_issue' ? 'selected' : '' }}>Issue Scan Delivery</option>

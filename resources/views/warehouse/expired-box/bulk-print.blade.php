@@ -6,10 +6,10 @@
 <h1>Surat Pengantar Packing · {{ $records->count() }} box</h1>
 @isset($transaction)<p><strong>Transaksi {{ $transaction->reference }}</strong> · Dibuat {{ $transaction->created_at->format('d M Y H:i') }}</p>@endisset
 <p>Setiap baris mewakili satu box lama dan satu box pengganti. Hasil QA seluruh box pada daftar ini: <strong>Lolos</strong>.</p>
-<p>Pengantar menyertai barang sampai kembali ke warehouse. Petugas warehouse mengisi ID baru sesuai label packing dan mencocokkan setiap pasangan. Jangan menggabungkan identitas atau PCS antarbaris.</p>
+<p>Dokumen ini opsional sebagai ringkasan penanganan. Penerimaan di sistem cukup scan ID Box baru dari packing dan boleh bertahap. Acuan asal dipilih otomatis menurut FIFO dalam part dan PCS yang sama, bukan konfirmasi pasangan label fisik.</p>
 <table><thead><tr><th>No.</th><th>Referensi / ID lama</th><th>Part / PCS</th><th>Masuk asli</th><th>Penyerahan packing</th><th>ID baru</th><th>Waktu ID diterbitkan</th><th>Penerima / waktu diterima</th></tr></thead><tbody>
 @foreach($records as $record)<tr><td>{{ $loop->iteration }}</td><td><strong>{{ $record->source_box_number }}</strong><small>{{ $record->reference }}</small></td><td>{{ $record->part_number }}<small>{{ $record->pcs_quantity }} PCS</small></td><td>{{ $record->original_stored_at->format('d M Y H:i') }}</td><td>{{ $record->sent_packing_at?->format('d M Y H:i') ?? '________________' }}</td><td class="blank">{{ $record->replacement_box_number }}</td><td class="blank">{{ $record->label_issued_at?->format('d M Y H:i:s') }}</td><td class="blank">{{ $record->received_at?->format('d M Y H:i:s') }}</td></tr>@endforeach
 </tbody></table>
-<p>Jumlah: {{ $records->count() }} box / {{ number_format($records->sum('pcs_quantity')) }} PCS. Part dan PCS hasil harus sama dengan baris asal. Bila pasangan ID belum pasti, tahan pencatatan penerimaan untuk klarifikasi.</p>
+<p>Jumlah: {{ $records->count() }} box / {{ number_format($records->sum('pcs_quantity')) }} PCS. Part dan PCS hasil mengikuti kelompok transaksi. Masa aktif penerimaan baru satu bulan sejak diterima; tanggal penerbitan hanya catatan historis bila tersedia.</p>
 <div class="signatures"><p>Petugas warehouse yang menyerahkan</p><p>Petugas warehouse yang menerima</p></div>
 </body></html>

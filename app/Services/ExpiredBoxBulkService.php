@@ -16,8 +16,19 @@ class ExpiredBoxBulkService
     public function __construct(private readonly ExpiredBoxHandlingService $workflow) {}
 
     /** Every selected row commits together; nested workflow transactions use savepoints. */
-    public function execute(array $input, int $userId): array
+    public function execute(array $input, int $userId, string $scope = 'domestic'): array
     {
+        if (($input['action'] ?? '') === 'receive' && array_key_exists('new_box_numbers', $input)) {
+            return app(ExpiredBoxPackingReceiptService::class)->receive($input, $userId, $scope);
+        }
+        $export = $scope === 'export';
+        if ($export && ($input['action'] ?? '') === 'receive') {
+            throw ValidationException::withMessages(['new_box_numbers' => 'Gunakan daftar scan ID Box baru untuk penerimaan packing ekspor.']);
+        }
+        $handlingModel = $export ? \App\Models\ExportExpiredBoxHandling::class : ExpiredBoxHandling::class;
+        $transactionModel = $export ? \App\Models\ExportExpiredBoxTransaction::class : ExpiredBoxTransaction::class;
+        $stockModel = $export ? \App\Models\ExportStockBox::class : Box::class;
+        $workflow = $export ? app(ExportExpiredBoxHandlingService::class) : $this->workflow;
         $rules = [
             'action' => ['required', 'in:start,qa,packing,receive'],
             'rows' => ['required', 'array', 'min:1', 'max:'.self::LIMIT],
@@ -44,19 +55,21 @@ class ExpiredBoxBulkService
         $data = Validator::make($input, $rules)->validate();
         // Expiry synchronization is independent housekeeping, not a batch transition.
         if ($data['action'] === 'start') {
-            app(ExpiredBoxService::class)->syncStatuses();
+            app($export ? ExportExpiredBoxService::class : ExpiredBoxService::class)->syncStatuses();
         }
 
-        return DB::transaction(function () use ($data, $userId) {
+        $run = $export ? fn ($work) => app(ExportInventoryService::class)->transaction($work) : fn ($work) => DB::transaction($work);
+
+        return $run(function () use ($data, $userId, $export, $handlingModel, $transactionModel, $stockModel, $workflow) {
             $rows = collect($data['rows'])->sortBy('id');
             $ids = $rows->pluck('id')->all();
             if ($data['action'] === 'start') {
                 // Serialize overlapping selections before checking existing membership.
-                Box::withTrashed()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
+                $sourceBoxes = $stockModel::withTrashed()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
             }
             $before = $data['action'] === 'start'
-                ? ExpiredBoxHandling::whereIn('source_box_id', $ids)->get()->keyBy('source_box_id')
-                : ExpiredBoxHandling::whereIn('id', $ids)->orderBy('id')->get()->keyBy('id');
+                ? $handlingModel::whereIn('source_box_id', $ids)->get()->keyBy('source_box_id')
+                : $handlingModel::whereIn('id', $ids)->orderBy('id')->get()->keyBy('id');
             if ($data['action'] !== 'start' && $before->count() !== count($ids)) {
                 throw ValidationException::withMessages(['rows' => 'Ada penanganan yang tidak ditemukan. Pilih ulang dari daftar.']);
             }
@@ -64,19 +77,23 @@ class ExpiredBoxBulkService
                 if ($before->isNotEmpty()) {
                     $groups = $before->pluck('transaction_id')->unique();
                     if ($before->count() === count($ids) && $groups->count() === 1
-                        && ExpiredBoxHandling::where('transaction_id', $groups->first())->count() === count($ids)) {
+                        && $handlingModel::where('transaction_id', $groups->first())->count() === count($ids)) {
                         return $before->pluck('id')->all();
                     }
                     throw ValidationException::withMessages(['rows' => 'Sebagian box sudah menjadi anggota transaksi lain. Buka transaksi tersebut atau pilih box yang belum ditangani.']);
                 }
-                $transaction = ExpiredBoxTransaction::create(['created_by' => $userId]);
+                if ($sourceBoxes->count() !== count($ids)
+                    || $sourceBoxes->map(fn ($box) => ExpiredBoxHandling::groupKey($box->part_number, (int) $box->pcs_quantity))->unique()->count() !== 1) {
+                    throw ValidationException::withMessages(['rows' => 'Satu transaksi hanya boleh berisi satu nomor part dan jumlah PCS per box yang sama. Pilih satu kelompok.']);
+                }
+                $transaction = $transactionModel::create(['created_by' => $userId]);
             } else {
                 $groups = $before->pluck('transaction_id')->unique();
                 if ($groups->count() !== 1 || ! $groups->first()
                     || (! empty($data['transaction_id']) && (int) $data['transaction_id'] !== (int) $groups->first())) {
                     throw ValidationException::withMessages(['rows' => 'Box harus berasal dari satu transaksi yang sama.']);
                 }
-                $transaction = ExpiredBoxTransaction::whereKey($groups->first())->lockForUpdate()->firstOrFail();
+                $transaction = $transactionModel::whereKey($groups->first())->lockForUpdate()->firstOrFail();
                 $members = $transaction->handlings()->lockForUpdate()->get();
                 $expected = $data['action'] === 'qa' ? $members : $members->where('status', '!=', 'rejected');
                 if ($expected->pluck('id')->sort()->values()->all() !== $rows->pluck('id')->map(fn ($id) => (int) $id)->sort()->values()->all()) {
@@ -114,18 +131,18 @@ class ExpiredBoxBulkService
             $changed = false;
             foreach ($rows as $index => $row) {
                 $label = $data['action'] === 'start'
-                    ? (Box::withTrashed()->whereKey($row['id'])->value('box_number') ?? 'ID #'.$row['id'])
+                    ? ($stockModel::withTrashed()->whereKey($row['id'])->value('box_number') ?? 'ID #'.$row['id'])
                     : $before[$row['id']]->source_box_number;
                 try {
                     if ($data['action'] === 'start') {
-                        $handling = $this->workflow->start((int) $row['id'], $userId, false, $transaction->id);
+                        $handling = $workflow->start((int) $row['id'], $userId, false, $transaction->id);
                     } else {
                         match ($data['action']) {
-                            'qa' => $this->workflow->decideQa((int) $row['id'], $row['decision'], $row['notes'] ?? null, $userId),
-                            'packing' => $this->workflow->sendToPacking((int) $row['id'], $userId),
-                            'receive' => $this->workflow->receive((int) $row['id'], array_merge($row, $target), $userId, false),
+                            'qa' => $workflow->decideQa((int) $row['id'], $row['decision'], $row['notes'] ?? null, $userId),
+                            'packing' => $workflow->sendToPacking((int) $row['id'], $userId),
+                            'receive' => $workflow->receive((int) $row['id'], array_merge($row, $target), $userId, false),
                         };
-                        $handling = ExpiredBoxHandling::findOrFail($row['id']);
+                        $handling = $handlingModel::findOrFail($row['id']);
                     }
                 } catch (ValidationException $e) {
                     $errors = [];
@@ -149,7 +166,7 @@ class ExpiredBoxBulkService
                 }
             }
             if ($changed) {
-                AuditService::record('expired_box', 'bulk_'.$data['action'], 'ExpiredBoxHandling', $result[0], $userId, [],
+                AuditService::record($export ? 'export_expired_box' : 'expired_box', 'bulk_'.$data['action'], class_basename($handlingModel), $result[0], $userId, [],
                     ['transaction_id' => $transaction->id, 'handling_ids' => $result, 'count' => count($result)],
                     'Penanganan massal '.$data['action'].': '.count($result).' box, seluruhnya tersimpan bersama.');
             }

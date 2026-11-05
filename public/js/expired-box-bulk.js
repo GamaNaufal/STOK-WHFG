@@ -9,7 +9,7 @@
         const count = document.querySelector(`[data-selection-count="${group}"]`);
         const submit = document.querySelector(`[data-review="${group}"]`);
         const action = form.elements.action;
-        const eligible = box => group === 'start' || (states[action.value] || []).includes(box.dataset.state);
+        const eligible = box => box.dataset.blocked !== '1' && (group === 'start' || (states[action.value] || []).includes(box.dataset.state));
         const update = () => {
             const selected = boxes.filter(box => box.checked);
             const invalid = selected.filter(box => !eligible(box)).length;
@@ -37,6 +37,7 @@
 
     const filter = document.querySelector('[data-box-filter]');
     if (filter) {
+        const group = document.querySelector('[data-box-group]');
         const rows = Array.from(document.querySelectorAll('[data-box-row]'));
         const visibleCount = document.querySelector('[data-filter-visible]');
         const empty = document.querySelector('[data-box-filter-empty]');
@@ -44,12 +45,28 @@
             const term = filter.value.trim().toLocaleLowerCase();
             let visible = 0;
             rows.forEach(row => {
-                row.hidden = !row.textContent.toLocaleLowerCase().includes(term);
+                const inGroup = !group || (!!group.value && row.dataset.group === group.value);
+                row.hidden = !inGroup || !row.textContent.toLocaleLowerCase().includes(term);
+                const checkbox = row.querySelector('[data-bulk-item]');
+                if (checkbox) {
+                    checkbox.disabled = !inGroup || checkbox.dataset.blocked === '1';
+                    if (!inGroup || checkbox.disabled) checkbox.checked = false;
+                }
                 if (!row.hidden) visible += 1;
             });
             visibleCount.textContent = `${visible} dari ${rows.length} box ditampilkan`;
             empty.hidden = visible > 0 || rows.length === 0;
+            if (group && !group.value) empty.textContent = 'Pilih kelompok nomor part dan PCS untuk menampilkan box.';
+            else empty.textContent = 'Tidak ada box yang cocok dalam kelompok ini. Coba pencarian lain.';
+            rows[0]?.querySelector('[data-bulk-item]')?.dispatchEvent(new Event('change'));
         };
+        group?.addEventListener('change', () => {
+            rows.forEach(row => {
+                const checkbox = row.querySelector('[data-bulk-item]');
+                if (checkbox) { checkbox.checked = false; checkbox.dispatchEvent(new Event('change')); }
+            });
+            updateFilter();
+        });
         filter.addEventListener('input', updateFilter);
         window.addEventListener('pageshow', updateFilter);
         updateFilter();
@@ -79,30 +96,21 @@
         select.addEventListener('change', update);
         update();
     });
-    document.querySelector('[data-apply-issued]')?.addEventListener('click', () => {
-        const value = document.getElementById('common-issued').value;
-        if (value) document.querySelectorAll('[data-issued]').forEach(input => { input.value = value; });
-        const feedback = document.querySelector('[data-issued-feedback]');
-        if (feedback) feedback.textContent = value ? 'Waktu diterapkan ke semua box. Periksa setiap baris sebelum menyimpan.' : 'Isi waktu penerbitan terlebih dahulu.';
-    });
     const pallet = document.getElementById('batch-pallet');
     const newPalletLocation = document.querySelector('[data-new-pallet-location]');
     if (pallet && newPalletLocation) {
         const location = document.getElementById('batch-location');
         const updatePallet = () => {
-            const isNew = !pallet.value;
+            const mode = document.querySelector('[name="destination_mode"]:checked');
+            const isNew = mode ? mode.value === 'new' : !pallet.value;
             newPalletLocation.hidden = !isNew;
             location.disabled = !isNew;
             location.required = isNew;
+            const existing = document.querySelector('[data-existing-pallet]');
+            if (existing) { existing.hidden = isNew; pallet.disabled = isNew; pallet.required = !isNew; }
         };
         pallet.addEventListener('change', updatePallet);
+        document.querySelectorAll('[name="destination_mode"]').forEach(radio => radio.addEventListener('change', updatePallet));
         updatePallet();
     }
-    const scans = Array.from(document.querySelectorAll('[data-new-box]'));
-    scans.forEach((input, index) => input.addEventListener('keydown', event => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            (scans[index + 1] || document.querySelector('[data-issued]'))?.focus();
-        }
-    }));
 })();

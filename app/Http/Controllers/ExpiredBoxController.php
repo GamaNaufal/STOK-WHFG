@@ -3,8 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\ExpiredBoxHandling;
-use App\Models\ExpiredBoxReport;
-use App\Models\ExpiredBoxTransaction;
 use App\Models\MasterLocation;
 use App\Models\Pallet;
 use App\Services\ExpiredBoxBulkService;
@@ -12,52 +10,12 @@ use App\Services\ExpiredBoxHandlingService;
 use App\Services\ExpiredBoxService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 
 class ExpiredBoxController extends Controller
 {
     public function index(Request $request, ExpiredBoxService $service)
     {
-        $service->syncStatuses();
-
-        $boxesQuery = $service->getExpirableBoxesQuery()
-            ->whereIn('boxes.expired_status', ['warning', 'expired'])
-            ->when($request->filled('search'), function ($query) use ($request) {
-                $query->where(function ($q) use ($request) {
-                    $search = '%'.(string) $request->input('search').'%';
-                    $q->where('boxes.box_number', 'like', $search)->orWhere('boxes.part_number', 'like', $search)
-                        ->orWhere('pallets.pallet_number', 'like', $search)->orWhere('stock_locations.warehouse_location', 'like', $search);
-                });
-            })
-            ->orderBy('stored_at', 'asc')
-            ->get();
-
-        $warningBoxes = $boxesQuery->filter(fn ($row) => $row->expired_status === 'warning');
-        $expiredBoxes = $boxesQuery->filter(fn ($row) => $row->expired_status === 'expired');
-
-        $handledHistory = collect();
-        if (Schema::hasTable('expired_box_reports')) {
-            $handledHistory = ExpiredBoxReport::with('handler')
-                ->where('status', 'handled')
-                ->orderByDesc('handled_at')
-                ->paginate(15);
-        }
-
-        $transactions = ExpiredBoxTransaction::with(['handlings' => fn ($q) => $q->select('id', 'transaction_id', 'status', 'pcs_quantity')])
-            ->when($request->filled('search'), function ($query) use ($request) {
-                $search = (string) $request->input('search');
-                $query->where(function ($q) use ($search) {
-                    if (preg_match('/^EXP-\d{8}-(\d+)$/i', $search, $matches)) {
-                        $q->where('id', (int) $matches[1]);
-                    }
-                    $q->orWhereHas('handlings', fn ($items) => $items->where('source_box_number', 'like', '%'.$search.'%')
-                        ->orWhere('replacement_box_number', 'like', '%'.$search.'%')
-                        ->orWhere('part_number', 'like', '%'.$search.'%'));
-                });
-            })->withExists(['handlings as is_open' => fn ($q) => $q->whereNotIn('status', ['completed', 'rejected'])])
-            ->orderByDesc('is_open')->latest('id')->paginate(15, ['*'], 'transaction_page')->withQueryString();
-
-        return view('warehouse.expired-box.index', compact('warningBoxes', 'expiredBoxes', 'handledHistory', 'transactions'));
+        return app(ExpiredBoxWorkspaceController::class)->index($request);
     }
 
     public function handle(Request $request, int $boxId, ExpiredBoxService $service): RedirectResponse
@@ -118,7 +76,7 @@ class ExpiredBoxController extends Controller
             'box_number' => ['required', 'string', 'regex:/^\d{8}$/'],
             'part_number' => ['required', 'string', 'max:255'],
             'pcs_quantity' => ['required', 'integer', 'min:1'],
-            'label_issued_at' => ['required', 'date', 'before_or_equal:now'],
+            'label_issued_at' => ['nullable', 'date', 'before_or_equal:now'],
             'pallet_id' => ['nullable', 'integer', 'exists:pallets,id'],
             'location_id' => ['nullable', 'required_without:pallet_id', 'integer', 'exists:master_locations,id,scope,domestic'],
             'confirmed' => ['accepted'],
@@ -183,6 +141,9 @@ class ExpiredBoxController extends Controller
             }
 
             return redirect()->route('expired-box.transactions.show', $records->first()->transaction_id);
+        }
+        if ($records->map(fn ($box) => ExpiredBoxHandling::groupKey($box->part_number, (int) $box->pcs_quantity))->unique()->count() !== 1) {
+            return redirect()->route('expired-box.transactions.create')->with('error', 'Pilih satu kelompok nomor part dan PCS per box untuk satu transaksi.');
         }
         $availableLocations = MasterLocation::available()->orderBy('code')->get(['id', 'code']);
         $pallets = Pallet::with('stockLocation')->whereHas('stockLocation')->orderBy('pallet_number')->get();

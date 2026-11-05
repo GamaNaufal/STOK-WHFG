@@ -6,6 +6,7 @@ use App\Models\Box;
 use App\Models\ExpiredBoxHandling;
 use App\Models\ExpiredBoxTransaction;
 use App\Models\Pallet;
+use App\Support\BoxIdentity;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -117,15 +118,16 @@ class ExpiredBoxHandlingService
             if ($data['part_number'] !== $handling->part_number || (int) $data['pcs_quantity'] !== (int) $handling->pcs_quantity) {
                 throw new \RuntimeException('Part dan PCS hasil packing harus sama dengan box asal.');
             }
-            if (DB::table('box_identities')->where('box_number', $data['box_number'])->exists()
+            if (BoxIdentity::unavailable($data['box_number'])
                 || DB::table('not_full_box_requests')->where('box_number', $data['box_number'])->exists()) {
                 throw ValidationException::withMessages(['box_number' => 'ID Box baru sudah pernah digunakan atau diajukan.']);
             }
-            $issuedAt = Carbon::parse($data['label_issued_at']);
-            if ($issuedAt->gt(now()) || $issuedAt->lt($handling->sent_packing_at)) {
+            $receivedAt = isset($data['received_at']) ? Carbon::parse($data['received_at']) : now();
+            $issuedAt = ! empty($data['label_issued_at']) ? Carbon::parse($data['label_issued_at']) : null;
+            if ($issuedAt && ($issuedAt->gt(now()) || $issuedAt->lt($handling->sent_packing_at))) {
                 throw ValidationException::withMessages(['label_issued_at' => 'Waktu penerbitan ID harus sejak penyerahan ke packing sampai sekarang.']);
             }
-            $until = $issuedAt->copy()->addMonthNoOverflow();
+            $until = $receivedAt->copy()->addMonthNoOverflow();
             if (! empty($data['pallet_id'])) {
                 $pallet = Pallet::whereKey($data['pallet_id'])->lockForUpdate()->firstOrFail();
                 $blocking = app(PalletDeliveryLockService::class)->blockingBoxForPallets([$pallet->id], true);
@@ -163,7 +165,9 @@ class ExpiredBoxHandlingService
             $handling->update([
                 'status' => 'completed', 'replacement_box_id' => $replacement->id,
                 'replacement_box_number' => $replacement->box_number, 'label_issued_at' => $issuedAt,
-                'usable_until' => $until, 'received_at' => now(), 'received_by' => $userId,
+                'usable_until' => $until, 'received_at' => $receivedAt, 'received_by' => $userId,
+                'receipt_id' => $data['receipt_id'] ?? null,
+                'replacement_mapping' => $data['replacement_mapping'] ?? 'explicit',
                 'destination_pallet' => $pallet->pallet_number, 'destination_location' => $storage->warehouse_location,
             ]);
             // A separate handling receipt avoids counting the same goods as production inbound.
@@ -181,7 +185,8 @@ class ExpiredBoxHandlingService
             }
             $this->audit($handling, 'packing_received', $userId);
             AuditService::record('expired_box', 'replacement_created', 'Box', $replacement->id, $userId, [],
-                ['handling_id' => $handling->id, 'source_box_number' => $handling->source_box_number, 'usable_until' => $until->toDateTimeString()],
+                ['handling_id' => $handling->id, 'source_box_number' => $handling->source_box_number, 'usable_until' => $until->toDateTimeString(),
+                    'replacement_mapping' => $handling->replacement_mapping, 'receipt_id' => $handling->receipt_id],
                 "Box {$replacement->box_number} diterima dari packing; asal {$handling->source_box_number} ({$handling->reference}).");
         });
     }

@@ -2,14 +2,25 @@
 
 namespace App\Services;
 
-use App\Models\{ExportDeliveryPlan, ExportFulfillmentBox, ExportMasterLocation, ExportPalletLocationReservation, ExportPickingIssue, ExportPlannedPallet, ExportStockBox, ExportStockMovement, ExportStockPallet, User};
+use App\Models\ExportDeliveryPlan;
+use App\Models\ExportMasterLocation;
+use App\Models\ExportPalletLocationReservation;
+use App\Models\ExportPickingIssue;
+use App\Models\ExportPlannedPallet;
+use App\Models\ExportStockAllocationNotice;
+use App\Models\ExportStockMovement;
+use App\Models\ExportStockPallet;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class ExportFulfillmentCompletionService
 {
-    private function fail(string $message): never { throw ValidationException::withMessages(['fulfillment' => $message]); }
+    private function fail(string $message): never
+    {
+        throw ValidationException::withMessages(['fulfillment' => $message]);
+    }
 
     public function assertPalletUnlocked(?ExportStockPallet $pallet): void
     {
@@ -22,10 +33,17 @@ class ExportFulfillmentCompletionService
     {
         $delivery = ExportDeliveryPlan::with('items')->lockForUpdate()->findOrFail($deliveryId);
         $plan = $delivery->palletPlan()->lockForUpdate()->firstOrFail();
-        if (!$plan->isFinalFor($delivery) || $plan->completed_at) $this->fail('Permintaan sudah selesai atau perencanaan belum final.');
-        if ($plan->revision !== (int) $data['revision']) $this->fail('Permintaan berubah. Muat ulang sebelum melanjutkan.');
+        if (! $plan->isFinalFor($delivery) || $plan->completed_at) {
+            $this->fail('Permintaan sudah selesai atau perencanaan belum final.');
+        }
+        if ($plan->revision !== (int) $data['revision']) {
+            $this->fail('Permintaan berubah. Muat ulang sebelum melanjutkan.');
+        }
         $pallet = $palletId ? $plan->pallets()->whereKey($palletId)->lockForUpdate()->firstOrFail() : null;
-        if ($pallet && $pallet->fulfillment_revision !== (int) $data['fulfillment_revision']) $this->fail('Pallet berubah. Muat ulang rincian pallet.');
+        if ($pallet && $pallet->fulfillment_revision !== (int) $data['fulfillment_revision']) {
+            $this->fail('Pallet berubah. Muat ulang rincian pallet.');
+        }
+
         return [$delivery, $plan, $pallet];
     }
 
@@ -35,7 +53,10 @@ class ExportFulfillmentCompletionService
             $hash = hash('sha256', json_encode([$action, $deliveryId, $palletId, $data, $actor->id], JSON_THROW_ON_ERROR));
             $previous = DB::table('export_fulfillment_actions')->where('request_token', $data['request_token'])->first();
             if ($previous) {
-                if ($previous->request_hash !== $hash) $this->fail('Token konfirmasi sudah dipakai untuk data lain.');
+                if ($previous->request_hash !== $hash) {
+                    $this->fail('Token konfirmasi sudah dipakai untuk data lain.');
+                }
+
                 return;
             }
             [$delivery, $plan, $pallet] = $this->context($deliveryId, $palletId, $data);
@@ -50,46 +71,70 @@ class ExportFulfillmentCompletionService
     }
 
     /** Validate both requirement confirmations and all actual contents; surplus stock cannot leave with the pallet. */
-    public function contents(ExportPlannedPallet $pallet): array
+    public function contents(ExportPlannedPallet $pallet, bool $allowExpired = false): array
     {
         $items = $pallet->items()->get();
         $commitments = $pallet->fulfillmentBoxes()->with('stockBox')->get();
         $physical = ExportStockPallet::where('export_planned_pallet_id', $pallet->id)->whereNull('retired_at')->first();
-        if (!$physical || (int) $physical->master_location_id !== $pallet->master_location_id || $items->sum('box_quantity') < 1) $this->fail('Pallet belum memiliki penempatan fisik yang sesuai.');
+        if (! $physical || (int) $physical->master_location_id !== $pallet->master_location_id || $items->sum('box_quantity') < 1) {
+            $this->fail('Pallet belum memiliki penempatan fisik yang sesuai.');
+        }
         $location = ExportMasterLocation::find($pallet->master_location_id);
-        if (!$location || !$location->is_occupied || $location->current_pallet_id || $location->stockLocations()->exists()
-            || !ExportPalletLocationReservation::where('master_location_id', $location->id)->where('export_planned_pallet_id', $pallet->id)->exists()) $this->fail('Lokasi fisik dan reservasi pallet tidak konsisten. Periksa stok ekspor.');
+        if (! $location || ! $location->is_occupied || $location->current_pallet_id || $location->stockLocations()->exists()
+            || ! ExportPalletLocationReservation::where('master_location_id', $location->id)->where('export_planned_pallet_id', $pallet->id)->exists()) {
+            $this->fail('Lokasi fisik dan reservasi pallet tidak konsisten. Periksa stok ekspor.');
+        }
         foreach ($items as $item) {
             $rows = $commitments->where('export_planned_pallet_item_id', $item->id);
-            if ($rows->count() !== $item->box_quantity) $this->fail('Seluruh kebutuhan setiap part harus terpenuhi tepat sebelum konfirmasi/revisi.');
+            if ($rows->count() !== $item->box_quantity) {
+                $this->fail('Seluruh kebutuhan setiap part harus terpenuhi tepat sebelum konfirmasi/revisi.');
+            }
             foreach ($rows as $f) {
                 $box = $f->stockBox;
-                if (!$f->placed_at || !$f->placed_by || (int) $f->placed_location_id !== $pallet->master_location_id
-                    || !$box || $box->state !== 'stored' || (int) $box->current_pallet_id !== $physical->id
+                if (! $allowExpired) {
+                    $box?->assertEligible();
+                }
+                if (! $f->placed_at || ! $f->placed_by || (int) $f->placed_location_id !== $pallet->master_location_id
+                    || ! $box || $box->state !== 'stored' || (int) $box->current_pallet_id !== $physical->id
                     || (int) $f->part_setting_id !== $item->part_setting_id || (int) $box->part_setting_id !== $item->part_setting_id
                     || $box->pcs_quantity !== $item->pcs_per_box || $f->pcs_quantity !== $item->pcs_per_box
-                    || $box->box_number !== $f->box_number || !$box->stored_at || !$box->stored_by) $this->fail('Identitas, part, PCS, atau posisi box belum sesuai. Periksa penempatan pallet.');
+                    || $box->box_number !== $f->box_number || ! $box->stored_at || ! $box->stored_by) {
+                    $this->fail('Identitas, part, PCS, atau posisi box belum sesuai. Periksa penempatan pallet.');
+                }
             }
         }
-        if ($physical->boxes()->count() !== $commitments->count()) $this->fail('Pallet berisi box di luar permintaan. Pindahkan stok tambahan sebelum konfirmasi.');
-        if (ExportPickingIssue::open()->whereIn('export_stock_box_id', $commitments->pluck('export_stock_box_id'))->exists()) $this->fail('Ada box pallet yang masih ditahan issue picking.');
+        if ($physical->boxes()->count() !== $commitments->count()) {
+            $this->fail('Pallet berisi box di luar permintaan. Pindahkan stok tambahan sebelum konfirmasi.');
+        }
+        if (ExportPickingIssue::open()->whereIn('export_stock_box_id', $commitments->pluck('export_stock_box_id'))->exists()) {
+            $this->fail('Ada box pallet yang masih ditahan issue picking.');
+        }
+
         return [$physical, $items, $commitments];
     }
 
     public function ready(int $deliveryId, int $palletId, array $data, User $actor): void
     {
         $this->run('ready', $deliveryId, $palletId, $data, $actor, function ($delivery, $plan, $pallet) use ($data, $actor) {
-            if ($pallet->ready_at) $this->fail('Pallet sudah dikonfirmasi siap.');
+            if ($pallet->ready_at) {
+                $this->fail('Pallet sudah dikonfirmasi siap.');
+            }
             [$physical, $items, $commitments] = $this->contents($pallet);
             $sourceId = $pallet->master_location_id;
             $targetId = (int) $data['location_id'];
             $locations = ExportMasterLocation::whereIn('id', [$sourceId, $targetId])->orderBy('id')->lockForUpdate()->get()->keyBy('id');
             $target = $locations->get($targetId);
-            if (!$target) $this->fail('Pilih lokasi master ekspor.');
+            if (! $target) {
+                $this->fail('Pilih lokasi master ekspor.');
+            }
             if ($sourceId !== $targetId && ($target->is_occupied || $target->current_pallet_id || $target->stockLocations()->exists()
-                || $target->stockPallet()->exists() || $target->reservation()->exists())) $this->fail('Tujuan harus lokasi kosong atau lokasi pallet semula.');
+                || $target->stockPallet()->exists() || $target->reservation()->exists())) {
+                $this->fail('Tujuan harus lokasi kosong atau lokasi pallet semula.');
+            }
             $claim = ExportPalletLocationReservation::where('export_planned_pallet_id', $pallet->id)->first();
-            if (!$claim || (int) $claim->master_location_id !== $sourceId) $this->fail('Reservasi lokasi pallet sudah berubah.');
+            if (! $claim || (int) $claim->master_location_id !== $sourceId) {
+                $this->fail('Reservasi lokasi pallet sudah berubah.');
+            }
             $before = ['location' => $pallet->location_code, 'status' => 'terpenuhi'];
             if ($sourceId !== $targetId) {
                 app(ExportPalletMoveService::class)->assertPickingIdle($physical);
@@ -118,8 +163,10 @@ class ExportFulfillmentCompletionService
     public function reopen(int $deliveryId, int $palletId, array $data, User $actor): void
     {
         $this->run('reopened', $deliveryId, $palletId, $data, $actor, function ($delivery, $plan, $pallet) use ($actor) {
-            if (!$pallet->ready_at) $this->fail('Pallet belum dikonfirmasi siap.');
-            $this->contents($pallet);
+            if (! $pallet->ready_at) {
+                $this->fail('Pallet belum dikonfirmasi siap.');
+            }
+            $this->contents($pallet, allowExpired: true);
             $pallet->update(['ready_at' => null, 'ready_by' => null, 'fulfillment_revision' => $pallet->fulfillment_revision + 1]);
             AuditService::record('export_fulfillment', 'reopened', 'ExportPlannedPallet', $pallet->id, $actor->id,
                 ['status' => 'siap'], ['plan_code' => $delivery->plan_code, 'pallet_number' => $pallet->position,
@@ -127,32 +174,53 @@ class ExportFulfillmentCompletionService
         });
     }
 
-    public function reduction(ExportPlannedPallet $pallet, array $quantities): array
+    public function reduction(ExportPlannedPallet $pallet, array $quantities, array $additions = []): array
     {
-        return app(ExportFulfillmentRevisionService::class)->preview($pallet, $quantities);
+        return app(ExportFulfillmentRevisionService::class)->preview($pallet, $quantities, $additions);
     }
 
     public function reduce(int $deliveryId, int $palletId, array $data, User $actor): void
     {
         $this->run('reduced', $deliveryId, $palletId, $data, $actor, function ($delivery, $plan, $pallet) use ($data, $actor) {
-            $preview = $this->reduction($pallet, $data['quantities']);
-            if (!hash_equals($preview['fingerprint'], $data['fingerprint'])) $this->fail('Rekomendasi box berubah. Tinjau ulang FIFO sebelum mengembalikan.');
+            $preview = $this->reduction($pallet, $data['quantities'], $data['additions'] ?? []);
+            if (! hash_equals($preview['fingerprint'], $data['fingerprint'])) {
+                $this->fail('Stok atau isi pallet berubah. Tinjau ulang revisi sebelum menyimpan.');
+            }
+            $pending = ExportStockAllocationNotice::where('export_pallet_plan_id', $plan->id)
+                ->where('plan_revision', $plan->revision)->whereNull('acknowledged_at')->first();
             $before = app(ExportDeliveryPlanService::class)->snapshot($delivery);
             $this->confirmReturns($preview['returns'], $data);
             $reusable = [];
             $result = app(ExportFulfillmentRevisionService::class)->apply($delivery, $pallet, $preview, $data['destination'] ?? null, $actor, $reusable);
             $delivery->update(['revision' => $delivery->revision + 1]);
             $plan->update(['revision' => $plan->revision + 1, 'delivery_revision' => $delivery->revision, 'updated_by' => $actor->id]);
-            AuditService::record('export_fulfillment', 'reduced', 'ExportPlannedPallet', $pallet->id, $actor->id, $before,
-                app(ExportDeliveryPlanService::class)->snapshot($delivery) + ['pallet_number' => $pallet->position] + $result,
-                'Revisi pallet: box terbaru dikembalikan dan reservasi yang belum dipindahkan dilepas; box tertua dipertahankan untuk pengiriman FIFO.');
-            if (!$plan->pallets()->exists()) $this->archiveCancelled($delivery, $plan, $actor, $before, 'Seluruh pallet dihapus melalui revisi.');
+
+            if ($preview['recommended']) {
+                // The save button confirms these exact FIFO candidates and creates a new queue transaction.
+                $notices = app(ExportStockAllocationNoticeService::class);
+                $notice = $notices->create($plan, $actor);
+                app(ExportStockAllocationService::class)->reserveRevision($delivery, $pallet, $preview['changes'], $actor, $notice);
+                $notices->acknowledge($delivery->id, $notice->id, $plan->revision, $actor);
+            } elseif ($pending?->boxes()->whereNull('placed_at')->exists()) {
+                $pending->update(['plan_revision' => $plan->revision]);
+            }
+            app(ExportNotFullService::class)->sync($delivery, $actor);
+
+            AuditService::record('export_fulfillment', $preview['difference'] ? 'reduced' : 'revised',
+                'ExportPlannedPallet', $pallet->id, $actor->id, $before,
+                app(ExportDeliveryPlanService::class)->snapshot($delivery) + ['pallet_number' => $pallet->position,
+                    'added_box_quantity' => $preview['added'], 'reduced_box_quantity' => $preview['difference'],
+                    'recommended_box_quantity' => $preview['recommended']] + $result,
+                'Kebutuhan pallet dan rencana delivery diperbarui. Reservasi tambahan mengikuti FIFO dan box terbaru dipilih untuk pengurangan.');
+            if (! $plan->pallets()->exists()) {
+                $this->archiveCancelled($delivery, $plan, $actor, $before, 'Seluruh pallet dihapus melalui revisi.');
+            }
         });
     }
 
     private function confirmReturns($returns, array $data): void
     {
-        if ($returns->isNotEmpty() && !in_array($data['return_confirmed'] ?? null, [true, 1, '1', 'yes', 'on'], true)) {
+        if ($returns->isNotEmpty() && ! in_array($data['return_confirmed'] ?? null, [true, 1, '1', 'yes', 'on'], true)) {
             throw ValidationException::withMessages(['return_confirmed' => 'Konfirmasikan penempatan seluruh box yang harus dikembalikan.']);
         }
     }
@@ -162,10 +230,13 @@ class ExportFulfillmentCompletionService
         $previews = $delivery->palletPlan->pallets()->get()->map(function ($pallet) {
             return ['pallet' => $pallet, 'preview' => $this->reduction($pallet, $pallet->items()->pluck('box_quantity', 'id')->map(fn () => 0)->all())];
         });
-        if ($previews->isEmpty()) $this->fail('Permintaan tidak memiliki pallet aktif.');
+        if ($previews->isEmpty()) {
+            $this->fail('Permintaan tidak memiliki pallet aktif.');
+        }
         $returns = $previews->flatMap(fn ($row) => $row['preview']['returns']);
         $released = $previews->flatMap(fn ($row) => $row['preview']['released']);
         $fingerprint = hash('sha256', json_encode($previews->map(fn ($row) => $row['preview']['fingerprint'])->all(), JSON_THROW_ON_ERROR));
+
         return compact('previews', 'returns', 'released', 'fingerprint');
     }
 
@@ -173,7 +244,9 @@ class ExportFulfillmentCompletionService
     {
         $this->run('cancelled', $deliveryId, null, $data, $actor, function ($delivery, $plan) use ($data, $actor) {
             $preview = $this->cancellation($delivery);
-            if (!hash_equals($preview['fingerprint'], $data['fingerprint'])) $this->fail('Isi permintaan berubah. Tinjau ulang pembatalan.');
+            if (! hash_equals($preview['fingerprint'], $data['fingerprint'])) {
+                $this->fail('Isi permintaan berubah. Tinjau ulang pembatalan.');
+            }
             $this->confirmReturns($preview['returns'], $data);
             $destination = $data['destination'] ?? null;
             if ($destination && str_starts_with($destination, 'pallet:')) {
@@ -213,9 +286,12 @@ class ExportFulfillmentCompletionService
     {
         $this->run('completed', $deliveryId, null, $data, $actor, function ($delivery, $plan) use ($actor) {
             $pallets = $plan->pallets()->get();
-            if ($pallets->isEmpty() || $pallets->contains(fn ($p) => !$p->ready_at)) $this->fail('Konfirmasikan semua pallet siap sebelum menyelesaikan permintaan.');
+            if ($pallets->isEmpty() || $pallets->contains(fn ($p) => ! $p->ready_at)) {
+                $this->fail('Konfirmasikan semua pallet siap sebelum menyelesaikan permintaan.');
+            }
             $snapshot = app(ExportDeliveryPlanService::class)->snapshot($delivery);
-            $snapshot['pallets'] = []; $snapshot['boxes'] = [];
+            $snapshot['pallets'] = [];
+            $snapshot['boxes'] = [];
             foreach ($pallets as $pallet) {
                 [$physical, , $rows] = $this->contents($pallet);
                 $snapshot['pallets'][] = ['pallet_number' => $pallet->position, 'location' => $pallet->location_code,

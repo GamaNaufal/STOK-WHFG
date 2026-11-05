@@ -49,14 +49,14 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $location = MasterLocation::create(['code' => 'BULK-01', 'is_occupied' => true, 'current_pallet_id' => $pallet->id]);
         StockLocation::create(['pallet_id' => $pallet->id, 'master_location_id' => $location->id, 'warehouse_location' => $location->code, 'stored_at' => now()->subMonthsNoOverflow(13)]);
         $boxes = collect();
+        $part = 'BULK-PART';
+        PartSetting::create(['part_number' => $part, 'qty_box' => 20]);
         foreach (range(1, $count) as $index) {
-            $part = 'BULK-PART-'.$index;
-            PartSetting::create(['part_number' => $part, 'qty_box' => 20]);
             $box = Box::create(['box_number' => (string) (98000000 + $index), 'part_number' => $part, 'pcs_quantity' => 20, 'qty_box' => 20, 'qr_code' => 'test', 'user_id' => $user->id, 'created_at' => now()->subMonthsNoOverflow(13)]);
             $pallet->boxes()->attach($box->id);
-            PalletItem::create(['pallet_id' => $pallet->id, 'part_number' => $part, 'box_quantity' => 1, 'pcs_quantity' => 20]);
             $boxes->push($box);
         }
+        PalletItem::create(['pallet_id' => $pallet->id, 'part_number' => $part, 'box_quantity' => $count, 'pcs_quantity' => 20 * $count]);
 
         return [$user, $boxes, $location, $pallet];
     }
@@ -166,7 +166,7 @@ class ExpiredBoxBulkHandlingTest extends TestCase
     {
         [$user, $boxes, $location] = $this->inventory(3);
         $handlings = $this->atPacking($boxes, $user);
-        $this->get(route('expired-box.transactions.show', $handlings[0]->transaction_id))->assertOk()->assertSee('Tujuan penerimaan bersama');
+        $this->get(route('expired-box.transactions.show', $handlings[0]->transaction_id))->assertOk()->assertSee('Tujuan penyimpanan');
         $payload = $this->receipt($handlings, $location);
         $this->post(route('expired-box.bulk.store'), $payload)->assertSessionHas('success');
         $this->assertDatabaseCount('pallets', 2);
@@ -218,7 +218,7 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $this->assertDatabaseCount('boxes', 2);
     }
 
-    public function test_late_first_receipt_does_not_vacate_pallet_before_active_second_receipt(): void
+    public function test_old_label_dates_do_not_reduce_the_new_receipt_validity(): void
     {
         [$user, $boxes, $location] = $this->inventory();
         $handlings = $this->atPacking($boxes, $user);
@@ -227,10 +227,10 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $payload = $this->receipt($handlings, $location);
         $payload['rows'][0]['label_issued_at'] = $issued;
         $this->post(route('expired-box.bulk.store'), $payload)->assertSessionHas('success');
-        $this->assertSame('expired', Box::where('box_number', '99000001')->sole()->expired_status);
+        $this->assertSame('active', Box::where('box_number', '99000001')->sole()->expired_status);
         $this->assertSame('active', Box::where('box_number', '99000002')->sole()->expired_status);
         $this->assertTrue($location->fresh()->is_occupied);
-        $this->assertSame(1, Box::active()->count());
+        $this->assertSame(2, Box::active()->count());
     }
 
     public function test_batch_audit_failure_rolls_back_all_rows(): void
@@ -275,11 +275,11 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $handlings = $this->start($boxes, $user);
         $transaction = ExpiredBoxTransaction::sole();
         $this->assertSame([$transaction->id], $handlings->pluck('transaction_id')->unique()->all());
-        $this->get(route('expired-box.index'))->assertOk()
+        $this->get(route('expired-box.index', ['tab' => 'process']))->assertOk()
             ->assertViewHas('transactions', fn ($list) => $list->count() === 1 && $list[0]->handlings->count() === 3)
             ->assertSee('3 box')->assertDontSee('data-bulk-selection="handling"', false);
         foreach ([$boxes[0]->box_number, $boxes[1]->part_number, $transaction->reference] as $search) {
-            $this->get(route('expired-box.index', ['search' => $search]))->assertOk()
+            $this->get(route('expired-box.index', ['tab' => 'process', 'search' => $search]))->assertOk()
                 ->assertViewHas('transactions', fn ($list) => $list->count() === 1 && $list[0]->handlings->count() === 3);
         }
         $this->get(route('expired-box.transactions.show', $transaction))->assertOk()
@@ -364,7 +364,7 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $this->assertDatabaseCount('boxes', 0);
         $this->get(route('expired-box.transactions.show', $transaction))->assertOk()->assertSee('Tidak ada box yang dilanjutkan ke packing.')->assertDontSee('name="action"', false);
         $this->get(route('expired-box.transactions.print', $transaction))->assertStatus(409);
-        $this->get(route('expired-box.index', ['search' => $boxes[0]->box_number]))->assertOk()->assertSee($transaction->reference);
+        $this->get(route('expired-box.index', ['tab' => 'history', 'search' => $boxes[0]->box_number]))->assertOk()->assertSee($transaction->reference);
     }
 
     public function test_transaction_routes_preserve_feature_permissions(): void

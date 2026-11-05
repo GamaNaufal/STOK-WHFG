@@ -81,6 +81,11 @@ class ExportPalletMergeService
         }
         $survivor = $pallets->first();
         $plan = $survivor?->palletPlan;
+        if ($plan) {
+            foreach ($boxes as $box) {
+                $box->assertEligible();
+            }
+        }
         $delivery = $plan?->deliveryPlan;
         if ($plan && (! $delivery || ! $plan->isFinalFor($delivery) || $plan->completed_at || $delivery->status === 'cancelled')) {
             $this->fail('Merge permintaan hanya tersedia pada perencanaan final yang belum selesai/dibatalkan.');

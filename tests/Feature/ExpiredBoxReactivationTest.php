@@ -81,9 +81,9 @@ class ExpiredBoxReactivationTest extends TestCase
     public function test_warning_is_visible_but_handle_is_rejected_without_changing_inventory(): void
     {
         [, $supervisor, $box, $pallet, $location] = $this->inventory(10);
-        $this->actingAs($supervisor)->get(route('expired-box.index'))->assertOk()
+        $this->actingAs($supervisor)->get(route('expired-box.index', ['tab' => 'warning']))->assertOk()
             ->assertViewHas('warningBoxes', fn ($boxes) => $boxes->contains('id', $box->id))
-            ->assertSee('Box belum expired, tidak perlu Handle.')
+            ->assertSee('Box mendekati expired dan belum perlu diserahkan ke QA.')
             ->assertDontSee('class="js-handle-btn"', false);
         $this->post(route('expired-box.handle', $box->id), ['location_id' => $location->id])
             ->assertSessionHas('error');
@@ -303,7 +303,7 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->post(route('expired-box.receive', $handling), $this->receipt($handling, ['location_id' => $free->id]))->assertSessionHas('success');
     }
 
-    public function test_late_receipt_records_expired_box_without_renewing_deadline(): void
+    public function test_receipt_validity_starts_on_receipt_even_when_packing_label_is_old(): void
     {
         [, $supervisor, $box] = $this->inventory();
         $handling = $this->readyForPacking($box, $supervisor);
@@ -311,10 +311,10 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->travel(35)->days();
         $this->workflow()->receive($handling->id, $this->receipt($handling, ['label_issued_at' => $issued]), $supervisor->id);
         $replacement = Box::findOrFail($handling->fresh()->replacement_box_id);
-        $this->assertSame('expired', $replacement->expired_status);
-        $this->assertSame('2026-02-28 10:00:00', $replacement->reactivated_until->toDateTimeString());
-        $this->assertFalse(Box::active()->whereKey($replacement->id)->exists());
-        $this->assertDatabaseHas('expired_box_reports', ['box_id' => $replacement->id, 'status' => 'expired']);
+        $this->assertSame('active', $replacement->expired_status);
+        $this->assertSame(now()->addMonthNoOverflow()->toDateTimeString(), $replacement->reactivated_until->toDateTimeString());
+        $this->assertTrue(Box::active()->whereKey($replacement->id)->exists());
+        $this->assertDatabaseMissing('expired_box_reports', ['box_id' => $replacement->id]);
     }
 
     public function test_assigned_and_pick_locked_boxes_cannot_start_qa(): void
@@ -478,13 +478,13 @@ class ExpiredBoxReactivationTest extends TestCase
             ]);
         }
 
-        $firstPage = $this->actingAs($supervisor)->get(route('expired-box.index'));
+        $firstPage = $this->actingAs($supervisor)->get(route('expired-box.index', ['tab' => 'history']));
         $firstPage->assertOk()->assertSee('class="page-item', false);
         $firstPage->assertViewHas('handledHistory', fn ($history) => $history->perPage() === 15
             && $history->total() === 16
             && $history->count() === 15);
 
-        $secondPage = $this->actingAs($supervisor)->get(route('expired-box.index', ['page' => 2]));
+        $secondPage = $this->actingAs($supervisor)->get(route('expired-box.index', ['tab' => 'history', 'page' => 2]));
         $secondPage->assertOk();
         $secondPage->assertViewHas('handledHistory', fn ($history) => $history->total() === 16
             && $history->firstItem() === 16

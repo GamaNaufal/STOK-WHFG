@@ -5,9 +5,9 @@
 <button class="no-print" onclick="window.print()">Cetak pengantar</button>
 <h1>Surat Pengantar Packing</h1><p><strong>{{ $handling->reference }}</strong><br>Hasil QA: Lolos · {{ $handling->qa_decided_at?->format('d M Y H:i') }}</p>
 <table><tr><th>ID Box lama</th><td>{{ $handling->source_box_number }}</td></tr><tr><th>Nomor part</th><td>{{ $handling->part_number }}</td></tr><tr><th>Jumlah tetap</th><td>{{ $handling->pcs_quantity }} PCS · 1 box</td></tr><tr><th>Tanggal masuk asli</th><td>{{ $handling->original_stored_at->format('d M Y H:i') }}</td></tr><tr><th>Diserahkan ke packing</th><td>{{ $handling->sent_packing_at?->format('d M Y H:i') ?? '________________________' }}</td></tr></table>
-<p>Sertakan pengantar ini bersama box sampai kembali ke warehouse. Satu box lama menjadi satu box baru dengan part dan PCS yang sama.</p>
-<h2>Diisi petugas warehouse saat penerimaan</h2>
+<p>Dokumen ini opsional sebagai ringkasan penanganan. Penerimaan di sistem cukup scan ID Box baru dari packing dengan part dan PCS sesuai transaksi.</p>
+<h2>Catatan penerimaan warehouse</h2>
 <table><tr><th>ID baru dari packing</th><td class="blank">{{ $handling->replacement_box_number }}</td></tr><tr><th>Waktu ID baru diterbitkan</th><td class="blank">{{ $handling->label_issued_at?->format('d M Y H:i:s') }}</td></tr><tr><th>Waktu diterima warehouse</th><td class="blank">{{ $handling->received_at?->format('d M Y H:i:s') }}</td></tr><tr><th>Catatan pencocokan</th><td class="blank"></td></tr></table>
-<p>Warehouse mencocokkan pengantar, ID baru, part, dan PCS sebelum mencatat penerimaan di sistem. Bila pasangan ID tidak dapat dipastikan, tahan pencatatan untuk klarifikasi.</p>
+<p>Penerimaan boleh bertahap. Untuk penerimaan baru, acuan ID asal dipilih otomatis menurut FIFO; pasangan ini bukan konfirmasi label fisik. Masa aktif satu bulan sejak diterima. Tanggal penerbitan di atas hanya catatan historis bila tersedia.</p>
 <div class="signatures"><p>Petugas warehouse yang menyerahkan</p><p>Petugas warehouse yang menerima</p></div>
 </body></html>

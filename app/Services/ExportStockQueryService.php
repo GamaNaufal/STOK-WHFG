@@ -2,7 +2,9 @@
 
 namespace App\Services;
 
-use App\Models\{ExportMasterLocation, ExportPlannedPalletItem, ExportStockBox};
+use App\Models\ExportMasterLocation;
+use App\Models\ExportPlannedPalletItem;
+use App\Models\ExportStockBox;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -29,12 +31,12 @@ class ExportStockQueryService
 
         return ['q' => trim($data['q'] ?? ''), 'part_number' => trim($data['part_number'] ?? ''), 'status' => $status,
             'mode' => $data['mode'] ?? 'box',
-            'location_id' => !empty($data['location_id']) ? (int) $data['location_id'] : null];
+            'location_id' => ! empty($data['location_id']) ? (int) $data['location_id'] : null];
     }
 
     public function boxes(array $filters): Builder
     {
-        return ExportStockBox::query()->with(self::LIST_RELATIONS)
+        return ExportStockBox::query()->whereIn('state', ['received', 'stored'])->with(self::LIST_RELATIONS)
             ->when($filters['q'] !== '', fn ($q) => $q->where(function ($s) use ($filters) {
                 $search = $filters['q'];
                 $s->where('box_number', 'like', '%'.$search.'%')->orWhere('part_number', 'like', '%'.$search.'%')

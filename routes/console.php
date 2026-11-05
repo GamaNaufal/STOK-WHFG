@@ -15,6 +15,7 @@ Schedule::command('delivery:expire-verifications')->everyMinute()->withoutOverla
 
 Artisan::command('expired-box:sync-statuses', function () {
     app(\App\Services\ExpiredBoxService::class)->syncStatuses();
+    app(\App\Services\ExportExpiredBoxService::class)->syncStatuses();
     $this->info('Box expiry statuses synchronized.');
 })->purpose('Synchronize box age and one-month reactivation deadlines');
 
@@ -27,7 +28,7 @@ Artisan::command('inspire', function () {
 Artisan::command('locations:sync', function () {
     $this->info('Syncing master_locations with stock_locations...');
 
-    DB  ::transaction(function () {
+    DB::transaction(function () {
         \App\Models\MasterLocation::query()->update([
             'is_occupied' => false,
             'current_pallet_id' => null,
@@ -107,11 +108,11 @@ Artisan::command('health:concurrency', function () {
     }
 
     $this->line('=== Concurrency Health Check ===');
-    $this->line('Active session duplicates: ' . $activeSessionDuplicates->count());
-    $this->line('Duplicate pick items: ' . $duplicatePickItems->count());
-    $this->line('Duplicate withdrawals: ' . $duplicateWithdrawals->count());
-    $this->line('Verification overflows: ' . $verificationOverflows->count());
-    if (!$hasVerificationColumn) {
+    $this->line('Active session duplicates: '.$activeSessionDuplicates->count());
+    $this->line('Duplicate pick items: '.$duplicatePickItems->count());
+    $this->line('Duplicate withdrawals: '.$duplicateWithdrawals->count());
+    $this->line('Verification overflows: '.$verificationOverflows->count());
+    if (! $hasVerificationColumn) {
         $this->warn('Verification overflow check skipped: column verification_box_ids not found.');
     }
 
@@ -146,10 +147,12 @@ Artisan::command('health:concurrency', function () {
 
     if ($hasIssue) {
         $this->error('FAILED: concurrency anomalies detected.');
+
         return 1;
     }
 
     $this->info('OK: no concurrency anomalies detected.');
+
     return 0;
 })->purpose('Run delivery concurrency health checks (session/item/withdrawal/verification consistency)');
 
@@ -177,14 +180,14 @@ Artisan::command('stock-input:diagnose
             ->leftJoin('users as u', 'u.id', '=', 'si.user_id')
             ->leftJoin('stock_input_boxes as sib', 'sib.stock_input_id', '=', 'si.id')
             ->whereNull('si.deleted_at')
-            ->when($dateFilter !== '', fn ($q) => $q->where('si.stored_at', 'like', $dateFilter . '%'))
-            ->when($palletFilter !== '', fn ($q) => $q->where('p.pallet_number', 'like', '%' . $palletFilter . '%'))
-            ->when($operatorFilter !== '', fn ($q) => $q->where('u.name', 'like', '%' . $operatorFilter . '%'))
-            ->when($locationFilter !== '', fn ($q) => $q->where('si.warehouse_location', 'like', '%' . $locationFilter . '%'))
+            ->when($dateFilter !== '', fn ($q) => $q->where('si.stored_at', 'like', $dateFilter.'%'))
+            ->when($palletFilter !== '', fn ($q) => $q->where('p.pallet_number', 'like', '%'.$palletFilter.'%'))
+            ->when($operatorFilter !== '', fn ($q) => $q->where('u.name', 'like', '%'.$operatorFilter.'%'))
+            ->when($locationFilter !== '', fn ($q) => $q->where('si.warehouse_location', 'like', '%'.$locationFilter.'%'))
             ->groupBy('si.id', 'si.stored_at', 'si.user_id', 'u.name', 'si.warehouse_location', 'si.box_quantity', 'p.pallet_number')
             ->selectRaw('si.id, si.stored_at, si.user_id, u.name as operator_name, p.pallet_number, si.warehouse_location, si.box_quantity as recorded_box_qty, COUNT(sib.id) as mapped_box_qty');
 
-        if (!$includeAll) {
+        if (! $includeAll) {
             $listQuery->havingRaw('si.box_quantity <> COUNT(sib.id)');
         }
 
@@ -199,6 +202,7 @@ Artisan::command('stock-input:diagnose
             } else {
                 $this->info('No stock input mismatch found for current filters.');
             }
+
             return 0;
         }
 
@@ -229,12 +233,14 @@ Artisan::command('stock-input:diagnose
 
         $this->line('Run detail check: php artisan stock-input:diagnose <stock_input_id>');
         $this->line('Example filter check: php artisan stock-input:diagnose --date="2026-04-20" --pallet="PLT-108" --all --recent=30');
+
         return 0;
     }
 
     $stockInputId = (int) $stockInputIdArg;
     if ($stockInputId <= 0) {
         $this->error('stockInputId must be a positive integer.');
+
         return 1;
     }
 
@@ -252,8 +258,9 @@ Artisan::command('stock-input:diagnose
         ->selectRaw('SUM(CASE WHEN b.deleted_at IS NOT NULL THEN COALESCE(b.pcs_quantity, 0) ELSE 0 END) as soft_deleted_pcs_qty')
         ->first();
 
-    if (!$summary) {
-        $this->error('stock_input_id not found: ' . $stockInputId);
+    if (! $summary) {
+        $this->error('stock_input_id not found: '.$stockInputId);
+
         return 1;
     }
 
@@ -317,7 +324,7 @@ Artisan::command('stock-input:diagnose
         );
 
         if ($boxRows->count() > 100) {
-            $this->warn('Only first 100 rows shown. Total mapped rows: ' . $boxRows->count());
+            $this->warn('Only first 100 rows shown. Total mapped rows: '.$boxRows->count());
         }
     }
 

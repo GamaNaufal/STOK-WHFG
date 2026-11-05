@@ -119,6 +119,7 @@ class ExportNotFullService
         $items = ExportPlannedPalletItem::with('pallet')->withCount('fulfillmentBoxes')->where('part_setting_id', $request->part_setting_id)
             ->where('pcs_per_box', $request->pcs_quantity)
             ->whereHas('pallet', fn ($q) => $q->where('export_pallet_plan_id', $plan->id))->orderBy('id')->get();
+
         return $items->first(fn ($i) => $i->fulfillment_boxes_count < $i->box_quantity)
             ?? $items->first(fn ($i) => $i->fulfillmentBoxes()->whereNull('placed_at')->exists()) ?? $items->first();
     }
@@ -142,7 +143,7 @@ class ExportNotFullService
 
     public function source(ExportNotFullRequest $request): ?ExportStockBox
     {
-        return ExportStockBox::with('currentPallet.location')->where('part_setting_id', $request->part_setting_id)
+        return ExportStockBox::with('currentPallet.location')->eligible()->where('part_setting_id', $request->part_setting_id)
             ->where('pcs_quantity', $request->fixed_qty)->where('is_not_full', false)->where('state', 'stored')
             ->whereNotNull('stored_at')->whereNotNull('stored_by')->whereDoesntHave('fulfillment')
             ->whereHas('currentPallet', fn ($q) => $q->whereNull('retired_at')->whereNotNull('master_location_id'))
@@ -179,7 +180,7 @@ class ExportNotFullService
             $this->fail('ID Box baru wajib tepat 8 angka.');
         }
         app(ExportPickingService::class)->assertReceiptAllowed($number);
-        if (\App\Support\BoxIdentity::unavailable($number,$requestId) || ExportStockBox::withTrashed()->where('box_number', $number)->exists()
+        if (\App\Support\BoxIdentity::unavailable($number, $requestId) || ExportStockBox::withTrashed()->where('box_number', $number)->exists()
             || ExportNotFullRequest::whereKeyNot($requestId)->where('status', 'prepared')->where('preparation->box_number', $number)->exists()) {
             $this->fail('ID Box sudah dipakai pada lokal/ekspor atau sedang disiapkan request lain.');
         }
@@ -258,6 +259,7 @@ class ExportNotFullService
                 'part_number' => $r->part_number, 'pcs_quantity' => $r->pcs_quantity, 'standard_pcs_quantity' => $r->fixed_qty,
                 'receipt_pcs_quantity' => $source ? 0 : $r->pcs_quantity, 'origin' => $source ? 'split' : 'external',
                 'source_box_id' => $source?->id, 'is_not_full' => true, 'state' => 'received', 'revision' => 1,
+                'reactivated_until' => $source?->reactivated_until,
                 'receive_token' => (string) Str::uuid(), 'first_received_at' => $source?->first_received_at ?? now(), 'received_by' => $actor->id]);
             ExportFulfillmentBox::create(['export_stock_box_id' => $box->id, 'box_number' => $box->box_number,
                 'export_planned_pallet_item_id' => $target->id, 'part_setting_id' => $r->part_setting_id,

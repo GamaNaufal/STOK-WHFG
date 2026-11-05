@@ -6,9 +6,29 @@ use Illuminate\Database\Eloquent\Model;
 
 class ExpiredBoxHandling extends Model
 {
+    use \App\Models\Concerns\HasMasterScope;
+
+    public const MASTER_SCOPE = 'domestic';
+
+    public const TRANSACTION_MODEL = ExpiredBoxTransaction::class;
+
+    protected $table = 'expired_box_handlings';
+
+    protected $attributes = ['scope' => 'domestic'];
+
+    public static function groupKey(string $part, int $pcs): string
+    {
+        return hash('sha256', json_encode([$part, $pcs], JSON_THROW_ON_ERROR));
+    }
+
+    public function getGroupKeyAttribute(): string
+    {
+        return self::groupKey($this->part_number, (int) $this->pcs_quantity);
+    }
+
     public function transaction(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(ExpiredBoxTransaction::class, 'transaction_id');
+        return $this->belongsTo(static::TRANSACTION_MODEL, 'transaction_id');
     }
 
     protected $guarded = ['id'];
