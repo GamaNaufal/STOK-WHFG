@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\StockOpnameExport;
 use App\Models\StockOpnameSession;
 use App\Services\StockOpnameService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class StockOpnameController extends Controller
 {
@@ -77,6 +80,18 @@ class StockOpnameController extends Controller
         ])->header('Cache-Control', 'private, no-store');
         $opname->load(['starter', 'finisher']);
         return response()->view('stock-opname.show', $data)->header('Cache-Control', 'private, no-store');
+    }
+
+    public function export(Request $request, StockOpnameSession $opname): BinaryFileResponse
+    {
+        $this->context($request, $opname);
+        abort_unless($opname->status === 'completed', 404);
+
+        $opname->load(['starter', 'finisher']);
+        $response = Excel::download(new StockOpnameExport($opname), 'stock-opname-'.$opname->code.'.xlsx');
+        $response->headers->set('Cache-Control', 'private, no-store');
+
+        return $response;
     }
 
     public function scan(Request $request, StockOpnameSession $opname, StockOpnameService $service)

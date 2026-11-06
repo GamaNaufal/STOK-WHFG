@@ -21,20 +21,21 @@
             <p class="receiving-complete">Penempatan sudah dikonfirmasi.</p>
         @endif
         @if($waitingForReview)<p class="alert alert-info">Tinjau hasil stok FIFO dan klik Oke sebelum penempatan.@if(auth()->user()->canAccess('export_pallet_plans')) <a href="{{ route('export.pallet-plans.show', $delivery) }}">Buka tinjauan perencanaan</a>.@endif</p>@endif
-        @if($needsPicking && !$waitingForReview)<p class="alert alert-warning">ID Box ini wajib diverifikasi sebelum penempatan. <a href="{{ route('export.receiving.picking.show', ['pallet'=>$planned->id]) }}">Buka verifikasi pengambilan</a>.</p>@endif
-        @if(($needsPlacement || $canMoveSpare) && !$waitingForReview && !$needsPicking)
+        @if($needsPicking && !$waitingForReview)<p class="alert alert-warning">ID Box ini wajib diverifikasi sebelum penempatan.@if(auth()->user()->canAccessRoute('export.receiving.picking.show')) <a href="{{ route('export.receiving.picking.show', ['pallet'=>$planned->id]) }}">Buka verifikasi pengambilan</a>.@endif</p>@endif
+        @if(($needsPlacement || $canMoveSpare) && !$waitingForReview && !$needsPicking && auth()->user()->canAccessRoute('export.receiving.place'))
             @if($canMoveSpare)<details class="receiving-relocate"><summary>Ubah penempatan stok cadangan</summary>@endif
             <form method="POST" action="{{ route('export.receiving.place', $selected) }}" id="export-place-form">
                 @csrf<input type="hidden" name="revision" value="{{ $selected->revision }}"><input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                 @unless($commitment)
-                    <label class="form-label" for="receiving-destination">Penempatan stok cadangan</label><select class="form-select mb-3" id="receiving-destination" name="destination" required data-pallet-load-select data-incoming-count="1"><option value="">Pilih lokasi atau pallet ekspor</option><optgroup label="Lokasi kosong">@foreach($locations as $loc)<option value="location:{{ $loc->id }}" data-box-count="0">{{ $loc->code }} · pallet cadangan baru</option>@endforeach</optgroup><optgroup label="Pallet ekspor existing">@foreach($pallets as $physical)@if($physical->id !== $selected->current_pallet_id)<option value="pallet:{{ $physical->id }}" data-box-count="{{ $physical->boxes_count }}">{{ $physical->display_name }} · {{ $physical->location_code }} · {{ $physical->boxes_count }} box</option>@endif @endforeach</optgroup></select>
+                    <label class="form-label" for="receiving-destination">Penempatan stok cadangan</label><select class="form-select mb-3" id="receiving-destination" name="destination" required data-pallet-load-select data-incoming-count="1"><option value="">Pilih lokasi atau pallet ekspor</option>@include('export.receiving.destination-options', ['excludePalletId' => $selected->current_pallet_id])</select>
+                    @include('export.receiving.box-limit-field', ['named' => true])
                     @include('export.receiving.destination-load')
                 @endunless
                 <button class="btn btn-primary w-100" type="submit" id="confirm-placement">Konfirmasi box sudah ditempatkan</button>
             </form>
             @if($canMoveSpare)</details>@endif
         @endif
-        @if($delivery && auth()->user()->canAccess('export_fulfillment'))<a class="plan-back mt-3 mb-0" href="{{ route('export.fulfillment.show', $delivery) }}">Lihat pemenuhan permintaan</a>@endif
+        @if($delivery && auth()->user()->canAccess('export_fulfillment'))<a class="plan-back mt-3 mb-0" href="{{ route('export.fulfillment.show', $delivery) }}">Lihat detail delivery</a>@endif
     @else
         <div class="receiving-empty"><i class="bi bi-upc-scan" aria-hidden="true"></i><strong>Mulai dengan scan box</strong><p>Sistem mencari kebutuhan bertenggat terdekat dan nomor pallet terkecil. Stok yang lebih lama diprioritaskan sesuai FIFO.</p></div>
     @endif

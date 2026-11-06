@@ -13,6 +13,7 @@
         <i class="bi bi-arrow-left"></i> Kembali ke Dashboard
     </a>
 </x-page-header>
+<x-delivery-announcement-notes :delivery="$order" surface="local_fulfill" />
 
 <div class="row">
     <div class="col-12">

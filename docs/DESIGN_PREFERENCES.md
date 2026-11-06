@@ -45,6 +45,7 @@ Khusus dashboard ini, gunakan animasi terbatas untuk angka KPI, penggambaran
 garis, ring pemenuhan, komposisi stok dan pergantian rincian. Interaksi pointer
 horizontal pada grafik meninjau titik data; klik menahan titik, keyboard memberi
 alternatif yang setara. Hindari gerakan dekoratif tanpa akhir, angka tren fiktif
-dan penggabungan satuan PCS lokal dengan box ekspor. Animasi dapat dimatikan
-dan tetap menghormati prefers-reduced-motion. Preferensi operasional/scanner
+dan penggabungan satuan PCS lokal dengan box ekspor. Animasi mengikuti
+preferensi kurangi gerakan perangkat (prefers-reduced-motion) tanpa tombol
+pengaturan pada dashboard. Preferensi operasional/scanner
 dan navigasi halaman lain tetap berlaku.

@@ -5,8 +5,11 @@
 <div class="delivery-plan-page export-merge-page">
     <header class="mb-4"><p class="text-muted mb-1">Merge Pallet Ekspor</p><h1>Tinjau sebelum digabung</h1><p>{{ $preview['delivery']?->plan_code ?? 'Stok cadangan' }}@if($preview['delivery']) · {{ $preview['delivery']->customer_name }} · Revisi {{ $preview['plan']->revision }}@endif</p></header>
     <div class="merge-destination"><i class="bi bi-box-arrow-in-right" aria-hidden="true"></i><div><small>Tujuan seluruh box dari pallet terpilih</small><h2>{{ $preview['survivor'] ? 'Pallet '.$preview['survivor']->position : 'Pallet cadangan baru' }} · Lokasi {{ $preview['location']->code }}</h2><span>{{ $preview['result_boxes'] }} box dipindahkan @if($preview['plan']) · {{ $preview['required_boxes'] }} box kebutuhan setelah merge @endif</span></div><x-export-pallet-load :boxes="$preview['plan'] ? $preview['required_boxes'] : $preview['result_boxes']" /></div>
+    @unless($preview['plan'])
+        <p class="mt-3 mb-0"><strong>Kapasitas pallet cadangan baru</strong> · {{ $preview['boxLimit'] ? 'Maksimal '.$preview['boxLimit'].' box' : 'Tanpa batas' }}</p>
+    @endunless
     <p class="mt-3">Sumber: @foreach($preview['sources'] as $source)<strong>{{ $source->display_name }} · {{ $source->location_code }}</strong>{{ $loop->last ? '' : ' + ' }}@endforeach</p>
-    @if($preview['ready_count'])<div class="alert alert-warning"><strong>Status siap akan dibatalkan.</strong> {{ $preview['ready_count'] }} pallet sumber sudah siap. Setelah merge, pallet hasil harus dikonfirmasi siap kembali melalui Pemenuhan Permintaan.</div>@endif
+    @if($preview['ready_count'])<div class="alert alert-warning"><strong>Status siap akan dibatalkan.</strong> {{ $preview['ready_count'] }} pallet sumber sudah siap. Setelah merge, pallet hasil harus dikonfirmasi siap kembali melalui Delivery Schedule Ekspor.</div>@endif
     @if($preview['added_boxes'])<div class="alert alert-danger border-danger"><h2 class="fs-5"><i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i> Rencana delivery akan berubah</h2><p class="mb-0">Ada <strong>{{ $preview['added_boxes'] }} box tambahan</strong> di luar kebutuhan semula. Jumlah PCS dan box delivery akan bertambah sesuai rincian. Pastikan perubahan ini sudah sesuai kebutuhan customer.</p></div>@endif
     @if($preview['plan'])
         <section class="plan-panel"><div class="plan-panel-heading"><h2>Perubahan kebutuhan pada pallet terpilih</h2></div><div class="plan-table-scroll" tabindex="0" role="region" aria-label="Perubahan kebutuhan"><table class="table plan-table"><thead><tr><th>Nomor part</th><th>PCS / box</th><th>Semula (box)</th><th>Cadangan masuk</th><th>Tambahan</th><th>Hasil (box)</th><th>Perubahan PCS</th></tr></thead><tbody>
@@ -19,6 +22,7 @@
     </tbody></table></div></section>
     <form method="POST" action="{{ route('export.merge.store') }}" class="plan-panel" data-merge-confirm>@csrf
         @foreach($data['pallet_ids'] as $id)<input type="hidden" name="pallet_ids[]" value="{{ $id }}">@endforeach
+        @if($preview['boxLimit'] !== null)<input type="hidden" name="box_limit" value="{{ $preview['boxLimit'] }}">@endif
         <input type="hidden" name="location_id" value="{{ $data['location_id'] }}"><input type="hidden" name="spare_mode" value="{{ $data['spare_mode'] }}"><input type="hidden" name="fingerprint" value="{{ $preview['fingerprint'] }}"><input type="hidden" name="request_token" value="{{ $token }}">
         <div class="plan-panel-body"><h2 class="fs-5 mb-3">Konfirmasi fisik</h2>
             @if($preview['ready_count'])<label class="merge-confirm"><input type="checkbox" name="ready_confirmed" value="1" required><span>Saya memahami status siap dibatalkan dan pallet hasil harus dikonfirmasi ulang.</span></label>@endif
@@ -29,4 +33,4 @@
     </form>
 </div>
 @endsection
-@section('scripts')<script src="{{ asset('js/pages/export-merge.js') }}" defer></script>@endsection
+@section('scripts')<script src="{{ asset('js/pages/export-merge.js') }}?v={{ filemtime(public_path('js/pages/export-merge.js')) }}" defer></script>@endsection

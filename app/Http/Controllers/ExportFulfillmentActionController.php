@@ -23,11 +23,11 @@ class ExportFulfillmentActionController extends Controller
     {
         $this->pallet($deliveryPlan, $pallet);
         abort_if($pallet->ready_at, 409, 'Pallet sudah siap. Muat ulang halaman.');
-        [, $items] = $service->contents($pallet);
+        [, $items, $commitments] = $service->contents($pallet);
         $locations = ExportMasterLocation::where(fn ($q) => $q->whereKey($pallet->master_location_id)
             ->orWhere(fn ($free) => $free->available()->whereNull('current_pallet_id')->whereDoesntHave('stockLocations')->whereDoesntHave('stockPallet')))->orderBy('code')->get();
         return response()->view('export.fulfillment.ready-modal', ['delivery' => $deliveryPlan, 'pallet' => $pallet,
-            'items' => $items, 'locations' => $locations])->header('Cache-Control', 'private, no-store');
+            'items' => $items, 'locations' => $locations, 'commitments' => $commitments])->header('Cache-Control', 'private, no-store');
     }
 
     public function ready(Request $request, ExportDeliveryPlan $deliveryPlan, ExportPlannedPallet $pallet, ExportFulfillmentCompletionService $service)

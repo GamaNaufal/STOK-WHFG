@@ -131,6 +131,8 @@
         4. Scan setiap box setelah diambil<br>
     </div>
 
+    <x-delivery-announcement-notes :delivery="$order" surface="local_pdf" :boxes="$session->items->pluck('box.box_number')->filter()"
+        :parts="$session->items->pluck('part_number')" :context="'Sesi #'.$session->id" print />
     <div class="section-title">DAFTAR BOX YANG HARUS DIAMBIL</div>
     <table>
         <thead>

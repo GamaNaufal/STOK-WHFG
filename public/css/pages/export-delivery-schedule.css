@@ -1,0 +1,158 @@
+.export-schedule-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: .75rem;
+    margin-bottom: 1rem;
+}
+.export-schedule-search { position: relative; flex: 1 1 16rem; max-width: 28rem; }
+.export-schedule-filters.is-live [type="submit"],
+.export-schedule-filters.is-live .plan-inline-actions:has(#schedule-reset[hidden]),
+.export-schedule [hidden] { display: none !important; }
+.export-schedule-suggestions {
+    position: absolute;
+    z-index: 5;
+    inset: 100% 0 auto;
+    max-height: min(18rem, 45vh);
+    overflow-y: auto;
+    margin: .25rem 0 0;
+    padding: .25rem;
+    background: var(--ui-surface, #fff);
+    border: 1px solid var(--ui-border, #dfe1e5);
+    border-radius: .65rem;
+    box-shadow: 0 .4rem 1rem rgb(0 0 0 / .1);
+    list-style: none;
+}
+.export-schedule-suggestions [role="option"] {
+    display: grid;
+    align-content: center;
+    min-height: 2.75rem;
+    padding: .35rem .65rem;
+    border-radius: .4rem;
+    cursor: pointer;
+    font-size: .85rem;
+    overflow-wrap: anywhere;
+}
+.export-schedule-suggestions [aria-selected="true"] { background: var(--ui-soft, #e8f3f1); }
+.export-schedule-suggestions small { color: var(--ui-muted, #595d65); }
+.export-schedule-feedback:has(#schedule-retry:not([hidden])) { margin-bottom: .75rem; }
+.export-schedule-feedback p { margin: 0 0 .4rem; font-size: .85rem; }
+.export-schedule-filters :is(input, select, .btn),
+.export-schedule-navigation .btn { min-height: 2.75rem; }
+.export-schedule .export-schedule-heading { gap: .5rem 1rem; flex-wrap: wrap; }
+.export-schedule-navigation { display: flex; flex-wrap: wrap; gap: .35rem; }
+.export-schedule-navigation .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+}
+.export-schedule-viewport { position: relative; overflow: clip; }
+.export-schedule-scroll { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+.export-schedule-scroll--outgoing { position: absolute; inset: 0; pointer-events: none; }
+.export-schedule-scroll-hint {
+    display: none;
+    margin: 0;
+    padding: .6rem .75rem;
+    color: var(--ui-muted, #595d65);
+    font-size: .8rem;
+}
+.export-schedule-table {
+    width: 100%;
+    min-width: 42rem;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-variant-numeric: tabular-nums;
+}
+.export-schedule-table :is(th, td) {
+    padding: .45rem .5rem;
+    border-top: 1px solid var(--ui-border, #dfe1e5);
+    border-right: 1px solid var(--ui-border, #dfe1e5);
+}
+.export-schedule-table :is(th, td):last-child { border-right: 0; }
+.export-schedule-table th {
+    background: var(--ui-panel, #f4f5f7);
+    color: var(--ui-muted, #595d65);
+    font-size: .8rem;
+    font-weight: 600;
+}
+.export-schedule-table td { height: 5.5rem; vertical-align: top; }
+.export-schedule-table .export-schedule-outside { background: var(--ui-panel, #f4f5f7); }
+.export-schedule-table time {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.65rem;
+    min-height: 1.65rem;
+    padding-inline: .2rem;
+    border-radius: 50%;
+    font-size: .82rem;
+    font-weight: 600;
+}
+.export-schedule-table .is-today { background: var(--ui-soft, #e8f3f1); }
+.export-schedule-table .is-today time { background: var(--ui-accent, #0b7072); color: #fff; }
+.export-schedule-deliveries {
+    display: grid;
+    gap: .25rem;
+    margin: .25rem 0 0;
+    padding: 0;
+    list-style: none;
+}
+.export-schedule-deliveries a {
+    display: flex;
+    align-items: center;
+    min-height: 2.25rem;
+    padding: .3rem .4rem;
+    border-radius: .4rem;
+    background: var(--ui-soft, #e8f3f1);
+    color: var(--ui-accent, #0b7072);
+    font-size: .8rem;
+    font-weight: 600;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
+    text-decoration: none;
+}
+.export-schedule-deliveries a:focus-visible { text-decoration: underline; }
+.export-schedule-table .is-today .export-schedule-deliveries a { background: var(--ui-surface, #fff); }
+.warehouse-app .export-schedule :is(.export-schedule-scroll, .export-schedule-deliveries a):focus-visible {
+    outline: 2px solid var(--ui-accent, #0b7072);
+    outline-offset: -2px;
+}
+.export-schedule-empty {
+    margin: 0;
+    padding: .9rem 1rem;
+    border-top: 1px solid var(--ui-border, #dfe1e5);
+    color: var(--ui-muted, #595d65);
+    font-size: .875rem;
+}
+.export-schedule-preview { --bs-tooltip-bg: #243238; --bs-tooltip-opacity: 1; }
+.export-schedule-preview .tooltip-inner {
+    padding: .45rem .65rem;
+    text-align: start;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+}
+@media (hover: hover) and (pointer: fine) {
+    .export-schedule-suggestions [role="option"]:hover { background: var(--ui-soft, #e8f3f1); }
+    .export-schedule-deliveries a:hover { text-decoration: underline; }
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+    .export-schedule-preview.show .tooltip-inner {
+        opacity: 1;
+        transition: opacity 150ms cubic-bezier(.23, 1, .32, 1);
+    }
+    @starting-style {
+        .export-schedule-preview.show .tooltip-inner { opacity: 0; }
+    }
+    .export-schedule-navigation .btn { transition: transform 120ms cubic-bezier(.23, 1, .32, 1); }
+    .export-schedule-navigation .btn:active { transform: scale(.96); }
+}
+@media (pointer: coarse) {
+    .export-schedule-deliveries a { min-height: 2.75rem; }
+}
+@media (max-width: 767.98px) {
+    .export-schedule-scroll-hint { display: block; }
+}
+@media (max-width: 576px) {
+    .export-schedule-search { max-width: none; }
+    .export-schedule-filters > div { flex: 1 1 100%; }
+}

@@ -6,6 +6,9 @@ use App\Models\{AuditLog, Box, ExpiredBoxHandling, ExportStockBox, PartSetting, 
 use App\Services\StockOpnameService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use PhpOffice\PhpSpreadsheet\Cell\{Cell, DataType, DefaultValueBinder};
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use Tests\TestCase;
 
 class StockOpnameTest extends TestCase
@@ -46,6 +49,114 @@ class StockOpnameTest extends TestCase
     {
         $base = $session->scope === 'export' ? 'export.stock-opname' : 'stock-opname';
         return $this->postJson(route($base.'.scan', $session), ['box_number' => $number, 'request_token' => $token ?? (string) Str::uuid()]);
+    }
+
+    private function downloadWorkbook(string $base, StockOpnameSession $session, array $query = []): Spreadsheet
+    {
+        $response = $this->get(route($base.'.export', ['opname' => $session] + $query))
+            ->assertOk()->assertDownload('stock-opname-'.$session->code.'.xlsx');
+        $this->assertStringContainsString('private', $response->headers->get('Cache-Control'));
+        $this->assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        $path = $response->baseResponse->getFile()->getPathname();
+        Cell::setValueBinder(new DefaultValueBinder());
+        try {
+            return IOFactory::load($path);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function test_excel_contains_every_scan_and_the_final_reconciliation_with_original_snapshots(): void
+    {
+        $found = $this->local('00000001', ['part_number' => '00123']);
+        $this->local('00000002');
+        $departed = $this->local('00000003');
+        $session = $this->start();
+        $this->get(route('stock-opname.show', $session))->assertDontSee('Export Excel');
+        $this->get(route('stock-opname.export', $session))->assertNotFound();
+
+        $this->scan($session, $found->box_number)->assertJsonPath('outcome', 'ok');
+        $this->scan($session, $found->box_number)->assertJsonPath('outcome', 'duplicate');
+        $this->scan($session, '=1+1')->assertJsonPath('outcome', 'ng');
+        $this->scan($session, $departed->box_number)->assertJsonPath('outcome', 'ok');
+        $service = app(StockOpnameService::class);
+        for ($i = 0; $i < 20; $i++) {
+            $service->scan($session->id, $found->box_number, (string) Str::uuid(), $this->admin);
+        }
+        $found->update(['pcs_quantity' => 55]);
+        $departed->delete();
+        $this->local('00000004');
+        $this->post(route('stock-opname.finish', $session), ['confirmed' => 1])->assertRedirect()->assertSessionHasNoErrors();
+        $found->update(['pcs_quantity' => 1]);
+        $this->get(route('stock-opname.show', $session))->assertSee('Export Excel')
+            ->assertSee(route('stock-opname.export', $session), false);
+
+        $workbook = $this->downloadWorkbook('stock-opname', $session, ['tab' => 'ng', 'q' => 'tidak-ada', 'page' => 2]);
+        $this->assertSame(['Ringkasan', 'Semua Scan', 'Rekonsiliasi Box'], $workbook->getSheetNames());
+        $summary = array_column($workbook->getSheet(0)->toArray(formatData: false), 1, 0);
+        $this->assertSame('Lokal', $summary['Lingkup']);
+        $this->assertSame(24, $summary['Total scan']);
+        $this->assertSame(21, $summary['Scan duplikat']);
+        $this->assertSame(2, $summary['Scan OK']);
+        $this->assertSame(1, $summary['Scan NG']);
+        $this->assertSame(2, $summary['Box belum terscan']);
+
+        $scans = $workbook->getSheet(1);
+        $this->assertSame(25, $scans->getHighestDataRow());
+        $this->assertSame($this->admin->name, $scans->getCell('C2')->getValue());
+        $this->assertSame('00000001', $scans->getCell('D2')->getValue());
+        $this->assertSame('00123', $scans->getCell('G2')->getValue());
+        $this->assertSame(80, $scans->getCell('H2')->getValue());
+        $this->assertSame('OK', $scans->getCell('E2')->getValue());
+        $this->assertSame('Duplikat', $scans->getCell('E3')->getValue());
+        $this->assertSame('=1+1', $scans->getCell('D4')->getValue());
+        $this->assertSame(DataType::TYPE_STRING, $scans->getCell('D4')->getDataType());
+        $this->assertSame('NG', $scans->getCell('E4')->getValue());
+        $this->assertSame('ID Box harus tepat 8 angka.', $scans->getCell('F4')->getValue());
+        $this->assertSame('dd/mm/yyyy hh:mm:ss', $scans->getStyle('B2')->getNumberFormat()->getFormatCode());
+        $this->assertSame('A1:M25', $scans->getAutoFilter()->getRange());
+        $this->assertSame('A2', $scans->getFreezePane());
+
+        $items = $workbook->getSheet(2);
+        $this->assertSame(5, $items->getHighestDataRow());
+        $this->assertSame('00000001', $items->getCell('A2')->getValue());
+        $this->assertSame('Posisi / data berubah', $items->getCell('C2')->getValue());
+        $this->assertSame(80, $items->getCell('H2')->getValue());
+        $this->assertSame(55, $items->getCell('M2')->getValue());
+        $this->assertSame('Belum terscan', $items->getCell('B3')->getValue());
+        $this->assertSame('Keluar / ID diganti', $items->getCell('B4')->getValue());
+        $this->assertSame('Masuk selama sesi', $items->getCell('C5')->getValue());
+        $workbook->disconnectWorksheets();
+    }
+
+    public function test_excel_uses_the_same_scope_permissions_and_supports_empty_results(): void
+    {
+        $this->export('00000009');
+        $local = $this->start();
+        $export = $this->start('export');
+        $this->scan($export, '00000009')->assertJsonPath('outcome', 'ok');
+        $this->post(route('stock-opname.finish', $local), ['confirmed' => 1])->assertRedirect()->assertSessionHasNoErrors();
+        $this->post(route('export.stock-opname.finish', $export), ['confirmed' => 1])->assertRedirect()->assertSessionHasNoErrors();
+        $this->get(route('export.stock-opname.export', $local))->assertNotFound();
+        $this->get(route('stock-opname.export', $export))->assertNotFound();
+
+        $this->actingAs(User::factory()->create(['role' => 'warehouse_operator']));
+        $this->get(route('export.stock-opname.export', $export))->assertForbidden();
+        $this->actingAs(User::factory()->create(['role' => 'export_operator']));
+        $this->get(route('stock-opname.export', $local))->assertForbidden();
+        $this->get(route('export.stock-opname.show', $export))->assertSee(route('export.stock-opname.export', $export), false);
+        $workbook = $this->downloadWorkbook('export.stock-opname', $export);
+        $this->assertSame('Ekspor', $workbook->getSheet(0)->getCell('B3')->getValue());
+        $this->assertSame('00000009', $workbook->getSheet(1)->getCell('D2')->getValue());
+        $this->assertSame('00000009', $workbook->getSheet(2)->getCell('A2')->getValue());
+        $workbook->disconnectWorksheets();
+
+        $this->actingAs(User::factory()->create(['role' => 'supervisi']));
+        $empty = $this->downloadWorkbook('stock-opname', $local);
+        $this->assertSame(1, $empty->getSheet(1)->getHighestDataRow());
+        $this->assertSame(1, $empty->getSheet(2)->getHighestDataRow());
+        $this->assertSame(0, array_column($empty->getSheet(0)->toArray(formatData: false), 1, 0)['Total scan']);
+        $empty->disconnectWorksheets();
     }
 
     public function test_scopes_have_separate_single_active_sessions_and_start_is_idempotent(): void

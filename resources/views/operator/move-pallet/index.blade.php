@@ -474,7 +474,7 @@
                     </div>
                     <div class="move-pallet-confirm-contents">Isi tetap sama: <strong>${boxCount} Box</strong> · <strong>${pcsCount} PCS</strong></div>
                 </div>
-                ${pallet.ready ? '<p class="alert alert-warning text-start"><strong>Status Siap akan dibatalkan.</strong> Konfirmasikan ulang pallet di lokasi baru melalui Pemenuhan Permintaan.</p>' : ''}
+                ${pallet.ready ? '<p class="alert alert-warning text-start"><strong>Status Siap akan dibatalkan.</strong> Konfirmasikan ulang pallet di lokasi baru melalui Delivery Schedule Ekspor.</p>' : ''}
                 <p class="move-pallet-confirm-note">Saat dikonfirmasi, lokasi asal dilepas dan lokasi tujuan ditempati pallet ini. Server memeriksa ulang kelayakan pallet dan ketersediaan lokasi; jika ada konflik, perpindahan ditolak tanpa mengubah stok.</p>
             </div>`;
 

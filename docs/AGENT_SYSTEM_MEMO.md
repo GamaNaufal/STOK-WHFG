@@ -2,6 +2,130 @@
 
 Terakhir diverifikasi dari source code: 5 November 2026 (pembaruan inkremental).
 
+Delivery Schedule Ekspor, 5 November 2026
+
+- Menu Pemenuhan Permintaan kini bernama Delivery Schedule Ekspor. Kalender
+  bulanan membuka bulan berjalan dan menempatkan nama customer pada tenggat
+  rencana delivery. Setiap nama membuka rincian delivery yang sama.
+- Pencarian customer/kode dan status berlaku pada bulan yang dipilih, dan
+  kalender diperbarui lewat AJAX. Saat mengetik, saran delivery dapat langsung
+  dibuka. Hover atau fokus menampilkan kode, tenggat dan status.
+- Hak akses, status, dan tindakan pemenuhan pada rincian tetap sama.
+
+Draf penempatan cadangan ekspor per transaksi, 5 November 2026
+
+- Tab browser menyimpan tujuan, pembagian jumlah dan batas pallet baru per
+  operator dan transaksi penerimaan. Konfirmasi satu part memuat status
+  transaksi terbaru dan otomatis memulihkan pilihan part yang masih pending.
+- Jika beberapa part memilih lokasi kosong yang sama, respons konfirmasi
+  memetakan lokasi ke pallet yang benar-benar dibuat dalam batch tersebut.
+  Pilihan lain mengikuti pallet itu selama masih berada di lokasi semula
+  dan dapat dipilih. Kapasitas dihitung ulang dari data terbaru.
+- Pilihan yang sudah dikonfirmasi dibuang dari draf. Perubahan box atau
+  tujuan yang sudah tidak tersedia meminta peninjauan ulang pada part
+  terkait. Payload memakai revisi dan token dari halaman terbaru.
+- Regresi 22 tes Laravel dan 131 tes frontend lulus. Chrome menguji lima
+  part, penempatan satu part, pemulihan empat part termasuk tujuan bersama
+  dan pembagian box, serta lokasi yang menjadi tidak tersedia.
+
+Pengumuman delivery Lokal dan Ekspor, 5 November 2026
+
+- Admin Utama, Supervisi dan Admin Warehouse mengelola fitur melalui
+  Warehouse > Pengumuman Delivery. Customer dan nomor part dicocokkan
+  tanpa membedakan kapitalisasi. Customer, part dan jenis kuota ditetapkan
+  saat terbit. Admin dapat memperbarui instruksi, jumlah kuota dan status.
+- Kuota per delivery dipakai saat order Lokal disetujui atau perencanaan
+  pallet Ekspor final. Delivery aktif yang cocok saat penerbitan juga
+  dipertimbangkan. Pembatalan mengembalikan slot ke delivery aktif yang
+  menunggu. Membuka revisi perencanaan menahan slot delivery yang sudah
+  diperoleh selama customer dan part masih cocok.
+- Kuota per box direservasi untuk ID Box yang sudah dipilih oleh proses
+  assignment/picking Lokal atau komitmen stok Ekspor. FIFO mengikuti
+  data pemilihan stok. Kuota berubah menjadi terpakai saat pengiriman
+  dikonfirmasi. Pembatalan, revisi dan redo melepaskan box terkait.
+  Keterangan perencanaan dapat menandai instruksi yang masih menunggu ID.
+- DeliveryAnnouncementService menyinkronkan kuota pada transaksi status
+  delivery dan assignment. Satu mutex database menyelaraskan kuota lintas
+  lingkup. DeliveryAnnouncementDisplay mencatat snapshot instruksi, lingkup,
+  kode delivery, halaman/dokumen, akun, serta waktu pertama dan terakhir.
+  Penayangan tidak memengaruhi kuota. Keterangan per pallet atau transaksi
+  hanya membawa part/ID Box pada dokumen atau layar tersebut.
+- Nonaktif menyembunyikan instruksi pada delivery aktif dan menghentikan
+  alokasi baru. Pengaktifan kembali memakai sisa kuota dan kandidat aktif.
+  Riwayat penayangan serta pemakaian sebelumnya tetap tersimpan.
+- Migration 2026_11_05_000005 dijalankan di MySQL development lokal.
+  Regresi 623 tes Laravel lulus. Tes fitur pengumuman dan verifikasi
+  Chrome mencakup kuota bersama, picking Lokal, penyelesaian Ekspor,
+  pemilahan ID Box saat cetak pallet, hak akses dan tampilan ponsel.
+
+Kelola stok ekspor, 5 November 2026
+
+- Admin Utama, Supervisi, dan Admin Warehouse mengakses Kelola box,
+  Kelola pallet, dan Riwayat box melalui Stok Ekspor. Hak
+  export_stock_manage dibatasi pada ketiga role tersebut. Hak kelola
+  dan baca stok tidak memberikan akses penerimaan.
+- Koreksi stok cadangan aktif dapat mengubah nomor part, PCS sesuai
+  master bersama, dan waktu pertama masuk yang dipakai FIFO serta
+  umur stok. ID Box global, histori perpindahan, dan snapshot jumlah
+  PCS saat penerimaan dipertahankan. Isi Box Not Full mengikuti alur
+  persetujuan, sedangkan data hasil packing mengikuti alur QA.
+- Batas maksimal dapat diedit pada pallet cadangan aktif. Nilai 0
+  berarti tanpa batas dan nilai positif minimal sebesar isi pallet
+  saat ini. Penghapusan pallet mencakup semua isinya dalam satu
+  transaksi. Menghapus box terakhir juga menonaktifkan pallet cadangan
+  dan membebaskan lokasi. Box, ID global, dan jejak audit tetap bisa
+  dicari berdasarkan delapan digit ID Box.
+- Pallet rencana dan box yang masih terikat reservasi, picking, QA,
+  packing, atau penyiapan Box Not Full dilindungi dari penghapusan
+  administratif. Aksi stok cadangan memakai mutex inventory ekspor
+  dan memeriksa revisi box atau versi isi pallet sebelum menyimpan.
+  Semua aksi edit dan hapus meminta alasan dan konfirmasi, kemudian
+  mencatat operator, waktu, serta data sebelum dan sesudah.
+- Riwayat box menggabungkan penerimaan, perpindahan, reservasi, picking
+  terverifikasi, asal box hasil packing atau pecah, perubahan stok,
+  dan penyelesaian pengiriman sesuai catatan yang tersedia.
+- Migration hak kelola dijalankan di MySQL development lokal.
+  Pengujian mencakup 619 tes Laravel, 131 tes frontend, serta klik
+  Batal dan Konfirmasi pada form edit/hapus box dan pallet di Chrome.
+
+Batas kapasitas pallet cadangan Ekspor 5 November 2026:
+- export_stock_pallets.box_limit menyimpan batas fisik opsional per ID pallet
+  cadangan. Kosong atau 0 dinormalisasi ke null. Pallet Perencanaan Pallet
+  dikecualikan; peringatan kuning 36 dan merah 72 tetap independen.
+- Pada penempatan cadangan ke lokasi kosong, operator dapat mengisi batas
+  pallet baru. Semua kelompok yang menuju lokasi sama memakai batas yang
+  sama. Opsi pallet existing menunjukkan isi, batas dan ruang tersisa.
+  UI menahan konfirmasi atau cetak tujuan yang melebihi kapasitas dan
+  operator membagi box dengan kontrol tujuan yang sudah tersedia.
+- ExportStockReceivingService memeriksa kapasitas fisik dalam mutex
+  inventory untuk penerimaan, relokasi, pengembalian revisi, dan hasil
+  packing. Picking issue memeriksa saat approval dan konfirmasi, kecuali
+  box yang masih tercatat pada pallet asal. Box Not Full dihitung satu.
+  Jika melebihi kapasitas, perubahan satu konfirmasi di-rollback.
+- Pemindahan pallet utuh mempertahankan ID dan batas. Merge cadangan
+  membuat ID baru dengan batas opsional baru yang harus muat seluruh isi;
+  nilai pada sumber tetap tersimpan untuk histori. Hasil merge rencana
+  mengikuti kapasitas rencananya. Edit batas pallet aktif tersedia melalui Kelola pallet.
+- Migration kolom nullable dijalankan pada MySQL development lokal; 7
+  pallet sebelum dan sesudah, semua batas awal null. Regresi 615 tes
+  Laravel dan 131 tes frontend serta Vite build lulus. Chrome memeriksa
+  penerimaan dan merge pada viewport 1.366/390 px, termasuk kasus 34/36,
+  pembagian lintas part dan input 0 pada merge.
+
+Unduhan Excel Stock Opname Lokal / Ekspor 5 November 2026:
+- Hasil sesi selesai menyediakan Export Excel dengan izin baca yang sama
+  seperti riwayat opname dan pemeriksaan lingkup dari route.
+- Satu workbook per sesi berisi Ringkasan, Semua Scan, dan Rekonsiliasi Box.
+  Semua percobaan OK/NG/duplikat beserta alasan, waktu, operator, dan
+  snapshot saat scan diambil dari log sesi. Rekonsiliasi mencatat hasil
+  setiap box, termasuk belum terscan dan perubahan kondisi awal/akhir.
+- Workbook memakai snapshot akhir yang tersimpan, tanpa membaca ulang stok
+  aktif atau membatasi hasil berdasarkan filter/pagination halaman. ID Box,
+  nomor part dan teks scan disimpan sebagai teks untuk menjaga nol di depan.
+- Verifikasi file aktual mencakup sesi Lokal/Ekspor, sesi kosong, pembatasan
+  hak akses, dan input scan yang menyerupai rumus. Workbook terbaca juga
+  oleh OpenPyXL; posisi tombol diperiksa di Chrome 1.366/390 px.
+
 Pemulihan otomatis scan Penerimaan Transfer Box Ekspor 5 November 2026:
 - Draft box yang sudah diterima scan dimuat kembali dari server. ID Box yang
   belum ditambahkan, fase cek, nomor part dan tanggal pilihan dipulihkan

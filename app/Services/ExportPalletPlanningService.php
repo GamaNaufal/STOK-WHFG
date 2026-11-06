@@ -173,6 +173,7 @@ class ExportPalletPlanningService
             AuditService::record('export_pallet_plan', $final ? 'finalized' : 'saved', 'ExportPalletPlan', $plan->id,
                 $actor->id, $before, $this->snapshot($plan), $final ? 'Perencanaan pallet difinalisasi dan lokasi direservasi.' : 'Draft perencanaan pallet disimpan.');
             if ($final) {
+                app(DeliveryAnnouncementService::class)->sync($delivery);
                 $notice = app(ExportStockAllocationNoticeService::class)->create($plan, $actor);
                 app(ExportStockAllocationService::class)->allocate($actor, notice: $notice);
             }
@@ -183,7 +184,7 @@ class ExportPalletPlanningService
     public function transition(int $deliveryId, int $revision, User $actor, bool $cancel = false): void
     {
         app(ExportInventoryService::class)->transaction(function () use ($deliveryId, $revision, $actor, $cancel) {
-            ExportDeliveryPlan::lockForUpdate()->findOrFail($deliveryId);
+            $delivery = ExportDeliveryPlan::lockForUpdate()->findOrFail($deliveryId);
             $plan = ExportPalletPlan::where('export_delivery_plan_id', $deliveryId)->lockForUpdate()->firstOrFail();
             if ($plan->revision !== $revision) $this->fail('revision', 'Perencanaan sudah berubah. Muat ulang halaman.');
             if (!$cancel && $plan->status !== 'final') $this->fail('status', 'Hanya perencanaan final yang perlu dibuka untuk revisi.');
@@ -197,6 +198,7 @@ class ExportPalletPlanningService
             }
             $plan->update(['status' => $cancel ? 'cancelled' : 'draft', 'revision' => $plan->revision + 1,
                 'updated_by' => $actor->id, 'finalized_by' => null, 'finalized_at' => null]);
+            app(DeliveryAnnouncementService::class)->sync($delivery);
             AuditService::record('export_pallet_plan', $cancel ? 'cancelled' : 'reopened', 'ExportPalletPlan', $plan->id,
                 $actor->id, $before, $this->snapshot($plan), $cancel ? 'Perencanaan dibatalkan dan reservasi lokasi dilepas.' : 'Perencanaan dibuka untuk revisi; reservasi lokasi tetap ditahan.');
         });

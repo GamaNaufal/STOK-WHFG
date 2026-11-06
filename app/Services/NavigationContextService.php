@@ -66,24 +66,28 @@ class NavigationContextService
             $item['short_label'] = match ($item['route']) {
                 'export.locations.index' => 'Lokasi',
                 'part-settings.index' => 'Nomor Part',
+                'export.fulfillment.index' => $item['label'],
                 default => str_contains($item['group'], 'Ekspor') ? Str::replaceEnd(' Ekspor', '', $item['label']) : $item['label'],
             };
             $item['group_label'] = match ($item['group']) {
                 'Warehouse' => 'Warehouse', 'Delivery' => 'Pengiriman Lokal', default => $item['group'],
             };
             $scope = str_starts_with($item['key'], 'export_') ? 'ekspor export' : match ($item['key']) {
-                'not_full_request', 'not_full_approval', 'delivery_issues', 'reports', 'audit', 'parts' => 'lokal ekspor export',
+                'not_full_request', 'not_full_approval', 'delivery_issues', 'delivery_announcements', 'reports', 'audit', 'parts' => 'lokal ekspor export',
                 'stock_input', 'stock_view', 'merge_pallet', 'move_pallet', 'expired_box', 'delivery_schedule',
                 'delivery_order', 'delivery_approval', 'delivery_assign', 'delivery_pick', 'locations' => 'lokal',
                 default => '',
             };
             $item['keywords'] = $item['label'].' '.$item['group'].' '.$item['group_label'].' '.$scope.' '.match ($item['key']) {
+                'delivery_announcements' => 'pengumuman instruksi keterangan delivery customer part kuota',
+                'export_stock_manage' => 'stok stock ekspor kelola edit hapus riwayat box pallet',
                 'export_stock_input', 'stock_input' => 'input penerimaan stok stock box transfer',
                 'stock_opname_local', 'stock_opname_export' => 'stock stok opname cek cocok pemeriksaan history inventaris',
                 'parts' => 'master nomor no part part number kapasitas pcs box',
                 'export_locations', 'locations' => 'master lokasi location tempat',
                 'merge_pallet', 'export_merge_pallet' => 'gabung palet pallet'.(count($mergeRoutes) === 2 ? ' lokal ekspor export' : ''),
                 'export_pallet_plans' => 'palet pallet rencana planning',
+                'export_fulfillment' => 'jadwal kalender tenggat pemenuhan permintaan',
                 'move_pallet', 'export_move_pallet' => 'palet pallet pindah lokasi'.(count($moveRoutes) === 2 ? ' lokal ekspor export' : ''),
                 'export_delivery_plans', 'delivery_schedule', 'delivery_order' => 'rencana jadwal pengiriman delivery',
                 'not_full_request', 'not_full_approval' => 'box not full nf pengajuan persetujuan approval',

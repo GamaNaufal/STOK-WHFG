@@ -28,6 +28,8 @@
             <i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali ke daftar
         </a>
     </header>
+    <x-delivery-announcement-notes :delivery="$order" surface="local_verify" :boxes="$session->items->pluck('box.box_number')->filter()"
+        :parts="$session->items->pluck('part_number')" :context="'Sesi #'.$session->id" />
 
     <div class="verification-grid">
         <div class="verification-controls">

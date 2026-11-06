@@ -101,6 +101,7 @@ class ExportDeliveryPlanService
             $plan->load('items');
             if ($id) app(ExportPalletPlanningService::class)->invalidateForDeliveryRevision($plan, $actor);
             app(ExportNotFullService::class)->sync($plan, $actor);
+            app(DeliveryAnnouncementService::class)->sync($plan);
             AuditService::record('export_delivery_plan', $id ? 'updated' : 'created', 'ExportDeliveryPlan',
                 $plan->id, $actor->id, $before, $this->snapshot($plan),
                 'Rencana delivery ekspor disimpan.');

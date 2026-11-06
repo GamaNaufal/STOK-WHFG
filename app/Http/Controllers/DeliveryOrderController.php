@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DeliveryAnnouncementService;
 use App\Models\Box;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
@@ -569,6 +570,7 @@ class DeliveryOrderController extends Controller
                     $order->status = 'partial';
                     $order->save();
                 }
+                app(DeliveryAnnouncementService::class)->syncOrders([$order, $childOrder]);
             });
 
             return redirect()->back()->with('success', 'Delivery berhasil di-split.');
@@ -650,6 +652,7 @@ class DeliveryOrderController extends Controller
 
                 $parentOrder->status = $remainingActiveChildren ? 'partial' : 'approved';
                 $parentOrder->save();
+                app(DeliveryAnnouncementService::class)->syncOrders([$childOrder, $parentOrder]);
             });
 
             return redirect()->back()->with('success', 'Delivery split berhasil dikembalikan ke delivery utama.');
@@ -961,6 +964,7 @@ class DeliveryOrderController extends Controller
                 }
 
                 $order->save();
+                app(DeliveryAnnouncementService::class)->sync($order);
             });
         } catch (\RuntimeException $e) {
             return redirect()->back()->with('error', $e->getMessage());
@@ -1044,6 +1048,7 @@ class DeliveryOrderController extends Controller
                 $order->status = 'deleted';
                 $order->save();
                 $order->delete();
+                app(DeliveryAnnouncementService::class)->sync($order);
             });
         } catch (\RuntimeException $e) {
             return redirect()->back()->with('error', $e->getMessage());

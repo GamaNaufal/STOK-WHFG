@@ -1,5 +1,5 @@
 @extends('shared.layouts.app')
-@section('title', 'Detail Pemenuhan Permintaan')
+@section('title', 'Detail Delivery Ekspor')
 @section('styles')
 <link rel="stylesheet" href="{{ asset('css/pages/export-delivery-plans.css') }}">
 <link rel="stylesheet" href="{{ asset('css/pages/export-fulfillment.css') }}">
@@ -8,9 +8,10 @@
 <div class="delivery-plan-page fulfillment-page">
     @include('export.not-full.requirements',['notFullDelivery'=>$delivery])
     @if($errors->any())<div class="alert alert-danger" role="alert">@foreach($errors->all() as $error)<p class="mb-1">{{ $error }}</p>@endforeach</div>@endif
-    <header class="plan-header"><div><a class="plan-back" href="{{ route('export.fulfillment.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Pemenuhan permintaan</a><span class="plan-eyebrow">Pengiriman ekspor</span><h1>{{ $delivery->plan_code ?? 'Rencana tanpa kode' }}</h1><p>{{ $delivery->customer_name }} · Batas pengiriman {{ $delivery->delivery_deadline->format('d/m/Y') }} · {{ $overview->pallet_count }} pallet</p></div>
+    <header class="plan-header"><div><a class="plan-back" href="{{ route('export.fulfillment.index', ['month' => $delivery->delivery_deadline->format('Y-m')]) }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Delivery Schedule Ekspor</a><span class="plan-eyebrow">Pengiriman ekspor</span><h1>{{ $delivery->plan_code ?? 'Rencana tanpa kode' }}</h1><p>{{ $delivery->customer_name }} · Batas pengiriman {{ $delivery->delivery_deadline->format('d/m/Y') }} · {{ $overview->pallet_count }} pallet</p></div>
         <div class="plan-inline-actions">@if(auth()->user()->canAccess('export_pallet_plans'))<a class="btn btn-outline-secondary" href="{{ route('export.pallet-plans.show', $delivery) }}">Lihat perencanaan</a>@endif<a class="btn btn-outline-primary" href="{{ request()->fullUrl() }}">Perbarui tampilan</a></div>
     </header>
+    <x-delivery-announcement-notes :delivery="$delivery" surface="export_fulfill" />
     @if($overview->fulfillment_status === 'paused')<div class="alert alert-warning" role="status"><strong>Perencanaan perlu diselesaikan kembali.</strong> Rencana sedang direvisi atau berubah dari acuan final. Periksa pembagian dan finalisasi ulang sebelum melanjutkan pemenuhan.</div>@endif
     @if($metrics['invalid'] || $metrics['excess'])<div class="alert alert-warning" role="alert"><strong>Periksa pencatatan box.</strong> {{ number_format($metrics['invalid'], 0, ',', '.') }} box tidak sesuai part, kapasitas, atau lokasi tujuan; {{ number_format($metrics['excess'], 0, ',', '.') }} alokasi box melebihi kebutuhan. Box yang tidak sesuai tidak dihitung terpenuhi.</div>@endif
     <section class="plan-panel fulfillment-total" aria-labelledby="fulfillment-progress-title">

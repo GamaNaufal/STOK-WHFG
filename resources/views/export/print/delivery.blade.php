@@ -3,6 +3,7 @@
 @section('print-help', 'A4 portrait')
 @section('content')
     <header class="delivery-print-heading"><p>PT. YAMATOGOMU INDONESIA - WAREHOUSE FG EKSPOR</p><h1>Rencana delivery</h1><strong>{{ $delivery->plan_code ?? 'RD-'.$delivery->id }}</strong><span class="final-label">PERENCANAAN FINAL</span></header>
+    <x-delivery-announcement-notes :delivery="$delivery" surface="export_print_delivery" print />
     <table class="print-meta"><tbody>
         <tr><th>Customer</th><td>{{ $delivery->customer_name }}</td><th>Batas pengiriman</th><td>{{ $delivery->delivery_deadline->format('d/m/Y') }}</td></tr>
         <tr><th>Revisi delivery</th><td>{{ $delivery->revision }}</td><th>Revisi pallet</th><td>{{ $planning->revision }} · {{ $planning->pallets_count }} pallet</td></tr>

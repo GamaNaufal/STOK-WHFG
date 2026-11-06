@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DeliveryAnnouncementService;
 use App\Models\Box;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
@@ -575,6 +576,7 @@ class StockWithdrawalController extends Controller
                             $order->status = 'processing';
                             $order->save();
                         }
+                        app(DeliveryAnnouncementService::class)->sync($order, $boxDetails);
                     }
                 }
 
@@ -918,6 +920,13 @@ class StockWithdrawalController extends Controller
 
                     $batchWithdrawal->status = 'reversed';
                     $batchWithdrawal->save();
+                }
+
+                $original = \App\Models\AuditLog::where('type', 'stock_withdrawal')->where('model', 'StockWithdrawal')
+                    ->where('model_id', $batchWithdrawals->min('id'))->where('action', 'completed')->first();
+                $deliveryId = $original?->getNewValuesArray()['delivery_order_id'] ?? null;
+                if ($deliveryId && ($order = DeliveryOrder::withTrashed()->find($deliveryId))) {
+                    app(DeliveryAnnouncementService::class)->sync($order, reversed: $boxesById->pluck('box_number')->all());
                 }
 
                 AuditService::record('stock_withdrawal', 'reversed', 'StockWithdrawal', $withdrawal->id, Auth::id(),

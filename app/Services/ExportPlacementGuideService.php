@@ -8,7 +8,9 @@ class ExportPlacementGuideService
     {
         $warnings = [];
         $assigned = collect($assignments)->keyBy('id');
-        $resolve = function (?string $value) use ($data): ?array {
+        $limits = $assigned->filter(fn ($row) => str_starts_with($row['destination'] ?? '', 'location:'))
+            ->groupBy('destination')->map(fn ($rows) => $rows->map(fn ($row) => (int) ($row['box_limit'] ?? 0))->unique());
+        $resolve = function (?string $value) use ($data, $limits): ?array {
             if (! $value) {
                 return null;
             }
@@ -20,7 +22,8 @@ class ExportPlacementGuideService
 
             return ['pallet' => $type === 'pallet' ? $choice->display_name : 'Pallet cadangan',
                 'location' => $type === 'pallet' ? $choice->location_code : $choice->code,
-                'current' => $type === 'pallet' ? (int) $choice->boxes_count : 0];
+                'current' => $type === 'pallet' ? (int) $choice->boxes_count : 0,
+                'limit' => $type === 'pallet' ? $choice->spareBoxLimit() : ($limits->get($value)?->first() ?: null)];
         };
         $incoming = [];
         foreach ($data['groups'] as $group) {
@@ -60,12 +63,17 @@ class ExportPlacementGuideService
                     $value = $assigned->has($box->id) ? $assigned->get($box->id)['destination'] : $destination;
                     $target = $resolve($value);
                     $key = 'pending-'.$group['key'].'-'.($value ?: 'unassigned');
-                    $place = $target ? $target + ['load' => $target['current'] + ($incoming[$value] ?? 0)] : ['pallet' => 'Pallet cadangan', 'location' => null];
-                    if (! $target) {
+                    $load = $target ? $target['current'] + ($incoming[$value] ?? 0) : null;
+                    $exceedsLimit = $target && (($limits->get($value)?->count() ?? 0) > 1
+                        || ($target['limit'] !== null && $load > $target['limit']));
+                    if ($exceedsLimit) {
+                        $warnings[] = 'Pembagian ke '.$target['location'].' melampaui kapasitas atau memuat batas berbeda. Atur kembali tujuan di transaksi sebelum menempatkan box.';
+                    } elseif (! $target) {
                         $warnings[] = $value
                             ? 'Tujuan cadangan tidak lagi tersedia. Buka halaman transaksi dan pilih kembali.'
                             : 'Tujuan stok cadangan belum dipilih. Tentukan lokasi di halaman transaksi agar panduan menunjukkan tujuan yang lengkap.';
                     }
+                    $place = $target && ! $exceedsLimit ? $target + ['load' => $load] : ['pallet' => 'Pallet cadangan', 'location' => null];
                 } else {
                     $key = 'stored-'.($box->current_pallet_id ?? 'unknown');
                     $place = ['pallet' => $box->currentPallet?->display_name ?? 'Pallet cadangan', 'location' => $box->currentPallet?->location_code];

@@ -141,12 +141,35 @@ class ExportPalletMergeTest extends TestCase
         $this->get(route('export.merge.result', $data['request_token']))->assertOk()->assertSee('Pallet sudah digabung');
     }
 
+    public function test_spare_merge_sets_new_optional_limit_and_rejects_a_limit_below_the_result(): void
+    {
+        $location = $this->location();
+        $a = $this->place($this->box(), ['location_id' => $location->id, 'box_limit' => 1]);
+        $b = $this->spare();
+        $input = ['pallet_ids' => [$a->current_pallet_id, $b->current_pallet_id], 'location_id' => $location->id, 'spare_mode' => 'fill'];
+        $preview = route('export.merge.preview');
+        $this->postJson($preview, $input + ['box_limit' => 1])->assertUnprocessable()->assertJsonValidationErrors('merge');
+        $this->post($preview, $input + ['box_limit' => 0])->assertOk()->assertSee('Tanpa batas');
+        $review = $this->post($preview, $input + ['box_limit' => 2])->assertOk()->assertSee('Maksimal 2 box');
+        $data = $input + ['box_limit' => 2, 'physical_confirmed' => 1, 'request_token' => $review->viewData('token'),
+            'fingerprint' => $review->viewData('preview')['fingerprint']];
+        $this->postJson(route('export.merge.store'), array_replace($data, ['box_limit' => 3]))->assertUnprocessable()->assertJsonValidationErrors('merge');
+        $this->postJson(route('export.merge.store'), $data)->assertRedirect();
+        $this->assertSame(2, $location->fresh()->stockPallet->box_limit);
+        $this->assertNotSame($a->current_pallet_id, $location->fresh()->stockPallet->id);
+        $this->assertSame(1, $a->currentPallet->fresh()->box_limit);
+        $this->get(route('export.merge.result', $data['request_token']))->assertOk()->assertSee('Maksimal 2 box');
+    }
+
     public function test_same_delivery_merge_preserves_unfilled_demand_and_smallest_position(): void
     {
         $d = $this->plan();
         $this->fill(3);
         $sources = ExportStockPallet::whereNull('retired_at')->pluck('id')->all();
-        $r = app(ExportPalletMergeService::class)->merge($this->data($sources), $this->operator);
+        $data = $this->data($sources);
+        $this->invalid(fn () => app(ExportPalletMergeService::class)->preview($data + ['box_limit' => 5], $this->operator), 'hanya berlaku');
+        $r = app(ExportPalletMergeService::class)->merge($data, $this->operator);
+        $this->assertNull(ExportStockPallet::findOrFail($r['result_pallet_id'])->box_limit);
         $p = $d->fresh('palletPlan.pallets')->palletPlan->pallets->sole();
         $this->assertSame(1, $p->position);
         $this->assertSame(4, $p->items()->sum('box_quantity'));

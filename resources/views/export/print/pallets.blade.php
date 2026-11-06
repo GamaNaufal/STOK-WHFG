@@ -2,7 +2,10 @@
 @section('title', 'Rincian pallet '.($delivery->plan_code ?? 'RD-'.$delivery->id))
 @section('print-help', $pallets->count().' pallet · A4 portrait · ukuran mengikuti rincian part')
 @section('content')
+    @php($palletTargets = app(\App\Services\DeliveryAnnouncementDisplay::class)->targets('export', [$delivery->id])->get($delivery->id, collect()))
     @foreach($pallets as $pallet)
+        @php($palletInstructions = app(\App\Services\DeliveryAnnouncementDisplay::class)->notes($delivery, 'export_print_pallet', auth()->user(),
+            $pallet->fulfillmentBoxes->pluck('box_number'), $pallet->items->pluck('part_number'), 'Pallet '.$pallet->position, $palletTargets))
         @php($boxCount = (int) $pallet->items->sum('box_quantity'))
         <table class="pallet-print-card">
             <colgroup><col style="width:9%"><col style="width:68%"><col style="width:23%"></colgroup>
@@ -11,7 +14,11 @@
                 <tr><th class="col-no">No.</th><th class="col-part">Nomor part</th><th class="number col-box">Jumlah box</th></tr>
             </thead>
             <tbody>@foreach($pallet->items as $item)<tr><td>{{ $loop->iteration }}</td><td>{{ $item->part_number }}<small style="display:block">{{ $item->pcs_per_box }} PCS/box</small></td><td class="number"><strong>{{ number_format($item->box_quantity, 0, ',', '.') }}</strong></td></tr>@endforeach</tbody>
-            <tfoot><tr><td colspan="3">{{ $pallet->items->count() }} part · Total {{ number_format($boxCount, 0, ',', '.') }} box · Dicetak {{ $printedAt->format('d/m/Y H:i') }}</td></tr></tfoot>
+            <tfoot>
+                @if($palletInstructions->isNotEmpty())
+                    <tr><td colspan="3"><x-delivery-announcement-notes :delivery="$delivery" surface="export_print_pallet" :instructions="$palletInstructions" print /></td></tr>
+                @endif
+                <tr><td colspan="3">{{ $pallet->items->count() }} part · Total {{ number_format($boxCount, 0, ',', '.') }} box · Dicetak {{ $printedAt->format('d/m/Y H:i') }}</td></tr></tfoot>
         </table>
     @endforeach
 @endsection

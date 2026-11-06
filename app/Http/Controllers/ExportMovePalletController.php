@@ -54,7 +54,7 @@ class ExportMovePalletController extends Controller
         $result = $service->move($data, $request->user());
         $message = "Pallet berhasil dipindahkan dari {$result['from']} ke {$result['to']}.";
         if (! empty($data['ready_confirmed'])) {
-            $message .= ' Konfirmasikan kembali status Siap di Pemenuhan Permintaan.';
+            $message .= ' Konfirmasikan kembali status Siap di Delivery Schedule Ekspor.';
         }
         $request->session()->flash('export_move_success', $message);
 

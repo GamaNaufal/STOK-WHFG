@@ -7,6 +7,7 @@ use App\Models\ExportReceivingBatch;
 use App\Models\ExportReceivingBatchItem;
 use App\Models\ExportStockAllocationNotice;
 use App\Models\ExportStockBox;
+use App\Models\ExportStockPallet;
 use App\Services\ExportPlacementGuideService;
 use App\Services\ExportPickingService;
 use App\Services\ExportReceivingTransactionService;
@@ -119,6 +120,7 @@ class ExportReceivingTransactionController extends Controller
             $validated = validator(['spare_placements' => $rows], [
                 'spare_placements' => 'required|array|list|max:1000', 'spare_placements.*.id' => 'required|integer|min:1|distinct',
                 'spare_placements.*.destination' => ['present', 'nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/'],
+                'spare_placements.*.box_limit' => ExportStockPallet::BOX_LIMIT_RULE,
             ])->validate();
             $assignments = $validated['spare_placements'];
             $allowed = $data['groups']->filter(fn ($group) => ! $group['planned'])->flatMap(fn ($group) => $group['pending'])->pluck('id');

@@ -6,6 +6,7 @@ use App\Models\ExportFulfillmentBox;
 use App\Models\ExportReceivingBatch;
 use App\Models\ExportReceivingBatchItem;
 use App\Models\ExportStockBox;
+use App\Models\ExportStockPallet;
 use App\Services\ExportReceivingBatchService;
 use App\Services\ExportReceivingTransactionService;
 use App\Services\ExportStockReceivingService;
@@ -147,7 +148,8 @@ class ExportStockReceivingController extends Controller
     {
         try {
             $data = $request->validate(['revision' => 'required|integer|min:1', 'request_token' => 'required|uuid',
-                'destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/']]);
+                'destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/'],
+                'box_limit' => ExportStockPallet::BOX_LIMIT_RULE]);
             $box = $service->place($stockBox->id, $data + $this->destination($data['destination'] ?? null), $request->user());
         } catch (ValidationException $exception) {
             if (! $request->expectsJson()) {
@@ -171,6 +173,7 @@ class ExportStockReceivingController extends Controller
         $data = $request->validate(['placements' => 'required|array|list|min:1|max:1000',
             'placements.*.id' => 'required|integer|min:1|distinct', 'placements.*.revision' => 'required|integer|min:1',
             'placements.*.destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/'],
+            'placements.*.box_limit' => ExportStockPallet::BOX_LIMIT_RULE,
             'placements.*.request_token' => 'required|uuid|distinct', 'return_batch' => 'nullable|integer|min:1', 'return_box' => 'nullable|integer|min:1',
             'return_notice' => 'nullable|required_with:return_pallet|integer|min:1', 'return_pallet' => 'nullable|required_with:return_notice|integer|min:1',
             'destination' => ['nullable', 'string', 'regex:/^(pallet|location):[1-9][0-9]*$/']]);
@@ -197,7 +200,8 @@ class ExportStockReceivingController extends Controller
             throw ValidationException::withMessages(['placements' => 'Gunakan tujuan umum atau pembagian tujuan per box, bukan keduanya.']);
         }
         $place = fn () => $service->placeMany(array_map(fn ($row) => ['id' => (int) $row['id'], 'revision' => (int) $row['revision'],
-            'request_token' => $row['request_token']] + $this->destination($row['destination'] ?? $data['destination'] ?? null), $data['placements']), $request->user());
+            'request_token' => $row['request_token'], 'box_limit' => $row['box_limit'] ?? null] + $this->destination($row['destination'] ?? $data['destination'] ?? null), $data['placements']), $request->user());
+        $createdPallets = [];
         if (! empty($data['return_notice'])) {
             app(\App\Services\ExportInventoryService::class)->transaction(function () use ($data, $ids, $place) {
                 $notice = \App\Models\ExportStockAllocationNotice::findOrFail($data['return_notice']);
@@ -213,10 +217,15 @@ class ExportStockReceivingController extends Controller
         } else {
             $route = ! empty($data['return_batch']) ? 'export.receiving.transactions.show' : (! empty($data['return_box']) ? 'export.receiving.transactions.legacy' : 'export.stock.index');
             $parameters = ! empty($data['return_batch']) ? ['batch' => $data['return_batch']] : (! empty($data['return_box']) ? ['stockBox' => $data['return_box']] : []);
-            $place();
+            $createdPallets = $place();
         }
 
-        return redirect()->route($route, $parameters)
+        $response = redirect()->route($route, $parameters)
             ->with('success', 'Penempatan '.count($rows).' box dikonfirmasi.');
+        if (! empty($data['return_batch']) && $createdPallets) {
+            $response->with('export_receiving_created_pallets', ['batch' => (int) $data['return_batch'], 'pallets' => $createdPallets]);
+        }
+
+        return $response;
     }
 }

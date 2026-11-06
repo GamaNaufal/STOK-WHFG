@@ -28,6 +28,7 @@ class ExportStockAllocationService
                 'pallets.items' => fn ($q) => $q->withCount('fulfillmentBoxes')])
             ->orderBy('id')->lockForUpdate()->get()->keyBy('export_delivery_plan_id');
         $allocated = 0;
+        $changed = [];
         foreach ($deliveries->sortBy(fn ($d) => [$d->delivery_deadline->format('Y-m-d'), $d->id]) as $delivery) {
             $plan = $plans->get($delivery->id);
             if (! $plan || $plan->delivery_revision !== $delivery->revision) {
@@ -57,6 +58,7 @@ class ExportStockAllocationService
                     foreach ($boxes as $box) {
                         $this->reserve($delivery, $pallet, $item, $box, $actor, $notice);
                         $allocated++;
+                        $changed[$delivery->id] = $delivery;
                     }
                 }
             }
@@ -64,6 +66,10 @@ class ExportStockAllocationService
 
         if ($notice) {
             $this->persistPickingRequirements($notice);
+        }
+
+        if ($changed) {
+            app(DeliveryAnnouncementService::class)->syncOrders($changed);
         }
 
         return $allocated;

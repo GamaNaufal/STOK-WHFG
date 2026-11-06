@@ -7,7 +7,12 @@
 @endsection
 @section('content')
 <div class="delivery-plan-page receiving-page">
-    <header class="plan-header"><div><h1>{{ $physicalPallet?->display_name ?? 'Belum ditempatkan' }}</h1><p>{{ $physicalPallet?->location_code }}</p></div><a class="btn btn-outline-primary" href="{{ route('export.stock.index', array_merge($filters, ['mode' => 'pallet'])) }}">Kembali ke stok</a></header>
+    <header class="plan-header"><div><h1>{{ $physicalPallet?->display_name ?? 'Belum ditempatkan' }}</h1><p>{{ $physicalPallet?->location_code }}</p>@if($physicalPallet && !$physicalPallet->export_planned_pallet_id)<p>{{ $physicalPallet->capacityLabel($physicalPallet->boxes_count) }}</p>@endif</div>
+        <div class="plan-inline-actions">
+            @include('export.stock.pallet-admin-action')
+            <a class="btn btn-outline-primary" href="{{ route('export.stock.index', array_merge($filters, ['mode' => 'pallet'])) }}">Kembali ke stok</a>
+        </div>
+    </header>
     <section class="plan-panel">@include('export.stock.pallet-boxes')</section>
 </div>
 @include('export.stock.box-modal')

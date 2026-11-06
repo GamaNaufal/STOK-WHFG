@@ -503,6 +503,9 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @php
+                        $scheduleAnnouncements = app(\App\Services\DeliveryAnnouncementDisplay::class)->targets('domestic', $approvedOrders->pluck('id'));
+                    @endphp
                     @forelse($approvedOrders as $order)
                     <tr data-schedule-search="{{ $order->id }} {{ $order->customer_name }} {{ $order->items->pluck('part_number')->implode(' ') }}" data-schedule-timing="{{ $order->days_remaining < 0 ? 'overdue' : ($order->days_remaining === 0 ? 'today' : 'upcoming') }}">
                         <th scope="row">
@@ -516,6 +519,7 @@
                                     {{ \Illuminate\Support\Str::limit($order->notes, 140) }}
                                 </div>
                             @endif
+                            <x-delivery-announcement-notes :delivery="$order" surface="local_schedule" :targets="$scheduleAnnouncements->get($order->id, collect())" class="mt-2 mb-0" />
                         </td>
                         <td>
                             @foreach($order->items as $item)

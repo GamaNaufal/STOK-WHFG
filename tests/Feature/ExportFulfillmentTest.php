@@ -14,6 +14,8 @@ use App\Models\RoleFeatureAccess;
 use App\Models\User;
 use App\Services\ExportDeliveryPlanService;
 use App\Services\ExportPalletPlanningService;
+use DOMDocument;
+use DOMXPath;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Schema;
@@ -83,9 +85,10 @@ class ExportFulfillmentTest extends TestCase
 
     public function test_final_plans_enter_automatically_and_reopened_plans_remain_visible_on_hold(): void
     {
+        $calendar = route('export.fulfillment.index', ['month' => '2026-11']);
         $draft = $this->plan('DRAFT-ONLY', final: false);
         $delivery = $this->plan('FINAL-VISIBLE');
-        $this->get(route('export.fulfillment.index'))->assertOk()->assertSee('FINAL-VISIBLE')->assertDontSee('DRAFT-ONLY');
+        $this->get($calendar)->assertOk()->assertSee('FINAL-VISIBLE')->assertDontSee('DRAFT-ONLY');
         $this->get(route('export.fulfillment.show', $draft))->assertNotFound();
         $this->get(route('export.fulfillment.show', $delivery))->assertOk()
             ->assertViewHas('metrics', fn ($m) => $m['required'] === 6 && $m['fulfilled'] === 0 && $m['remaining'] === 6)
@@ -101,9 +104,10 @@ class ExportFulfillmentTest extends TestCase
         $this->assertDatabaseCount('export_pallet_location_reservations', 0);
         $this->get(route('export.fulfillment.show', $delivery))->assertOk()
             ->assertViewHas('overview', fn ($p) => $p->fulfillment_status === 'paused');
+        $this->get($calendar)->assertSee('FINAL-VISIBLE');
         $this->post(route('export.pallet-plans.transition', $delivery), ['revision' => 3, 'action' => 'cancel'])->assertSessionHasNoErrors();
         $this->get(route('export.fulfillment.show', $delivery))->assertNotFound();
-        $this->get(route('export.fulfillment.index'))->assertDontSee('FINAL-VISIBLE');
+        $this->get($calendar)->assertDontSee('FINAL-VISIBLE');
     }
 
     public function test_permission_is_independent_revocable_and_enforced_for_direct_requests(): void
@@ -117,7 +121,7 @@ class ExportFulfillmentTest extends TestCase
         $setting = RoleFeatureAccess::create(['role' => 'export_operator', 'permissions' => ['export_fulfillment']]);
         $this->actingAs($this->operator)->get(route('export.fulfillment.show', $delivery))->assertOk()
             ->assertDontSee(route('export.pallet-plans.show', $delivery), false);
-        $this->get(route('dashboard'))->assertOk()->assertSee('Pantau pemenuhan');
+        $this->get(route('dashboard'))->assertOk()->assertSee('Buka jadwal delivery');
         $setting->update(['permissions' => []]);
         $this->get(route('export.fulfillment.index'))->assertForbidden();
         $this->actingAs(User::factory()->create(['role' => 'admin']))->get(route('export.fulfillment.index'))->assertOk();
@@ -185,19 +189,52 @@ class ExportFulfillmentTest extends TestCase
             ->assertViewHas('pallets', fn ($p) => $p[0]['metrics']['remaining'] === 2);
     }
 
-    public function test_index_filters_searches_orders_deadlines_and_ignores_archived_plans(): void
+    public function test_schedule_groups_customer_links_by_deadline_in_the_selected_month(): void
     {
-        $late = $this->plan('LATE-CODE', '2026-12-02');
+        $this->travelTo(now()->setDate(2026, 11, 30));
+        $late = $this->plan('LATE-CODE', '2026-12-01');
+        $lastDay = $this->plan('MONTH-END-A', '2026-11-30');
+        $other = $this->plan('MONTH-END-B', '2026-11-30');
         $early = $this->plan('EARLY-CODE', '2026-11-01');
+        $response = $this->get(route('export.fulfillment.index'))->assertOk()
+            ->assertSee('November 2026')->assertSeeInOrder(['EARLY-CODE', 'MONTH-END-A', 'MONTH-END-B'])->assertDontSee('LATE-CODE');
+
+        $dom = new DOMDocument;
+        @$dom->loadHTML($response->getContent());
+        $xpath = new DOMXPath($dom);
+        $links = $xpath->query('//td[@data-date="2026-11-30"]//a');
+        $this->assertCount(2, $links);
+        foreach ([$lastDay, $other] as $index => $delivery) {
+            $this->assertSame($delivery->customer_name, $links->item($index)->textContent);
+            $this->assertSame(route('export.fulfillment.show', $delivery), $links->item($index)->getAttribute('href'));
+        }
+        $this->assertCount(1, $xpath->query('//td[@data-date="2026-11-30"]/time[@aria-current="date"]'));
+        $this->assertCount(1, $xpath->query('//nav[@id="mobileSidebar"]//a[@aria-current="page" and @aria-label="Delivery Schedule Ekspor"]'));
+        $this->get(route('export.fulfillment.show', $late))->assertOk()
+            ->assertSee('href="'.route('export.fulfillment.index', ['month' => '2026-12']).'"', false);
+
         $this->box($late->palletPlan->pallets[0]->items[0]);
-        $this->get(route('export.fulfillment.index'))->assertOk()->assertSeeInOrder(['EARLY-CODE', 'LATE-CODE']);
-        $this->get(route('export.fulfillment.index', ['status' => 'partial', 'q' => 'Customer LATE']))->assertOk()
-            ->assertViewHas('plans', fn ($plans) => $plans->total() === 1 && $plans->first()->delivery_id === $late->id);
+        $this->get(route('export.fulfillment.index', ['month' => '2026-12', 'status' => 'partial', 'q' => 'Customer LATE']))->assertOk()
+            ->assertSee('Desember 2026')->assertSee('Customer LATE-CODE')->assertDontSee('MONTH-END-A');
+        $this->get(route('export.fulfillment.index', ['month' => '2026-12', 'status' => 'waiting']))->assertOk()->assertDontSee('LATE-CODE');
+        $live = $this->getJson(route('export.fulfillment.index', ['month' => '2026-12', 'status' => 'partial', 'q' => 'late']))
+            ->assertOk()->assertHeader('Vary', 'Accept')->assertJsonPath('month', '2026-12')->assertJsonPath('total', 1)
+            ->assertJsonPath('suggestions.0', [
+                'customer' => 'Customer LATE-CODE', 'code' => 'LATE-CODE',
+                'deadline' => '2026-12-01', 'url' => route('export.fulfillment.show', $late),
+            ]);
+        $this->assertStringContainsString('Dalam pemenuhan', $live->json('calendar'));
+        $this->assertStringNotContainsString('mobileSidebar', $live->json('calendar'));
+        $this->getJson(route('export.fulfillment.index', ['month' => '2026-11', 'q' => 'late']))
+            ->assertOk()->assertJsonPath('total', 0)->assertJsonCount(0, 'suggestions');
+        $this->getJson(route('export.fulfillment.index', ['month' => '2026-11']))
+            ->assertOk()->assertJsonPath('total', 3)->assertJsonCount(0, 'suggestions');
         $this->get(route('export.fulfillment.index', ['q' => 'NO-MATCH']))->assertOk()->assertSee('Tidak ada rencana yang cocok');
         $early->delete();
         $this->get(route('export.fulfillment.index'))->assertDontSee('EARLY-CODE');
         $this->get(route('export.fulfillment.show', $early))->assertNotFound();
         $this->getJson(route('export.fulfillment.index', ['q' => ['bad'], 'status' => 'unknown']))->assertUnprocessable();
+        $this->getJson(route('export.fulfillment.index', ['month' => '2026-13']))->assertUnprocessable()->assertJsonValidationErrors('month');
     }
 
     public function test_box_list_is_paginated_in_original_receipt_order_with_stable_box_ties(): void

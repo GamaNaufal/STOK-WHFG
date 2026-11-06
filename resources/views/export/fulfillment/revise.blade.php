@@ -10,7 +10,7 @@
 <div class="delivery-plan-page fulfillment-page">
     <header class="plan-header">
         <div>
-            <a class="plan-back" href="{{ route('export.fulfillment.show', $delivery) }}">← Pemenuhan permintaan</a>
+            <a class="plan-back" href="{{ route('export.fulfillment.show', $delivery) }}">← Detail delivery</a>
             <span class="plan-eyebrow">Revisi pallet ekspor</span>
             <h1>Pallet {{ $pallet->position }} · {{ $pallet->location_code }}</h1>
             <p>{{ $delivery->plan_code }} · {{ $delivery->customer_name }}</p>

@@ -10,6 +10,10 @@
 @endphp
 <section class="plan-panel receiving-result-group" @unless($group['planned']) data-spare-part-group @else data-planned-target="{{ $group['physical_pallet_id'] }}" data-planned-current="{{ $group['load']['current'] }}" data-planned-incoming="{{ $group['load']['incoming'] }}" @endunless>
     <div class="plan-panel-heading"><div><h3>{{ $group['planned'] ? 'Pallet '.$group['planned']->position.' · '.$group['planned']->location_code : 'Part '.$group['part_number'] }}</h3>@if($group['delivery'])<p class="plan-help">{{ $group['delivery']->plan_code ?? 'Rencana delivery' }} · {{ $group['delivery']->customer_name }} · {{ $group['delivery']->delivery_deadline->format('d/m/Y') }}</p>@else<p class="plan-help">Stok cadangan · Belum mendapat alokasi rencana</p>@endif</div><strong>{{ $group['boxes']->count() }} box</strong></div>
+    @if($group['delivery'])
+        <x-delivery-announcement-notes :delivery="$group['delivery']" surface="export_receiving" :boxes="$group['boxes']->pluck('box_number')"
+            :parts="$group['boxes']->pluck('part_number')" :context="$receipt['code'].' · Pallet '.$group['planned']->position" class="mx-3 mt-3" />
+    @endif
     @if($group['qa']->isEmpty() || $group['pending']->isNotEmpty())
         <div class="receiving-destination {{ !$group['planned'] && $group['pending']->isNotEmpty() ? 'is-unassigned' : '' }}" @if(!$group['planned'] && $group['pending']->isNotEmpty()) data-spare-guide-destination aria-live="polite" @endif>
             <p>{{ $group['pending']->isNotEmpty() ? 'Antarkan box ke' : ($group['redirected']->isNotEmpty() ? 'Melalui transaksi rekomendasi' : 'Penempatan selesai') }}</p>

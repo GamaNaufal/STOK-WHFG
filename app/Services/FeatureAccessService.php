@@ -38,6 +38,9 @@ class FeatureAccessService
         if (($feature['admin_only'] ?? false) || ! array_key_exists($user->role, config('feature_access.roles'))) {
             return false;
         }
+        if (isset($feature['allowed_roles']) && ! in_array($user->role, $feature['allowed_roles'], true)) {
+            return false;
+        }
         if (! in_array($key, $this->permissions($user->role), true)) {
             return false;
         }
@@ -90,7 +93,7 @@ class FeatureAccessService
                 if ($key === 'reports') {
                     $items[] = ['key' => $key, 'label' => 'Laporan Pengambilan', 'group' => 'Laporan', 'icon' => 'file-earmark-text', 'route' => 'reports.withdrawal'];
                 }
-                if ($key === 'export_stock_input') {
+                if ($key === 'export_stock_input' && ! $this->allows($user, 'export_stock_manage')) {
                     $items[] = ['key' => $key, 'label' => 'Stok Expor', 'group' => 'Pengiriman Ekspor', 'icon' => 'box-seam', 'route' => 'export.stock.index'];
                 }
             }

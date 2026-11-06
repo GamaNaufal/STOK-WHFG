@@ -19,6 +19,7 @@ use App\Services\ExpiredBoxHandlingService;
 use App\Services\ExportDeliveryPlanService;
 use App\Services\ExportPalletPlanningService;
 use App\Services\ExportStockAllocationService;
+use App\Services\ExportStockReceivingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -141,6 +142,30 @@ class ExportExpiredBoxTest extends TestCase
         $this->assertSame(1, ExportStockBox::eligible()->count());
         $this->assertSame('Expired', $new->fresh()->expiry_label);
         $this->assertCount(1, $this->start(collect([$new->fresh()]), $actor));
+    }
+
+    public function test_packing_receipt_cannot_exceed_spare_pallet_capacity(): void
+    {
+        [$actor, $part, $boxes, , $location] = $this->inventory(2);
+        $transaction = $this->packing($boxes, $actor);
+        $receiving = app(ExportStockReceivingService::class);
+        $existing = $receiving->receive(['box_number' => '73200000', 'part_number' => $part->part_number,
+            'receive_token' => (string) Str::uuid()], $actor);
+        $existing = $receiving->place($existing->id, ['revision' => $existing->revision, 'request_token' => (string) Str::uuid(),
+            'location_id' => $location->id, 'box_limit' => 2], $actor);
+        $url = route('export.expired-box.transactions.update', $transaction);
+        $payload = $this->receipt($location, ['73200001', '73200002']);
+        $payload['pallet_id'] = $existing->current_pallet_id;
+        $this->get(route('export.expired-box.transactions.show', $transaction))->assertOk()->assertSee('1/2 box · Sisa 1');
+        $this->post($url, $payload)->assertSessionHasErrors('destination');
+        $this->assertDatabaseMissing('box_identities', ['box_number' => '73200001']);
+        $this->assertSame(0, ExportExpiredBoxReceipt::count());
+        $this->assertSame(1, $existing->currentPallet->boxes()->count());
+
+        $payload['new_box_numbers'] = ['73200001'];
+        $this->post($url, $payload)->assertSessionHas('success');
+        $this->assertSame(2, $existing->currentPallet->boxes()->count());
+        $this->assertSame('at_packing', $transaction->fresh()->stage);
     }
 
     public function test_qa_rejected_members_leave_inventory_and_history_and_global_id_survive(): void

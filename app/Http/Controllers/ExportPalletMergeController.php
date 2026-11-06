@@ -26,7 +26,7 @@ class ExportPalletMergeController extends Controller
     private function data(Request $request, bool $confirm = false): array
     {
         return $request->validate(['pallet_ids' => 'required|array|min:2|max:50', 'pallet_ids.*' => 'required|integer|distinct',
-            'location_id' => 'required|integer', 'spare_mode' => ['required', Rule::in(['fill', 'add'])]] + ($confirm ? [
+            'location_id' => 'required|integer', 'box_limit' => ExportStockPallet::BOX_LIMIT_RULE, 'spare_mode' => ['required', Rule::in(['fill', 'add'])]] + ($confirm ? [
                 'fingerprint' => 'required|string|size:64', 'request_token' => 'required|uuid',
                 'physical_confirmed' => 'accepted', 'ready_confirmed' => 'sometimes|accepted', 'demand_confirmed' => 'sometimes|accepted',
             ] : []));

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DeliveryAnnouncementService;
 use App\Models\ExportDeliveryPlan;
 use App\Models\PartSetting;
 use App\Services\AuditService;
@@ -134,6 +135,7 @@ class ExportDeliveryPlanController extends Controller
                 ]);
             }
             $locked->delete();
+            app(DeliveryAnnouncementService::class)->sync($locked);
             app(\App\Services\ExportNotFullService::class)->sync($locked, $request->user());
             AuditService::record('export_delivery_plan', 'deleted', 'ExportDeliveryPlan', $locked->id,
                 $request->user()->id, $before, [], 'Rencana delivery ekspor diarsipkan.');

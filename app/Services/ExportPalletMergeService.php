@@ -81,6 +81,13 @@ class ExportPalletMergeService
         }
         $survivor = $pallets->first();
         $plan = $survivor?->palletPlan;
+        $boxLimit = (int) ($data['box_limit'] ?? 0) ?: null;
+        if ($boxLimit !== null && $survivor) {
+            $this->fail('Batas maksimal box hanya berlaku untuk hasil merge pallet cadangan.');
+        }
+        if ($boxLimit !== null && $boxes->count() > $boxLimit) {
+            $this->fail('Hasil merge berisi '.$boxes->count().' box. Isi batas minimal '.$boxes->count().' box atau pilih tanpa batas.');
+        }
         if ($plan) {
             foreach ($boxes as $box) {
                 $box->assertEligible();
@@ -164,10 +171,10 @@ class ExportPalletMergeService
         $requirements = $requirements->map(fn ($r) => $r + ['after' => $r['before'] + $r['added']]);
         $requests = $delivery ? ExportNotFullRequest::where('export_delivery_plan_id', $delivery->id)->orderBy('id')->get() : collect();
         $fingerprint = hash('sha256', json_encode([$ids, $mode, $sources->toArray(), $items->toArray(), $commitments->toArray(),
-            $location->toArray(), $claim?->toArray(), $delivery?->toArray(), $plan?->toArray(), $requests->toArray(), $requirements->all()], JSON_THROW_ON_ERROR));
+            $location->toArray(), $claim?->toArray(), $delivery?->toArray(), $plan?->toArray(), $requests->toArray(), $requirements->all(), $boxLimit], JSON_THROW_ON_ERROR));
 
         return compact('sources', 'boxes', 'pallets', 'survivor', 'plan', 'delivery', 'items', 'commitments', 'free',
-            'location', 'mode', 'requirements', 'fingerprint') + ['added_boxes' => $requirements->sum('added'),
+            'location', 'mode', 'requirements', 'fingerprint', 'boxLimit') + ['added_boxes' => $requirements->sum('added'),
                 'ready_count' => $pallets->whereNotNull('ready_at')->count(), 'result_boxes' => $boxes->count(),
                 'required_boxes' => $requirements->sum('after')];
     }
@@ -179,7 +186,11 @@ class ExportPalletMergeService
         return app(ExportInventoryService::class)->transaction(function () use ($data, $actor) {
             $ids = array_values(array_unique(array_map('intval', $data['pallet_ids'])));
             sort($ids);
-            $hash = hash('sha256', json_encode([$ids, (int) $data['location_id'], $data['spare_mode'], $data['fingerprint']], JSON_THROW_ON_ERROR));
+            $request = [$ids, (int) $data['location_id'], $data['spare_mode'], $data['fingerprint']];
+            if ($boxLimit = (int) ($data['box_limit'] ?? 0)) {
+                $request[] = $boxLimit;
+            }
+            $hash = hash('sha256', json_encode($request, JSON_THROW_ON_ERROR));
             if ($replay = DB::table('export_pallet_merges')->where('request_token', $data['request_token'])->first()) {
                 if ($replay->request_hash !== $hash || (int) $replay->created_by !== $actor->id) {
                     $this->fail('Token merge sudah digunakan untuk data lain.');
@@ -200,7 +211,7 @@ class ExportPalletMergeService
             if ($c['added_boxes'] && ! ($data['demand_confirmed'] ?? false)) {
                 $this->fail('Setujui penambahan kebutuhan rencana delivery yang ditampilkan.');
             }
-            $before = ['pallets' => $c['sources']->map(fn ($s) => $s->only(['id', 'master_location_id', 'location_code', 'export_planned_pallet_id'])
+            $before = ['pallets' => $c['sources']->map(fn ($s) => $s->only(['id', 'master_location_id', 'location_code', 'export_planned_pallet_id', 'box_limit'])
                 + ['pallet_number' => $s->plannedPallet?->position, 'box_quantity' => $s->boxes->count()])->all(),
                 'boxes' => $c['boxes']->map(fn ($b) => $b->only(['box_number', 'part_number', 'pcs_quantity', 'first_received_at'])
                     + ['warehouse_location' => $c['sources']->firstWhere('id', $b->current_pallet_id)->location_code])->all(),
@@ -225,7 +236,7 @@ class ExportPalletMergeService
                 ExportPalletLocationReservation::where('export_planned_pallet_id', $pallet->id)->delete();
             }
             $result = ExportStockPallet::create(['master_location_id' => $location->id, 'initial_location_id' => $location->id,
-                'location_code' => $location->code, 'export_planned_pallet_id' => $target?->id, 'created_by' => $actor->id]);
+                'location_code' => $location->code, 'export_planned_pallet_id' => $target?->id, 'box_limit' => $c['boxLimit'], 'created_by' => $actor->id]);
             $mergedItems = collect();
             if ($target) {
                 $target->update(['master_location_id' => $location->id, 'location_code' => $location->code,
@@ -308,13 +319,14 @@ class ExportPalletMergeService
                     ExportFulfillmentBox::whereIn('allocation_notice_id', $unreviewed)->update(['allocation_notice_id' => $notice->id]);
                 }
                 app(ExportNotFullService::class)->sync($delivery, $actor);
+                app(DeliveryAnnouncementService::class)->sync($delivery);
                 foreach ($plan->fresh()->pallets as $pallet) {
                     app(ExportFulfillmentRevisionService::class)->contents($pallet);
                 }
             }
             $snapshot = ['result_pallet_id' => $result->id, 'pallet_number' => $target?->position, 'location_code' => $location->code,
                 'plan_code' => $delivery?->plan_code, 'delivery_id' => $delivery?->id, 'plan_revision' => $plan?->revision,
-                'box_quantity' => $c['boxes']->count(), 'required_boxes' => $c['required_boxes'], 'added_boxes' => $c['added_boxes'],
+                'box_quantity' => $c['boxes']->count(), 'box_limit' => $c['boxLimit'], 'required_boxes' => $c['required_boxes'], 'added_boxes' => $c['added_boxes'],
                 'spare_mode' => $c['mode'], 'ready_cancelled' => $c['ready_count'], 'requirements' => $c['requirements']->values()->all(),
                 'boxes' => $c['boxes']->map(fn ($b) => $b->only(['box_number', 'part_number', 'pcs_quantity', 'first_received_at']) + ['warehouse_location' => $location->code])->all(),
                 'planning' => $plan ? app(ExportPalletPlanningService::class)->snapshot($plan) : null];

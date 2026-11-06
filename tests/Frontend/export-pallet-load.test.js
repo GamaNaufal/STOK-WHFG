@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {palletLoadLevel, updatePalletLoad, initDestinationLoads} from '../../resources/js/export-stock/pallet-load.mjs';
+import {palletCapacity, palletLoadLevel, updatePalletLoad, initDestinationLoads} from '../../resources/js/export-stock/pallet-load.mjs';
 import {analyzePallets} from '../../resources/js/export-delivery/pallet-planning.mjs';
 
 function badge() {
@@ -45,4 +45,15 @@ test('existing pallet preview includes all incoming boxes and supports dynamical
     select.value = 'location:2'; select.selectedOptions = [{dataset:{boxCount:'0'}}]; events.change({target:select});
     assert.equal(ui.dataset.level,'normal'); assert.equal(ui.count.textContent,'2 box');
     select.value = ''; events.change({target:select}); assert.equal(panel.hidden,true);
+});
+
+test('spare pallet limits are independent from the 36 and 72 box warnings', () => {
+    assert.deepEqual(palletCapacity(72, 5, ''), {text: '', blocked: false});
+    assert.equal(palletCapacity(72, 5, '0').blocked, false);
+    assert.equal(palletCapacity(34, 2, '36').text, 'Maksimal 36 box · Penuh setelah penempatan.');
+    assert.equal(palletCapacity(34, 5, '36').blocked, true);
+    assert.match(palletCapacity(34, 5, '36').text, /Sisa 2 box/);
+    assert.equal(palletCapacity(28, 2, '29').blocked, true);
+    assert.equal(palletCapacity(71, 1, '80').blocked, false);
+    assert.equal(palletCapacity(0, 5, '4.5').blocked, true);
 });

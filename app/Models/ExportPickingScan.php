@@ -17,4 +17,9 @@ class ExportPickingScan extends Model
     {
         return $this->belongsTo(ExportFulfillmentBox::class, 'export_fulfillment_box_id');
     }
+
+    public function actor()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

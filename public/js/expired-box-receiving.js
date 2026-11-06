@@ -31,9 +31,18 @@
             const existing = form.querySelector('[name="destination_mode"]:checked')?.value === 'existing';
             const current = existing ? Number(pallet.selectedOptions[0]?.dataset.boxes || 0) : 0;
             const total = current + staged.length;
+            const limit = existing ? Number(pallet.selectedOptions[0]?.dataset.boxLimit || 0) : 0;
+            const blocked = limit > 0 && total > limit;
+            if (blocked) save.disabled = true;
             load.hidden = !staged.length;
+            load.classList.toggle('text-danger', blocked);
             load.dataset.level = total >= 72 ? 'danger' : total >= 36 ? 'warning' : 'normal';
             load.textContent = `Pallet tujuan: ${current} box + ${staged.length} hasil packing = ${total} box.${total >= 72 ? ' Perhatian: mencapai 72 box atau lebih.' : total >= 36 ? ' Peringatan: mencapai 36 box atau lebih.' : ''}`;
+            if (limit) {
+                load.textContent += ' Maksimal ' + limit + ' box. ' + (blocked
+                    ? 'Sisa ' + Math.max(0, limit - current) + ' box. Kurangi daftar atau pilih tujuan lain.'
+                    : 'Sisa ' + (limit - total) + ' box setelah penempatan.');
+            }
         }
     };
     const validate = row => {

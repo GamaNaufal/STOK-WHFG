@@ -10,7 +10,14 @@
 <div class="delivery-plan-page receiving-page export-stock-page">
     <header class="plan-header stock-header">
         <div><span class="plan-eyebrow">Pengiriman ekspor</span><h1>Stok ekspor</h1><p>Tinjau posisi box, isi pallet, dan tujuan reservasi.</p></div>
-        <a class="btn btn-outline-primary" href="{{ route('export.receiving.index') }}"><i class="bi bi-upc-scan" aria-hidden="true"></i> Penerimaan Transfer Box Ekspor</a>
+        <div class="plan-inline-actions">
+            @if(auth()->user()->canAccess('export_stock_manage'))
+                <a class="btn btn-outline-primary" href="{{ route('export.stock.box-history') }}"><i class="bi bi-clock-history" aria-hidden="true"></i> Riwayat box</a>
+            @endif
+            @if(auth()->user()->canAccessRoute('export.receiving.index'))
+                <a class="btn btn-outline-primary" href="{{ route('export.receiving.index') }}"><i class="bi bi-upc-scan" aria-hidden="true"></i> Penerimaan Transfer Box Ekspor</a>
+            @endif
+        </div>
     </header>
     <div class="stock-summary" aria-label="Ringkasan stok ekspor">
         <div class="stock-summary-item">
@@ -78,7 +85,7 @@
                 </div>
                 <details class="stock-category-guide">
                     <summary><i class="bi bi-info-circle" aria-hidden="true"></i> Arti kategori</summary>
-                    <p><strong>Tersimpan</strong> berarti pallet sudah dikonfirmasi Siap di Pemenuhan Permintaan. <strong>Stok cadangan</strong> mencakup box yang memiliki reservasi dan yang masih menunggu konfirmasi pallet Siap. Excel mengikuti seluruh hasil filter.</p>
+                    <p><strong>Tersimpan</strong> berarti pallet sudah dikonfirmasi Siap di Delivery Schedule Ekspor. <strong>Stok cadangan</strong> mencakup box yang memiliki reservasi dan yang masih menunggu konfirmasi pallet Siap. Excel mengikuti seluruh hasil filter.</p>
                 </details>
             </div>
             <noscript><button class="btn btn-primary" type="submit">Terapkan filter</button></noscript>

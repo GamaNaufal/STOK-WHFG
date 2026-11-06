@@ -5,10 +5,11 @@
 @include('export.not-full.requirements',['notFullDelivery'=>$delivery])
 <div class="delivery-plan-page">
     @include('export.pallet-plans.header')
+    <x-delivery-announcement-notes :delivery="$delivery" surface="export_planning" />
     @include('export.pallet-plans.stock-allocation-modal')
     <div class="plan-inline-actions mb-3">
         @if($printReady)<a class="btn btn-outline-primary" href="{{ route('export.pallet-plans.print', $delivery) }}" target="_blank" rel="noopener">Cetak semua pallet</a>@if(auth()->user()->canAccess('export_delivery_plans'))<a class="btn btn-outline-primary" href="{{ route('export.delivery-plans.print', $delivery) }}" target="_blank" rel="noopener">Cetak rencana delivery</a>@endif @endif
-        @if($planning->status === 'final' && auth()->user()->canAccess('export_fulfillment'))<a class="btn btn-primary" href="{{ route('export.fulfillment.show', $delivery) }}">Pantau pemenuhan permintaan</a>@endif
+        @if($planning->status === 'final' && auth()->user()->canAccess('export_fulfillment'))<a class="btn btn-primary" href="{{ route('export.fulfillment.show', $delivery) }}">Lihat detail delivery</a>@endif
         @if($planning->status !== 'final')<a class="btn btn-primary" href="{{ route('export.pallet-plans.edit', $delivery) }}">{{ $planning->status === 'cancelled' ? 'Susun ulang perencanaan' : 'Lanjutkan perencanaan' }}</a>@endif
         @foreach(['reopen' => 'Buka revisi', 'cancel' => 'Batalkan perencanaan'] as $action => $label)
             @if(($action === 'reopen' && $planning->status === 'final') || ($action === 'cancel' && $planning->status !== 'cancelled'))

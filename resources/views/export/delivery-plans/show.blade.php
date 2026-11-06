@@ -7,6 +7,7 @@
         <div><a class="plan-back" href="{{ route('export.delivery-plans.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Rencana delivery</a><span class="plan-eyebrow">Pengiriman ekspor / {{ $printReady ? 'Perencanaan final' : 'Draft' }}</span><h1>{{ $plan->customer_name }}</h1><p>Kode rencana <strong>{{ $plan->plan_code ?? '—' }}</strong></p><p>Batas pengiriman {{ $plan->delivery_deadline->format('d/m/Y') }}</p></div>
         <div class="plan-inline-actions">@if($printReady)<a class="btn btn-outline-primary" href="{{ route('export.delivery-plans.print', $plan) }}" target="_blank" rel="noopener">Cetak rencana delivery</a>@endif<a class="btn btn-primary" href="{{ route('export.delivery-plans.edit', $plan) }}"><i class="bi bi-pencil" aria-hidden="true"></i> Ubah rencana</a></div>
     </header>
+    <x-delivery-announcement-notes :delivery="$plan" surface="export_delivery" />
     @unless($printReady)<p class="plan-help mb-3">Cetak rencana delivery tersedia setelah perencanaan pallet final.</p>@endunless
     @include('export.not-full.requirements',['notFullDelivery'=>$plan])
     <section class="plan-panel">

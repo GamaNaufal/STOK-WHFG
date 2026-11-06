@@ -9,7 +9,12 @@
     <a class="plan-back" href="{{ route($base.'.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> History opname {{ $scopeLabel }}</a>
     <header class="plan-header">
         <div><span class="plan-eyebrow">Stock opname {{ $scopeLabel }}</span><h1>{{ $opname->code }}</h1><p>{{ $opname->started_at->format('d/m/Y H:i') }} · {{ $opname->starter->name }}</p></div>
-        <span class="opname-scope">{{ $opname->status === 'active' ? 'Sesi aktif' : 'Selesai' }} · {{ $scopeLabel }}</span>
+        <div class="plan-inline-actions">
+            <span class="opname-scope">{{ $opname->status === 'active' ? 'Sesi aktif' : 'Selesai' }} · {{ $scopeLabel }}</span>
+            @if($opname->status === 'completed')
+                <a class="btn btn-outline-primary" href="{{ route($base.'.export', $opname) }}"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Export Excel</a>
+            @endif
+        </div>
     </header>
     @if($errors->any())<div class="alert alert-danger" role="alert">{{ $errors->first() }}</div>@endif
     @if($opname->status === 'completed')

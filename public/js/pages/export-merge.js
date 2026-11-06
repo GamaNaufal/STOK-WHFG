@@ -9,7 +9,13 @@
         const select = document.getElementById('merge-location');
         const options = [...select.options];
         const update = () => {
-            const selected = new Set(checks.filter(c => c.checked).map(c => c.value));
+            const checked = checks.filter(check => check.checked);
+            const selected = new Set(checked.map(check => check.value));
+            const planned = checked.some(check => check.dataset.planned === '1');
+            const limit = document.getElementById('merge-box-limit-field');
+            limit.hidden = selected.size < 2 || planned;
+            limit.querySelector('input').disabled = limit.hidden;
+            document.getElementById('merge-plan-options').hidden = !planned;
             form.querySelector('button[type="submit"]').disabled = selected.size < 2;
             document.getElementById('merge-selection-count').textContent = `${selected.size} pallet dipilih`;
             options.forEach(option => {

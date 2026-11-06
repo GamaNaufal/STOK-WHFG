@@ -22,6 +22,12 @@
                         <span class="guide-target-pallet">{{ $destination['pallet'] }}</span>
                         <span class="guide-target-location">LOKASI: {{ $destination['location'] ?? 'BELUM DITENTUKAN' }}</span>
                         @if($destination['delivery'])<span class="guide-delivery">{{ $destination['delivery']->plan_code }} · {{ $destination['delivery']->customer_name }} · Tenggat {{ $destination['delivery']->delivery_deadline->format('d/m/Y') }}</span>@endif
+                        @if($destination['delivery'])
+                            <x-delivery-announcement-notes :delivery="$destination['delivery']" surface="export_guide"
+                                :boxes="collect($destination['rows'])->pluck('box.box_number')" :parts="collect($destination['rows'])->pluck('box.part_number')"
+                                :context="$receipt['code'].' · '.$destination['pallet']" print />
+                        @endif
+                        @if(!empty($destination['limit']))<span class="guide-load">Maksimal {{ $destination['limit'] }} box pada pallet cadangan</span>@endif
                         @if($destination['load'] !== null && \App\Support\ExportPalletLoad::level($destination['load']) !== 'normal')<span class="guide-load">Setelah penempatan kelompok ini: {{ $destination['load'] }} box · {{ \App\Support\ExportPalletLoad::note($destination['load']) }}</span>@endif
                     </th></tr>
                     <tr><th class="col-number">No.</th><th class="col-box">ID Box</th><th class="col-part">Nomor part</th><th class="col-pcs">PCS</th><th class="col-source">Posisi saat dicetak</th><th class="col-check">Cek</th></tr>

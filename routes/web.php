@@ -27,11 +27,17 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
             Route::get('/', [$controller, 'index'])->defaults('scope', $scope)->name('index');
             Route::post('/', [$controller, 'start'])->defaults('scope', $scope)->name('start');
             Route::get('{opname}', [$controller, 'show'])->whereNumber('opname')->defaults('scope', $scope)->name('show');
+            Route::get('{opname}/excel', [$controller, 'export'])->whereNumber('opname')->defaults('scope', $scope)->name('export');
             Route::post('{opname}/scan', [$controller, 'scan'])->whereNumber('opname')->defaults('scope', $scope)->name('scan');
             Route::post('{opname}/refresh', [$controller, 'refresh'])->whereNumber('opname')->defaults('scope', $scope)->name('refresh');
             Route::post('{opname}/finish', [$controller, 'finish'])->whereNumber('opname')->defaults('scope', $scope)->name('finish');
         });
     }
+
+    Route::patch('delivery-announcements/{announcement}/status', [\App\Http\Controllers\DeliveryAnnouncementController::class, 'status'])
+        ->whereNumber('announcement')->name('delivery-announcements.status');
+    Route::resource('delivery-announcements', \App\Http\Controllers\DeliveryAnnouncementController::class)
+        ->parameters(['delivery-announcements' => 'announcement'])->except('destroy');
 
     // Profile Routes - Available to all authenticated users
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -95,7 +101,15 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::post('receiving/picking/issues/{issue}/return', [\App\Http\Controllers\ExportPickingController::class, 'confirmReturn'])->whereNumber('issue')->name('receiving.picking.return');
         Route::get('stock/export-excel', [\App\Http\Controllers\ExportStockController::class, 'export'])->name('stock.export');
         Route::get('stock/pallets/{pallet}/boxes', [\App\Http\Controllers\ExportStockController::class, 'palletBoxes'])->where('pallet', '[0-9]+|unplaced')->name('stock.pallet-boxes');
-        Route::get('stock/{stockBox}', [\App\Http\Controllers\ExportStockController::class, 'show'])->name('stock.show');
+        $stockAdmin = \App\Http\Controllers\ExportStockAdminController::class;
+        Route::get('stock/box-history', [$stockAdmin, 'history'])->name('stock.box-history');
+        Route::get('stock/{stockBox}/manage', [$stockAdmin, 'box'])->whereNumber('stockBox')->name('stock.box-manage');
+        Route::patch('stock/{stockBox}', [$stockAdmin, 'updateBox'])->whereNumber('stockBox')->name('stock.box-update');
+        Route::delete('stock/{stockBox}', [$stockAdmin, 'deleteBox'])->whereNumber('stockBox')->name('stock.box-delete');
+        Route::get('stock/pallets/{pallet}/manage', [$stockAdmin, 'pallet'])->whereNumber('pallet')->name('stock.pallet-manage');
+        Route::patch('stock/pallets/{pallet}/limit', [$stockAdmin, 'updatePalletLimit'])->whereNumber('pallet')->name('stock.pallet-limit');
+        Route::delete('stock/pallets/{pallet}', [$stockAdmin, 'deletePallet'])->whereNumber('pallet')->name('stock.pallet-delete');
+        Route::get('stock/{stockBox}', [\App\Http\Controllers\ExportStockController::class, 'show'])->whereNumber('stockBox')->name('stock.show');
         Route::post('receiving/batches', [\App\Http\Controllers\ExportStockReceivingController::class, 'start'])->name('receiving.batches.start');
         Route::get('receiving/batches/{batch}', [\App\Http\Controllers\ExportStockReceivingController::class, 'batchState'])->name('receiving.batches.state');
         Route::post('receiving/batches/{batch}/scan', [\App\Http\Controllers\ExportStockReceivingController::class, 'scan'])->name('receiving.batches.scan');

@@ -22,8 +22,8 @@
         </ul>
     @endif
     @if(auth()->user()->canAccess('export_fulfillment'))
-        <ul class="dashboard-actions" aria-label="Pemenuhan permintaan ekspor">
-            <x-dashboard-action icon="clipboard-data" title="Pemenuhan Permintaan" description="Pantau kebutuhan, reservasi box, dan penempatan per pallet" route-name="export.fulfillment.index" label="Pantau pemenuhan" />
+        <ul class="dashboard-actions" aria-label="Delivery Schedule Ekspor">
+            <x-dashboard-action icon="calendar3" title="Delivery Schedule Ekspor" description="Lihat tenggat pengiriman dan rincian pemenuhan pallet" route-name="export.fulfillment.index" label="Buka jadwal delivery" />
         </ul>
     @endif
     @if(auth()->user()->canAccess('export_stock_input'))

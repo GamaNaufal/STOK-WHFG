@@ -10,11 +10,14 @@ export function initPlacementGuide({documentRef = globalThis.document, windowRef
             if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
             try {
-                const rows = blocks.flatMap(block => readSparePlacement(block, {requireDestination:false}));
-                printForm.querySelector('[name="spare_placements_json"]').value = JSON.stringify(rows.map(({id,destination})=>({id,destination:destination||null})));
+                const rows = blocks.flatMap(block => {
+                    if (block.dataset.spareCapacityError) throw new Error(block.dataset.spareCapacityError);
+                    return readSparePlacement(block, {requireDestination:false});
+                });
+                printForm.querySelector('[name="spare_placements_json"]').value = JSON.stringify(rows.map(({id,destination,box_limit})=>({id,destination:destination||null,box_limit})));
                 printForm.requestSubmit();
             } catch (error) {
-                const block = blocks.find(item => { try { readSparePlacement(item,{requireDestination:false}); return false; } catch { return true; } });
+                const block = blocks.find(item => { if (item.dataset.spareCapacityError) return true; try { readSparePlacement(item,{requireDestination:false}); return false; } catch { return true; } });
                 const status = block?.querySelector('[data-spare-allocation-status]');
                 if (status) { status.textContent = error.message+' Perbaiki pembagian sebelum mencetak.'; status.tabIndex=-1; status.focus(); }
             }

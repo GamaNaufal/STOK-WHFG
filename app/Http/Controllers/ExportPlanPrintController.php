@@ -28,7 +28,7 @@ class ExportPlanPrintController extends Controller
     public function pallets(ExportDeliveryPlan $deliveryPlan, ?int $pallet = null)
     {
         $planning = $this->finalized($deliveryPlan);
-        $pallets = $planning->pallets()->with('items')->when($pallet !== null, fn ($q) => $q->whereKey($pallet))->get();
+        $pallets = $planning->pallets()->with('items', 'fulfillmentBoxes')->when($pallet !== null, fn ($q) => $q->whereKey($pallet))->get();
         abort_if($pallets->isEmpty(), 404);
         return response()->view('export.print.pallets', [
             'delivery' => $deliveryPlan, 'planning' => $planning, 'pallets' => $pallets, 'printedAt' => now(),

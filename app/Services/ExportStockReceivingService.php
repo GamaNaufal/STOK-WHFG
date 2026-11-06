@@ -90,7 +90,7 @@ class ExportStockReceivingService
         });
     }
 
-    private function palletAt(ExportMasterLocation $location, User $actor, ?int $plannedId, bool $allowExisting): ExportStockPallet
+    private function palletAt(ExportMasterLocation $location, User $actor, ?int $plannedId, bool $allowExisting, ?int $boxLimit = null): ExportStockPallet
     {
         if ($location->current_pallet_id || $location->stockLocations()->exists()) {
             $this->fail('location_id', 'Lokasi tidak tersedia untuk stok ekspor.');
@@ -108,7 +108,7 @@ class ExportStockReceivingService
         }
 
         return ExportStockPallet::create(['master_location_id' => $location->id, 'initial_location_id' => $location->id,
-            'location_code' => $location->code, 'export_planned_pallet_id' => $plannedId, 'created_by' => $actor->id]);
+            'location_code' => $location->code, 'export_planned_pallet_id' => $plannedId, 'box_limit' => $boxLimit, 'created_by' => $actor->id]);
     }
 
     public function place(int $boxId, array $data, User $actor, array $reusableLocations = [], bool $allowExpiredReturn = false): ExportStockBox
@@ -116,7 +116,15 @@ class ExportStockReceivingService
         return app(ExportInventoryService::class)->transaction(function () use ($boxId, $data, $actor, $reusableLocations, $allowExpiredReturn) {
             $locationId = ! empty($data['location_id']) ? (int) $data['location_id'] : null;
             $palletId = ! empty($data['pallet_id']) ? (int) $data['pallet_id'] : null;
-            $hash = hash('sha256', json_encode([$boxId, (int) $data['revision'], $locationId, $palletId], JSON_THROW_ON_ERROR));
+            $boxLimit = (int) ($data['box_limit'] ?? 0) ?: null;
+            if ($boxLimit !== null && (! $locationId || $palletId)) {
+                $this->fail('box_limit', 'Batas box hanya bisa ditetapkan saat membuat pallet cadangan di lokasi kosong.');
+            }
+            $request = [$boxId, (int) $data['revision'], $locationId, $palletId];
+            if ($boxLimit !== null) {
+                $request[] = $boxLimit;
+            }
+            $hash = hash('sha256', json_encode($request, JSON_THROW_ON_ERROR));
             $replay = ExportStockMovement::where('request_token', $data['request_token'])->first();
             if ($replay) {
                 if ($replay->request_hash !== $hash || (int) $replay->placed_by !== $actor->id) {
@@ -184,6 +192,9 @@ class ExportStockReceivingService
                 if ($palletId && (! $selected || ! $selected->master_location_id)) {
                     $this->fail('pallet_id', 'Pallet ekspor tidak tersedia.');
                 }
+                if ($locationId && $selected && $selected->box_limit !== $boxLimit) {
+                    $this->fail('box_limit', 'Gunakan satu batas box untuk seluruh kelompok yang menuju lokasi yang sama.');
+                }
                 $locationId ??= $selected->master_location_id;
             }
             $locations = ExportMasterLocation::whereIn('id', array_filter([$locationId, $source?->master_location_id]))
@@ -202,7 +213,7 @@ class ExportStockReceivingService
                 if (! $palletId && $claim) {
                     $this->fail('location_id', 'Lokasi sedang direservasi. Pilih lokasi kosong atau pallet ekspor existing.');
                 }
-                $target = $this->palletAt($location, $actor, $selected?->export_planned_pallet_id, (bool) $selected);
+                $target = $this->palletAt($location, $actor, $selected?->export_planned_pallet_id, (bool) $selected, $boxLimit);
                 if ($selected && $target->id !== $selected->id) {
                     $this->fail('pallet_id', 'Lokasi pallet sudah berubah. Pilih ulang.');
                 }
@@ -220,6 +231,9 @@ class ExportStockReceivingService
             }
             $moment = now();
             app(ExportFulfillmentCompletionService::class)->assertPalletUnlocked($target);
+            if ($source?->id !== $target->id) {
+                $target->assertSpaceForIncomingBox();
+            }
             ExportStockMovement::create(['export_stock_box_id' => $box->id, 'request_token' => $data['request_token'],
                 'request_hash' => $hash, 'from_pallet_id' => $source?->id, 'to_pallet_id' => $target->id,
                 'export_fulfillment_box_id' => $commitment?->id, 'from_location_code' => $source?->location_code,
@@ -241,16 +255,17 @@ class ExportStockReceivingService
                 $before, $box->only(['current_pallet_id', 'state', 'revision']) + [
                     'box_number' => $box->box_number, 'from_location' => $source?->location_code,
                     'to_location' => $location->code, 'fulfillment_id' => $commitment?->id,
-                    'first_received_at' => $box->first_received_at->toDateTimeString()],
+                    'first_received_at' => $box->first_received_at->toDateTimeString(), 'pallet_box_limit' => $target->spareBoxLimit()],
                 'Penempatan fisik box ekspor dikonfirmasi.');
 
             return $box->fresh();
         });
     }
 
-    public function placeMany(array $rows, User $actor): void
+    /** @return array<int, int> Location IDs mapped to the pallets created for them. */
+    public function placeMany(array $rows, User $actor): array
     {
-        app(ExportInventoryService::class)->transaction(function () use ($rows, $actor) {
+        return app(ExportInventoryService::class)->transaction(function () use ($rows, $actor) {
             $reusable = [];
             foreach ($rows as $row) {
                 $this->place((int) $row['id'], $row, $actor, $reusable);
@@ -262,6 +277,8 @@ class ExportStockReceivingService
                     }
                 }
             }
+
+            return $reusable;
         });
     }
 }

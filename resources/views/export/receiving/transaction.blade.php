@@ -6,7 +6,16 @@
 <link rel="stylesheet" href="{{ asset('css/pages/export-receiving.css') }}?v={{ filemtime(public_path('css/pages/export-receiving.css')) }}">
 @endsection
 @section('content')
-<div class="delivery-plan-page receiving-page">
+@php
+    $sparePending = $groups->filter(fn ($group) => !$group['planned'] && $group['actionable']->isNotEmpty());
+    $spareGroups = $sparePending->reject(fn ($group) => $group['picking_issue']);
+    $createdPallets = session('export_receiving_created_pallets', []);
+    $palletsForBatch = $batch && ($createdPallets['batch'] ?? null) === $batch->id ? $createdPallets['pallets'] : [];
+@endphp
+<div class="delivery-plan-page receiving-page"
+    data-spare-draft-key="{{ auth()->id().'.'.$receipt['code'] }}"
+    data-spare-pending-keys="{{ $sparePending->pluck('key')->toJson() }}"
+    data-spare-created-pallets="{{ json_encode($palletsForBatch, JSON_THROW_ON_ERROR) }}">
     <header class="plan-header">
         <div>
             <span class="plan-eyebrow">{{ !empty($receipt['notice_id']) ? 'Transaksi rekomendasi stok FIFO' : 'Penerimaan Transfer Box Ekspor' }}</span>
@@ -41,15 +50,12 @@
     @if($receipt['qa'])
         <p class="alert alert-warning"><strong>{{ $receipt['qa'] }} box terkait penanganan QA.</strong> Untuk box yang masih berstatus expired, hubungi Admin Warehouse agar ditangani melalui Expired Box dan Handle.</p>
     @endif
-    @if($groups->contains(fn($group)=>!$group['planned']&&$group['actionable']->isNotEmpty()))
-        <p class="plan-help mb-3">Box cadangan dikelompokkan per nomor part di dalam transaksi ini. Pilih satu tujuan atau bagi ke beberapa tujuan; pilihan tidak menjadi default untuk penerimaan berikutnya.</p>
+    @if($sparePending->isNotEmpty())
+        <p class="plan-help mb-3">Pilih satu tujuan atau bagi box per nomor part. Pilihan part yang masih menunggu akan dipulihkan di tab ini setelah konfirmasi.</p>
         <form method="POST" action="{{ $receipt['print_url'] }}" target="_blank" data-spare-print-form hidden>@csrf<input type="hidden" name="spare_placements_json" value="[]"></form>
     @endif
     <h2 class="visually-hidden">Daftar box dan tujuan penempatan</h2>
     @foreach($groups as $group)@include('export.receiving.group')@endforeach
-    @php
-        $spareGroups=$groups->filter(fn($group)=>!$group['planned']&&$group['actionable']->isNotEmpty()&&!$group['picking_issue']);
-    @endphp
     @if($spareGroups->count()>1)
         <form method="POST" action="{{ route('export.receiving.place-bulk') }}" class="plan-panel plan-panel-body" data-placement-form data-spare-confirm-all hidden>
             @csrf

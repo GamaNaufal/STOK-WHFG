@@ -214,6 +214,8 @@ class ExportFulfillmentCompletionService
                 'Kebutuhan pallet dan rencana delivery diperbarui. Reservasi tambahan mengikuti FIFO dan box terbaru dipilih untuk pengurangan.');
             if (! $plan->pallets()->exists()) {
                 $this->archiveCancelled($delivery, $plan, $actor, $before, 'Seluruh pallet dihapus melalui revisi.');
+            } else {
+                app(DeliveryAnnouncementService::class)->sync($delivery);
             }
         });
     }
@@ -276,6 +278,7 @@ class ExportFulfillmentCompletionService
         $plan->update(['status' => 'cancelled']);
         $delivery->update(['status' => 'cancelled', 'updated_by' => $actor->id]);
         $delivery->delete();
+        app(DeliveryAnnouncementService::class)->sync($delivery);
         app(ExportNotFullService::class)->sync($delivery, $actor);
         AuditService::record('export_fulfillment', 'cancelled', 'ExportDeliveryPlan', $delivery->id, $actor->id, $before,
             ['plan_code' => $delivery->plan_code, 'customer_name' => $delivery->customer_name, 'status' => 'cancelled', 'reason' => $reason],
@@ -311,6 +314,7 @@ class ExportFulfillmentCompletionService
             $plan->update(['completed_at' => now(), 'completed_by' => $actor->id]);
             $delivery->update(['status' => 'completed', 'updated_by' => $actor->id]);
             $delivery->delete();
+            app(DeliveryAnnouncementService::class)->sync($delivery, $snapshot['boxes']);
             AuditService::record('export_fulfillment', 'completed', 'ExportDeliveryPlan', $delivery->id, $actor->id, $snapshot,
                 ['plan_code' => $delivery->plan_code, 'customer_name' => $delivery->customer_name, 'status' => 'completed',
                     'total_boxes' => count($snapshot['boxes']), 'deleted' => true, 'completed_at' => now()->toDateTimeString()],

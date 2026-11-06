@@ -426,10 +426,14 @@ class ExportFulfillmentCompletionTest extends TestCase
         $spare = $this->receive();
         $loc = ExportMasterLocation::create(['code' => 'SPARE-TARGET']);
         $this->place($spare, ['location_id' => $loc->id]);
-        $target = $spare->fresh()->current_pallet_id;
-        $data = array_replace($data, ['destination' => 'pallet:'.$target, 'request_token' => (string) Str::uuid()]);
+        $target = $spare->fresh()->currentPallet;
+        $target->update(['box_limit' => 1]);
+        $data = array_replace($data, ['destination' => 'pallet:'.$target->id, 'request_token' => (string) Str::uuid()]);
+        $this->post(route('export.fulfillment.reduce', [$delivery, $pallet]), $data)->assertSessionHasErrors('destination');
+        $this->assertSame(3, $delivery->fresh()->total_boxes);
+        $target->update(['box_limit' => 2]);
         $this->post(route('export.fulfillment.reduce', [$delivery, $pallet]), $data)->assertSessionHasNoErrors();
-        $this->assertSame(2, ExportStockBox::where('current_pallet_id', $target)->count());
+        $this->assertSame(2, ExportStockBox::where('current_pallet_id', $target->id)->count());
     }
 
     public function test_revision_can_increase_existing_part_and_add_new_part_using_free_fifo_stock(): void

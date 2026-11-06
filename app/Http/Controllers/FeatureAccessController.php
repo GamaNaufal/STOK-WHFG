@@ -21,9 +21,15 @@ class FeatureAccessController extends Controller
         return view('admin.access.index', [
             'roles' => $roles,
             'selectedRole' => $role,
-            'features' => config('feature_access.features'),
+            'features' => $this->featuresForRole($role),
             'selected' => $access->permissions($role),
         ]);
+    }
+
+    private function featuresForRole(mixed $role): array
+    {
+        return array_filter(config('feature_access.features'), fn ($feature) => ! isset($feature['allowed_roles'])
+            || in_array($role, $feature['allowed_roles'], true));
     }
 
     public function update(Request $request, FeatureAccessService $access)
@@ -32,7 +38,7 @@ class FeatureAccessController extends Controller
         if ($request->exists('permissions') && $request->input('permissions') === null) {
             $request->merge(['permissions' => []]);
         }
-        $features = config('feature_access.features');
+        $features = $this->featuresForRole($request->input('role'));
         $editable = array_keys(array_filter($features, fn ($feature) => ! ($feature['admin_only'] ?? false)));
         $validated = $request->validate([
             'role' => ['required', Rule::in(array_keys(config('feature_access.roles')))],

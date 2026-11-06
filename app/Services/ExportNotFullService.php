@@ -273,6 +273,7 @@ class ExportNotFullService
                     $sourceBefore, $source->fresh()->toArray() + ['new_box_number' => $box->box_number, 'split_pcs' => $box->pcs_quantity],
                     'Box penuh FIFO dipecah. Sisa memakai ID/lokasi asal; kedua box mewarisi tanggal penerimaan sumber.');
             }
+            app(DeliveryAnnouncementService::class)->sync($r->delivery()->firstOrFail());
             app(ExportStockAllocationService::class)->allocate($actor, [$r->part_setting_id]);
         });
     }

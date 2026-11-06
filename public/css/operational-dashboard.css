@@ -12,9 +12,7 @@
 .od-subtitle { color:var(--od-muted); font-size:.85rem; margin:0; }
 .od-header-actions { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
 .operational-dashboard :is(button,a,summary) { -webkit-tap-highlight-color:transparent; }
-.od-motion-toggle,.od-icon-button { display:inline-flex; gap:.4rem; align-items:center; justify-content:center; min-height:2.5rem; border:1px solid var(--od-border); background:white; color:var(--od-muted); border-radius:.65rem; text-decoration:none; }
-.od-motion-toggle { font-size:.75rem; padding:.5rem .7rem; }
-.od-motion-toggle[aria-pressed=true] i { color:var(--od-teal); }
+.od-icon-button { display:inline-flex; gap:.4rem; align-items:center; justify-content:center; min-height:2.5rem; border:1px solid var(--od-border); background:white; color:var(--od-muted); border-radius:.65rem; text-decoration:none; }
 .od-icon-button { width:2.5rem; }
 .od-header-actions .od-export { background:#193e3d; border-color:#193e3d; font-size:.8rem; padding:.65rem .9rem; }
 .od-export i { margin-right:.35rem; }

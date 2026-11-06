@@ -38,7 +38,7 @@ class ExportStockController extends Controller
         $filterLocations = $stock->locationOptions();
         $storedCount = ExportStockBox::stockCategory('stored')->count();
         $spareCount = ExportStockBox::stockCategory('spare')->count();
-        $choices = $selected && !$selected->fulfillment ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
+        $choices = $selected && !$selected->fulfillment && $request->user()->canAccessRoute('export.receiving.place') ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
         $selectedLoad = $selected?->fulfillment ? $view->groups(collect([$selected]))->first()['load'] : null;
         return response()->view('export.stock.index', $results + compact('selected', 'selectedLoad', 'storedCount', 'spareCount', 'search', 'status', 'filterLocations') + $choices)
             ->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
@@ -62,7 +62,7 @@ class ExportStockController extends Controller
     public function palletBoxes(Request $request, string $pallet, ExportStockQueryService $stock)
     {
         $filters = $stock->filters($request);
-        $physicalPallet = $pallet === 'unplaced' ? null : ExportStockPallet::with('plannedPallet.palletPlan.deliveryPlan')->findOrFail($pallet);
+        $physicalPallet = $pallet === 'unplaced' ? null : ExportStockPallet::with('plannedPallet.palletPlan.deliveryPlan')->withCount('boxes')->findOrFail($pallet);
         $boxes = $stock->boxes($filters)->where('current_pallet_id', $physicalPallet?->id)
             ->paginate(20, ['*'], 'box_page')->withQueryString();
         $data = compact('boxes', 'physicalPallet', 'filters');
@@ -72,10 +72,10 @@ class ExportStockController extends Controller
             ->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
     }
 
-    public function show(ExportStockBox $stockBox, ExportStockViewService $view)
+    public function show(Request $request, ExportStockBox $stockBox, ExportStockViewService $view)
     {
         $stockBox->load($view::RELATIONS);
-        $choices = !$stockBox->fulfillment ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
+        $choices = !$stockBox->fulfillment && $request->user()->canAccessRoute('export.receiving.place') ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
         $selectedLoad = $stockBox->fulfillment ? $view->groups(collect([$stockBox]))->first()['load'] : null;
         return response()->json(['html' => view('export.stock.box-detail', ['selected' => $stockBox, 'selectedLoad' => $selectedLoad] + $choices)->render()])
             ->header('Cache-Control', 'private, no-store');

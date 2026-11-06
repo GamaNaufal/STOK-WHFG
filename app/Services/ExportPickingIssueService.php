@@ -33,6 +33,7 @@ class ExportPickingIssueService
                 [$pallet, $location] = [$source, $source->location];
             } else {
                 [$pallet, $location] = $this->destination($data['destination'] ?? null);
+                $pallet?->assertSpaceForIncomingBox();
             }
             if (!$box && ExportStockBox::onlyTrashed()->where('box_number', $issue->box_number)->exists()) $this->fail('issue', 'ID Box ini sudah keluar gudang pada permintaan yang selesai. Periksa identitas box; riwayat tidak dapat didaftarkan ulang.');
             $part = !$box ? app(ExportStockReceivingService::class)->part(trim($data['part_number'] ?? ''), true) : null;
@@ -115,6 +116,7 @@ class ExportPickingIssueService
             if ((int) $box->part_setting_id !== (int) $issue->part_setting_id || $box->pcs_quantity !== $issue->pcs_quantity) $this->fail('part_number', 'Data box berbeda dari approval. Minta admin meninjau kembali.');
             if ($issue->issue_type === 'wrong_box' && (int) $box->current_pallet_id !== (int) $target?->id) $this->fail('destination', 'Posisi box berubah dari asalnya. Minta admin meninjau ulang tujuan pengembalian.');
             if (!$target || (int) $box->current_pallet_id !== $target->id) {
+                $target?->assertSpaceForIncomingBox();
                 app(ExportFulfillmentCompletionService::class)->assertPalletUnlocked($target);
                 app(ExportFulfillmentCompletionService::class)->assertPalletUnlocked($box->currentPallet);
                 $target ??= ExportStockPallet::create(['master_location_id' => $location->id, 'initial_location_id' => $location->id,

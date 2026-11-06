@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DeliveryAnnouncementService;
 use App\Models\Box;
 use App\Models\DeliveryOrder;
 use App\Models\DeliveryOrderItem;
@@ -734,6 +735,7 @@ class DeliveryAssignController extends Controller
             if (!empty($rows)) {
                 DB::table('delivery_pick_items')->insert($rows);
             }
+            app(DeliveryAnnouncementService::class)->sync($order);
         });
 
         if (!empty($assignedBoxIds)) {
@@ -1459,6 +1461,7 @@ class DeliveryAssignController extends Controller
                     }
                 }
             }
+            app(DeliveryAnnouncementService::class)->sync($order);
             });
         } catch (\RuntimeException $e) {
             return response()->json(['message' => $e->getMessage()], 409);

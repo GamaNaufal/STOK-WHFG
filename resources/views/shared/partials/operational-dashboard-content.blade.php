@@ -20,7 +20,6 @@
     <header class="od-header">
         <div><p class="od-eyebrow"><span class="od-brand-mark" aria-hidden="true"><i class="bi bi-bar-chart-line"></i></span> WAREHOUSE ANALYTICS</p><h1>Setiap pergerakan, berarti.</h1><p class="od-subtitle">Dashboard analitik · {{ $scopeLabel($filters['scope']) }} · {{ $rangeLabel }}</p></div>
         <div class="od-header-actions">
-            <button type="button" class="od-motion-toggle" data-motion-toggle hidden aria-pressed="true"><i class="bi bi-play-circle" aria-hidden="true"></i><span data-motion-label>Animasi aktif</span></button>
             <a class="od-icon-button" href="{{ $dashboardUrl() }}" data-report-reset aria-label="Perbarui dashboard" title="Perbarui dashboard"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></a>
             @if(auth()->user()->canAccess('reports'))<a class="btn btn-dark od-export" data-report-export href="{{ route('reports.operational.export',\Illuminate\Support\Arr::except($filters,['audit_page'])) }}"><i class="bi bi-download" aria-hidden="true"></i> Export Excel</a>@endif
         </div>

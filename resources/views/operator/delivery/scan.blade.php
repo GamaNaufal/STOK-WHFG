@@ -33,6 +33,8 @@
             </a>
         </nav>
     </header>
+    <x-delivery-announcement-notes :delivery="$order" surface="local_scan" :boxes="$session->items->pluck('box.box_number')->filter()"
+        :parts="$session->items->pluck('part_number')" :context="'Sesi #'.$session->id" />
 
     <div class="delivery-scan-grid">
         <div class="delivery-scan-controls">

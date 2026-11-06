@@ -10,6 +10,9 @@
 @section('content')
 <div id="deliveryVerificationPage" class="delivery-verification-page"><div id="export-picking-page">
     <header class="verification-header"><div class="verification-heading"><span class="verification-eyebrow">Ekspor / Pemeriksaan box</span><h1><i class="bi bi-upc-scan" aria-hidden="true"></i> Picking Verification</h1><div class="verification-context">@if($transactionCode)<span class="verification-order">{{ $transactionCode }}</span>@endif<span class="verification-order">{{ $pallet->palletPlan->deliveryPlan?->plan_code }}</span><span>{{ $pallet->palletPlan->deliveryPlan?->customer_name }}</span><span>Pallet {{ $pallet->position }} · {{ $pallet->location_code }}</span></div></div><a class="verification-back-link" href="{{ !$helper && $transactionUrl ? $transactionUrl : route($helper ? 'export.picking.index' : 'export.receiving.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Kembali</a></header>
+    <x-delivery-announcement-notes :delivery="$pallet->palletPlan->deliveryPlan" :surface="$helper ? 'export_seek' : 'export_picking'"
+        :boxes="$rows->pluck('box_number')" :parts="$rows->pluck('plannedItem.part_number')"
+        :context="'Pallet '.$pallet->position.($transactionCode ? ' · '.$transactionCode : '')" />
     @if($errors->any())<div class="alert alert-danger" role="alert">@foreach($errors->all() as $error)<p class="mb-1">{{ $error }}</p>@endforeach</div>@endif
     <p class="alert {{ $helper ? 'alert-info' : 'alert-warning' }}">{{ $helper ? 'Mode pencarian: scan salah hanya menampilkan NG. Scan di sini tidak menggantikan verifikasi pengambilan wajib.' : 'Mode verifikasi wajib: scan ID Box yang ditandai wajib pada daftar rekomendasi. Salah ID Box 8 digit memblokir proses sampai approval admin dan penempatan pengembalian dikonfirmasi.' }}</p>
     <div class="receiving-scan-outcome" id="export-pick-feedback" role="status" aria-live="polite" hidden></div>

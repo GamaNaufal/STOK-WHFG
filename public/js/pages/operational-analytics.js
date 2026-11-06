@@ -39,8 +39,7 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
     const host = documentRef?.querySelector('[data-report-browser]');
     if (!host?.querySelector('[data-analytics-dashboard]')) return;
     const preference = windowRef.matchMedia('(prefers-reduced-motion: reduce)');
-    const state = {view: 'flow', detail: 'orders', advanced: null, motion: true, series: new Map(), focusId: null};
-    try { state.motion = windowRef.localStorage.getItem('whfg.dashboard.motion') !== 'off'; } catch {}
+    const state = {view: 'flow', detail: 'orders', advanced: null, series: new Map(), focusId: null};
     let cleanup = () => {};
     const mount = () => {
         cleanup();
@@ -48,27 +47,17 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
         if (!dashboard) return;
         const abort = new AbortController(), frames = new Map();
         const options = {signal: abort.signal};
-        const motion = () => state.motion && !preference.matches;
+        const motion = () => !preference.matches;
         const stopCounters = () => {
             frames.forEach((id, element) => { windowRef.cancelAnimationFrame(id); element.textContent = formatMetric(element.dataset.count, Number(element.dataset.decimals || 0)); });
             frames.clear();
         };
         const updateMotion = () => {
             dashboard.dataset.motion = motion() ? 'on' : 'off';
-            const toggle = dashboard.querySelector('[data-motion-toggle]');
-            toggle.hidden = false;
-            toggle.setAttribute('aria-pressed', String(motion()));
-            toggle.querySelector('[data-motion-label]').textContent = preference.matches ? 'Gerak dikurangi' : state.motion ? 'Animasi aktif' : 'Animasi mati';
-            toggle.title = preference.matches ? 'Mengikuti pengaturan kurangi gerakan perangkat' : 'Aktifkan atau matikan animasi dashboard';
             if (!motion()) stopCounters();
         };
         updateMotion();
         preference.addEventListener('change', updateMotion, options);
-        dashboard.querySelector('[data-motion-toggle]').addEventListener('click', () => {
-            state.motion = !state.motion;
-            try { windowRef.localStorage.setItem('whfg.dashboard.motion', state.motion ? 'on' : 'off'); } catch {}
-            updateMotion();
-        }, options);
         const animateCounter = element => {
             if (!motion()) return;
             const target = Number(element.dataset.count), decimals = Number(element.dataset.decimals || 0);

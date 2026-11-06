@@ -177,6 +177,7 @@ class ExportPickingVerificationTest extends TestCase
     public function test_approval_alone_does_not_unblock_until_operator_confirms_return(): void
     {
         [$pallet, $first, $wrong, $source] = $this->mixed();
+        $source->update(['box_limit' => $source->boxes()->count()]);
         $originalDate = $wrong->first_received_at->toDateTimeString();
         $token = (string) Str::uuid();
         $this->scan($pallet, $wrong->box_number, $token)->assertStatus(423)->assertJsonPath('blocked', true);
@@ -316,6 +317,33 @@ class ExportPickingVerificationTest extends TestCase
         $this->approve($issue, ['destination' => 'location:'.$export->id, 'part_number' => 'ONLY-LOCAL'])->assertSessionHasNoErrors();
         $this->assertSame('awaiting_return', $issue->fresh()->status);
         $this->assertFalse(ExportStockBox::where('box_number', '00888888')->exists());
+    }
+
+    public function test_picking_return_rechecks_capacity_and_requires_new_approval_if_target_fills(): void
+    {
+        [$pallet, , , $source] = $this->mixed();
+        $source->update(['box_limit' => 4]);
+        $this->scan($pallet, '00888888')->assertStatus(423);
+        $issue = ExportPickingIssue::sole();
+        $data = ['destination' => 'pallet:'.$source->id, 'part_number' => $this->part->part_number];
+        $this->approve($issue, $data)->assertSessionHasNoErrors();
+
+        $another = User::factory()->create(['role' => 'export_operator']);
+        $part = PartSetting::create(['part_number' => 'LIMIT-OTHER', 'qty_box' => 2]);
+        $service = app(ExportStockReceivingService::class);
+        $other = $service->receive(['box_number' => '00777777', 'part_number' => $part->part_number,
+            'receive_token' => (string) Str::uuid()], $another);
+        $service->place($other->id, ['revision' => $other->revision, 'request_token' => (string) Str::uuid(),
+            'pallet_id' => $source->id], $another);
+
+        $this->confirm($issue)->assertSessionHasErrors('destination');
+        $this->assertSame('awaiting_return', $issue->fresh()->status);
+        $this->assertDatabaseMissing('export_stock_boxes', ['box_number' => '00888888']);
+        $this->approve($issue, $data)->assertSessionHasErrors('destination');
+        $newLocation = ExportMasterLocation::create(['code' => 'LIMIT-RETURN']);
+        $this->approve($issue, array_replace($data, ['destination' => 'location:'.$newLocation->id]))->assertSessionHasNoErrors();
+        $this->confirm($issue)->assertSessionHasNoErrors();
+        $this->assertSame('returned', $issue->fresh()->status);
     }
 
     public function test_changed_return_destination_needs_updated_admin_approval_and_stays_blocked(): void

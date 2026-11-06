@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\DeliveryAnnouncementService;
 use App\Models\Box;
 use App\Models\DeliveryIssue;
 use App\Models\DeliveryOrder;
@@ -577,6 +578,7 @@ class DeliveryPickController extends Controller
                 throw new \RuntimeException('Stok tidak cukup atau tidak ada rekomendasi FIFO yang tersedia.');
             }
 
+            app(DeliveryAnnouncementService::class)->sync($lockedOrder);
             AuditService::record('delivery_pick', 'started', 'DeliveryPickSession', $session->id, $userId,
                 [], ['status' => 'scanning', 'delivery_order_id' => $lockedOrder->id,
                     'verification' => $verification, 'box_count' => $session->items()->count()],
@@ -799,6 +801,9 @@ class DeliveryPickController extends Controller
             $session->verification_last_activity_at = null;
             $session->approval_notes = $notes !== '' ? ($notes.' | '.$cancelNote) : $cancelNote;
             $session->save();
+            if ($order = $session->order()->first()) {
+                app(DeliveryAnnouncementService::class)->sync($order);
+            }
             AuditService::record('delivery_pick', 'cancelled', 'DeliveryPickSession', $session->id, $user->id,
                 ['status' => $previousStatus], ['status' => 'cancelled', 'delivery_order_id' => $session->delivery_order_id],
                 "Sesi picking #{$session->id} dibatalkan oleh {$user->name}.");
@@ -1315,6 +1320,8 @@ class DeliveryPickController extends Controller
                 }
 
                 $session = DeliveryPickSession::with('items')->findOrFail($session->id);
+                $announcementBoxes = Box::withTrashed()->whereIn('id', $sessionItems->pluck('box_id'))
+                    ->get(['box_number', 'part_number'])->all();
 
                 $remainingAfterComplete = 0;
                 foreach ($order->items as $orderItem) {
@@ -1331,6 +1338,7 @@ class DeliveryPickController extends Controller
                 $session->completion_status = 'completed';
                 $session->redo_until = now()->addDays(5);
                 $session->save();
+                app(DeliveryAnnouncementService::class)->sync($order, $announcementBoxes);
                 AuditService::record('delivery_pick', 'completed', 'DeliveryPickSession', $session->id, $user->id,
                     ['status' => 'scanning'], ['status' => 'completed', 'delivery_order_id' => $order->id,
                         'box_count' => $session->items->count()],
@@ -1487,6 +1495,8 @@ class DeliveryPickController extends Controller
             $order = $session->order;
             $order->status = 'processing';
             $order->save();
+            $reversedNumbers = Box::withTrashed()->whereIn('id', $withdrawals->pluck('box_id'))->pluck('box_number')->all();
+            app(DeliveryAnnouncementService::class)->sync($order, reversed: $reversedNumbers);
 
             DB::commit();
 
@@ -2370,6 +2380,9 @@ class DeliveryPickController extends Controller
                 $session->verification_last_activity_at = null;
                 $session->approval_notes = $notes !== '' ? ($notes.' | '.$terminateNote) : $terminateNote;
                 $session->save();
+                if ($order = $session->order()->first()) {
+                    app(DeliveryAnnouncementService::class)->sync($order);
+                }
                 AuditService::record('delivery_pick', 'terminated', 'DeliveryPickSession', $session->id, $user->id,
                     ['status' => $previousStatus], ['status' => 'cancelled', 'delivery_order_id' => $session->delivery_order_id,
                         'reason' => $reason], "Lock sesi picking #{$session->id} dihentikan oleh {$user->name}.");
