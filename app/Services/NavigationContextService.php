@@ -63,10 +63,14 @@ class NavigationContextService
         $activeRoute = $this->activeRoute($items, $routeName, $access);
         foreach ($items as &$item) {
             $item['active'] = $item['route'] === $activeRoute;
+            $item['label'] = match ($item['route']) {
+                'locations.index' => 'Lokasi Lokal',
+                'export.locations.index' => 'Lokasi Ekspor',
+                default => $item['label'],
+            };
             $item['short_label'] = match ($item['route']) {
-                'export.locations.index' => 'Lokasi',
                 'part-settings.index' => 'Nomor Part',
-                'export.fulfillment.index' => $item['label'],
+                'export.locations.index', 'export.fulfillment.index' => $item['label'],
                 default => str_contains($item['group'], 'Ekspor') ? Str::replaceEnd(' Ekspor', '', $item['label']) : $item['label'],
             };
             $item['group_label'] = match ($item['group']) {
@@ -84,7 +88,8 @@ class NavigationContextService
                 'export_stock_input', 'stock_input' => 'input penerimaan stok stock box transfer',
                 'stock_opname_local', 'stock_opname_export' => 'stock stok opname cek cocok pemeriksaan history inventaris',
                 'parts' => 'master nomor no part part number kapasitas pcs box',
-                'export_locations', 'locations' => 'master lokasi location tempat',
+                'export_locations' => 'master lokasi location tempat',
+                'locations' => 'master lokasi location tempat kelola lokasi',
                 'merge_pallet', 'export_merge_pallet' => 'gabung palet pallet'.(count($mergeRoutes) === 2 ? ' lokal ekspor export' : ''),
                 'export_pallet_plans' => 'palet pallet rencana planning',
                 'export_fulfillment' => 'jadwal kalender tenggat pemenuhan permintaan',
