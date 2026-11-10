@@ -1,3 +1,13 @@
+@php
+    $scopeLabel=fn($scope)=>\App\Services\OperationalDashboardService::SCOPES[$scope]??'Umum';
+    $date=fn($value,$time=false)=>$value?\Carbon\Carbon::parse($value)->format($time?'d/m/Y H:i':'d/m/Y'):'—';
+    $palletName=fn($row)=>$row->scope==='export'?($row->pallet_number?'Pallet '.$row->pallet_number:($row->pallet_id?'Pallet cadangan':'Belum ditempatkan')):($row->pallet_number??'—');
+    $issueReason=fn($row)=>$row->scope==='domestic'?(new \App\Models\DeliveryIssue(['issue_type'=>$row->issue_type]))->reason:(new \App\Models\ExportPickingIssue(['issue_type'=>$row->issue_type]))->reason;
+    $mainKeys=['scope','period','start_date','end_date','group_by','fulfillment_filter'];
+    $auditKeys=['audit_type','audit_action','audit_user'];
+    $activeAuditCount=collect($auditKeys)->filter(fn($key)=>filled($filters[$key]))->count();
+    $auditUserName=$auditOptions['users']->firstWhere('user_id',(int)$filters['audit_user'])?->user_name??'User #'.$filters['audit_user'];
+@endphp
     <section class="od-panel" id="fulfillment-report" data-detail-panel="orders" aria-labelledby="od-orders-title"><div class="od-panel-header"><h2 id="od-orders-title">Pemenuhan dan kesiapan pengiriman</h2><span class="od-muted">{{ $orders->count() }} baris ditampilkan</span></div><div class="od-scroll" tabindex="0" role="region" aria-label="Daftar pemenuhan permintaan">
         <table class="od-table"><thead><tr><th>Lingkup / rencana</th><th>Customer / tenggat</th><th>Kebutuhan</th><th>Terpenuhi</th><th>Reservasi</th><th>Pallet siap</th><th>Status</th></tr></thead><tbody>
         @forelse($orders as $row)<tr><td><span class="od-scope">{{ $scopeLabel($row->scope) }}</span><small>@if(auth()->user()->canAccess('reports'))<a href="{{ route('reports.records.detail',['record'=>$row->report_id,'scope'=>$row->scope,'kind'=>'fulfillment']) }}">{{ $row->reference ?: 'RD-'.$row->record_id }}</a>@else{{ $row->reference ?: 'RD-'.$row->record_id }}@endif</small></td><td>{{ $row->customer_name }}<small>{{ $date($row->deadline) }}</small></td><td class="od-nowrap">{{ number_format($row->required,0,',','.') }} {{ $row->unit }}</td><td class="od-nowrap">{{ number_format($row->fulfilled,0,',','.') }} {{ $row->unit }}<small>{{ $row->required?round($row->fulfilled*100/$row->required,1):0 }}%</small></td><td>{{ $row->reserved===null?'—':number_format($row->reserved,0,',','.').' box' }}</td><td>{{ $row->pallet_count===null?'—':$row->ready_pallets.' / '.$row->pallet_count }}</td><td>{{ \App\Services\WarehouseReportService::statusLabel($row->status) }}</td></tr>

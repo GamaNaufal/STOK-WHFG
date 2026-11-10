@@ -146,6 +146,7 @@
 .od-attention-icon { display:grid; place-items:center; width:2rem; height:2rem; border-radius:.6rem; background:#edf5ef; color:#54816a; }
 .od-attention-icon.is-warning { color:#a6752c; background:#fcf4e7; }
 .od-details { scroll-margin-top:6rem; }
+.od-detail-placeholder { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.75rem; min-height:8rem; }
 .od-updated { font-size:.65rem; color:#788a7e; }
 .od-detail-tabs { display:flex; overflow-x:auto; gap:.25rem; padding:.3rem; background:#e8eeea; border-radius:.8rem; margin-bottom:1rem; scrollbar-width:thin; }
 .od-detail-tabs a { display:flex; align-items:center; justify-content:center; gap:.4rem; flex:1 0 auto; border-radius:.55rem; color:#6b7e71; text-decoration:none; font-size:.72rem; padding:.65rem .85rem; white-space:nowrap; }

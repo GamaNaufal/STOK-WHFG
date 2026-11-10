@@ -75,6 +75,9 @@ class FeatureAccessService
         if (in_array($route, ['dashboard', 'profile.edit', 'profile.update'], true)) {
             return true;
         }
+        if ($route === 'dashboard.details') {
+            return in_array($user->role, ['admin', 'supervisi'], true);
+        }
         foreach ($this->routePermissions($route) as $permission) {
             if ($this->allows($user, $permission)) {
                 return true;

@@ -145,13 +145,23 @@ class OperationalDashboardScopeTest extends TestCase
             ->assertJsonPath('title', 'Dashboard Analitik - Warehouse FG');
         $response = $this->getJson(route('dashboard', ['scope' => 'export', 'period' => 'today']));
         $html = $response->json('html');
-        $this->assertStringContainsString('EXPORT CUSTOMER', $html);
+        $this->assertStringContainsString('data-details-url=', $html);
+        $this->assertStringNotContainsString('data-detail-panel=', $html);
+        $this->assertStringNotContainsString('EXPORT CUSTOMER', $html);
         $this->assertStringNotContainsString('DOM CUSTOMER', $html);
         $this->assertStringNotContainsString('<html', $html);
         $this->assertStringNotContainsString('code.highcharts.com', $html);
         $this->assertStringNotContainsString('cdn.jsdelivr.net', $html);
         $this->assertStringNotContainsString('@else', $html);
         $this->assertStringNotContainsString('Pemenuhan mengikuti realisasi order lokal', $html);
+        $details = $this->getJson(route('dashboard.details', ['scope' => 'export', 'period' => 'today']))
+            ->assertOk()->assertHeader('Cache-Control', 'no-store, private')->json('html');
+        $this->assertStringContainsString('EXPORT CUSTOMER', $details);
+        $this->assertStringContainsString('data-detail-panel="audit"', $details);
+        $this->assertStringNotContainsString('DOM CUSTOMER', $details);
+        $this->assertStringNotContainsString('data-analytics-dashboard', $details);
+        $this->get(route('dashboard', ['scope' => 'export', 'period' => 'today', 'show_details' => 1]))
+            ->assertOk()->assertSee('EXPORT CUSTOMER')->assertDontSee('data-details-url=', false);
         foreach (['domestic', 'export'] as $scope) {
             $d = $this->data(['scope' => $scope]);
             $this->assertSame([$scope], array_keys($d['domains']));
@@ -253,9 +263,11 @@ class OperationalDashboardScopeTest extends TestCase
     {
         foreach (['admin', 'supervisi'] as $role) {
             $this->actingAs(User::factory()->create(['role' => $role]))->get(route('dashboard'))->assertOk()->assertViewIs('shared.operational-dashboard');
+            $this->getJson(route('dashboard.details'))->assertOk();
         }
         $this->actingAs($this->operator)->get(route('dashboard', ['scope' => 'all']))->assertOk()->assertViewIs('export.dashboard');
         $this->get(route('reports.operational.export', ['scope' => 'export']))->assertForbidden();
+        $this->getJson(route('dashboard.details'))->assertForbidden();
         RoleFeatureAccess::create(['role' => 'supervisi', 'permissions' => []]);
         $this->actingAs(User::factory()->create(['role' => 'supervisi']));
         $this->get(route('dashboard'))->assertOk()->assertDontSee('data-report-export', false);

@@ -20,6 +20,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 // Protected Routes
 Route::middleware(['auth', 'active', 'features'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/details', [DashboardController::class, 'details'])->name('dashboard.details');
 
     foreach (['domestic' => ['stock-opname', 'stock-opname.'], 'export' => ['export/stock-opname', 'export.stock-opname.']] as $scope => [$prefix, $name]) {
         Route::prefix($prefix)->name($name)->group(function () use ($scope) {

@@ -1,12 +1,7 @@
 @php
     $scopeLabel=fn($scope)=>\App\Services\OperationalDashboardService::SCOPES[$scope]??'Umum';
     $date=fn($value,$time=false)=>$value?\Carbon\Carbon::parse($value)->format($time?'d/m/Y H:i':'d/m/Y'):'—';
-    $palletName=fn($row)=>$row->scope==='export'?($row->pallet_number?'Pallet '.$row->pallet_number:($row->pallet_id?'Pallet cadangan':'Belum ditempatkan')):($row->pallet_number??'—');
-    $issueReason=fn($row)=>$row->scope==='domestic'?(new \App\Models\DeliveryIssue(['issue_type'=>$row->issue_type]))->reason:(new \App\Models\ExportPickingIssue(['issue_type'=>$row->issue_type]))->reason;
-    $mainKeys=['scope','period','start_date','end_date','group_by','fulfillment_filter'];
     $auditKeys=['audit_type','audit_action','audit_user'];
-    $activeAuditCount=collect($auditKeys)->filter(fn($key)=>filled($filters[$key]))->count();
-    $auditUserName=$auditOptions['users']->firstWhere('user_id',(int)$filters['audit_user'])?->user_name??'User #'.$filters['audit_user'];
     $totalStock=(int)collect($stockTotals)->sum('boxes');
     $totalPallets=(int)collect($stockTotals)->sum('pallets');
     $unplaced=(int)collect($stockTotals)->sum('unplaced');
@@ -14,6 +9,7 @@
     $dashboardUrl=fn($changes=[])=>route('dashboard',array_filter(array_merge(\Illuminate\Support\Arr::except($filters,['audit_page']),$changes),fn($value)=>$value!==''));
     $customRange=filled($filters['start_date'])||filled($filters['end_date']);
     $detailTabs=['orders'=>['Pemenuhan','fulfillment-report','bi-truck'], 'stock'=>['Stok box','current-handling','bi-box-seam'], 'pallets'=>['Pallet','active-pallets','bi-grid'], 'processing'=>['Durasi proses','processing-time','bi-stopwatch'], 'issues'=>['Issue scan','scan-issues','bi-exclamation-circle'], 'audit'=>['Audit aktivitas','od-audit','bi-clock-history']];
+    $detailLink = fn ($id) => (isset($orders) ? '' : $dashboardUrl(['show_details' => 1])).'#'.$id;
 @endphp
 <div class="operational-dashboard" data-analytics-dashboard>
     @if($errors->any())<div class="alert alert-danger" role="alert">@foreach($errors->all() as $error)<p>{{ $error }}</p>@endforeach</div>@endif
@@ -50,7 +46,7 @@
         <div class="od-kpi {{ $issueSummary->open?'od-kpi-warning':'' }}"><dt><i class="bi bi-shield-exclamation" aria-hidden="true"></i> Issue scan masih terbuka</dt><dd class="od-number"><span data-count="{{ $issueSummary->open }}">{{ number_format($issueSummary->open,0,',','.') }}</span><span class="od-unit">issue</span></dd><dd class="od-kpi-context">{{ $issueSummary->total }} issue scan pada periode ini.</dd><dd class="od-kpi-footer">Termasuk histori salah input yang sudah ditutup.</dd></div>
     </dl>
     <section class="od-analytics" aria-labelledby="od-trends-title">
-        <div class="od-section-heading"><div><p class="od-eyebrow">BACA POLANYA</p><h2 id="od-trends-title">Dinamika gudang</h2><p class="od-muted">Lokal dalam PCS. Ekspor dalam box. Setiap lingkup punya skalanya sendiri.</p></div><div class="od-metric-switch" role="group" aria-label="Tampilan grafik" hidden><button type="button" data-chart-view="flow" aria-pressed="true"><i class="bi bi-activity" aria-hidden="true"></i> Arus stok</button><button type="button" data-chart-view="fulfillment" aria-pressed="false">Pemenuhan</button><button type="button" data-chart-view="hours" aria-pressed="false">Per jam</button></div></div>
+        <div class="od-section-heading"><div><p class="od-eyebrow">BACA POLANYA</p><h2 id="od-trends-title">Dinamika Warehouse</h2><p class="od-muted">Lokal dalam PCS. Ekspor dalam box. Setiap lingkup punya skalanya sendiri.</p></div><div class="od-metric-switch" role="group" aria-label="Tampilan grafik" hidden><button type="button" data-chart-view="flow" aria-pressed="true"><i class="bi bi-activity" aria-hidden="true"></i> Arus stok</button><button type="button" data-chart-view="fulfillment" aria-pressed="false">Pemenuhan</button><button type="button" data-chart-view="hours" aria-pressed="false">Per jam</button></div></div>
         <div class="od-domain-grid {{ count($domains)===1?'od-domain-grid-single':'' }}">
         @foreach($domains as $domain)
             <section class="od-domain od-domain-{{ $domain['scope'] }}" aria-label="Grafik {{ $domain['label'] }}" data-domain="{{ $domain['scope'] }}">
@@ -70,14 +66,23 @@
             @if(!$totalStock)<p class="od-muted mb-0">Belum ada stok aktif. Arus barang akan terlihat setelah penerimaan.</p>@endif
         </div></section>
         <section class="od-panel od-attention" aria-labelledby="od-attention-title"><div class="od-panel-header"><div><p class="od-eyebrow">FOKUS BERIKUTNYA</p><h2 id="od-attention-title">Perlu dipantau</h2></div><i class="bi bi-crosshair" aria-hidden="true"></i></div><div class="od-attention-list">
-            <a href="#fulfillment-report" data-open-detail="orders"><span class="od-attention-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span><strong>{{ $remainingOrders }} permintaan belum penuh</strong><small>Sesuai periode dan status pilihan</small></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
-            <a href="#current-handling" data-open-detail="stock"><span class="od-attention-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></span><span><strong>{{ number_format($unplaced,0,',','.') }} box menunggu penempatan</strong><small>Posisi stok saat ini</small></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
-            <a href="#scan-issues" data-open-detail="issues"><span class="od-attention-icon {{ $issueSummary->open?'is-warning':'' }}"><i class="bi bi-shield-exclamation" aria-hidden="true"></i></span><span><strong>{{ $issueSummary->open }} issue scan terbuka</strong><small>Dari issue yang dibuat pada periode ini</small></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+            <a href="{{ $detailLink('fulfillment-report') }}" data-open-detail="orders"><span class="od-attention-icon"><i class="bi bi-truck" aria-hidden="true"></i></span><span><strong>{{ $remainingOrders }} permintaan belum penuh</strong><small>Sesuai periode dan status pilihan</small></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+            <a href="{{ $detailLink('current-handling') }}" data-open-detail="stock"><span class="od-attention-icon"><i class="bi bi-box-arrow-in-down" aria-hidden="true"></i></span><span><strong>{{ number_format($unplaced,0,',','.') }} box menunggu penempatan</strong><small>Posisi stok saat ini</small></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
+            <a href="{{ $detailLink('scan-issues') }}" data-open-detail="issues"><span class="od-attention-icon {{ $issueSummary->open?'is-warning':'' }}"><i class="bi bi-shield-exclamation" aria-hidden="true"></i></span><span><strong>{{ $issueSummary->open }} issue scan terbuka</strong><small>Dari issue yang dibuat pada periode ini</small></span><i class="bi bi-arrow-up-right" aria-hidden="true"></i></a>
         </div></section>
     </div>
-    <section class="od-details" aria-labelledby="od-details-title" data-analytics-details>
-        <div class="od-section-heading"><div><p class="od-eyebrow">TELUSURI LEBIH DALAM</p><h2 id="od-details-title">Di balik angkanya</h2><p class="od-muted">Rincian operasional tetap tersedia saat dibutuhkan.</p></div><span class="od-updated"><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Data per {{ now()->format('d/m/Y H:i') }}</span></div>
-        <nav class="od-detail-tabs" aria-label="Rincian dashboard">@foreach($detailTabs as $key=>$tab)<a id="od-tab-{{ $key }}" href="#{{ $tab[1] }}" data-detail-tab="{{ $key }}"><i class="bi {{ $tab[2] }}" aria-hidden="true"></i>{{ $tab[0] }}</a>@endforeach</nav>
-        @include('shared.partials.operational-dashboard-details')
+    <section class="od-details" id="od-details" aria-labelledby="od-details-title" data-analytics-details>
+        <div class="od-section-heading"><div><p class="od-eyebrow">TELUSURI LEBIH DALAM</p><h2 id="od-details-title">Di balik angkanya</h2><p class="od-muted">Rincian operasional tetap tersedia saat dibutuhkan.</p></div><span class="od-updated" data-details-updated @unless(isset($orders)) hidden @endunless><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Data per <time>{{ now()->format('d/m/Y H:i') }}</time></span></div>
+        <nav class="od-detail-tabs" aria-label="Rincian dashboard">@foreach($detailTabs as $key=>$tab)<a id="od-tab-{{ $key }}" href="{{ $detailLink($tab[1]) }}" data-detail-tab="{{ $key }}"><i class="bi {{ $tab[2] }}" aria-hidden="true"></i>{{ $tab[0] }}</a>@endforeach</nav>
+        <div data-detail-body>
+            @if(isset($orders))
+                @include('shared.partials.operational-dashboard-details')
+            @else
+                <div class="od-panel od-body od-detail-placeholder" data-details-url="{{ route('dashboard.details', array_filter($filters, fn ($value) => $value !== '')) }}">
+                    <p class="od-muted mb-0" role="status">Lihat data pemenuhan, stok, dan aktivitas gudang.</p>
+                    <a class="btn btn-sm btn-outline-secondary" href="{{ $detailLink('od-details') }}" data-details-fallback>Lihat rincian</a>
+                </div>
+            @endif
+        </div>
     </section>
 </div>

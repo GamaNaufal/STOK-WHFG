@@ -17,12 +17,26 @@ class DashboardController extends Controller
 {
     private function operational(Request $request, array $extra = [])
     {
-        $data = array_merge(app(OperationalDashboardService::class)->build($request), $extra);
+        $includeDetails = $request->boolean('show_details')
+            || $request->anyFilled(['audit_page', 'audit_type', 'audit_action', 'audit_user']);
+        $data = array_merge(app(OperationalDashboardService::class)->build($request, includeDetails: $includeDetails), $extra);
         $response = $request->expectsJson()
             ? response()->json(['html' => view('shared.partials.operational-dashboard-content', $data)->render(),
                 'title' => 'Dashboard Analitik - Warehouse FG', 'url' => $request->fullUrl()])
             : response()->view('shared.operational-dashboard', $data);
         return $response->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
+    }
+
+    public function details(Request $request, OperationalDashboardService $service)
+    {
+        $data = $service->buildDetails($request);
+        $data['auditLogs']->withPath(route('dashboard'));
+
+        return response()->json([
+            'html' => view('shared.partials.operational-dashboard-details', $data)->render(),
+            'updatedAt' => now()->format('d/m/Y H:i'),
+        ])
+            ->header('Cache-Control', 'private, no-store');
     }
 
     private function applyStoredLocationExistsFilter($query)

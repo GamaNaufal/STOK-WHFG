@@ -1,5 +1,10 @@
 /* Shared navigation; follows DESIGN_PREFERENCES.md and existing teal tokens. */
 @media screen {
+    .warehouse-app .top-navbar { z-index:1030; }
+    .warehouse-app.navbar-idle .top-navbar:not(:has(:focus-visible)) {
+        transform:translateY(calc(-100% - 1rem));
+        pointer-events:none;
+    }
     .warehouse-app .top-navbar .navbar-inner { min-height:4rem; gap:.875rem; }
     .warehouse-app #sidebarToggleBtn { display:inline-flex; align-items:center; justify-content:center; gap:.5rem; flex:0 0 auto; min-width:44px; min-height:44px; color:var(--ui-ink); border-color:var(--ui-border); background:var(--ui-surface); }
     .warehouse-app .navigation-toggle-label { font-size:.8125rem; font-weight:600; }
@@ -15,6 +20,7 @@
     .warehouse-app .top-search-form .input-group { flex-wrap:nowrap; position:relative; }
     .warehouse-app .top-search-form .input-group-text { padding-inline:.75rem; }
     .warehouse-app .top-search-form .form-control { min-width:0; min-height:44px; font-size:.875rem; padding-right:2.5rem; border-radius:0 .625rem .625rem 0 !important; }
+    .warehouse-app .top-search-form .input-group:has(#globalSearchClear[hidden]) .form-control { padding-right:.75rem; }
     .warehouse-app #globalSearchClear { position:absolute; inset:0 0 0 auto; z-index:5; width:40px; border:0; background:transparent; color:var(--ui-muted); border-radius:0 .625rem .625rem 0; }
     .warehouse-app #globalSearchClear:hover { color:var(--ui-ink); background:rgb(20 25 32 / 5%); }
     .warehouse-app .global-search-dropdown { display:block; min-width:21rem; max-height:min(30rem,calc(100dvh - var(--top-navbar-height) - 1.5rem)); overscroll-behavior:contain; }
@@ -41,7 +47,7 @@
     .warehouse-app .navigation-item-label { min-width:0; line-height:1.4; overflow-wrap:normal; }
     .warehouse-app .sidebar .nav-link>.badge { flex-shrink:0; }
     @media(min-width:992px) {
-        .warehouse-app #mobileSidebar { margin-right:0; opacity:1; transform:translateX(0); visibility:visible !important; }
+        .warehouse-app #mobileSidebar { z-index:1020; height:calc(100dvh - var(--top-navbar-height)); min-height:0; margin-right:0; opacity:1; transform:translateX(0); visibility:visible !important; }
         .warehouse-app.sidebar-collapsed #mobileSidebar { margin-right:-248px; opacity:0; transform:translateX(-100%); visibility:hidden !important; }
         .warehouse-app .sidebar :is(.offcanvas-body,.position-sticky),
         .warehouse-app.sidebar-collapsed .sidebar :is(.offcanvas-body,.position-sticky) { opacity:1; transform:none; }
@@ -49,6 +55,8 @@
         .warehouse-app.sidebar-collapsed .main-content { flex:1 1 0%; width:0 !important; max-width:none; }
     }
     @media(prefers-reduced-motion:no-preference) {
+        .warehouse-app .top-navbar:not(:has(:focus-visible)) { transition:transform 180ms cubic-bezier(.23,1,.32,1); }
+        .warehouse-app.navbar-idle .top-navbar:not(:has(:focus-visible)) { transition:transform 280ms ease-in-out; }
         @media(min-width:992px) {
             /* Animate only a deliberate toggle; loading/restoring/resizing remains immediate. */
             .warehouse-app.navigation-motion #mobileSidebar {
@@ -76,11 +84,14 @@
         .warehouse-app .top-navbar .dropdown { order:2; }
         .warehouse-app .navigation-context { order:3; flex:1 0 100%; padding:.125rem 0 0; }
         .warehouse-app .navigation-context li { font-size:.75rem; }
+        .warehouse-app .navigation-context :is(a,span) { white-space:normal; overflow-wrap:anywhere; }
         .warehouse-app .global-search-dropdown { position:fixed; top:calc(var(--top-navbar-height) + .375rem); left:1rem; right:1rem; min-width:0; }
         .warehouse-app .top-search-form .input-group-text { padding-inline:.625rem; }
         .warehouse-app .avatar-trigger { padding:.25rem; }
         .warehouse-app .avatar-trigger>i { display:none; }
         .warehouse-app #globalSearchClear { min-height:44px; }
+        .warehouse-app #mobileSidebar { top:0; height:100dvh; }
         .warehouse-app #mobileSidebar .offcanvas-header { min-height:4rem; padding:.75rem 1rem; }
+        .warehouse-app #mobileSidebar .offcanvas-body { height:auto; min-height:0; }
     }
 }
