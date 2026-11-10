@@ -6,15 +6,20 @@ use App\Models\ExportStockBox;
 use App\Models\ExportStockPallet;
 use App\Exports\ExportStockExport;
 use App\Services\ExportStockQueryService;
+use App\Services\ExportStockCustomerReadiness;
 use App\Services\ExportStockViewService;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 
 class ExportStockController extends Controller
 {
-    public function index(Request $request, ExportStockViewService $view, ExportStockQueryService $stock)
+    public function index(Request $request, ExportStockViewService $view, ExportStockQueryService $stock, ExportStockCustomerReadiness $readiness)
     {
         $filters = $stock->filters($request);
+        $selection = $request->validate(['customer' => 'nullable|string|max:255']);
+        $customer = mb_strtolower(trim($selection['customer'] ?? ''));
+        $readinessData = $readiness->forCustomer($customer);
+        $stockCounts = $stock->overviewCounts();
         $boxes = $palletGroups = null;
         $reservationGroups = collect();
         if ($filters['mode'] === 'pallet') {
@@ -25,10 +30,15 @@ class ExportStockController extends Controller
             $boxes = $stock->boxes($filters)->paginate(20, ['*'], 'stock_page')->withQueryString();
             $resultCount = $boxes->total();
         }
-        $hasFilters = $filters['q'] !== '' || $filters['part_number'] !== '' || $filters['status'] !== '' || $filters['location_id'];
+        $hasFilters = $filters['q'] !== '' || $filters['part_number'] !== '' || $filters['status'] !== '' || $filters['location_id'] || $filters['pcs_per_box'];
         $results = compact('filters', 'boxes', 'palletGroups', 'reservationGroups', 'resultCount', 'hasFilters');
         if ($request->expectsJson()) {
-            return response()->json(['html' => view('export.stock.results', $results)->render(), 'count' => $resultCount])
+            return response()->json([
+                'html' => view('export.stock.results', $results)->render(),
+                'count' => $resultCount,
+                'readiness' => view('export.stock.customer-readiness', $readinessData)->render(),
+                'stockCounts' => $stockCounts,
+            ])
                 ->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
         }
 
@@ -36,11 +46,13 @@ class ExportStockController extends Controller
         $search = $filters['q']; $status = $filters['status'];
         $selected = !empty($data['box']) ? ExportStockBox::with($view::RELATIONS)->findOrFail($data['box']) : null;
         $filterLocations = $stock->locationOptions();
-        $storedCount = ExportStockBox::stockCategory('stored')->count();
-        $spareCount = ExportStockBox::stockCategory('spare')->count();
+        $storedCount = $stockCounts['stored'];
+        $spareCount = $stockCounts['spare'];
+        $customers = $readiness->customers();
         $choices = $selected && !$selected->fulfillment && $request->user()->canAccessRoute('export.receiving.place') ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
         $selectedLoad = $selected?->fulfillment ? $view->groups(collect([$selected]))->first()['load'] : null;
-        return response()->view('export.stock.index', $results + compact('selected', 'selectedLoad', 'storedCount', 'spareCount', 'search', 'status', 'filterLocations') + $choices)
+        return response()->view('export.stock.index', $results + $readinessData
+            + compact('selected', 'selectedLoad', 'storedCount', 'spareCount', 'stockCounts', 'customers', 'search', 'status', 'filterLocations') + $choices)
             ->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
     }
 

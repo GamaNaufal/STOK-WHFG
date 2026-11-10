@@ -16,19 +16,30 @@ class ExportFulfillmentService
     ];
 
     /** Count confirmations per requirement, so excess on one part cannot fill another. */
-    public function itemMetrics(): Builder
+    public function itemMetrics(bool $stockBacked = false): Builder
     {
         $matches = 'box.part_setting_id = item.part_setting_id AND box.pcs_quantity = item.pcs_per_box';
-        $placed = "($matches AND box.placed_at IS NOT NULL AND box.placed_by IS NOT NULL AND box.placed_location_id = pallet.master_location_id)";
+        if ($stockBacked) {
+            $matches .= " AND stock.deleted_at IS NULL AND stock.state IN ('received', 'stored')"
+                .' AND stock.part_setting_id = item.part_setting_id AND stock.pcs_quantity = item.pcs_per_box';
+        }
+        $physicalPlacement = $stockBacked
+            ? " AND stock.state = 'stored' AND physical.export_planned_pallet_id = pallet.id AND physical.retired_at IS NULL AND physical.master_location_id = pallet.master_location_id"
+            : '';
+        $placed = "($matches AND box.placed_at IS NOT NULL AND box.placed_by IS NOT NULL AND box.placed_location_id = pallet.master_location_id$physicalPlacement)";
         $reserved = "($matches AND box.placed_at IS NULL AND box.placed_by IS NULL AND box.placed_location_id IS NULL)";
 
         return DB::table('export_planned_pallet_items as item')
             ->join('export_planned_pallets as pallet', 'pallet.id', '=', 'item.export_planned_pallet_id')
             ->leftJoin('export_fulfillment_boxes as box', 'box.export_planned_pallet_item_id', '=', 'item.id')
+            ->when($stockBacked, fn ($query) => $query
+                ->leftJoin('export_stock_boxes as stock', 'stock.id', '=', 'box.export_stock_box_id')
+                ->leftJoin('export_stock_pallets as physical', 'physical.id', '=', 'stock.current_pallet_id'))
             ->select(['item.id as item_id', 'item.part_setting_id', 'item.part_number', 'item.pcs_per_box',
                 'item.box_quantity as required_boxes', 'pallet.id as pallet_id', 'pallet.export_pallet_plan_id as plan_id',
                 'pallet.position', 'pallet.master_location_id', 'pallet.location_code'])
             ->selectRaw("COUNT(CASE WHEN $placed THEN 1 END) as fulfilled_boxes")
+            ->when($stockBacked, fn ($query) => $query->selectRaw("COUNT(CASE WHEN $placed AND pallet.ready_at IS NOT NULL THEN 1 END) as ready_boxes"))
             ->selectRaw("COUNT(CASE WHEN $reserved THEN 1 END) as reserved_boxes")
             ->selectRaw("COUNT(box.id) - COUNT(CASE WHEN $placed OR $reserved THEN 1 END) as invalid_boxes")
             ->selectRaw('MAX(box.placed_at) as last_placed_at')

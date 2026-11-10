@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ExportMasterLocation;
+use App\Models\ExportPickingIssue;
 use App\Models\ExportPlannedPalletItem;
 use App\Models\ExportStockBox;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,7 +19,8 @@ class ExportStockQueryService
         $data = $request->validate([
             'q' => 'nullable|string|max:100',
             'part_number' => 'nullable|string|max:100',
-            'status' => ['nullable', Rule::in(['stored', 'pending', 'spare', 'reserved'])],
+            'pcs_per_box' => 'nullable|integer|min:1|max:4294967295',
+            'status' => ['nullable', Rule::in(['stored', 'pending', 'spare', 'reserved', 'free', 'in_progress'])],
             'mode' => ['nullable', Rule::in(['box', 'pallet'])],
             'location_id' => ['nullable', 'integer', 'min:1', Rule::exists('master_locations', 'id')->where('scope', ExportMasterLocation::MASTER_SCOPE)],
         ]);
@@ -29,7 +31,7 @@ class ExportStockQueryService
             $status = 'spare';
         }
 
-        return ['q' => trim($data['q'] ?? ''), 'part_number' => trim($data['part_number'] ?? ''), 'status' => $status,
+        return ['q' => trim($data['q'] ?? ''), 'part_number' => trim($data['part_number'] ?? ''), 'pcs_per_box' => $data['pcs_per_box'] ?? null, 'status' => $status,
             'mode' => $data['mode'] ?? 'box',
             'location_id' => ! empty($data['location_id']) ? (int) $data['location_id'] : null];
     }
@@ -50,11 +52,47 @@ class ExportStockQueryService
                         }
                     });
             }))
-            ->when(($filters['part_number'] ?? '') !== '', fn ($q) => $q->where('part_number', 'like', '%'.$filters['part_number'].'%'))
-            ->when($filters['status'] !== '', fn ($q) => $q->stockCategory($filters['status']))
+            ->when($filters['pcs_per_box'] ?? null, fn ($q, $pcs) => $q->where('pcs_quantity', $pcs))
+            ->when(($filters['part_number'] ?? '') !== '', fn ($q) => ($filters['pcs_per_box'] ?? null)
+                ? $q->where('part_number', $filters['part_number'])
+                : $q->where('part_number', 'like', '%'.$filters['part_number'].'%'))
+            ->when($filters['status'] !== '', fn ($q) => $this->applyStatus($q, $filters['status']))
             // A reservation is a future destination; it must not change physical stock filters.
             ->when($filters['location_id'], fn ($q, $id) => $q->whereHas('currentPallet', fn ($p) => $p->where('master_location_id', $id)))
             ->orderBy('first_received_at')->orderBy('id');
+    }
+
+    public function freeBoxes(Builder $query): Builder
+    {
+        return $query->eligible()->where('state', 'stored')
+            ->where(fn ($box) => $box->whereNull('expired_status')->orWhere('expired_status', '<>', 'handled'))
+            ->whereDoesntHave('fulfillment')
+            ->whereHas('currentPallet', fn ($pallet) => $pallet->whereNull('retired_at')
+                ->whereNull('export_planned_pallet_id')->whereNotNull('master_location_id'))
+            ->whereNotIn('box_number', ExportPickingIssue::open()->select('box_number'));
+    }
+
+    private function applyStatus(Builder $query, string $status): Builder
+    {
+        return match ($status) {
+            'free' => $this->freeBoxes($query),
+            'in_progress' => $query->stockCategory('spare')
+                ->where(fn ($box) => $box->where('state', 'received')->orWhereHas('fulfillment')),
+            default => $query->stockCategory($status),
+        };
+    }
+
+    public function overviewCounts(): array
+    {
+        $active = ExportStockBox::whereIn('state', ['received', 'stored']);
+        $stored = $this->applyStatus(clone $active, 'stored')->count();
+
+        return [
+            'stored' => $stored,
+            'spare' => (clone $active)->count() - $stored,
+            'free' => $this->applyStatus(clone $active, 'free')->count(),
+            'in_progress' => $this->applyStatus(clone $active, 'in_progress')->count(),
+        ];
     }
 
     public function groups(array $filters)

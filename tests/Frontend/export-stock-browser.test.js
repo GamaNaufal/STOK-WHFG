@@ -114,7 +114,7 @@ test('unified search and radio grouping apply filters and restore them through r
     assert.equal(fields.mode.value, 'box');
     assert.equal(fields.status.value, 'spare');
     assert.equal(partChip.hidden, false);
-    assert.equal(partLabel.textContent, '7105');
+    assert.equal(partLabel.textContent, 'Nomor part 7105');
     assert.equal(windowRef.location.href, form.action + '?q=12000001&part_number=7105&mode=box&status=reserved');
 
     formEvents.click({target: {closest: () => ({})}});

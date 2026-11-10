@@ -1,6 +1,19 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 5 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 10 November 2026 (pembaruan inkremental).
+
+Posisi stok dan kesiapan customer ekspor, 10 November 2026
+
+- Stok Ekspor menampilkan filter cepat Stok Bersih, Sedang Diproses dan
+  Siap Kirim. Stok bersih mensyaratkan box aktif dan layak, sudah tersimpan
+  di pallet cadangan dengan lokasi, tanpa reservasi atau issue picking terbuka.
+- Kesiapan Customer menggabungkan nama customer tanpa membedakan kapitalisasi,
+  menampilkan delivery aktif menurut tenggat, dan memisahkan box siap, sudah
+  di pallet, masih direservasi, dan belum dialokasikan.
+- Kekurangan digabung per nomor part dan PCS per box agar stok yang sama
+  tidak dihitung berulang untuk beberapa delivery customer. Pencarian
+  stok bersih tetap mengecualikan reservasi semua customer. Panel customer
+  berdiri berdampingan dengan ringkasan kekurangan di desktop.
 
 Delivery Schedule Ekspor, 5 November 2026
 

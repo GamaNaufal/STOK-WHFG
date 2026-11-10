@@ -269,11 +269,16 @@ class ExportStockFilterExportTest extends TestCase
             'part_number' => $this->part->part_number, 'receive_token' => (string) Str::uuid()], $this->operator);
         $this->box('00000002');
         $this->box('00000003', $this->pallet('SPARE-SOURCE'));
+        $customerUrl = route('export.stock.index', ['customer' => 'customer ready']);
+        $this->get($customerUrl)->assertOk()->assertViewHas('deliveries',
+            fn ($rows) => $rows->sole()['reserved'] === 1 && $rows->sole()['ready'] === 0);
         $this->get(route('export.stock.index', ['status' => 'spare']))->assertOk()
             ->assertViewHas('storedCount', 0)->assertViewHas('spareCount', 3)->assertViewHas('resultCount', 3)
             ->assertSee('Memiliki reservasi')->assertSee('RD-READY-CATEGORY')->assertSee('READY-TARGET');
         app(ExportStockReceivingService::class)->place($box->id, ['revision' => $box->fresh()->revision,
             'request_token' => (string) Str::uuid()], $this->operator);
+        $this->get($customerUrl)->assertOk()->assertViewHas('deliveries',
+            fn ($rows) => $rows->sole()['placed'] === 1 && $rows->sole()['ready'] === 0);
         $this->get(route('export.stock.index', ['status' => 'stored']))->assertOk()->assertViewHas('resultCount', 0);
         $this->get(route('export.stock.index', ['status' => 'spare']))->assertOk()->assertViewHas('resultCount', 3)
             ->assertSee('Menunggu konfirmasi pallet siap');
@@ -283,6 +288,8 @@ class ExportStockFilterExportTest extends TestCase
         $completion = app(ExportFulfillmentCompletionService::class);
         $completion->ready($delivery->id, $pallet->id, ['revision' => $plan->revision, 'fulfillment_revision' => $pallet->fulfillment_revision,
             'request_token' => (string) Str::uuid(), 'location_id' => $location->id], $this->operator);
+        $this->get($customerUrl)->assertOk()->assertViewHas('deliveries',
+            fn ($rows) => $rows->sole()['ready'] === 1 && $rows->sole()['placed'] === 0);
         $this->get(route('export.stock.index', ['status' => 'stored']))->assertOk()
             ->assertViewHas('storedCount', 1)->assertViewHas('spareCount', 2)
             ->assertViewHas('boxes', fn ($boxes) => $boxes->pluck('id')->all() === [$box->id]);
@@ -296,8 +303,50 @@ class ExportStockFilterExportTest extends TestCase
         $this->assertSame('RD-READY-CATEGORY', $sheet->getCell('H2')->getValue());
         $completion->reopen($delivery->id, $pallet->id, ['revision' => $plan->revision,
             'fulfillment_revision' => $pallet->fresh()->fulfillment_revision, 'request_token' => (string) Str::uuid()], $this->operator);
+        $this->get($customerUrl)->assertOk()->assertViewHas('deliveries',
+            fn ($rows) => $rows->sole()['placed'] === 1 && $rows->sole()['ready'] === 0);
         $this->get(route('export.stock.index', ['status' => 'stored']))->assertOk()->assertViewHas('resultCount', 0);
         $this->get(route('export.stock.index', ['status' => 'spare']))->assertOk()->assertViewHas('resultCount', 3);
+    }
+
+    public function test_customer_gap_uses_shared_free_stock_once_and_matches_exact_box_capacity(): void
+    {
+        $save = fn ($code, $customer, $pcs, $deadline) => app(ExportDeliveryPlanService::class)->save([
+            'plan_code' => $code, 'customer_name' => $customer, 'delivery_deadline' => $deadline, 'source_type' => 'manual',
+            'items' => [['part_number' => $this->part->part_number, 'pcs_quantity' => $pcs]],
+        ], $this->operator);
+
+        $save('RD-A2', 'CUSTOMER A', 220, '2026-11-11');
+        $save('RD-A1', 'Customer A', 120, '2026-11-10');
+        $save('RD-CANCELLED', 'Customer A', 100, '2026-11-09')->update(['status' => 'cancelled']);
+        $other = $save('RD-B', 'Customer B', 100, '2026-11-08');
+        $source = $this->pallet('FREE-SOURCE');
+        $this->box('00000001', $source);
+        $target = ExportMasterLocation::create(['code' => 'OTHER-TARGET']);
+        app(ExportPalletPlanningService::class)->save($other->id, [
+            'revision' => 0, 'delivery_revision' => 1, 'action' => 'finalize',
+            'pallets' => [['master_location_id' => $target->id, 'items' => [['part_setting_id' => $this->part->id, 'box_quantity' => 1]]]],
+        ], $this->operator);
+        $this->box('00000002', $source);
+        $this->box('00000003', $source);
+        $this->box('00000004', $source, ['pcs_quantity' => 20, 'is_not_full' => true]);
+        $this->box('00000005', $source, ['first_received_at' => now()->subMonths(13)]);
+        $this->box('00000006');
+
+        $params = ['customer' => 'CUSTOMER A'];
+        $this->get(route('export.stock.index', $params))->assertOk()
+            ->assertViewHas('customers', fn ($customers) => $customers->count() === 2)
+            ->assertViewHas('deliveries', fn ($rows) => $rows->pluck('delivery.plan_code')->all() === ['RD-A1', 'RD-A2'])
+            ->assertViewHas('shortages', fn ($rows) => $rows->map(fn ($row) => [
+                $row['pcs_per_box'], $row['unallocated'], $row['available'], $row['remaining'],
+            ])->all() === [[100, 3, 2, 1], [20, 2, 1, 1]])
+            ->assertSee('20 PCS/box · Not Full');
+        $response = $this->getJson(route('export.stock.index', $params + [
+            'status' => 'free', 'part_number' => $this->part->part_number, 'pcs_per_box' => 20,
+        ]))->assertOk()->assertJsonPath('count', 1)->assertJsonPath('stockCounts.free', 3)
+            ->assertJsonPath('stockCounts.in_progress', 2);
+        $this->assertStringContainsString('00000004', $response->json('html'));
+        $this->assertStringNotContainsString('RD-B', $response->json('readiness'));
     }
 
     public function test_ajax_list_does_not_load_layout_location_choices_or_destination_catalogs(): void

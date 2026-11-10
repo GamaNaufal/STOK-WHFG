@@ -43,22 +43,48 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
     const status = documentRef.getElementById('stock-request-status');
     const retry = documentRef.getElementById('stock-request-retry');
     const count = documentRef.getElementById('stock-result-count');
+    const readiness = documentRef.getElementById('stock-customer-readiness');
+    const customer = documentRef.getElementById('stock-customer');
+    const summary = documentRef.getElementById('export-stock-summary');
+    const reset = documentRef.querySelector('[data-stock-reset]');
     const partFilter = form.querySelector('[data-stock-part-filter]');
     let timer, lastUrl = windowRef.location.href, historyMode = 'replace';
     const format = value => Number(value).toLocaleString('id-ID');
     const state = ({busy, error}) => {
         results.setAttribute('aria-busy', String(busy));
+        readiness?.setAttribute('aria-busy', String(busy));
         status.textContent = busy ? 'Memperbarui stok…' : error ? 'Daftar belum diperbarui. '+error : count.textContent+' box ditemukan.';
         retry.hidden = !error;
     };
     const loader = createStockLoader({fetcher, state, render: (data, url) => {
         results.innerHTML = data.html;
         count.textContent = format(data.count);
+        if (readiness && typeof data.readiness === 'string') readiness.innerHTML = data.readiness;
+        if (summary && data.stockCounts) {
+            for (const link of summary.querySelectorAll('[data-stock-quick-status]')) {
+                const category = link.dataset.stockQuickStatus;
+                link.querySelector('[data-stock-count]').textContent = format(data.stockCounts[category]);
+                link.href = summaryUrl(category);
+                if (form.elements.namedItem('status').value === category) link.setAttribute('aria-current', 'true');
+                else link.removeAttribute('aria-current');
+            }
+        }
+        if (customer) reset.href = summaryUrl();
         if (historyMode !== 'none') windowRef.history[historyMode+'State']({}, '', url);
     }});
     const filterUrl = () => {
         const url = new URL(form.action);
         for (const [key, value] of new FormData(form)) if (value !== '') url.searchParams.set(key, value);
+        return url.href;
+    };
+    const summaryUrl = category => {
+        const url = new URL(form.action);
+        if (customer?.value) url.searchParams.set('customer', customer.value);
+        if (category) {
+            url.searchParams.set('status', category);
+            url.searchParams.set('mode', form.elements.namedItem('mode').value);
+            url.hash = 'export-stock-results';
+        }
         return url.href;
     };
     const load = (url, mode = 'replace') => {
@@ -74,24 +100,31 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
     };
     const syncForm = url => {
         const params = new URL(url).searchParams;
-        for (const name of ['q', 'part_number', 'status', 'location_id', 'mode']) {
+        for (const name of ['q', 'part_number', 'pcs_per_box', 'status', 'location_id', 'mode', 'customer']) {
+            const field = form.elements.namedItem(name);
+            if (!field) continue;
             let value = params.get(name) ?? (name === 'mode' ? 'box' : '');
             if (name === 'status' && ['pending', 'reserved'].includes(value)) value = 'spare';
-            form.elements.namedItem(name).value = value;
+            if (name === 'customer') value = value.trim().toLowerCase();
+            field.value = value;
         }
         const part = form.elements.namedItem('part_number').value;
-        partFilter.hidden = part === '';
-        partFilter.querySelector('[data-stock-part-label]').textContent = part;
+        const pcs = form.elements.namedItem('pcs_per_box')?.value;
+        partFilter.hidden = !part && !pcs;
+        partFilter.querySelector('[data-stock-part-label]').textContent = [part && `Nomor part ${part}`, pcs && `${pcs} PCS/box`].filter(Boolean).join(' · ');
     };
 
     form.addEventListener('input', event => { if (event.target.name === 'q') apply(true); });
     form.addEventListener('change', event => { if (event.target.matches('select') || event.target.name === 'mode') apply(false); });
+    customer?.addEventListener('change', () => apply(false));
     form.addEventListener('keydown', event => {
         if (event.key === 'Enter' && event.target.name === 'q') { event.preventDefault(); apply(false); }
     });
     form.addEventListener('click', event => {
         if (event.target.closest('[data-stock-clear-part]')) {
             form.elements.namedItem('part_number').value = '';
+            const pcs = form.elements.namedItem('pcs_per_box');
+            if (pcs) pcs.value = '';
             partFilter.hidden = true;
             apply(false);
         }
@@ -101,9 +134,19 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
         event.preventDefault(); apply(false);
     });
     retry.addEventListener('click', () => load(lastUrl, historyMode));
-    documentRef.querySelector('[data-stock-reset]').addEventListener('click', event => {
-        event.preventDefault(); form.reset();
-        syncForm(form.action); apply(false);
+    reset.addEventListener('click', event => {
+        event.preventDefault();
+        const url = summaryUrl();
+        form.reset();
+        syncForm(url); apply(false);
+    });
+    summary?.addEventListener('click', async event => {
+        const link = event.target.closest('[data-stock-quick-status]');
+        if (!link || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        const url = summaryUrl(link.dataset.stockQuickStatus);
+        syncForm(url);
+        if (await load(url, 'push')) results.scrollIntoView({block: 'start'});
     });
     windowRef.addEventListener('popstate', () => { syncForm(windowRef.location.href); load(windowRef.location.href, 'none'); });
 
