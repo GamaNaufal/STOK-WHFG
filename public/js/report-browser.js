@@ -107,6 +107,7 @@ export function initReportBrowser({documentRef = globalThis.document, windowRef 
         if (link.matches('[data-report-reset]') || link.closest('.pagination')) { event.preventDefault(); load(link.href); }
     });
     retry.addEventListener('click', () => load(lastUrl, lastMode));
+    root.addEventListener('report:content-appended', enhance);
     windowRef.addEventListener('popstate', () => load(windowRef.location.href, 'none'));
     windowRef.addEventListener('pagehide', () => { windowRef.clearTimeout(timer); loader.cancel(); });
     enhance();

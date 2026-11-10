@@ -151,45 +151,75 @@ class OperationalDashboardService
         return [$forExport ? $query->get() : $query->paginate(20, ['*'], 'audit_page', (int) ($filters['audit_page'] ?? 1))->withQueryString(), $options];
     }
 
-    public function build(Request $request, bool $forExport = false): array
+    private function queries(array $filters, ?Carbon $start, ?Carbon $end): array
     {
-        $filters = $this->filters($request);
-        [$start,$end,$rangeLabel] = $this->range($filters);
         $scopes = $filters['scope'] === 'all' ? ['domestic', 'export'] : [$filters['scope']];
         $source = app(OperationalDashboardSources::class);
-        $stocks = $palletStocks = $orders = $issues = $processing = $domains = $stockTotals = [];
+        $stocks = $palletStocks = $orders = $issues = [];
         foreach ($scopes as $scope) {
             $stocks[$scope] = $source->stock($scope);
             $palletStocks[$scope] = $source->stock($scope, true);
-            $stock = DB::query()->fromSub(clone $stocks[$scope], 'stock');
-            $stockTotals[$scope] = (clone $stock)->selectRaw('COALESCE(SUM(box_quantity),0) AS boxes, COALESCE(SUM(pcs_quantity),0) AS pcs,
-                COUNT(DISTINCT pallet_id) AS pallets, COUNT(DISTINCT part_number) AS parts,
-                COALESCE(SUM(CASE WHEN pallet_id IS NULL THEN box_quantity ELSE 0 END),0) AS unplaced')->first();
-            $stockTotals[$scope]->pallets = DB::query()->fromSub(clone $palletStocks[$scope], 'pallet_stock')->distinct()->count('pallet_id');
             $orders[$scope] = $this->between(DB::query()->fromSub($source->orders($scope), 'orders'), 'deadline', $start, $end, true);
-            $domains[$scope] = $this->domain($scope, $filters, $start, $end, clone $orders[$scope]);
             $issues[$scope] = $this->between(DB::query()->fromSub($source->issues($scope), 'issues'), 'occurred_at', $start, $end);
-            $processing[$scope] = $this->between(DB::query()->fromSub($source->processing($scope), 'process'), 'started_at', $start, $end);
         }
-        $stockQuery = $this->combined(array_values($stocks));
-        $stockRows = $this->rows((clone $stockQuery)->orderBy('occurred_at')->orderBy('scope')->orderBy('record_id'), $forExport);
-        $palletQuery = $this->combined(array_values($palletStocks))->whereNotNull('pallet_id')->groupBy('scope', 'pallet_id', 'pallet_number', 'warehouse_location')
+
+        $orderQuery = $this->combined(array_values($orders))->when($filters['fulfillment_filter'] !== 'all',
+            fn ($q) => $q->where('is_full', $filters['fulfillment_filter'] === 'full' ? 1 : 0));
+        $issueQuery = $this->combined(array_values($issues));
+
+        return compact('scopes', 'stocks', 'palletStocks', 'orders', 'orderQuery', 'issueQuery');
+    }
+
+    private function detailData(array $queries, array $filters, ?Carbon $start, ?Carbon $end, bool $forExport): array
+    {
+        $stockQuery = $this->combined(array_values($queries['stocks']));
+        $stockRows = $this->rows($stockQuery->orderBy('occurred_at')->orderBy('scope')->orderBy('record_id'), $forExport);
+        $palletQuery = $this->combined(array_values($queries['palletStocks']))->whereNotNull('pallet_id')->groupBy('scope', 'pallet_id', 'pallet_number', 'warehouse_location')
             ->selectRaw('scope,pallet_id,pallet_number,warehouse_location,SUM(box_quantity) AS boxes,SUM(pcs_quantity) AS pcs,MIN(occurred_at) AS first_received_at');
         $palletRows = $this->rows($palletQuery->orderBy('first_received_at')->orderBy('scope')->orderBy('pallet_id'), $forExport);
-        $orderQuery = $this->combined(array_values($orders))->when($filters['fulfillment_filter'] !== 'all', fn ($q) => $q->where('is_full', $filters['fulfillment_filter'] === 'full' ? 1 : 0));
-        $orderSummary = (clone $orderQuery)->selectRaw('COUNT(*) AS total, COALESCE(SUM(is_full),0) AS full')->first();
-        $orders = $this->rows($orderQuery->orderBy('deadline')->orderBy('scope')->orderBy('record_id'), $forExport);
-        $issueQuery = $this->combined(array_values($issues));
-        $issueSummary = (clone $issueQuery)->selectRaw('COUNT(*) AS total, COALESCE(SUM(is_open),0) AS open')->first();
-        $issues = $this->rows($issueQuery->orderByDesc('occurred_at')->orderBy('scope')->orderByDesc('record_id'), $forExport, 50);
-        $processing = $this->rows($this->combined(array_values($processing))->orderByDesc('started_at')->orderBy('scope')->orderByDesc('record_id'), $forExport);
+        $orders = $this->rows($queries['orderQuery']->orderBy('deadline')->orderBy('scope')->orderBy('record_id'), $forExport);
+        $issues = $this->rows($queries['issueQuery']->orderByDesc('occurred_at')->orderBy('scope')->orderByDesc('record_id'), $forExport, 50);
+
+        $source = app(OperationalDashboardSources::class);
+        $processQueries = array_map(fn ($scope) => $this->between(DB::query()->fromSub($source->processing($scope), 'process'),
+            'started_at', $start, $end), $queries['scopes']);
+        $processing = $this->rows($this->combined($processQueries)->orderByDesc('started_at')->orderBy('scope')->orderByDesc('record_id'), $forExport);
         foreach ($processing as $row) {
             $row->duration_min = $row->started_at && $row->completed_at ? Carbon::parse($row->started_at)->diffInMinutes(Carbon::parse($row->completed_at)) : null;
             $row->scan_duration_min = $row->first_scan && $row->last_scan ? Carbon::parse($row->first_scan)->diffInMinutes(Carbon::parse($row->last_scan)) : null;
         }
-        [$auditLogs,$auditOptions] = $this->audit($filters, $start, $end, $forExport);
-        $fulfillmentRate = $orderSummary->total ? round($orderSummary->full * 100 / $orderSummary->total, 1) : 0;
+        [$auditLogs, $auditOptions] = $this->audit($filters, $start, $end, $forExport);
 
-        return compact('filters', 'start', 'end', 'rangeLabel', 'domains', 'stockTotals', 'stockRows', 'palletRows', 'orders', 'orderSummary', 'fulfillmentRate', 'issues', 'issueSummary', 'processing', 'auditLogs', 'auditOptions');
+        return compact('filters', 'stockRows', 'palletRows', 'orders', 'issues', 'processing', 'auditLogs', 'auditOptions');
+    }
+
+    public function buildDetails(Request $request): array
+    {
+        $filters = $this->filters($request);
+        [$start, $end] = $this->range($filters);
+
+        return $this->detailData($this->queries($filters, $start, $end), $filters, $start, $end, false);
+    }
+
+    public function build(Request $request, bool $forExport = false, bool $includeDetails = true): array
+    {
+        $filters = $this->filters($request);
+        [$start, $end, $rangeLabel] = $this->range($filters);
+        $queries = $this->queries($filters, $start, $end);
+        $domains = $stockTotals = [];
+        foreach ($queries['scopes'] as $scope) {
+            $stock = DB::query()->fromSub($queries['stocks'][$scope], 'stock');
+            $stockTotals[$scope] = $stock->selectRaw('COALESCE(SUM(box_quantity),0) AS boxes, COALESCE(SUM(pcs_quantity),0) AS pcs,
+                COUNT(DISTINCT part_number) AS parts,
+                COALESCE(SUM(CASE WHEN pallet_id IS NULL THEN box_quantity ELSE 0 END),0) AS unplaced')->first();
+            $stockTotals[$scope]->pallets = DB::query()->fromSub($queries['palletStocks'][$scope], 'pallet_stock')->distinct()->count('pallet_id');
+            $domains[$scope] = $this->domain($scope, $filters, $start, $end, $queries['orders'][$scope]);
+        }
+        $orderSummary = (clone $queries['orderQuery'])->selectRaw('COUNT(*) AS total, COALESCE(SUM(is_full),0) AS full')->first();
+        $issueSummary = (clone $queries['issueQuery'])->selectRaw('COUNT(*) AS total, COALESCE(SUM(is_open),0) AS open')->first();
+        $fulfillmentRate = $orderSummary->total ? round($orderSummary->full * 100 / $orderSummary->total, 1) : 0;
+        $summary = compact('filters', 'start', 'end', 'rangeLabel', 'domains', 'stockTotals', 'orderSummary', 'fulfillmentRate', 'issueSummary');
+
+        return $includeDetails ? $summary + $this->detailData($queries, $filters, $start, $end, $forExport) : $summary;
     }
 }

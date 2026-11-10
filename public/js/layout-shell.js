@@ -67,6 +67,8 @@ export function initNavigation({documentRef = globalThis.document, windowRef = g
     const drawerActive = () => ['show', 'showing', 'hiding'].some(name => sidebar.classList.contains(name));
     let pendingHeaderAction = null;
     let suppressSearchFocus = false;
+    let navbarIdleTimer;
+    let pointerOverNavbar = false;
     let suggestions = [], activeIndex = -1, expandedResults = false;
     let features = [];
     try { features = JSON.parse(documentRef.getElementById('global-search-features-json')?.textContent ?? '[]'); } catch (_) {}
@@ -81,6 +83,20 @@ export function initNavigation({documentRef = globalThis.document, windowRef = g
 
     function syncHeight() {
         documentRef.documentElement.style.setProperty('--top-navbar-height', `${Math.ceil(navbar.getBoundingClientRect().height)}px`);
+    }
+
+    function revealNavbar() {
+        documentRef.body.classList.remove('navbar-idle');
+        if (navbarIdleTimer !== undefined) windowRef.clearTimeout(navbarIdleTimer);
+        if (!(windowRef.scrollY > 1)) return;
+
+        navbarIdleTimer = windowRef.setTimeout(() => {
+            navbarIdleTimer = undefined;
+            const searchOpen = popup && !popup.hidden;
+            const accountOpen = account?.getAttribute('aria-expanded') === 'true';
+            if (pointerOverNavbar || navbar.querySelector(':focus-visible') || searchOpen || accountOpen || drawerActive()) return;
+            documentRef.body.classList.add('navbar-idle');
+        }, 1500);
     }
 
     function syncSidebar() {
@@ -221,7 +237,7 @@ export function initNavigation({documentRef = globalThis.document, windowRef = g
     sidebar.addEventListener('shown.bs.offcanvas', () => { syncSidebar(); restoreScroll(); });
     sidebar.addEventListener('hide.bs.offcanvas', () => { saveScroll(); toggle.setAttribute('aria-expanded', 'false'); });
     sidebar.addEventListener('hidden.bs.offcanvas', () => {
-        syncSidebar(); cleanupBackdrops();
+        syncSidebar(); cleanupBackdrops(); revealNavbar();
         const action = pendingHeaderAction; pendingHeaderAction = null;
         if (action) action();
         else if (!desktop()) toggle.focus({preventScroll: true});
@@ -234,6 +250,25 @@ export function initNavigation({documentRef = globalThis.document, windowRef = g
             closeDrawer(() => { account.focus({preventScroll: true}); windowRef.bootstrap.Dropdown.getOrCreateInstance(account).show(); });
         }
     });
+    account?.addEventListener('hidden.bs.dropdown', revealNavbar);
+
+    navbar.addEventListener('pointerenter', event => {
+        if (event.pointerType !== 'mouse') return;
+        pointerOverNavbar = true;
+        revealNavbar();
+    });
+    navbar.addEventListener('pointerleave', event => {
+        if (event.pointerType !== 'mouse') return;
+        pointerOverNavbar = false;
+        revealNavbar();
+    });
+    navbar.addEventListener('focusin', revealNavbar);
+    navbar.addEventListener('focusout', revealNavbar);
+    documentRef.addEventListener('pointermove', event => {
+        if (event.pointerType === 'mouse' && event.clientY <= 12 && documentRef.body.classList.contains('navbar-idle')) {
+            revealNavbar();
+        }
+    }, {passive: true});
 
     if (input && popup && results) {
         form.addEventListener('pointerdown', event => {
@@ -274,10 +309,12 @@ export function initNavigation({documentRef = globalThis.document, windowRef = g
             event.preventDefault(); hideAccount(); account.focus({preventScroll: true});
         }
     });
+    windowRef.addEventListener('scroll', revealNavbar, {passive: true});
     windowRef.addEventListener('pagehide', saveScroll);
     windowRef.addEventListener('pageshow', () => {
         documentRef.body.classList.remove('navigation-motion');
-        hideSearch(); hideAccount(); cleanupBackdrops(); syncSidebar(); syncHeight(); windowRef.requestAnimationFrame(restoreScroll);
+        pointerOverNavbar = navbar.matches(':hover');
+        hideSearch(); hideAccount(); cleanupBackdrops(); syncSidebar(); syncHeight(); revealNavbar(); windowRef.requestAnimationFrame(restoreScroll);
     });
     windowRef.addEventListener('resize', () => {
         documentRef.body.classList.remove('navigation-motion');
@@ -286,7 +323,7 @@ export function initNavigation({documentRef = globalThis.document, windowRef = g
         syncSidebar();
     });
     if (windowRef.ResizeObserver) new windowRef.ResizeObserver(syncHeight).observe(navbar);
-    syncHeight(); syncSidebar(); cleanupBackdrops();
+    syncHeight(); syncSidebar(); cleanupBackdrops(); revealNavbar();
     windowRef.requestAnimationFrame(restoreScroll);
 }
 

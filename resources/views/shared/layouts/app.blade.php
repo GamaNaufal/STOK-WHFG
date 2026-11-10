@@ -20,9 +20,8 @@
 </head>
 <body class="warehouse-app">
     <a href="#main-content" class="skip-to-content">Lewati navigasi</a>
+    @include('shared.layouts.partials.top-navbar')
     <div class="container-fluid">
-        @include('shared.layouts.partials.top-navbar')
-
         <div class="row">
             @include('shared.layouts.partials.sidebar')
 

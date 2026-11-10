@@ -81,7 +81,13 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
         advanced.addEventListener('toggle', () => { state.advanced = advanced.open; }, options);
 
         const tabs = [...dashboard.querySelectorAll('[data-detail-tab]')];
-        const panels = [...dashboard.querySelectorAll('[data-detail-panel]')];
+        const detailSection = dashboard.querySelector('[data-analytics-details]');
+        const detailBody = detailSection.querySelector('[data-detail-body]');
+        const placeholder = detailBody.querySelector('[data-details-url]');
+        const detailFallback = placeholder?.querySelector('[data-details-fallback]');
+        let loadingDetails = false, detailsObserver;
+        if (detailFallback) detailFallback.hidden = false;
+
         dashboard.querySelector('.od-detail-tabs').setAttribute('role', 'tablist');
         const selectDetail = (key, focus = false) => {
             if (!tabs.some(tab => tab.dataset.detailTab === key)) return;
@@ -89,12 +95,13 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
             tabs.forEach(tab => {
                 const active = tab.dataset.detailTab === key;
                 tab.setAttribute('role', 'tab');
-                tab.setAttribute('aria-controls', tab.hash.slice(1));
+                const panelId = tab.hash.slice(1);
+                if (documentRef.getElementById(panelId)) tab.setAttribute('aria-controls', panelId);
                 tab.setAttribute('aria-selected', String(active));
                 tab.tabIndex = active ? 0 : -1;
                 if (focus && active) tab.focus({preventScroll: true});
             });
-            panels.forEach(panel => {
+            detailBody.querySelectorAll('[data-detail-panel]').forEach(panel => {
                 const active = panel.dataset.detailPanel === key;
                 panel.hidden = !active;
                 panel.setAttribute('role', 'tabpanel');
@@ -102,6 +109,45 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
                 panel.tabIndex = 0;
             });
         };
+        const loadDetails = async () => {
+            if (!placeholder?.isConnected || loadingDetails) return;
+            detailsObserver?.disconnect();
+            const message = placeholder.querySelector('[role="status"]');
+            loadingDetails = true;
+            message.textContent = 'Memuat rincian dashboard…';
+            detailBody.setAttribute('aria-busy', 'true');
+            try {
+                const response = await windowRef.fetch(placeholder.dataset.detailsUrl, {
+                    headers: {Accept: 'application/json'}, signal: abort.signal,
+                });
+                if (!response.ok) throw new Error('Dashboard details request failed');
+                const data = await response.json();
+                if (typeof data.html !== 'string') throw new Error('Invalid dashboard details');
+                if (abort.signal.aborted || !detailBody.isConnected) return;
+                const restoreFocus = documentRef.activeElement === detailFallback;
+                detailBody.innerHTML = data.html;
+                const updated = detailSection.querySelector('[data-details-updated]');
+                updated.querySelector('time').textContent = data.updatedAt;
+                updated.hidden = false;
+                selectDetail(state.detail, restoreFocus);
+                host.dispatchEvent(new Event('report:content-appended'));
+                if (!restoreFocus && state.focusId && documentRef.activeElement === documentRef.body) {
+                    documentRef.getElementById(state.focusId)?.focus({preventScroll: true});
+                }
+            } catch {
+                if (abort.signal.aborted) return;
+                message.textContent = 'Rincian dashboard belum dapat dimuat.';
+                detailFallback.textContent = 'Coba lagi';
+            } finally {
+                detailBody.removeAttribute('aria-busy');
+                loadingDetails = false;
+            }
+        };
+        detailFallback?.addEventListener('click', event => {
+            if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+            event.preventDefault();
+            loadDetails();
+        }, options);
         const hashTab = tabs.find(tab => tab.hash === windowRef.location.hash);
         if (hashTab) state.detail = hashTab.dataset.detailTab;
         // Opening a paginated audit link directly must reveal the audit panel.
@@ -109,13 +155,19 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
         selectDetail(state.detail);
         const hashChanged = () => {
             const tab = tabs.find(item => item.hash === windowRef.location.hash);
-            if (tab) selectDetail(tab.dataset.detailTab);
+            if (!tab) return;
+            selectDetail(tab.dataset.detailTab);
+            if (placeholder?.isConnected) {
+                detailSection.scrollIntoView({block: 'start'});
+                loadDetails();
+            }
         };
         windowRef.addEventListener('hashchange', hashChanged, options);
         tabs.forEach((tab, index) => {
             tab.addEventListener('click', event => {
                 if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
                 event.preventDefault(); selectDetail(tab.dataset.detailTab);
+                loadDetails();
             }, options);
             tab.addEventListener('keydown', event => {
                 if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -123,14 +175,23 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
                 const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
                 selectDetail(tabs[next].dataset.detailTab, true);
                 tabs[next].scrollIntoView({block: 'nearest', inline: 'nearest', behavior: 'instant'});
+                loadDetails();
             }, options);
         });
         dashboard.querySelectorAll('[data-open-detail]').forEach(link => link.addEventListener('click', event => {
             if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
             event.preventDefault();
             selectDetail(link.dataset.openDetail, true);
-            dashboard.querySelector('[data-analytics-details]').scrollIntoView({block: 'start', behavior: motion() ? 'smooth' : 'instant'});
+            detailSection.scrollIntoView({block: 'start', behavior: motion() ? 'smooth' : 'instant'});
+            loadDetails();
         }, options));
+        if (placeholder && hashTab) hashChanged();
+        else if (placeholder && 'IntersectionObserver' in windowRef) {
+            detailsObserver = new windowRef.IntersectionObserver(entries => {
+                if (entries.some(entry => entry.isIntersecting)) loadDetails();
+            }, {rootMargin: '180px 0px'});
+            detailsObserver.observe(placeholder);
+        }
 
         const charts = [...dashboard.querySelectorAll('[data-analytics-chart]')];
         const observer = 'IntersectionObserver' in windowRef ? new windowRef.IntersectionObserver(entries => {
@@ -226,7 +287,7 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
         if (state.focusId && documentRef.activeElement === documentRef.body) {
             documentRef.getElementById(state.focusId)?.focus({preventScroll: true});
         }
-        cleanup = () => { abort.abort(); observer?.disconnect(); stopCounters(); };
+        cleanup = () => { abort.abort(); observer?.disconnect(); detailsObserver?.disconnect(); stopCounters(); };
     };
     const observer = new windowRef.MutationObserver(mount);
     const observe = () => observer.observe(host, {childList: true}); // Only AJAX replacement; chart readouts never remount the page.

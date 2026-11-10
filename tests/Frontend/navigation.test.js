@@ -47,7 +47,7 @@ function shell(user = '1-admin', saved = {}) {
     const scroll = {...control(),clientHeight:400,scrollTop:0,getBoundingClientRect:()=>({top:64,bottom:464})};
     const active = {getBoundingClientRect:()=>({top:650-scroll.scrollTop,bottom:694-scroll.scrollTop})};
     const sidebar = {...control(),dataset:{navigationUser:user},querySelector:selector=>selector==='.offcanvas-body'?scroll:active,querySelectorAll:()=>[]};
-    const toggle = control(), navbar = {getBoundingClientRect:()=>({height:64}),querySelector:()=>null};
+    const toggle = control(), navbar = {...control(),getBoundingClientRect:()=>({height:64}),querySelector:()=>null};
     const body = {classList:classList(),style:{removeProperty(){}}};
     const documentRef = {body,activeElement:null,documentElement:{style:{setProperty(){}}},
         getElementById:id=>({'mobileSidebar':sidebar,'sidebarToggleBtn':toggle}[id]??null),
