@@ -10,13 +10,13 @@ class ExpiredBoxSummaryMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public $warningBoxes, public $expiredBoxes)
+    public function __construct(public array $sections)
     {
     }
 
     public function build()
     {
-        return $this->subject('Peringatan Box Mendekati Expired')
+        return $this->subject('[Warehouse FG] Ringkasan Umur Box Lokal dan Ekspor')
             ->view('emails.expired-box-summary');
     }
 }

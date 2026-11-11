@@ -2320,7 +2320,7 @@ Penanganan per transaksi (revisi UX 23 Oktober 2026):
 
 Transisi data lama: migration `2026_10_23_000001_create_expired_box_handlings` menyimpan deadline lama pada `legacy_reactivated_until` lalu mengakhiri deadline reaktivasi box non-withdrawn/non-deleted pada saat cutover. Box tersebut langsung tidak eligible delivery; sinkronisasi expiry memasukkannya ke daftar QA. Riwayat `expired_box_reports` lama tetap dipisahkan dari proses QA baru. Tidak ada transaksi QA fiktif yang dibuat. Data handled legacy yang tidak memiliki deadline tetap nonaktif.
 
-Scheduler `expired-box:sync-statuses` tetap berjalan setiap menit dan ringkasan email setiap 07.00. Query expiry mencakup box orphan; status handled tidak diaktifkan ulang oleh scheduler. Cek deadline pada query stok/FIFO/scan tetap berlaku sebelum scheduler berjalan. Setelah masa satu bulan habis, ID pengganti masuk siklus QA baru.
+Scheduler `expired-box:sync-statuses` memperbarui Lokal dan Ekspor setiap menit. Ringkasan harian `expired-box:send-summary` pukul 07.00 WIB mengirim satu email dengan bagian Lokal dan Ekspor terpisah. Penerima default adalah akun Supervisi. `EXPIRED_BOX_SUMMARY_TO` dapat mengarahkan ringkasan ke satu alamat uji di development. Query expiry mencakup box orphan; status handled tidak diaktifkan ulang oleh scheduler. Cek deadline pada query stok/FIFO/scan tetap berlaku sebelum scheduler berjalan. Setelah masa satu bulan habis, ID pengganti masuk siklus QA baru.
 
 File utama:
 

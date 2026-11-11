@@ -115,4 +115,6 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    'expired_box_summary_to' => env('EXPIRED_BOX_SUMMARY_TO'),
+
 ];

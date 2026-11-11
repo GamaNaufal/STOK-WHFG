@@ -69,10 +69,12 @@ Artisan::command('delivery:purge-completions', function () {
     $this->info('Expired completion data purged.');
 })->purpose('Purge completed delivery data after redo window');
 
-Artisan::command('expired-box:send-test', function () {
-    app(\App\Services\ExpiredBoxService::class)->sendDailySummary();
-    $this->info('Expired box email summary sent (if data exists).');
-})->purpose('Send expired box summary email on demand');
+Artisan::command('expired-box:send-summary', function () {
+    $sent = app(\App\Services\ExpiredBoxSummaryService::class)->sendDailySummary();
+    $this->info($sent
+        ? 'Ringkasan box Lokal dan Ekspor diproses oleh mailer.'
+        : 'Ringkasan dilewati karena tidak ada penerima atau tidak ada box Warning/Expired.');
+})->purpose('Send the daily Local and Export box expiry summary')->setAliases(['expired-box:send-test']);
 
 Artisan::command('health:concurrency', function () {
     $activeSessionDuplicates = DB::table('delivery_pick_sessions')
@@ -357,6 +359,4 @@ Artisan::command('stock-input:diagnose
     return 0;
 })->purpose('Diagnose mismatch between stock_inputs.box_quantity and stock_input_boxes mappings');
 
-Schedule::call(function () {
-    app(\App\Services\ExpiredBoxService::class)->sendDailySummary();
-})->dailyAt('07:00');
+Schedule::command('expired-box:send-summary')->dailyAt('07:00')->timezone('Asia/Jakarta')->withoutOverlapping();

@@ -2,15 +2,12 @@
 
 namespace App\Services;
 
-use App\Mail\ExpiredBoxSummaryMail;
 use App\Models\Box;
 use App\Models\ExpiredBoxReport;
 use App\Models\MasterLocation;
 use App\Models\PalletItem;
-use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 
 class ExpiredBoxService
@@ -118,36 +115,6 @@ class ExpiredBoxService
                 $linkedPallet->stockLocation->delete();
             }
         }
-    }
-
-    public function sendDailySummary(): void
-    {
-        $this->syncStatuses();
-
-        $warning = $this->getExpirableBoxesQuery()
-            ->where('boxes.expired_status', 'warning')
-            ->get();
-
-        $expired = $this->getExpirableBoxesQuery()
-            ->where('boxes.expired_status', 'expired')
-            ->get();
-
-        if ($warning->isEmpty() && $expired->isEmpty()) {
-            return;
-        }
-
-        $emails = User::where('role', 'supervisi')
-            ->whereNotNull('email')
-            ->pluck('email')
-            ->unique()
-            ->values()
-            ->all();
-
-        if (empty($emails)) {
-            return;
-        }
-
-        Mail::to($emails)->send(new ExpiredBoxSummaryMail($warning, $expired));
     }
 
     public function getExpirableBoxesQuery()

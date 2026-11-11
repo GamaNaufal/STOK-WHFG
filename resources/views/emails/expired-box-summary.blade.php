@@ -1,78 +1,59 @@
 <!doctype html>
-<html>
+<html lang="id">
 <head>
     <meta charset="utf-8">
     <style>
         body { font-family: Arial, sans-serif; color: #111827; }
-        .section-title { font-weight: 700; margin-top: 16px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        h2 { margin-top: 24px; border-bottom: 1px solid #d1d5db; padding-bottom: 6px; }
+        h3 { font-size: 15px; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #e5e7eb; padding: 6px 8px; font-size: 12px; }
         th { background: #f3f4f6; text-align: left; }
-        .badge { display: inline-block; padding: 2px 6px; font-size: 11px; border-radius: 6px; }
-        .warning { background: #fff7ed; color: #9a3412; }
-        .expired { background: #fee2e2; color: #991b1b; }
     </style>
 </head>
 <body>
-    <h2>Peringatan Box Mendekati Expired</h2>
-    <p>Berikut ringkasan box warning (umur 9–12 bulan) dan expired (umur 12+ bulan atau masa aktif hasil Handle sudah habis).</p>
+    <h1>Ringkasan Umur Box</h1>
+    <p>Warning berlaku mulai umur 9 bulan. Box menjadi Expired mulai umur 12 bulan atau saat masa aktif hasil Handle berakhir.</p>
 
-    <div class="section-title">Warning (9-12 bulan)</div>
-    @if($warningBoxes->isEmpty())
-        <p>Tidak ada data.</p>
-    @else
-        <table>
-            <thead>
-                <tr>
-                    <th>Box</th>
-                    <th>Part</th>
-                    <th>Pallet</th>
-                    <th>Lokasi</th>
-                    <th>Stored At</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($warningBoxes as $box)
-                    <tr>
-                        <td>{{ $box->box_number }}</td>
-                        <td>{{ $box->part_number }}</td>
-                        <td>{{ $box->pallet_number ?? '-' }}</td>
-                        <td>{{ $box->warehouse_location ?? '-' }}</td>
-                        <td>{{ $box->stored_at ? \Illuminate\Support\Carbon::parse($box->stored_at)->format('d M Y') : '-' }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    @endif
+    @foreach($sections as $scope => $statuses)
+        <h2>{{ $scope }}</h2>
+        @foreach(['warning' => 'Warning (9 hingga kurang dari 12 bulan)', 'expired' => 'Expired / Masa Aktif Habis'] as $status => $label)
+            @php($boxes = $statuses->get($status, collect()))
+            <h3>{{ $label }} · {{ $boxes->count() }} box</h3>
+            @if($boxes->isEmpty())
+                <p>Tidak ada box pada status ini.</p>
+            @else
+                <table>
+                    <thead>
+                        <tr>
+                            <th scope="col">ID Box</th>
+                            <th scope="col">Nomor Part</th>
+                            <th scope="col">Pallet</th>
+                            <th scope="col">Lokasi</th>
+                            <th scope="col">Pertama Diterima</th>
+                            <th scope="col">Masa Aktif Hasil Handle</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($boxes as $box)
+                            @php($pallet = $scope === 'Ekspor' && $box->pallet_id
+                                ? ($box->source_position ? 'Pallet '.$box->source_position : 'Pallet cadangan')
+                                : $box->pallet_number)
+                            <tr>
+                                <td>{{ $box->box_number }}</td>
+                                <td>{{ $box->part_number }}</td>
+                                <td>{{ $pallet ?? '—' }}</td>
+                                <td>{{ $box->warehouse_location ?? '—' }}</td>
+                                <td>{{ $box->stored_at ? \Illuminate\Support\Carbon::parse($box->stored_at)->format('d/m/Y') : '—' }}</td>
+                                <td>{{ $box->reactivated_until ? \Illuminate\Support\Carbon::parse($box->reactivated_until)->format('d/m/Y H:i') : '—' }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        @endforeach
+    @endforeach
 
-    <div class="section-title">Expired / Masa Aktif Habis</div>
-    @if($expiredBoxes->isEmpty())
-        <p>Tidak ada data.</p>
-    @else
-        <table>
-            <thead>
-                <tr>
-                    <th>Box</th>
-                    <th>Part</th>
-                    <th>Pallet</th>
-                    <th>Lokasi</th>
-                    <th>Stored At</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach($expiredBoxes as $box)
-                    <tr>
-                        <td>{{ $box->box_number }}</td>
-                        <td>{{ $box->part_number }}</td>
-                        <td>{{ $box->pallet_number ?? '-' }}</td>
-                        <td>{{ $box->warehouse_location ?? '-' }}</td>
-                        <td>{{ $box->stored_at ? \Illuminate\Support\Carbon::parse($box->stored_at)->format('d M Y') : '-' }}</td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
-    @endif
-
-    <p style="margin-top: 16px;">Email ini dikirim otomatis setiap hari pukul 07:00 (Asia/Jakarta).</p>
+    <p style="margin-top: 16px;">Ringkasan harian Warehouse FG dijadwalkan pukul 07.00 WIB.</p>
 </body>
 </html>
