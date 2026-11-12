@@ -3,404 +3,103 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f5f5f7">
     <title>Login - Warehouse FG Yamatogomu</title>
     <link rel="icon" type="image/png" href="{{ asset('logo.png') }}">
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
-    
-    <!-- Bootstrap 5 CSS -->
     <link href="{{ asset('vendor/bootstrap-5.3.0/dist/css/bootstrap.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ asset('vendor/bootstrap-icons-1.11.0/font/bootstrap-icons.min.css') }}">
-    
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html,
-        body {
-            margin: 0;
-            width: 100%;
-            min-height: 100%;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: linear-gradient(135deg, #005461 0%, #0C7779 50%, #249E94 100%);
-            background-attachment: fixed;
-        }
-
-        .login-page {
-            width: 100%;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            position: relative;
-            overflow: hidden; /* Hides the decorative circles without breaking page layout */
-        }
-
-        /* Background decoration */
-        .login-page::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -10%;
-            width: 600px;
-            height: 600px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 50%;
-            z-index: 0;
-            pointer-events: none;
-        }
-
-        .login-page::after {
-            content: '';
-            position: absolute;
-            bottom: -30%;
-            left: -5%;
-            width: 500px;
-            height: 500px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 50%;
-            z-index: 0;
-            pointer-events: none;
-        }
-
-        .login-wrapper {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            width: 100%;
-            max-width: 1000px;
-            gap: 2rem;
-            align-items: center;
-            position: relative;
-            z-index: 1;
-        }
-
-        .login-info {
-            color: white;
-            padding: 2rem;
-        }
-
-        .login-info h2 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            line-height: 1.2;
-        }
-
-        .login-info p {
-            font-size: 1rem;
-            opacity: 0.95;
-            margin-bottom: 2rem;
-            line-height: 1.6;
-        }
-
-        .login-container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-            width: 100%;
-        }
-
-        .login-header {
-            background: linear-gradient(135deg, #0C7779 0%, #005461 100%);
-            color: white;
-            padding: 3rem 2.5rem 2.5rem;
-            text-align: center;
-            position: relative;
-        }
-
-        .login-header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 200px;
-            height: 200px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 50%;
-            transform: translate(50%, -50%);
-        }
-
-        .icon-box {
-            display: inline-flex;
-            width: 70px;
-            height: 70px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 14px;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.5rem;
-            font-size: 2.2rem;
-            color: white;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            position: relative;
-            z-index: 1;
-        }
-        .icon-box .login-brand-logo {
-            width: 44px;
-            height: 44px;
-            object-fit: contain;
-        }
-
-        .login-header h1 {
-            font-size: 1.75rem;
-            margin-bottom: 0.25rem;
-            font-weight: 700;
-            position: relative;
-            z-index: 1;
-        }
-
-        .login-header .subtitle {
-            font-size: 0.9rem;
-            opacity: 0.85;
-            position: relative;
-            z-index: 1;
-        }
-
-        .login-body {
-            padding: 2.5rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #0C7779;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .form-control {
-            border-radius: 8px;
-            border: 1.5px solid #e0e0e0;
-            padding: 0.75rem 1rem;
-            font-size: 0.95rem;
-            transition: all 0.2s ease;
-            background: #fafafa;
-        }
-
-        .form-control:focus {
-            border-color: #0C7779;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(12, 119, 121, 0.1);
-        }
-
-        .form-control::placeholder {
-            color: #9ca3af;
-        }
-
-        .password-wrapper {
-            position: relative;
-        }
-
-        .password-input {
-            padding-right: 2.8rem;
-        }
-
-        .password-toggle {
-            position: absolute;
-            top: 50%;
-            right: 0.75rem;
-            transform: translateY(-50%);
-            border: none;
-            background: transparent;
-            color: #6b7280;
-            padding: 0;
-            line-height: 1;
-            cursor: pointer;
-        }
-
-        .password-toggle:hover {
-            color: #0C7779;
-        }
-
-        .btn-login {
-            width: 100%;
-            padding: 0.85rem 1.5rem;
-            font-size: 1rem;
-            font-weight: 700;
-            border-radius: 8px;
-            border: none;
-            background: linear-gradient(135deg, #0C7779 0%, #005461 100%);
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 28px rgba(12, 119, 121, 0.35);
-        }
-
-        .btn-login:active {
-            transform: translateY(0);
-        }
-
-        .alert-error {
-            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-            border: 1.5px solid #fca5a5;
-            color: #991b1b;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-            font-size: 0.9rem;
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-        }
-
-        .alert-error i {
-            font-size: 1.1rem;
-            flex-shrink: 0;
-            margin-top: 0.1rem;
-        }
-
-        @media (max-width: 991.98px) {
-            .login-page {
-                padding: 16px;
-            }
-
-            .login-wrapper {
-                grid-template-columns: 1fr;
-                gap: 0;
-                max-width: 420px;
-            }
-
-            .login-info {
-                display: none;
-            }
-
-            .login-container {
-                width: 100%;
-                max-width: 420px;
-                margin: 0 auto;
-            }
-
-            .login-header h1 {
-                font-size: 1.5rem;
-            }
-
-            .login-body {
-                padding: 2rem 1.5rem;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .login-page {
-                padding: 12px;
-            }
-
-            .login-container {
-                max-width: 100%;
-            }
-
-            .login-header {
-                padding: 2rem 1.25rem 1.75rem;
-            }
-
-            .icon-box {
-                width: 62px;
-                height: 62px;
-                margin-bottom: 1rem;
-            }
-
-            .icon-box .login-brand-logo {
-                width: 38px;
-                height: 38px;
-            }
-
-            .login-body {
-                padding: 1.4rem 1rem;
-            }
-        }
-    </style>
     <link rel="stylesheet" href="{{ asset('css/login-ui.css') }}">
     <link rel="stylesheet" href="{{ asset('css/apple-design.css') }}">
 </head>
 <body class="login-apple">
-    <div class="login-page">
+    <main class="login-page">
         <div class="login-wrapper">
-        <!-- Left Side - Info -->
-        <div class="login-info d-none d-lg-block">
-            <h2>Warehouse FG</h2>
-            <p>Sistem Manajemen Inventori & Pengiriman PT. Yamatogomu Indonesia</p>
-        </div>
-
-        <!-- Right Side - Login Form -->
-        <div class="login-container">
-            <!-- Header -->
-            <div class="login-header">
-                <div class="icon-box">
-                    <img src="{{ asset('logo.png') }}" alt="Logo" class="login-brand-logo">
+            <section class="login-info" aria-label="Warehouse FG">
+                <div class="login-introduction">
+                    <span class="login-eyebrow">PT. Yamatogomu Indonesia</span>
+                    <h2>Warehouse FG</h2>
+                    <p>Sistem Manajemen Inventori &amp; Pengiriman PT. Yamatogomu Indonesia</p>
                 </div>
-                <h1>Login</h1>
-                <p class="subtitle">PT. Yamatogomu Indonesia</p>
-            </div>
+                <div class="login-cinema" data-login-cinema>
+                    <div class="login-cinema-screen">
+                        <picture class="login-cinema-poster">
+                            <source media="(max-width: 1023px)" srcset="{{ asset('media/warehouse-login/warehouse_fg_login_mobile.webp') }}">
+                            <img src="{{ asset('media/warehouse-login/warehouse_fg_login_poster.webp') }}"
+                                 alt="Area penyimpanan finished goods dengan rak pallet dan forklift"
+                                 width="1280" height="720" fetchpriority="low" decoding="async">
+                        </picture>
+                        <video class="login-cinema-video" data-login-video
+                               data-src="{{ asset('media/warehouse-login/warehouse_fg_login_desktop.mp4') }}"
+                               autoplay muted loop playsinline preload="none" tabindex="-1" aria-hidden="true"
+                               disablepictureinpicture disableremoteplayback></video>
+                    </div>
+                    <div class="login-cinema-footer">
+                        <span>Penerimaan <span aria-hidden="true">·</span> Penyimpanan <span aria-hidden="true">·</span> Pengiriman</span>
+                        <button type="button" class="login-motion-toggle" data-login-motion hidden aria-label="Jeda animasi gudang">
+                            <i class="bi bi-pause-fill" aria-hidden="true" data-login-motion-icon></i>
+                            <span data-login-motion-label>Jeda animasi</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
 
-            <!-- Form -->
-            <div class="login-body">
-                @if ($errors->any())
-                    <div class="alert-error" role="alert">
-                        <i class="bi bi-exclamation-circle-fill"></i>
-                        <div>
-                            <strong>Gagal Login</strong><br>
-                            {{ $errors->first('email') }}
+            <section class="login-container" aria-labelledby="login-title">
+                <header class="login-header">
+                    <div class="icon-box">
+                        <img src="{{ asset('logo.png') }}" alt="Logo PT. Yamatogomu Indonesia" class="login-brand-logo" width="44" height="44">
+                    </div>
+                    <p class="login-mobile-brand">Warehouse FG</p>
+                    <h1 id="login-title">Login</h1>
+                    <p class="subtitle">PT. Yamatogomu Indonesia</p>
+                </header>
+
+                <div class="login-body">
+                    @if ($errors->any())
+                        <div class="alert-error" role="alert" id="login-error">
+                            <i class="bi bi-exclamation-circle-fill" aria-hidden="true"></i>
+                            <div>
+                                <strong>Gagal Login</strong><br>
+                                {{ $errors->first('email') ?: $errors->first() }}
+                            </div>
                         </div>
-                    </div>
-                @endif
+                    @endif
 
-                <form method="POST" action="{{ route('login') }}">
-                    @csrf
-
-                    <!-- Email -->
-                    <div class="form-group">
-                        <label for="email" class="form-label">
-                            <i class="bi bi-envelope-fill"></i> Email
-                        </label>
-                        <input id="email" autocomplete="username" type="email" class="form-control @error('email') is-invalid @enderror" 
-                               name="email" value="{{ old('email') }}" 
-                               placeholder="Masukkan email Anda" required autofocus>
-                    </div>
-
-                    <!-- Password -->
-                    <div class="form-group">
-                        <label for="password" class="form-label">
-                            <i class="bi bi-lock-fill"></i> Password
-                        </label>
-                        <div class="password-wrapper">
-                            <input id="password" autocomplete="current-password" type="password" class="form-control password-input @error('password') is-invalid @enderror" 
-                                   name="password" placeholder="Masukkan password" required>
-                            <button type="button" class="password-toggle" id="togglePassword" aria-label="Tampilkan password">
-                                <i class="bi bi-eye" id="togglePasswordIcon"></i>
-                            </button>
+                    <form method="POST" action="{{ route('login') }}">
+                        @csrf
+                        <div class="form-group">
+                            <label for="email" class="form-label">
+                                <i class="bi bi-envelope-fill" aria-hidden="true"></i> Email
+                            </label>
+                            <input id="email" autocomplete="username" type="email" class="form-control @error('email') is-invalid @enderror"
+                                   name="email" value="{{ old('email') }}" placeholder="Masukkan email Anda" required autofocus
+                                   @error('email') aria-invalid="true" aria-describedby="login-error" @enderror>
                         </div>
-                    </div>
 
-                    <!-- Submit -->
-                    <button type="submit" class="btn btn-login">
-                        <i class="bi bi-box-arrow-in-right"></i> Login Sekarang
-                    </button>
-                </form>
-            </div>
+                        <div class="form-group">
+                            <label for="password" class="form-label">
+                                <i class="bi bi-lock-fill" aria-hidden="true"></i> Password
+                            </label>
+                            <div class="password-wrapper">
+                                <input id="password" autocomplete="current-password" type="password" class="form-control password-input @error('password') is-invalid @enderror"
+                                       name="password" placeholder="Masukkan password" required
+                                       @error('password') aria-invalid="true" aria-describedby="login-error" @enderror>
+                                <button type="button" class="password-toggle" id="togglePassword" aria-label="Tampilkan password" aria-controls="password" aria-pressed="false">
+                                    <i class="bi bi-eye" id="togglePasswordIcon" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-login">
+                            <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Login Sekarang
+                        </button>
+                    </form>
+                </div>
+            </section>
         </div>
-    </div>
-</div>
+    </main>
 
-    <!-- Bootstrap JS -->
-    <script src="{{ asset('vendor/bootstrap-5.3.0/dist/js/bootstrap.bundle.min.js') }}"></script>
+    <script type="module" src="{{ asset('js/pages/login-cinematic.js') }}"></script>
     <script>
         const passwordInput = document.getElementById('password');
         const togglePasswordButton = document.getElementById('togglePassword');
@@ -416,6 +115,7 @@
                 togglePasswordIcon.classList.toggle('bi-eye', !isPassword);
                 togglePasswordIcon.classList.toggle('bi-eye-slash', isPassword);
                 togglePasswordButton.setAttribute('aria-label', isPassword ? 'Sembunyikan password' : 'Tampilkan password');
+                togglePasswordButton.setAttribute('aria-pressed', String(isPassword));
 
                 passwordInput.focus();
                 if (cursorStart !== null && cursorEnd !== null) {

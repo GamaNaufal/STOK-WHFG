@@ -1,0 +1,65 @@
+{
+  "verified_date": "2026-11-11",
+  "engine": "BLENDER_EEVEE",
+  "frame_bounds": [
+    1,
+    2700
+  ],
+  "fps": 30,
+  "resolution": [
+    1920,
+    1080,
+    100
+  ],
+  "markers": [
+    [
+      1,
+      "01 | Warehouse introduction",
+      "01 | Warehouse introduction"
+    ],
+    [
+      301,
+      "02 | Inbound scan and conveyor",
+      "02 | Inbound scan and conveyor"
+    ],
+    [
+      751,
+      "03 | Pallet transport and storage",
+      "03 | Pallet transport and storage"
+    ],
+    [
+      1351,
+      "04 | Picking and barcode verification",
+      "04 | Picking and barcode verification"
+    ],
+    [
+      1801,
+      "05 | Dispatch and delivery truck",
+      "05 | Dispatch and delivery truck"
+    ],
+    [
+      2371,
+      "07 | Corporate branding on black",
+      "07 | Corporate branding on black"
+    ]
+  ],
+  "branding": {
+    "Brand subtitle": "Sistem Manajemen Inventori & Pengiriman PT. Yamatogomu Indonesia",
+    "Brand title": "Warehouse FG"
+  },
+  "images": [
+    {
+      "name": "logo.png",
+      "packed": true,
+      "dimensions": [
+        960,
+        720
+      ]
+    }
+  ],
+  "checked_carry_samples": 33,
+  "max_active_carry_error_metres": 0.0,
+  "checked_retraction_intersections": 0,
+  "blend_sha256": "b8fc2ac051c1feecca4926af39e20acf68f373dd6af38fc0f0904c7101d331cf",
+  "source_sha256": "fc4ca8b8a609ebaae859cad102876ac76bfe68ddf3cd11571d3c6339a1be8b83"
+}

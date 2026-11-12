@@ -1,0 +1,222 @@
+{
+  "source_master": "F:\\Kuliah\\Project\\STOK-WHFG\\artifacts\\warehouse-login\\warehouse_fg_login_master.blend",
+  "render_copy": "C:\\Users\\burha\\AppData\\Local\\Temp\\warehouse-fg-login-render\\warehouse_fg_login_render_optimized.blend",
+  "objects_before": 8009,
+  "candidate_meshes": 6794,
+  "groups": 75,
+  "removed_orphan_empties": 0,
+  "objects_after": 1290,
+  "constraint_targets": {
+    "Inbound pallet to rack B4-02-L2/Follow actual fork carriage only while carried/target": "Physical load support / Inbound pallet to rack B4-02-L2",
+    "Picked pallet to truck dock 01/Follow actual fork carriage only while carried/target": "Physical load support / Picked pallet to truck dock 01"
+  },
+  "tracked_rig_objects": 76,
+  "pose_frames_verified": [
+    1,
+    180,
+    500,
+    930,
+    1020,
+    1110,
+    1230,
+    1231,
+    1300,
+    1350,
+    1440,
+    1530,
+    1600,
+    1800,
+    1920,
+    1965,
+    2050,
+    2100,
+    2150,
+    2180,
+    2220,
+    2280,
+    2281,
+    2370,
+    2460,
+    2700
+  ],
+  "rig_validation": "passed",
+  "max_rig_matrix_error": 0.0,
+  "max_pallet_vertex_bounds_error_metres": 4.76837158203125e-07,
+  "pallet_pose_comparisons": [
+    {
+      "frame": 180,
+      "pallet": "Inbound pallet to rack B4-02-L2",
+      "master_bounds": [
+        -0.6899999976158142,
+        -9.609999656677246,
+        0.2499999850988388,
+        0.6899999976158142,
+        -8.1899995803833,
+        1.8410000801086426
+      ],
+      "render_copy_bounds": [
+        -0.6899999976158142,
+        -9.609999656677246,
+        0.2499999850988388,
+        0.6899999976158142,
+        -8.1899995803833,
+        1.8410000801086426
+      ],
+      "max_error_metres": 0.0
+    },
+    {
+      "frame": 180,
+      "pallet": "Picked pallet to truck dock 01",
+      "master_bounds": [
+        -4.710000038146973,
+        3.3600001335144043,
+        0.3500000238418579,
+        -3.2899999618530273,
+        4.740000247955322,
+        1.940999984741211
+      ],
+      "render_copy_bounds": [
+        -4.710000038146973,
+        3.3600003719329834,
+        0.3500000238418579,
+        -3.2900002002716064,
+        4.740000247955322,
+        1.940999984741211
+      ],
+      "max_error_metres": 2.384185791015625e-07
+    },
+    {
+      "frame": 1020,
+      "pallet": "Inbound pallet to rack B4-02-L2",
+      "master_bounds": [
+        1.3899998664855957,
+        -4.639999866485596,
+        0.2499999850988388,
+        2.809999942779541,
+        -3.259999990463257,
+        1.8410000801086426
+      ],
+      "render_copy_bounds": [
+        1.389999508857727,
+        -4.639999866485596,
+        0.2499999850988388,
+        2.810000419616699,
+        -3.259999990463257,
+        1.8410000801086426
+      ],
+      "max_error_metres": 4.76837158203125e-07
+    },
+    {
+      "frame": 1020,
+      "pallet": "Picked pallet to truck dock 01",
+      "master_bounds": [
+        -4.710000038146973,
+        3.3600001335144043,
+        0.3500000238418579,
+        -3.2899999618530273,
+        4.740000247955322,
+        1.940999984741211
+      ],
+      "render_copy_bounds": [
+        -4.710000038146973,
+        3.3600003719329834,
+        0.3500000238418579,
+        -3.2900002002716064,
+        4.740000247955322,
+        1.940999984741211
+      ],
+      "max_error_metres": 2.384185791015625e-07
+    },
+    {
+      "frame": 1600,
+      "pallet": "Inbound pallet to rack B4-02-L2",
+      "master_bounds": [
+        3.2899999618530273,
+        -4.639999866485596,
+        2.5399999618530273,
+        4.710000038146973,
+        -3.259999990463257,
+        4.130999565124512
+      ],
+      "render_copy_bounds": [
+        3.289999485015869,
+        -4.639999866485596,
+        2.5399999618530273,
+        4.710000514984131,
+        -3.259999990463257,
+        4.13100004196167
+      ],
+      "max_error_metres": 4.76837158203125e-07
+    },
+    {
+      "frame": 1600,
+      "pallet": "Picked pallet to truck dock 01",
+      "master_bounds": [
+        -1.228310227394104,
+        5.278465747833252,
+        0.49000000953674316,
+        0.4011659622192383,
+        6.939280986785889,
+        2.0810000896453857
+      ],
+      "render_copy_bounds": [
+        -1.2283101081848145,
+        5.278465747833252,
+        0.49000000953674316,
+        0.40116608142852783,
+        6.939280986785889,
+        2.0809998512268066
+      ],
+      "max_error_metres": 2.384185791015625e-07
+    },
+    {
+      "frame": 2050,
+      "pallet": "Inbound pallet to rack B4-02-L2",
+      "master_bounds": [
+        3.2899999618530273,
+        -4.639999866485596,
+        2.5399999618530273,
+        4.710000038146973,
+        -3.259999990463257,
+        4.130999565124512
+      ],
+      "render_copy_bounds": [
+        3.289999485015869,
+        -4.639999866485596,
+        2.5399999618530273,
+        4.710000514984131,
+        -3.259999990463257,
+        4.13100004196167
+      ],
+      "max_error_metres": 4.76837158203125e-07
+    },
+    {
+      "frame": 2050,
+      "pallet": "Picked pallet to truck dock 01",
+      "master_bounds": [
+        -0.6899999976158142,
+        14.01209831237793,
+        0.9304457902908325,
+        0.6899999976158142,
+        15.667868614196777,
+        2.7597808837890625
+      ],
+      "render_copy_bounds": [
+        -0.6899998784065247,
+        14.01209831237793,
+        0.9304457306861877,
+        0.6900001764297485,
+        15.667868614196777,
+        2.7597808837890625
+      ],
+      "max_error_metres": 1.7881393432617188e-07
+    }
+  ],
+  "preparation_seconds": 69.6427,
+  "benchmark_seconds": {
+    "180": 1.7484,
+    "1020": 0.8382,
+    "2050": 0.7183,
+    "2460": 0.4236
+  }
+}

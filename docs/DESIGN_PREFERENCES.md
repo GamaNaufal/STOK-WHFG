@@ -49,3 +49,13 @@ dan penggabungan satuan PCS lokal dengan box ekspor. Animasi mengikuti
 preferensi kurangi gerakan perangkat (prefers-reduced-motion) tanpa tombol
 pengaturan pada dashboard. Preferensi operasional/scanner
 dan navigasi halaman lain tetap berlaku.
+
+## Visual sinematik login — 11 November 2026
+
+Atas permintaan pengguna, halaman login memiliki animasi gudang Blender dalam
+panel tersendiri pada desktop. Form tetap menjadi tindakan utama, dengan
+permukaan solid dan tanpa gerakan pada input. Video memakai kontrol jeda,
+poster saat gagal, serta fallback statis pada ponsel/tablet, mode hemat data,
+koneksi lambat yang terdeteksi, dan preferensi kurangi gerakan. Komposisi 16:9
+dipertahankan agar branding penutup tidak terpotong. Detail aset dan proses
+render ada di `docs/WAREHOUSE_LOGIN_ANIMATION.md`.
