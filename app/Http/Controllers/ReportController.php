@@ -4,9 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Exports\OperationalReportsExport;
 use App\Exports\StockInputExport;
-use App\Exports\StockWithdrawalExport;
 use App\Models\StockInput;
-use App\Models\StockWithdrawal;
 use App\Models\User;
 use App\Services\OperationalReportService;
 use Illuminate\Http\Request;
@@ -132,60 +130,7 @@ class ReportController extends Controller
      */
     public function withdrawalReport(Request $request)
     {
-        if ($this->exportScope($request)) {
-            $request->merge(['kind'=>'shipments']);
-            return app(WarehouseReportController::class)->index($request,app(\App\Services\WarehouseReportService::class));
-        }
-        $query = StockWithdrawal::with(['user', 'palletItem', 'box']);
-
-        // Date range filter
-        if ($request->filled('start_date')) {
-            $query->whereDate('withdrawn_at', '>=', $request->input('start_date'));
-        }
-
-        if ($request->filled('end_date')) {
-            $query->whereDate('withdrawn_at', '<=', $request->input('end_date'));
-        }
-
-        // Status filter
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        // Part number filter
-        if ($request->filled('part_number')) {
-            $query->where('part_number', 'like', '%' . $request->input('part_number') . '%');
-        }
-
-        // Operator filter
-        if ($request->filled('user_id')) {
-            $query->where('user_id', $request->input('user_id'));
-        }
-
-        $withdrawals = $query->orderBy('withdrawn_at', 'desc')->paginate(15);
-
-        // Get statistics
-        $totalWithdrawals = StockWithdrawal::where('status', 'completed')->count();
-        $totalPcsWithdrawn = StockWithdrawal::where('status', 'completed')->sum('pcs_quantity');
-        $totalReversed = StockWithdrawal::where('status', 'reversed')->count();
-
-        // Get all users for filter
-        $users = User::whereIn('role', ['warehouse_operator', 'admin'])->get();
-
-        return \App\Support\ReportPageResponse::make($request, 'operator.reports.withdrawal', [
-            'withdrawals' => $withdrawals,
-            'totalWithdrawals' => $totalWithdrawals,
-            'totalPcsWithdrawn' => $totalPcsWithdrawn,
-            'totalReversed' => $totalReversed,
-            'users' => $users,
-            'filters' => [
-                'start_date' => $request->input('start_date'),
-                'end_date' => $request->input('end_date'),
-                'status' => $request->input('status'),
-                'part_number' => $request->input('part_number'),
-                'user_id' => $request->input('user_id'),
-            ]
-        ]);
+        return app(ShipmentReportController::class)->index($request, app(\App\Services\ShipmentReportService::class));
     }
 
     /**
@@ -293,45 +238,7 @@ class ReportController extends Controller
      */
     public function exportWithdrawalCsv(Request $request)
     {
-        if ($this->exportScope($request)) {
-            $request->merge(['kind'=>'shipments']);
-            return app(WarehouseReportController::class)->export($request,app(\App\Services\WarehouseReportService::class));
-        }
-        $query = StockWithdrawal::query()
-            ->select([
-                'id',
-                'withdrawn_at',
-                'status',
-                'user_id',
-                'pcs_quantity',
-                'box_quantity',
-                'part_number',
-                'box_id',
-                'notes',
-                'warehouse_location',
-            ])
-            ->with(['user:id,name', 'box:id,box_number']);
-
-        if ($request->filled('start_date')) {
-            $query->whereDate('withdrawn_at', '>=', $request->input('start_date'));
-        }
-
-        if ($request->filled('end_date')) {
-            $query->whereDate('withdrawn_at', '<=', $request->input('end_date'));
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->input('status'));
-        }
-
-        if ($request->filled('part_number')) $query->where('part_number', 'like', '%'.$request->input('part_number').'%');
-        if ($request->filled('user_id')) $query->where('user_id', $request->input('user_id'));
-        $withdrawals = $query->orderBy('withdrawn_at', 'desc')->get();
-
-        return Excel::download(
-            new StockWithdrawalExport($withdrawals),
-            'stock_withdrawal_report_' . now()->format('Ymd_His') . '.xlsx'
-        );
+        return app(ShipmentReportController::class)->export($request, app(\App\Services\ShipmentReportService::class));
     }
 
     /**
@@ -391,8 +298,7 @@ class ReportController extends Controller
             return $input;
         });
 
-        return Excel::download(
-            new StockInputExport($stockInputs),
+        return (new StockInputExport($stockInputs))->download(
             'stock_input_report_' . now()->format('Ymd_His') . '.xlsx'
         );
     }

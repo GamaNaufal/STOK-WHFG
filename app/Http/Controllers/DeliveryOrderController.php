@@ -493,6 +493,11 @@ class DeliveryOrderController extends Controller
                     throw new \RuntimeException('Delivery hanya bisa di-split dari status approved atau partial.');
                 }
 
+                if (NotFullBoxRequest::where('delivery_order_id', $order->id)
+                    ->where('status', 'pending')->lockForUpdate()->get(['id'])->isNotEmpty()) {
+                    throw new \RuntimeException('Delivery tidak dapat di-split selama request box not full menunggu approval supervisi.');
+                }
+
                 $hasOperationalPickSession = DeliveryPickSession::where('delivery_order_id', (int) $order->id)
                     ->whereIn('status', ['pending', 'scanning', 'blocked', 'approved'])
                     ->lockForUpdate()

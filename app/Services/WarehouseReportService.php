@@ -10,7 +10,7 @@ use Illuminate\Validation\Rule;
 
 class WarehouseReportService
 {
-    public const KINDS = ['receipts' => 'Penerimaan', 'shipments' => 'Pengiriman / pengambilan',
+    public const KINDS = ['receipts' => 'Penerimaan', 'shipments' => 'Pengiriman',
         'stock' => 'Stok aktif / cadangan', 'fulfillment' => 'Pemenuhan permintaan', 'returns' => 'Revisi / pengembalian'];
 
     public function filters(Request $request): array

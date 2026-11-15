@@ -129,7 +129,8 @@ class WarehouseScopedReportsTest extends TestCase
         $this->fixture();$service=app(WarehouseReportService::class);$filters=$this->filters('shipments',['part_number'=>'RPT-A','q'=>'00000002']);
         Excel::fake();
         $this->get(route('reports.withdrawal.export',$filters))->assertOk();
-        Excel::assertDownloaded('laporan_export_shipments_20261030_100000.xlsx',fn(WarehouseRecordsExport $export)=>$export->query()->count()===1&&$export->query()->sole()->box_number==='00000002');
+        Excel::assertDownloaded('laporan_pengiriman_ekspor_20261030_100000.xlsx',fn(\App\Exports\ShipmentReportExport $export)=>count($export->sheets())===3
+            &&$export->sheets()[0]->query()->count()===1&&$export->sheets()[2]->query()->count()===2);
         $export=new WarehouseRecordsExport($service->query($filters),$filters);$mapped=$export->map($service->query($filters)->sole());
         $this->assertContains('00000002',$mapped);$this->assertSame('Ekspor',$mapped[0]);
     }
@@ -218,6 +219,6 @@ class WarehouseScopedReportsTest extends TestCase
         }
         Excel::fake();
         $this->get(route('reports.withdrawal.export',['part_number'=>'DOM-A','user_id'=>$this->operator->id]))->assertOk();
-        Excel::assertDownloaded('stock_withdrawal_report_20261030_100000.xlsx',fn($export)=>$export->collection()->count()===1);
+        Excel::assertDownloaded('laporan_pengiriman_lokal_20261030_100000.xlsx',fn(\App\Exports\ShipmentReportExport $export)=>$export->sheets()[0]->query()->count()===1);
     }
 }

@@ -23,6 +23,63 @@ class SystemIntegrityRegressionTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_direct_withdrawal_rejects_unapproved_closed_and_archived_deliveries_without_changing_stock(): void
+    {
+        $operator = User::factory()->create(['role' => 'warehouse_operator']);
+        $sales = User::factory()->create(['role' => 'sales']);
+        PartSetting::create(['part_number' => 'SEC-APPROVAL', 'qty_box' => 10]);
+        [, $box] = $this->createStoredBox($operator, 'SEC-APPROVAL', 10, '92110001', 'SEC-LOC');
+        foreach (['pending', 'rejected', 'correction', 'completed', 'approved'] as $status) {
+            $order = DeliveryOrder::create(['sales_user_id' => $sales->id, 'customer_name' => 'Dummy approval',
+                'delivery_date' => now()->addDay(), 'status' => $status]);
+            $item = DeliveryOrderItem::create(['delivery_order_id' => $order->id, 'part_number' => 'SEC-APPROVAL',
+                'quantity' => 10, 'fulfilled_quantity' => 0]);
+            if ($status === 'approved') $order->delete();
+            $this->actingAs($operator)->postJson(route('stock-withdrawal.confirm'), [
+                'part_number' => 'SEC-APPROVAL', 'pcs_quantity' => 10,
+                'delivery_order_id' => $order->id, 'delivery_order_item_id' => $item->id,
+            ])->assertStatus(422)->assertJsonPath('success', false);
+            $this->assertSame(0, (int) $item->fresh()->fulfilled_quantity);
+            $this->assertSame($status, $order->fresh()->status);
+            $this->assertFalse((bool) $box->fresh()->is_withdrawn);
+            $this->assertDatabaseCount('stock_withdrawals', 0);
+        }
+    }
+
+    public function test_split_cannot_remove_a_pending_not_full_hold(): void
+    {
+        $actor = User::factory()->create(['role' => 'admin_warehouse']);
+        PartSetting::create(['part_number' => 'SEC-SPLIT', 'qty_box' => 80]);
+        $order = DeliveryOrder::create(['sales_user_id' => $actor->id, 'customer_name' => 'Dummy split hold',
+            'delivery_date' => now()->addDay(), 'status' => 'approved']);
+        $item = DeliveryOrderItem::create(['delivery_order_id' => $order->id, 'part_number' => 'SEC-SPLIT', 'quantity' => 160]);
+        $hold = \App\Models\NotFullBoxRequest::create(['box_number' => '92110002', 'part_number' => 'SEC-SPLIT',
+            'pcs_quantity' => 40, 'fixed_qty' => 80, 'reason' => 'Dummy pending approval', 'request_type' => 'additional',
+            'delivery_order_id' => $order->id, 'requested_by' => $actor->id, 'status' => 'pending']);
+        $this->actingAs($actor)->post(route('delivery.split', $order->id), [
+            'items' => [['part_number' => 'SEC-SPLIT', 'quantity' => 80]],
+        ])->assertSessionHas('error');
+        $this->assertSame(160, (int) $item->fresh()->quantity);
+        $this->assertSame('approved', $order->fresh()->status);
+        $this->assertSame('pending', $hold->fresh()->status);
+        $this->assertSame(0, DeliveryOrder::where('parent_delivery_order_id', $order->id)->count());
+    }
+
+    public function test_demo_seeders_in_production_preserve_existing_users_and_create_none(): void
+    {
+        $actor = User::factory()->create(['role' => 'admin']);
+        $before = $actor->getAttributes();
+        $this->app->instance('env', 'production');
+        try {
+            (new \Database\Seeders\UserSeeder)->run();
+            (new \Database\Seeders\ExportOperatorSeeder)->run();
+        } finally {
+            $this->app->instance('env', 'testing');
+        }
+        $this->assertDatabaseCount('users', 1);
+        $this->assertSame($before, $actor->fresh()->getAttributes());
+    }
+
     public function test_sales_cannot_execute_stock_withdrawal(): void
     {
         $sales = User::factory()->create(['role' => 'sales']);

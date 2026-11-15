@@ -51,7 +51,7 @@ class ExportNotFullService
         if ($r->status === 'prepared') {
             $before = $r->toArray();
             $r->update(['status' => 'waiting', 'preparation' => null, 'prepared_by' => null, 'revision' => $r->revision + 1]);
-            $this->audit($r, 'stock_reused', $actor, $before, 'Stok yang sesuai sudah direservasi. Penyiapan box baru dilepas; konfirmasi penempatan melalui antrean existing.');
+            $this->audit($r, 'stock_reused', $actor, $before, 'Stok yang sesuai sudah direservasi. Penyiapan box baru dilepas, konfirmasi penempatan melalui antrean existing.');
         }
 
         return true;
@@ -161,7 +161,7 @@ class ExportNotFullService
             $this->fail('Box Not Full hanya dapat dibuat untuk pallet final yang belum dikonfirmasi siap.');
         }
         if ($target->fulfillmentBoxes()->count() >= $target->box_quantity) {
-            $this->fail('Kebutuhan ini sudah memiliki box direservasi/ditempatkan. Ikuti antrean penempatan; tidak perlu membuat box baru.');
+            $this->fail('Kebutuhan ini sudah memiliki box direservasi/ditempatkan. Ikuti antrean penempatan, tidak perlu membuat box baru.');
         }
 
         return $target;
@@ -180,7 +180,7 @@ class ExportNotFullService
             $this->fail('ID Box baru wajib tepat 8 angka.');
         }
         app(ExportPickingService::class)->assertReceiptAllowed($number);
-        if (\App\Support\BoxIdentity::unavailable($number, $requestId) || ExportStockBox::withTrashed()->where('box_number', $number)->exists()
+        if (\App\Support\BoxIdentity::unavailable($number, $requestId)
             || ExportNotFullRequest::whereKeyNot($requestId)->where('status', 'prepared')->where('preparation->box_number', $number)->exists()) {
             $this->fail('ID Box sudah dipakai pada lokal/ekspor atau sedang disiapkan request lain.');
         }
@@ -213,7 +213,7 @@ class ExportNotFullService
                 'preparation' => $this->stamp($r, $target) + ['mode' => $data['mode'], 'box_number' => $data['box_number'],
                     'source_box_id' => $source?->id, 'source_revision' => $source?->revision, 'source_box_number' => $source?->box_number,
                     'source_location' => $source?->currentPallet?->location_code, 'notes' => $data['notes']], 'notes' => $data['notes']]);
-            $this->audit($r, 'prepared', $actor, $before, 'Data Not Full disiapkan; box sumber tetap tunduk prioritas reservasi penuh dan diperiksa ulang saat approval.');
+            $this->audit($r, 'prepared', $actor, $before, 'Data Not Full disiapkan, box sumber tetap tunduk prioritas reservasi penuh dan diperiksa ulang saat approval.');
         });
     }
 
@@ -245,7 +245,7 @@ class ExportNotFullService
             $this->assertNewNumber($p['box_number'], $r->id);
             $source = $p['mode'] === 'split' ? $this->source($r) : null;
             if ($p['mode'] === 'split' && (! $source || $source->id !== $p['source_box_id'] || $source->revision !== $p['source_revision'])) {
-                $this->fail('Sumber FIFO berubah atau sudah direservasi untuk box penuh. Siapkan ulang; sumber yang terikat tidak boleh dipecah.');
+                $this->fail('Sumber FIFO berubah atau sudah direservasi untuk box penuh. Siapkan ulang, sumber yang terikat tidak boleh dipecah.');
             }
             $before = $r->toArray();
             $sourceBefore = $source?->toArray();
@@ -271,7 +271,7 @@ class ExportNotFullService
             if ($source) {
                 AuditService::record('export_not_full', 'split', 'ExportStockBox', $source->id, $actor->id,
                     $sourceBefore, $source->fresh()->toArray() + ['new_box_number' => $box->box_number, 'split_pcs' => $box->pcs_quantity],
-                    'Box penuh FIFO dipecah. Sisa memakai ID/lokasi asal; kedua box mewarisi tanggal penerimaan sumber.');
+                    'Box penuh FIFO dipecah. Sisa memakai ID/lokasi asal, kedua box mewarisi tanggal penerimaan sumber.');
             }
             app(DeliveryAnnouncementService::class)->sync($r->delivery()->firstOrFail());
             app(ExportStockAllocationService::class)->allocate($actor, [$r->part_setting_id]);
@@ -289,7 +289,7 @@ class ExportNotFullService
             $before = $r->toArray();
             $r->update(['status' => 'rejected', 'notes' => $data['reason'], 'preparation' => null, 'revision' => $r->revision + 1,
                 'approved_by' => $actor->id, 'approved_at' => now()]);
-            $this->audit($r, 'rejected', $actor, $before, 'Penyiapan Not Full ditolak; kebutuhan delivery tetap wajib dipenuhi.');
+            $this->audit($r, 'rejected', $actor, $before, 'Penyiapan Not Full ditolak, kebutuhan delivery tetap wajib dipenuhi.');
         });
     }
 }

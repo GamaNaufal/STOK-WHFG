@@ -55,7 +55,7 @@ class FeatureAccessManagementTest extends TestCase
         }
         $this->assertDatabaseCount('audit_logs', 2);
         $audit = AuditLog::latest('id')->first();
-        $this->assertSame(['stock_input'], $audit->getOldValuesArray()['permissions']);
+        $this->assertSame(['stock_input', 'stock_input_scan', 'stock_input_save', 'stock_input_clear', 'stock_input_print'], $audit->getOldValuesArray()['permissions']);
         $this->assertSame([], $audit->getNewValuesArray()['permissions']);
     }
 

@@ -33,7 +33,7 @@ class ExportReceivingBatchService
     private function editable(ExportReceivingBatch $batch, int $revision): void
     {
         if ($batch->status !== 'draft') $this->fail('batch', 'Daftar scan sudah diproses atau ditutup. Mulai daftar baru.');
-        if ($batch->revision !== $revision) $this->fail('revision', 'Daftar scan berubah di tab lain. Data terbaru sudah dimuat; periksa lalu scan kembali.');
+        if ($batch->revision !== $revision) $this->fail('revision', 'Daftar scan berubah di tab lain. Data terbaru sudah dimuat, periksa lalu scan kembali.');
     }
 
     public function scan(int $id, array $data, User $actor): ExportReceivingBatch
@@ -48,11 +48,11 @@ class ExportReceivingBatchService
             $this->editable($batch, (int) $data['revision']);
             if ($batch->items()->count() >= 1000) $this->fail('batch', 'Maksimal 1.000 box dalam satu daftar scan. Proses dahulu daftar ini.');
             if ($batch->items()->where('box_number', $data['box_number'])->exists()) $this->fail('box_number', 'ID Box sudah ada dalam daftar scan ini.');
-            if (\App\Support\BoxIdentity::unavailable($data['box_number']) || ExportStockBox::withTrashed()->where('box_number', $data['box_number'])->exists() || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
+            if (\App\Support\BoxIdentity::unavailable($data['box_number'])) {
                 $this->fail('box_number', 'ID Box sudah tercatat atau disiapkan pada lokal/ekspor.');
             }
             $part = app(ExportStockReceivingService::class)->part($data['part_number'], true);
-            $batch->items()->create(['box_number' => $data['box_number'], 'part_setting_id' => $part->id,
+            $batch->items()->create(['box_number' => $data['box_number'], 'expected_identity_cycle' => \App\Support\BoxIdentity::lastCycle($data['box_number']), 'part_setting_id' => $part->id,
                 'part_number' => $part->part_number, 'pcs_quantity' => $part->qty_box,
                 'position' => ((int) $batch->items()->max('position')) + 1, 'receive_token' => $data['scan_token']]);
             $batch->increment('revision');
@@ -89,6 +89,11 @@ class ExportReceivingBatchService
             $this->editable($batch, $revision);
             $items = $batch->items()->get();
             if ($items->isEmpty()) $this->fail('batch', 'Scan setidaknya satu box sebelum memproses penerimaan.');
+            foreach ($items as $item) {
+                if ($item->expected_identity_cycle !== null) {
+                    \App\Support\BoxIdentity::guardSnapshot($item->box_number, (int) $item->expected_identity_cycle);
+                }
+            }
             $processedAt = now();
             $receivedAt ??= $processedAt;
             $rows = $items->map(fn ($item) => $item->only(['box_number', 'part_number', 'receive_token'])
@@ -100,7 +105,7 @@ class ExportReceivingBatchService
             $batch->update(['status' => 'processed', 'processed_at' => $processedAt, 'revision' => $batch->revision + 1]);
             AuditService::record('export_receiving_batch', 'processed', 'ExportReceivingBatch', $batch->id, $actor->id,
                 [], ['box_count' => $items->count(), 'stock_box_ids' => $boxes->modelKeys(), 'first_received_at' => $receivedAt->format('Y-m-d H:i:s'),
-                    'processed_at' => $processedAt->toDateTimeString()], 'Daftar scan ekspor diterima sekaligus; tujuan sudah dihitung berdasarkan FIFO.');
+                    'processed_at' => $processedAt->toDateTimeString()], 'Daftar scan ekspor diterima sekaligus, tujuan sudah dihitung berdasarkan FIFO.');
 
             return $batch;
         });

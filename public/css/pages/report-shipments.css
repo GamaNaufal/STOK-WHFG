@@ -1,0 +1,35 @@
+.shipment-report { min-width: 0; }
+.shipment-overview { margin-block: 1.5rem; }
+.shipment-metrics { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: .75rem; }
+.shipment-metrics dl { margin: 0; padding: 1.125rem; border: 1px solid var(--ui-border,#dfe1e5); border-radius: var(--ui-radius,.875rem); background: var(--ui-surface,#fff); }
+.shipment-metrics dt { color: var(--ui-muted,#595d65); font-size: .8125rem; font-weight: 500; }
+.shipment-metrics dd { margin: .375rem 0 0; font-size: clamp(1.5rem,2.2vw,2rem); line-height: 1.2; font-weight: 700; letter-spacing: -.025em; }
+.shipment-metrics dd small { display: block; margin-top: .375rem; font-size: .75rem; line-height: 1.4; font-weight: 400; letter-spacing: normal; color: var(--ui-muted,#595d65); }
+.shipment-history-note { padding: 1rem; border-radius: .75rem; background: var(--ui-soft,#e8f3f1); color: var(--ui-ink,#202124); font-size: .8125rem; line-height: 1.6; }
+.shipment-tabs { display: flex; gap: .375rem; flex-wrap: wrap; margin-block: 1.25rem; }
+.shipment-tabs a { display: inline-flex; align-items: center; min-height: 44px; padding: .5rem .875rem; border: 1px solid var(--ui-border,#dfe1e5); border-radius: .625rem; color: var(--ui-ink,#202124); text-decoration: none; background: var(--ui-surface,#fff); font-size: .8125rem; }
+.shipment-tabs a[aria-current=page] { border-color: var(--ui-accent,#0b7072); background: var(--ui-soft,#e8f3f1); color: var(--ui-accent,#0b7072); font-weight: 700; }
+.shipment-tabs a:focus-visible { outline: 2px solid var(--ui-accent,#0b7072); outline-offset: 3px; }
+.shipment-filter-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem; }
+.shipment-table table { min-width: 960px; }
+.shipment-report th span,.shipment-report td small,.shipment-report th small { display: block; margin-top: .375rem; font-weight: 400; color: var(--ui-muted,#595d65); font-size: .75rem; line-height: 1.5; }
+.shipment-table th { min-width: 220px; }
+.shipment-table th:last-child,.shipment-table td:last-child { position: sticky; right: 0; min-width: 12rem; background: var(--ui-surface,#fff); }
+.shipment-report .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.shipment-notes { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 180px; max-width: 36rem; font-weight: 400; font-size: .8125rem; line-height: 1.6; }
+.shipment-table .shipment-notes { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin-top: .5rem; }
+.shipment-status { display: inline-block; padding: .25rem .5rem; border-radius: .375rem; background: var(--ui-soft,#e8f3f1); color: #195e47; font-size: .75rem; white-space: nowrap; }
+.shipment-status.is-reversed,.shipment-status.is-mixed { background: #fff3d6; color: #775514; }
+.shipment-status.is-cancelled { background: #f5e5e5; color: #873b3b; }
+.shipment-facts { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1.25rem; margin: 0; }
+.shipment-facts dt { font-size: .75rem; color: var(--ui-muted,#595d65); font-weight: 500; }
+.shipment-facts dd { margin: .25rem 0 0; font-size: .875rem; overflow-wrap: anywhere; }
+.shipment-note-block { border-top: 1px solid var(--ui-border,#dfe1e5); }
+.shipment-note-block h3 { font-size: .875rem; margin-block: .25rem .5rem; }
+.shipment-note-block p { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8125rem; line-height: 1.6; }
+.shipment-box-table table { min-width: 1000px; }
+.shipment-box-times { min-width: 210px; margin: 0; font-size: .75rem; }
+.shipment-box-times dt { font-weight: 500; color: var(--ui-muted,#595d65); }
+.shipment-box-times dd { margin: .25rem 0 .75rem; }
+@media(max-width:991.98px) { .shipment-metrics,.shipment-facts { grid-template-columns: repeat(2,minmax(0,1fr)); } .shipment-filter-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+@media(max-width:575.98px) { .shipment-filter-grid,.shipment-facts { grid-template-columns: minmax(0,1fr); } .shipment-tabs a { flex: 1 1 auto; justify-content: center; } .shipment-metrics dl { padding: .875rem; } }

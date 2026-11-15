@@ -229,12 +229,13 @@ class ExportPalletPlanningTest extends TestCase
         $this->assertDatabaseCount('export_pallet_location_reservations', 2);
     }
 
-    public function test_archive_requires_cancellation_and_master_identity_is_protected(): void
+    public function test_delete_requires_current_pallet_revision_and_master_identity_is_protected(): void
     {
         $delivery = $this->delivery();
         [$plan, $loc] = $this->finalized($delivery);
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
         $this->get(route('export.delivery-plans.show', $delivery))->assertOk()
-            ->assertSee('Batalkan perencanaan pallet terlebih dahulu')->assertDontSee('id="archive-plan"', false);
+            ->assertSee('Hapus rencana delivery')->assertSee('data-delete-delivery-preview', false);
         $this->deleteJson(route('export.delivery-plans.destroy', $delivery), ['revision' => 1])->assertUnprocessable()->assertJsonValidationErrors('pallet_plan');
         $this->put(route('export.locations.update', $loc), ['code' => 'RENAMED'])->assertSessionHas('error');
         $this->delete(route('export.locations.destroy', $loc))->assertSessionHas('error');

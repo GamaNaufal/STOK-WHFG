@@ -166,7 +166,8 @@ class NavigationContextService
             Str::is(['export.receiving.picking.*', 'export.picking.*'], $route ?? '') => 'export.picking.index',
             Str::is('export.stock.*', $route ?? '') => 'export.stock.index',
             Str::is('export.receiving.*', $route ?? '') => 'export.receiving.index',
-            Str::is('reports.withdrawal*', $route ?? '') => 'reports.withdrawal',
+            Str::is(['reports.withdrawal*', 'reports.shipments.*'], $route ?? '')
+                || (Str::is('reports.records*', $route ?? '') && request('kind') === 'shipments') => 'reports.withdrawal',
             Str::is('reports.*', $route ?? '') => 'reports.stock-input',
             default => null,
         };

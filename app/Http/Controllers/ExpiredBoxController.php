@@ -160,7 +160,7 @@ class ExpiredBoxController extends Controller
                 throw $e;
             }
 
-            return back()->withInput()->with('error', 'ID atau lokasi sedang digunakan transaksi lain. Seluruh pilihan belum disimpan; periksa dan coba kembali.');
+            return back()->withInput()->with('error', 'ID atau lokasi sedang digunakan transaksi lain. Seluruh pilihan belum disimpan, periksa dan coba kembali.');
         } catch (\RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }

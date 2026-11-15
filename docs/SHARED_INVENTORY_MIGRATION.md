@@ -14,7 +14,10 @@ Perubahan 3 November 2026. Berlaku pada branch aktif tanpa membuat branch baru.
 - `box_identities` menjadi registri ID delapan digit global. `origin_scope`
   mencatat asal, bukan namespace keunikan. Penerimaan, Not Full dan registrasi
   koreksi picking memeriksa identitas lintas lingkup. Histori yang dihapus tetap
-  mengunci ID. Identitas box tidak dapat diganti setelah tercatat. Tabel stok dan
+  mengunci ID pada kebijakan awal. Sejak 15 November 2026, ID boleh digunakan lagi
+  setelah penggunaan lama berakhir, dengan PK dan nomor penggunaan baru. Lihat
+  [aturan penggunaan ulang](BOX_NUMBER_REUSE.md). Identitas satu record box tidak
+  dapat diganti setelah tercatat. Tabel stok dan
   seluruh alur operasional lokal/ekspor tetap terpisah.
 - Kode delivery wajib, dinormalisasi trim/huruf besar, dan unik sepanjang histori.
   Indeks database menjaga kode aktif; `export_delivery_plan_codes` juga menjaga
@@ -23,6 +26,11 @@ Perubahan 3 November 2026. Berlaku pada branch aktif tanpa membuat branch baru.
   tetap idempoten, termasuk hash request lama yang pernah berhasil.
 
 ## Urutan deployment
+
+Urutan ini mengasumsikan tabel fitur Ekspor/registry prasyarat sudah tersedia.
+Untuk production yang baru sampai migration 15 Oktober, gunakan
+[panduan upgrade lengkap](PRODUCTION_UPGRADE_FROM_2026_10_15.md). Command pemeriksaan
+tidak dapat dipakai sebelum tabel prasyarat dibuat.
 
 1. Backup database dan pastikan restore dapat dilakukan. Uji pada salinan data
    production dengan versi MySQL yang sama terlebih dahulu.

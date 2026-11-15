@@ -13,7 +13,7 @@
     @if($processingReport->isEmpty())
         <div class="dashboard-stock-empty"><strong>Tidak ada sesi untuk ditampilkan.</strong><p>Periksa periode laporan untuk melihat sesi picking/delivery.</p></div>
     @else
-        <p class="dashboard-stock-hint" id="dashboard-processing-help">Operator sesi adalah akun yang memulai picking. Durasi memakai format menit:detik (contoh 00:17); tanda — berarti data belum tersedia. Geser tabel untuk melihat semua kolom; kolom Sesi tetap terlihat.</p>
+        <p class="dashboard-stock-hint" id="dashboard-processing-help">Operator sesi adalah akun yang memulai picking. Durasi memakai format menit:detik (contoh 00:17), tanda — berarti data belum tersedia. Geser tabel untuk melihat semua kolom, kolom Sesi tetap terlihat.</p>
         <div class="dashboard-stock-scroll" tabindex="0" role="region" aria-labelledby="dashboard-processing-title" aria-describedby="dashboard-processing-help">
             <table class="table dashboard-stock-table dashboard-stock-table--processing mb-0">
                 <caption class="visually-hidden">Durasi proses dan scan per sesi picking/delivery dalam format menit:detik</caption>

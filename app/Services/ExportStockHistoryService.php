@@ -56,7 +56,8 @@ class ExportStockHistoryService
             ]);
         }
 
-        foreach (ExportPickingScan::where('box_number', $box->box_number)->where('outcome', 'verified')->with('actor')->get() as $scan) {
+        foreach (ExportPickingScan::whereHas('fulfillmentBox', fn ($q) => $q->where('export_stock_box_id', $box->id))
+            ->where('outcome', 'verified')->with('actor')->get() as $scan) {
             $events->push([
                 'at' => $scan->created_at, 'label' => 'Picking terverifikasi', 'actor' => $scan->actor?->name,
                 'description' => 'ID Box dikonfirmasi pada sesi picking ekspor.', 'detail' => null,

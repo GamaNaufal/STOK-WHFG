@@ -3,7 +3,7 @@
 @section('title', 'Hak Akses — Admin Utama')
 
 @section('styles')
-<link rel="stylesheet" href="{{ asset('css/pages/access-management.css') }}">
+<link rel="stylesheet" href="{{ asset('css/pages/access-management.css') }}?v={{ filemtime(public_path('css/pages/access-management.css')) }}">
 @endsection
 
 @section('content')
@@ -23,7 +23,7 @@
     <header class="access-page-header">
         <span class="access-eyebrow">Administrasi / Kebijakan fitur</span>
         <h1>Hak Akses</h1>
-        <p>Atur fitur yang tersedia untuk setiap peran. Perubahan berlaku untuk semua akun dengan peran tersebut pada permintaan berikutnya.</p>
+        <p>Atur akses melihat data dan setiap tindakan secara terpisah untuk Lokal dan Ekspor. Perubahan berlaku untuk seluruh akun dengan peran tersebut.</p>
     </header>
 
     <section class="access-role-panel" aria-labelledby="access-role-title">
@@ -47,7 +47,7 @@
 
     <div class="access-policy-note" role="note">
         <i class="bi bi-shield-check" aria-hidden="true"></i>
-        <p><strong>Akses tetap:</strong> Admin Utama selalu memiliki akses penuh. Kelola User, Hak Akses, dan Lock Management khusus Admin Utama. Dashboard dan profil tersedia untuk seluruh pengguna aktif.</p>
+        <p><strong>Akses tetap:</strong> Admin Utama selalu memiliki akses penuh. Kelola User, Hak Akses, dan Lock Management khusus Admin Utama. Dashboard dan profil tersedia untuk seluruh pengguna aktif. Hapus delivery ekspor dan pembatalan seluruh permintaan hanya dapat diberikan kepada Admin Warehouse dan Supervisi, Admin Utama selalu diizinkan. Revisi pallet dapat diatur per peran.</p>
     </div>
 
     @if($errors->any())
@@ -64,6 +64,7 @@
         @csrf
         @method('PUT')
         <input type="hidden" name="role" value="{{ $selectedRole }}">
+        <input type="hidden" name="permissions_version" value="2">
         {{-- Explicitly submit an empty selection when every checkbox is off. --}}
         <input type="hidden" name="permissions" value="">
 
@@ -71,7 +72,7 @@
             <div>
                 <span class="access-eyebrow">Peran terpilih</span>
                 <h2>Akses {{ $roles[$selectedRole] }}</h2>
-                <p>Pilih fitur yang boleh digunakan. Izin turunan membutuhkan izin induknya.</p>
+                <p>Izin menu/baca membuka halaman. Centang tindakan yang boleh dijalankan, prasyaratnya dipilih otomatis.</p>
             </div>
             <span class="access-selected-count" id="accessSelectedCount" aria-live="polite">{{ $selectedCount }} dari {{ $editableFeatures->count() }} fitur dipilih</span>
         </div>
@@ -83,14 +84,24 @@
                 <button type="button" class="btn btn-sm btn-outline-secondary" id="clearAllFeatures">Kosongkan</button>
             </div>
         </div>
+        <label class="form-label" for="accessPermissionSearch">Cari menu atau tindakan</label>
+        <input type="search" id="accessPermissionSearch" class="form-control mb-1" placeholder="Contoh: revisi pallet, hapus delivery, QA" autocomplete="off" aria-describedby="accessSearchHint accessSearchStatus">
+        <p id="accessSearchHint" class="access-search-hint">Pencarian tidak mengubah pilihan. Pilih semua dan Kosongkan berlaku untuk seluruh izin.</p>
+        <div class="access-group-controls" id="accessGroupControls" hidden>
+            <p id="accessSearchStatus" role="status" aria-live="polite" aria-atomic="true"></p>
+            <div>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="expandAccessGroups">Buka semua kelompok</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" id="collapseAccessGroups">Ringkas kelompok</button>
+            </div>
+        </div>
 
         @foreach(collect($features)->groupBy('group', preserveKeys: true) as $group => $items)
             @php
                 $groupEditable = $items->reject(fn ($feature) => $feature['admin_only'] ?? false);
                 $groupSelected = $groupEditable->keys()->intersect($checkedPermissions)->count();
             @endphp
-            <section class="access-group" data-access-group aria-labelledby="access-group-{{ $loop->index }}">
-                <div class="access-group-heading">
+            <details class="access-group" data-access-group open>
+                <summary class="access-group-heading">
                     <div class="access-group-title">
                         <span class="access-group-icon"><i class="bi bi-{{ $groupIcons[$group] ?? 'grid' }}" aria-hidden="true"></i></span>
                         <div>
@@ -99,11 +110,12 @@
                         </div>
                     </div>
                     <span class="access-group-count" data-group-count data-group-total="{{ $groupEditable->count() }}">{{ $groupEditable->isEmpty() ? 'Khusus admin' : $groupSelected.' dari '.$groupEditable->count().' dipilih' }}</span>
-                </div>
+                    <i class="bi bi-chevron-down access-group-chevron" aria-hidden="true"></i>
+                </summary>
                 <div class="access-feature-grid">
                     @foreach($items as $key => $feature)
                         @php($locked = (bool) ($feature['admin_only'] ?? false))
-                        <label class="access-feature {{ $locked ? 'is-locked' : '' }}" for="feature-{{ $key }}">
+                        <label class="access-feature {{ $locked ? 'is-locked' : '' }} {{ isset($feature['parent']) ? 'is-action' : '' }}" for="feature-{{ $key }}" data-permission-row data-permission-search="{{ $feature['label'].' '.($feature['module'] ?? '').' '.($feature['description'] ?? '') }}">
                             <input class="form-check-input feature-checkbox" type="checkbox" id="feature-{{ $key }}"
                                 name="permissions[]" value="{{ $key }}"
                                 data-requires='@json($feature["requires"] ?? [])'
@@ -111,6 +123,8 @@
                                 @disabled($locked)>
                             <span class="access-feature-body">
                                 <span class="access-feature-label">{{ $feature['label'] }}</span>
+                                <span class="access-feature-note">{{ isset($feature['parent']) ? $feature['module'].' · Tindakan' : 'Menu / akses dasar' }}</span>
+                                @if(!empty($feature['description']))<span class="access-feature-note">{{ $feature['description'] }}</span>@endif
                                 @if($locked)
                                     <span class="access-feature-note"><i class="bi bi-lock" aria-hidden="true"></i> Khusus Admin Utama</span>
                                 @elseif(!empty($feature['requires']))
@@ -120,7 +134,7 @@
                         </label>
                     @endforeach
                 </div>
-            </section>
+            </details>
         @endforeach
 
         <div class="access-save-bar">
@@ -137,5 +151,5 @@
 @endsection
 
 @section('scripts')
-<script src="{{ asset('js/pages/feature-access.js') }}"></script>
+<script src="{{ asset('js/pages/feature-access.js') }}?v={{ filemtime(public_path('js/pages/feature-access.js')) }}"></script>
 @endsection

@@ -8,7 +8,7 @@ class RoleFeatureAccess extends Model
 {
     protected $table = 'role_feature_access';
 
-    protected $fillable = ['role', 'permissions'];
+    protected $fillable = ['role', 'permissions', 'permissions_version'];
 
-    protected $casts = ['permissions' => 'array'];
+    protected $casts = ['permissions' => 'array', 'permissions_version' => 'integer'];
 }

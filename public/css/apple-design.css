@@ -10,6 +10,8 @@
         --ui-surface: #fff;
         --ui-radius: .875rem;
         --ui-shadow: 0 1px 3px rgb(20 25 32 / 5%);
+        --ui-motion-fast: 120ms;
+        --ui-ease-out: cubic-bezier(.23, 1, .32, 1);
     }
     .warehouse-app, body.login-apple {
         --ui-ink: #202124;
@@ -67,6 +69,35 @@
     .warehouse-app .table > tbody > tr > td { border-bottom-color: #e8eaed; }
     .warehouse-app .form-control, .warehouse-app .form-select { border-color: #b7bdc5; border-radius: .625rem; box-shadow: none; }
     .warehouse-app .form-label { font-weight: 600; }
+    /* Shared form hierarchy, with native disclosure for secondary choices. */
+    .warehouse-app .ui-form-section { min-width: 0; margin: 0 0 1.25rem; padding: 0; border: 0; }
+    .warehouse-app .ui-form-section-title { float: none; width: 100%; margin: 0 0 1rem; padding: 0 0 .75rem; border-bottom: 1px solid var(--ui-border); color: var(--ui-ink); font-size: .9375rem; font-weight: 650; line-height: 1.5; }
+    .warehouse-app .ui-step { display: inline-grid; place-items: center; flex: none; min-width: 1.75rem; min-height: 1.75rem; margin-inline-end: .375rem; padding: .125rem .25rem; border: 1px solid #c8ddda; border-radius: .5rem; background: var(--ui-soft); color: #075b5d; font-size: .75rem; font-weight: 650; font-variant-numeric: tabular-nums; vertical-align: middle; }
+    .warehouse-app .ui-disclosure { margin-block: 0 1.25rem; border: 1px solid var(--ui-border); border-radius: .75rem; background: var(--ui-surface); }
+    .warehouse-app .ui-disclosure > summary { display: flex; align-items: center; gap: .5rem; min-height: 44px; padding: .875rem 1rem; cursor: pointer; list-style: none; border-radius: inherit; }
+    .warehouse-app .ui-disclosure > summary::-webkit-details-marker { display: none; }
+    .warehouse-app .ui-disclosure > summary:focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 3px; }
+    .warehouse-app .ui-disclosure > summary::after { content: "+"; flex: none; margin-inline-start: auto; font-size: 1.25rem; color: var(--ui-muted); }
+    .warehouse-app .ui-disclosure[open] > summary::after { content: "−"; }
+    .warehouse-app .ui-disclosure > summary > span:not(.ui-step) { min-width: 0; overflow-wrap: anywhere; }
+    .warehouse-app .ui-disclosure strong { display: block; font-size: .875rem; }
+    .warehouse-app .ui-disclosure small { display: block; margin-top: .25rem; color: var(--ui-muted); font-size: .8125rem; }
+    .warehouse-app .ui-disclosure-body { margin: 0; padding: 1rem; border-top: 1px solid var(--ui-border); }
+    .warehouse-app :is(.ui-form-section, .ui-disclosure) .form-check { display: flex; align-items: center; gap: .625rem; min-height: 44px; padding: 0; }
+    .warehouse-app :is(.ui-form-section, .ui-disclosure) .form-check-input { flex: none; float: none; margin: 0; }
+    .warehouse-app :is(.ui-form-section, .ui-disclosure) .form-check-label { display: flex; align-items: center; align-self: stretch; flex: 1; cursor: pointer; }
+    .warehouse-app :is(.form-control, .form-select):is(.is-invalid, [aria-invalid="true"]) { border-color: #b02a37 !important; }
+    .warehouse-app :is(.form-control, .form-select):is(.is-invalid, [aria-invalid="true"]):focus { border-color: #b02a37 !important; box-shadow: 0 0 0 3px rgb(176 42 55 / 16%); }
+    .warehouse-app :is(.form-control, .form-select):is(.is-invalid, [aria-invalid="true"]):focus-visible { outline-color: #b02a37; }
+    .warehouse-app :is(.form-text, .invalid-feedback, .modal-title, .modal-body .alert) { overflow-wrap: anywhere; }
+    /* Real target sizes avoid overlapping invisible click areas in dense rows. */
+    .warehouse-app .btn-close { box-sizing: border-box; flex: none; min-width: 44px; min-height: 44px; background-size: 1em; }
+    .warehouse-app :is(.table, .modal) :is(.btn, .btn-process, .btn-delete, .btn-split, .btn-restore, .btn-redo, .btn-insufficient, .btn-approve, .btn-correction, .btn-reject) { min-width: 44px; min-height: 44px; }
+    .warehouse-app .modal-header { gap: .75rem; }
+    .warehouse-app .modal-title { min-width: 0; }
+    .warehouse-app .modal-header .btn-close { margin-inline-start: auto; }
+    .warehouse-app .modal-footer { gap: .5rem; }
+    .warehouse-app .modal-footer > * { margin: 0; }
     .warehouse-app .btn, .warehouse-app .app-button { border-radius: .625rem !important; letter-spacing: 0; }
     .warehouse-app .text-primary { color: var(--ui-accent) !important; }
     .warehouse-app .btn-outline-primary {
@@ -79,16 +110,93 @@
     .warehouse-app .alert-info { --bs-alert-bg: #edf5f7; --bs-alert-border-color: #cbdde3; --bs-alert-color: #245363; }
     .warehouse-app .input-group > .btn:not(:first-child) { border-top-left-radius: 0 !important; border-bottom-left-radius: 0 !important; }
     .warehouse-app .input-group > .btn:not(:last-child) { border-top-right-radius: 0 !important; border-bottom-right-radius: 0 !important; }
+    /* Immediate press, short return. Keyboard and scanner controls stay still. */
+    .warehouse-app .btn, .login-apple .btn-login {
+        transition: transform var(--ui-motion-fast) var(--ui-ease-out),
+            background-color var(--ui-motion-fast) ease, color var(--ui-motion-fast) ease,
+            border-color var(--ui-motion-fast) ease;
+    }
     .warehouse-app .btn:not(:disabled):active, .login-apple .btn-login:active {
-        transform: scale(.98); transition: transform 100ms cubic-bezier(.23, 1, .32, 1);
+        transform: scale(.98); transition-duration: 0s;
     }
     .warehouse-app .btn:focus-visible, .warehouse-app .btn:focus-visible:active,
     .login-apple .btn-login:focus-visible { transform: none; transition: none; }
     .warehouse-app .btn.disabled:active { transform: none; }
+    .warehouse-app .stock-input-page .btn:active { transform: none !important; }
     .warehouse-app .modal-content { border-radius: 1.125rem !important; background: #fff; border: 1px solid var(--ui-border) !important; box-shadow: 0 24px 72px rgb(20 25 32 / 22%) !important; }
     .warehouse-app .modal-header, .warehouse-app .modal-footer { border-color: #e8eaed; }
     .warehouse-app .modal.fade .modal-dialog { transform: none; transition: none; }
     .warehouse-app .modal.fade { transition: opacity 150ms ease-out; }
+    /* Preserve the original dialog/icon and toast motion; only enlarge hit targets. */
+    .warehouse-app .swal2-actions button, .warehouse-app .swal2-close {
+        min-width: 44px; min-height: 44px;
+    }
+    /* Opt-in completion feedback, never applied to repeated scan notifications. */
+    .warehouse-app .toast.toast-completion {
+        --bs-toast-max-width: 24rem;
+        max-width: calc(100vw - 2rem);
+        border: 1px solid #b7dec9 !important;
+        border-left: 4px solid #198754 !important;
+        border-radius: .875rem;
+        background-color: #f0fdf4 !important;
+        color: #155b3b !important;
+        box-shadow: 0 6px 24px rgb(20 25 32 / 12%);
+    }
+    .warehouse-app .toast-completion .toast-body {
+        display: flex; align-items: center; gap: .75rem; min-width: 0; flex: 1;
+        padding: .875rem .75rem;
+    }
+    .warehouse-app .toast-completion-icon {
+        display: grid; place-items: center; flex: none; width: 2.5rem; height: 2.5rem;
+        border-radius: 50%; background: #d8f3e2; font-size: 1.375rem;
+        border: 1px solid #b7dec9;
+        box-shadow: inset 0 1px 0 rgb(255 255 255 / 90%),
+            inset 0 -2px 3px rgb(21 91 59 / 8%), 0 2px 4px rgb(21 91 59 / 14%);
+    }
+    .warehouse-app .toast-completion-icon i { display: block; }
+    .warehouse-app .toast-completion.show .toast-completion-icon i {
+        animation: ui-completion-settle 240ms var(--ui-ease-out) both;
+    }
+    .warehouse-app .toast-completion-copy { min-width: 0; overflow-wrap: anywhere; }
+    .warehouse-app .toast-completion-copy strong { display: block; margin-bottom: .125rem; font-size: .9375rem; }
+    .warehouse-app .toast-completion-copy .toast-message { display: block; font-size: .8125rem; line-height: 1.5; }
+    .warehouse-app .toast .btn-close { min-width: 44px; min-height: 44px; box-sizing: border-box; padding: .75rem; flex: none; }
+    .warehouse-app [data-report-feedback] { flex-wrap: wrap; }
+    .warehouse-app [data-report-feedback][data-report-state="slow"] [data-report-message] { color: #80551d; }
+    .warehouse-app [data-report-feedback][data-report-state="error"] [data-report-message] { color: #91232d; }
+    .warehouse-app [data-report-retry] { min-height: 44px; }
+    .warehouse-app [data-excel-busy="true"] { cursor: progress; }
+    .warehouse-app [data-excel-busy="true"] .bi::before,
+    .warehouse-app .excel-download-spinner {
+        content: ""; display: inline-block; flex: none; width: .875rem; height: .875rem;
+        vertical-align: -.125em;
+        border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+        animation: ui-excel-spin .8s linear infinite;
+    }
+    .warehouse-app [data-excel-busy="true"] .bi::before { width: 1em; height: 1em; box-sizing: border-box; }
+    .warehouse-app .excel-download-spinner { margin-inline-start: .375rem; }
+    .warehouse-app .excel-download-feedback {
+        --bs-toast-max-width: 25rem; max-width: calc(100vw - 2rem);
+        border: 1px solid var(--ui-border); border-radius: .875rem;
+        background: var(--ui-surface); color: var(--ui-ink); box-shadow: 0 6px 24px rgb(20 25 32 / 12%);
+    }
+    .warehouse-app .excel-download-heading { display: flex; align-items: center; gap: .5rem; }
+    .warehouse-app .excel-download-heading > i { color: var(--ui-accent); font-size: 1.25rem; }
+    .warehouse-app .excel-download-heading strong { flex: 1; min-width: 0; font-size: .9375rem; }
+    .warehouse-app .excel-download-feedback p { margin: .5rem 0 .75rem; font-size: .8125rem; line-height: 1.5; overflow-wrap: anywhere; }
+    .warehouse-app .excel-download-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+    .warehouse-app .excel-download-actions .btn { min-height: 44px; }
+    .warehouse-app .excel-download-actions [hidden] { display: none !important; }
+    .warehouse-app .excel-download-feedback[data-excel-state="ready"] .excel-download-heading > i { color: #198754; }
+    .warehouse-app .excel-download-feedback[data-excel-state="error"] .excel-download-heading > i { color: #b02a37; }
+    .warehouse-app .excel-download-feedback[data-excel-state="unconfirmed"] .excel-download-heading > i { color: #80551d; }
+    .warehouse-app .excel-download-feedback:is([data-excel-state="ready"], [data-excel-state="error"], [data-excel-state="unconfirmed"]) .excel-download-spinner { display: none; }
+    @keyframes ui-excel-spin { to { transform: rotate(360deg); } }
+    @keyframes ui-completion-settle {
+        0% { transform: scale(1.08, .92); }
+        60% { transform: scale(.92, 1.12); }
+        100% { transform: scale(1); }
+    }
     .warehouse-app .dashboard-stat-value, .warehouse-app .app-summary-value { color: var(--ui-ink) !important; font-weight: 650; font-variant-numeric: tabular-nums; }
     .warehouse-app .dashboard-role { background: #e8f3f1; border: 0; color: #075b5d; }
     .warehouse-app .dashboard-action-icon, .warehouse-app .dashboard-stat-icon { background: #eef3f2; border-radius: .75rem; }
@@ -116,6 +224,8 @@
         .warehouse-app .sidebar .nav-link.active { outline: 2px solid #075b5d; outline-offset: -2px; }
     }
     @media (prefers-reduced-motion: reduce) {
+        .warehouse-app [data-excel-busy="true"] .bi::before, .warehouse-app .excel-download-spinner { animation: none !important; }
+        .warehouse-app .toast-completion.show .toast-completion-icon i { animation: none !important; transform: none; }
         .warehouse-app .btn:active, .login-apple .btn-login:active { transform: none; transition: none; }
         .warehouse-app .top-navbar { backdrop-filter: none; background: #fff; }
     }

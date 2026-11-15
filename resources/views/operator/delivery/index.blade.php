@@ -487,7 +487,7 @@
             <h5>Jadwal Delivery Terdaftar</h5>
         </div>
         @include('operator.delivery.partials.schedule-filters')
-        <p class="delivery-results-help" id="delivery-results-help">PCS siap / kebutuhan mengikuti perhitungan FIFO saat halaman dimuat. Geser tabel untuk melihat status dan aksi; tanggal serta nomor order tetap terlihat.</p>
+        <p class="delivery-results-help" id="delivery-results-help">PCS siap / kebutuhan mengikuti perhitungan FIFO saat halaman dimuat. Geser tabel untuk melihat status dan aksi, tanggal serta nomor order tetap terlihat.</p>
         <div class="table-responsive delivery-results-scroll" tabindex="0" role="region" aria-label="Jadwal delivery aktif" aria-describedby="delivery-results-help">
             <table class="table modern-table" id="delivery-schedule-results" data-empty="{{ $approvedOrders->isEmpty() ? 'true' : 'false' }}">
                 <caption class="visually-hidden">Jadwal delivery aktif, diurutkan berdasarkan tanggal pengiriman</caption>
@@ -1220,12 +1220,12 @@
                                 const labels = `${loc.is_not_full ? '<span class="badge bg-warning text-dark ms-1">Not Full</span>' : ''}${loc.is_reserved ? '<span class="badge bg-info text-dark ms-1">Reserved</span>' : ''}`;
                                 tableBody.innerHTML += `
                                     <tr>
-                                        <td>${loc.box_number} ${labels}</td>
-                                        <td>${loc.pallet_number}</td>
-                                        <td>${loc.warehouse_location}</td>
-                                        <td>${loc.stored_date}</td>
-                                        <td>${loc.available_pcs}</td>
-                                        <td class="fw-bold text-primary">${loc.will_take_pcs}</td>
+                                        <td>${escapeRedoHtml(loc.box_number)} ${labels}</td>
+                                        <td>${escapeRedoHtml(loc.pallet_number)}</td>
+                                        <td>${escapeRedoHtml(loc.warehouse_location)}</td>
+                                        <td>${escapeRedoHtml(loc.stored_date)}</td>
+                                        <td>${escapeRedoHtml(loc.available_pcs)}</td>
+                                        <td class="fw-bold text-primary">${escapeRedoHtml(loc.will_take_pcs)}</td>
                                     </tr>
                                 `;
                             });

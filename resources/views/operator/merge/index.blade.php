@@ -167,11 +167,11 @@
                     </div>
                     <div id="locationSearchResults" class="list-group merge-pallet-location-results" role="group" aria-label="Pilihan lokasi tujuan" hidden></div>
                 </div>
-                <p id="mergeLocationHint" class="form-text mb-0">Pilih hasil pencarian; kode yang diketik saja belum menjadi lokasi tujuan.</p>
+                <p id="mergeLocationHint" class="form-text mb-0">Pilih hasil pencarian, kode yang diketik saja belum menjadi lokasi tujuan.</p>
                 <div id="locationSelectionStatus" class="merge-pallet-location-status" role="status" aria-live="polite">Belum ada lokasi tujuan dipilih.</div>
                 <div class="merge-pallet-action-row">
                     <span id="mergeActionHint">Pilih minimal dua pallet dan satu lokasi tujuan.</span>
-                    <button id="btnProcess" type="button" onclick="processMerge()" class="btn btn-primary" disabled>
+                    <button id="btnProcess" data-permission="merge_pallet_execute" type="button" onclick="processMerge()" class="btn btn-primary" disabled>
                         <i class="bi bi-intersect" aria-hidden="true"></i> Tinjau & gabungkan
                     </button>
                 </div>

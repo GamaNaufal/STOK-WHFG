@@ -308,7 +308,7 @@ class ExportPalletMergeService
                 $preparationBefore = $request->toArray();
                 $request->update(['status' => 'waiting', 'preparation' => null, 'prepared_by' => null, 'revision' => $request->revision + 1]);
                 AuditService::record('export_not_full', 'updated', 'ExportNotFullRequest', $request->id, $actor->id,
-                    $preparationBefore, $request->fresh()->toArray(), 'Sumber Not Full berpindah melalui merge; data wajib disiapkan dan disetujui ulang.');
+                    $preparationBefore, $request->fresh()->toArray(), 'Sumber Not Full berpindah melalui merge, data wajib disiapkan dan disetujui ulang.');
             }
             if ($plan) {
                 $this->updateDelivery($delivery, $plan, $actor);
@@ -334,7 +334,7 @@ class ExportPalletMergeService
             $mergeId = DB::table('export_pallet_merges')->insertGetId(['request_token' => $data['request_token'], 'request_hash' => $hash,
                 'created_by' => $actor->id, 'result_pallet_id' => $result->id, 'snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR), 'created_at' => now()]);
             AuditService::record('export_pallet_merge', 'merged', 'ExportStockPallet', $result->id, $actor->id, $before,
-                $snapshot + ['merge_id' => $mergeId], 'Merge fisik pallet ekspor; reservasi, komposisi box dan tanggal FIFO dipertahankan. Cetak ulang panduan revisi terbaru.');
+                $snapshot + ['merge_id' => $mergeId], 'Merge fisik pallet ekspor, reservasi, komposisi box dan tanggal FIFO dipertahankan. Cetak ulang panduan revisi terbaru.');
 
             return $snapshot;
         });

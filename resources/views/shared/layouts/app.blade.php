@@ -14,8 +14,8 @@
     @include('shared.layouts.partials.layout-shell-styles')
     
     @yield('styles')
-    <link rel="stylesheet" href="{{ asset('css/application-ui.css') }}">
-    <link rel="stylesheet" href="{{ asset('css/apple-design.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/application-ui.css') }}?v={{ filemtime(public_path('css/application-ui.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/apple-design.css') }}?v={{ filemtime(public_path('css/apple-design.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/navigation.css') }}?v={{ filemtime(public_path('css/navigation.css')) }}">
 </head>
 <body class="warehouse-app">
@@ -31,7 +31,7 @@
                     <script>
                         document.addEventListener('DOMContentLoaded', function() {
                             if (typeof window.showToast === 'function') {
-                                window.showToast("{{ session('success') }}", 'success');
+                                window.showToast("{{ session('success') }}", 'success', { emphasis: true });
                             }
                         });
                     </script>
@@ -59,8 +59,14 @@
     <script src="{{ asset('vendor/sweetalert2-11.26.25/dist/sweetalert2.all.min.js') }}"></script>
     <script src="{{ asset('js/alert-helper.js') }}"></script>
     @include('shared.layouts.partials.layout-shell-scripts')
+    <script type="module" src="{{ asset('js/excel-download.js') }}?v={{ filemtime(public_path('js/excel-download.js')) }}"></script>
     
     @yield('scripts')
+    @if(auth()->check())
+<style>[data-access-denied="true"] { display: none !important; }</style>
+<script type="application/json" id="action-permissions">@json(app(\App\Services\FeatureAccessService::class)->clientRules(auth()->user()))</script>
+        <script type="module" src="{{ asset('js/action-permissions.mjs') }}?v={{ filemtime(public_path('js/action-permissions.mjs')) }}"></script>
+    @endif
     @stack('scripts')
 </body>
 </html>

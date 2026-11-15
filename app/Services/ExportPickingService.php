@@ -230,7 +230,7 @@ class ExportPickingService
                 $issue = null;
                 $message = 'OK · Box '.$box->box_number.' sesuai rekomendasi. Tujuan Pallet '.$pallet->position.' · '.$pallet->location_code.'.';
             } else {
-                $box = ExportStockBox::with('currentPallet.plannedPallet')->where('box_number', $data['box_number'])->first();
+                $box = ExportStockBox::identityHeld()->with('currentPallet.plannedPallet')->where('box_number', $data['box_number'])->first();
                 $source = $box?->currentPallet;
                 $knownSource = $source && ! $source->retired_at && $source->master_location_id;
                 $issue = ExportPickingIssue::create(['export_planned_pallet_id' => $palletId, 'export_stock_box_id' => $box?->id,

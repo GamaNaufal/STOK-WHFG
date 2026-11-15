@@ -10,7 +10,7 @@
     <input type="hidden" name="receipt_token" value="{{ old('receipt_token', (string) \Illuminate\Support\Str::uuid()) }}">
     <section class="expired-page-panel p-4">
         <h2>Scan hasil packing</h2>
-        <p>Scan ID Box baru dari packing sebanyak box yang diterima sekarang. Part dan PCS mengikuti kelompok transaksi; tidak perlu memasangkan label lama dan baru.</p>
+        <p>Scan ID Box baru dari packing sebanyak box yang diterima sekarang. Part dan PCS mengikuti kelompok transaksi, tidak perlu memasangkan label lama dan baru.</p>
         <label for="receipt-group" class="form-label">Part / PCS per box</label>
         <select id="receipt-group" name="group_key" class="form-select mb-3" data-receipt-group required>
             @if($receiptGroups->count() > 1)<option value="">Pilih kelompok transaksi lama</option>@endif
@@ -30,7 +30,7 @@
         <tr data-staged-box="{{ $number }}"><td><strong>{{ $number }}</strong><input type="hidden" name="new_box_numbers[]" value="{{ $number }}"></td><td data-box-state>Menunggu pemeriksaan</td><td><button type="button" class="btn btn-sm btn-outline-secondary" data-remove-box>Hapus<span class="visually-hidden"> {{ $number }}</span></button><button type="button" class="btn btn-sm btn-outline-primary ms-2" data-retry-box hidden>Periksa ulang<span class="visually-hidden"> {{ $number }}</span></button></td></tr>
         @endforeach
         </tbody></table></div>
-        <p class="expired-form-feedback">Satu bulan aktif dihitung sejak penerimaan disimpan. Sistem mempertahankan tanggal FIFO asal tertua secara otomatis; hubungan ID lama–baru merupakan acuan data, bukan pencocokan label fisik.</p>
+        <p class="expired-form-feedback">Satu bulan aktif dihitung sejak penerimaan disimpan. Sistem mempertahankan tanggal FIFO asal tertua secara otomatis, hubungan ID lama–baru merupakan acuan data, bukan pencocokan label fisik.</p>
     </section>
     <section class="expired-page-panel p-4">
         <h2>Tujuan penyimpanan</h2><p>Seluruh box pada daftar scan ini ditempatkan ke satu pallet {{ $scopeLabel }}. Penerimaan berikutnya boleh memilih tujuan lain.</p>

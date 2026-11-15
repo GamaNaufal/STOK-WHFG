@@ -100,7 +100,7 @@
             if (roleChanged) warningItems.push('Akses fitur akan mengikuti peran yang baru.');
             if (statusChanged) {
                 warningItems.push(status.value === '0'
-                    ? 'Akun tidak dapat masuk setelah dinonaktifkan; riwayat aktivitas tetap tersimpan.'
+                    ? 'Akun tidak dapat masuk setelah dinonaktifkan, riwayat aktivitas tetap tersimpan.'
                     : 'Akun kembali dapat masuk sesuai perannya.');
             }
 

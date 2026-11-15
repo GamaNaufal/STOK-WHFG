@@ -206,14 +206,8 @@ const WarehouseAlert = {
         confirmText = "OK",
     }) {
         Swal.fire({
-            title: `<strong style="font-size: 1.5rem; color: #374151;">${title}</strong>`,
-            html: `
-                <div style="text-align: left; padding: 15px 20px;">
-                    <p style="margin: 0; font-size: 1rem; color: #4b5563;">
-                        ${message}
-                    </p>
-                </div>
-            `,
+            titleText: String(title ?? ''),
+            text: String(message ?? ''),
             icon: "error",
             iconColor: "#DC2626",
             confirmButtonText: confirmText,

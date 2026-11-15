@@ -11,7 +11,8 @@ class ReportPageResponse
         $name = substr($view, strlen('operator.reports.'));
         $title = match ($name) {
             'stock-input' => 'Laporan Input Stok - Warehouse FG Yamato',
-            'withdrawal' => 'Laporan Pengambilan Stok - Warehouse FG Yamato',
+            'withdrawal', 'shipments' => 'Laporan Pengiriman - Warehouse FG Yamato',
+            'shipment-detail' => 'Rincian Pengiriman - Warehouse FG Yamato',
             'record-detail' => 'Rincian Laporan',
             default => 'Laporan Operasional',
         };

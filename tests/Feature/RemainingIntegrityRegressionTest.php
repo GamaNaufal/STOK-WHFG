@@ -338,7 +338,7 @@ class RemainingIntegrityRegressionTest extends TestCase
         ]);
     }
 
-    public function test_redo_normalizes_shared_box_to_withdrawal_pallet_and_cancels_pending_assignment(): void
+    public function test_redo_consolidates_shared_box_and_cancels_pending_assignment(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
@@ -419,7 +419,10 @@ class RemainingIntegrityRegressionTest extends TestCase
             ->post(route('delivery.pick.redo', $completedSession->id))
             ->assertSessionHas('success');
 
-        $this->assertSame([$palletB->id], $box->fresh()->pallets()->pluck('pallets.id')->map(fn ($id) => (int) $id)->all());
+        $restoredPallet = $box->fresh()->pallets()->firstOrFail();
+        $this->assertNotEquals($palletA->id, $restoredPallet->id);
+        $this->assertNotEquals($palletB->id, $restoredPallet->id);
+        $this->assertSame(1, $box->fresh()->pallets()->count());
         $this->assertDatabaseHas('pallet_items', [
             'pallet_id' => $palletA->id,
             'part_number' => $box->part_number,
@@ -428,6 +431,12 @@ class RemainingIntegrityRegressionTest extends TestCase
         ]);
         $this->assertDatabaseHas('pallet_items', [
             'pallet_id' => $palletB->id,
+            'part_number' => $box->part_number,
+            'box_quantity' => 0,
+            'pcs_quantity' => 0,
+        ]);
+        $this->assertDatabaseHas('pallet_items', [
+            'pallet_id' => $restoredPallet->id,
             'part_number' => $box->part_number,
             'box_quantity' => 1,
             'pcs_quantity' => 10,

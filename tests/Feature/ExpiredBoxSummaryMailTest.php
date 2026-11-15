@@ -23,6 +23,7 @@ class ExpiredBoxSummaryMailTest extends TestCase
         $this->travelTo(now()->setDate(2026, 11, 10)->setTime(7, 0));
         $supervisor = User::factory()->create(['role' => 'supervisi']);
         $actor = User::factory()->create(['role' => 'admin_warehouse']);
+        $inactive = User::factory()->create(['role' => 'supervisi', 'is_active' => false]);
         $part = PartSetting::create(['part_number' => 'EXPIRY-SUMMARY', 'qty_box' => 20]);
         foreach (['99210001' => 9, '99210002' => 12] as $number => $age) {
             Box::create(['box_number' => (string) $number, 'part_number' => $part->part_number, 'pcs_quantity' => 20,
@@ -35,7 +36,7 @@ class ExpiredBoxSummaryMailTest extends TestCase
 
         $this->artisan('expired-box:send-summary')->assertSuccessful();
 
-        Mail::assertSent(ExpiredBoxSummaryMail::class, function ($mail) use ($supervisor, $actor) {
+        Mail::assertSent(ExpiredBoxSummaryMail::class, function ($mail) use ($supervisor, $actor, $inactive) {
             $this->assertSame(['99210001'], $mail->sections['Lokal']['warning']->pluck('box_number')->all());
             $this->assertSame(['99210002'], $mail->sections['Lokal']['expired']->pluck('box_number')->all());
             $this->assertSame(['99220001'], $mail->sections['Ekspor']['warning']->pluck('box_number')->all());
@@ -45,7 +46,7 @@ class ExpiredBoxSummaryMailTest extends TestCase
             $this->assertStringContainsString('<h2>Ekspor</h2>', $html);
             $this->assertStringNotContainsString('99220003', $html);
 
-            return $mail->hasTo($supervisor->email) && ! $mail->hasTo($actor->email);
+            return $mail->hasTo($supervisor->email) && ! $mail->hasTo($actor->email) && ! $mail->hasTo($inactive->email);
         });
         Mail::assertSentCount(1);
     }

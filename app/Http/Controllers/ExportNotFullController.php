@@ -45,7 +45,7 @@ class ExportNotFullController extends Controller
             'box_number' => ['required', 'string', 'regex:/^[0-9]{8}$/D'], 'notes' => 'required|string|min:3|max:1000']);
         $service->prepare($exportRequest->id, $data, $request->user());
 
-        return back()->with('success', 'Request diperbarui. Periksa status dan rincian; stok belum dibuat oleh penyiapan data.');
+        return back()->with('success', 'Request diperbarui. Periksa status dan rincian, stok belum dibuat oleh penyiapan data.');
     }
 
     public function approve(Request $request, ExportNotFullRequest $exportRequest, ExportNotFullService $service)

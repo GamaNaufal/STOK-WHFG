@@ -51,7 +51,7 @@
     }
     .warehouse-app :is(a, button, input, select, textarea, [tabindex]):focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 3px; }
     .warehouse-app :is(button, .btn):disabled { cursor: not-allowed; }
-    .warehouse-app .btn:not(:disabled):hover { transform: none !important; }
+    .warehouse-app .btn:not(:disabled):hover:not(:active) { transform: none !important; }
     .warehouse-app .btn:not(:disabled):active { transform: scale(.98); }
     .warehouse-app .btn:focus-visible:active { transform: none; }
     .warehouse-app .table { --bs-table-hover-bg: #f0f7f6; font-size: .875rem; font-variant-numeric: tabular-nums; }

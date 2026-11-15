@@ -23,38 +23,42 @@
                     <span class="part-form-icon"><i class="bi bi-plus-lg" aria-hidden="true"></i></span>
                     <div>
                         <h2 id="part-form-title">Data nomor part</h2>
-                        <p>Isi kedua field sebelum menambahkan master part.</p>
+                        <p>Isi kode label, kode dokumen, dan kapasitas box dalam satu kali simpan.</p>
                     </div>
                 </div>
                 <form id="partSettingForm" method="POST" action="{{ route('part-settings.store') }}" class="part-form-body">
                     @csrf
-                    <div class="part-form-field">
-                        <label for="partNumberInput" class="form-label">Nomor part</label>
-                        <input type="text" name="part_number" id="partNumberInput"
-                            class="form-control @error('part_number') is-invalid @enderror"
-                            value="{{ old('part_number') }}" placeholder="Contoh: ABC123XYZ"
-                            maxlength="100" required aria-invalid="{{ $errors->has('part_number') ? 'true' : 'false' }}"
-                            aria-describedby="part-number-help @error('part_number') part-number-error @enderror">
-                        <p class="part-form-help" id="part-number-help">Nomor part harus unik dan dipakai bersama oleh lokal dan ekspor.</p>
-                        @error('part_number')
-                            <div class="invalid-feedback" id="part-number-error" role="alert">{{ $message }}</div>
-                        @enderror
-                    </div>
-                    <div class="part-form-field">
-                        <label for="qtyBoxInput" class="form-label">PCS standar per box</label>
-                        <div class="part-number-input">
-                            <input type="number" name="qty_box" id="qtyBoxInput"
-                                class="form-control @error('qty_box') is-invalid @enderror"
-                                value="{{ old('qty_box') }}" min="1" max="4294967295" step="1" inputmode="numeric"
-                                placeholder="Contoh: 100" required aria-invalid="{{ $errors->has('qty_box') ? 'true' : 'false' }}"
-                                aria-describedby="qty-box-help @error('qty_box') qty-box-error @enderror">
-                            <span aria-hidden="true">PCS</span>
+                    <fieldset class="ui-form-section">
+                        <legend class="ui-form-section-title"><span class="ui-step" aria-hidden="true">01</span> Identitas dan kapasitas</legend>
+                        <div class="part-form-field">
+                            <label for="partNumberInput" class="form-label">Nomor part label / scan</label>
+                            <input type="text" name="part_number" id="partNumberInput"
+                                class="form-control @error('part_number') is-invalid @enderror"
+                                value="{{ old('part_number') }}" placeholder="Contoh: ABC123XYZ"
+                                maxlength="100" required aria-invalid="{{ $errors->has('part_number') ? 'true' : 'false' }}"
+                                aria-describedby="part-number-help @error('part_number') part-number-error @enderror">
+                            <p class="part-form-help" id="part-number-help">Isi kode yang dipindai sehari-hari. Nomor ini unik dan dipakai bersama oleh lokal dan ekspor.</p>
+                            @error('part_number')
+                                <div class="invalid-feedback" id="part-number-error" role="alert">{{ $message }}</div>
+                            @enderror
                         </div>
-                        <p class="part-form-help" id="qty-box-help">Jumlah PCS untuk satu box penuh.</p>
-                        @error('qty_box')
-                            <div class="invalid-feedback d-block" id="qty-box-error" role="alert">{{ $message }}</div>
-                        @enderror
-                    </div>
+                        <div class="part-form-field">
+                            <label for="qtyBoxInput" class="form-label">PCS standar per box</label>
+                            <div class="part-number-input">
+                                <input type="number" name="qty_box" id="qtyBoxInput"
+                                    class="form-control @error('qty_box') is-invalid @enderror"
+                                    value="{{ old('qty_box') }}" min="1" max="4294967295" step="1" inputmode="numeric"
+                                    placeholder="Contoh: 100" required aria-invalid="{{ $errors->has('qty_box') ? 'true' : 'false' }}"
+                                    aria-describedby="qty-box-help @error('qty_box') qty-box-error @enderror">
+                                <span aria-hidden="true">PCS</span>
+                            </div>
+                            <p class="part-form-help" id="qty-box-help">Jumlah PCS untuk satu box penuh.</p>
+                            @error('qty_box')
+                                <div class="invalid-feedback d-block" id="qty-box-error" role="alert">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </fieldset>
+                    @include('operator.part-settings._document-numbers')
                     <div class="part-form-actions">
                         <a href="{{ route('part-settings.index') }}" class="btn btn-outline-secondary">Batal</a>
                         <button type="submit" class="btn btn-primary part-primary-action"><i class="bi bi-check-lg" aria-hidden="true"></i> Tambah nomor part</button>
@@ -71,4 +75,8 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script src="{{ asset('js/pages/master-part-form.js') }}?v={{ filemtime(public_path('js/pages/master-part-form.js')) }}"></script>
 @endsection

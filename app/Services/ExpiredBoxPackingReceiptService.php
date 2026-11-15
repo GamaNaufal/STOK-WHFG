@@ -125,9 +125,8 @@ class ExpiredBoxPackingReceiptService
         if (! preg_match('/^[0-9]{8}$/D', $number)) {
             throw ValidationException::withMessages([$field => 'ID Box harus tepat 8 angka.']);
         }
-        if (BoxIdentity::unavailable($number)
-            || DB::table('not_full_box_requests')->where('box_number', $number)->exists()) {
-            throw ValidationException::withMessages([$field => 'ID Box sudah pernah digunakan atau sedang diajukan. Scan ID baru dari packing.']);
+        if (BoxIdentity::unavailable($number)) {
+            throw ValidationException::withMessages([$field => 'ID Box masih digunakan atau sedang diajukan. Scan ID yang tersedia dari packing.']);
         }
     }
 }

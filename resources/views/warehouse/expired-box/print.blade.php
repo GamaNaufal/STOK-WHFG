@@ -8,6 +8,6 @@
 <p>Dokumen ini opsional sebagai ringkasan penanganan. Penerimaan di sistem cukup scan ID Box baru dari packing dengan part dan PCS sesuai transaksi.</p>
 <h2>Catatan penerimaan warehouse</h2>
 <table><tr><th>ID baru dari packing</th><td class="blank">{{ $handling->replacement_box_number }}</td></tr><tr><th>Waktu ID baru diterbitkan</th><td class="blank">{{ $handling->label_issued_at?->format('d M Y H:i:s') }}</td></tr><tr><th>Waktu diterima warehouse</th><td class="blank">{{ $handling->received_at?->format('d M Y H:i:s') }}</td></tr><tr><th>Catatan pencocokan</th><td class="blank"></td></tr></table>
-<p>Penerimaan boleh bertahap. Untuk penerimaan baru, acuan ID asal dipilih otomatis menurut FIFO; pasangan ini bukan konfirmasi label fisik. Masa aktif satu bulan sejak diterima. Tanggal penerbitan di atas hanya catatan historis bila tersedia.</p>
+<p>Penerimaan boleh bertahap. Untuk penerimaan baru, acuan ID asal dipilih otomatis menurut FIFO, pasangan ini bukan konfirmasi label fisik. Masa aktif satu bulan sejak diterima. Tanggal penerbitan di atas hanya catatan historis bila tersedia.</p>
 <div class="signatures"><p>Petugas warehouse yang menyerahkan</p><p>Petugas warehouse yang menerima</p></div>
 </body></html>

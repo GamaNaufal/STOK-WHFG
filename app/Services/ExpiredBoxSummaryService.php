@@ -21,6 +21,7 @@ class ExpiredBoxSummaryService
             throw new InvalidArgumentException('EXPIRED_BOX_SUMMARY_TO harus berisi satu alamat email yang valid.');
         }
         $recipients = $override !== '' ? [$override] : User::where('role', 'supervisi')
+            ->where('is_active', true)
             ->whereNotNull('email')->distinct()->pluck('email')->all();
 
         if ($recipients === []) {

@@ -13,7 +13,7 @@
     </header>
     <x-delivery-announcement-notes :delivery="$delivery" surface="export_fulfill" />
     @if($overview->fulfillment_status === 'paused')<div class="alert alert-warning" role="status"><strong>Perencanaan perlu diselesaikan kembali.</strong> Rencana sedang direvisi atau berubah dari acuan final. Periksa pembagian dan finalisasi ulang sebelum melanjutkan pemenuhan.</div>@endif
-    @if($metrics['invalid'] || $metrics['excess'])<div class="alert alert-warning" role="alert"><strong>Periksa pencatatan box.</strong> {{ number_format($metrics['invalid'], 0, ',', '.') }} box tidak sesuai part, kapasitas, atau lokasi tujuan; {{ number_format($metrics['excess'], 0, ',', '.') }} alokasi box melebihi kebutuhan. Box yang tidak sesuai tidak dihitung terpenuhi.</div>@endif
+    @if($metrics['invalid'] || $metrics['excess'])<div class="alert alert-warning" role="alert"><strong>Periksa pencatatan box.</strong> {{ number_format($metrics['invalid'], 0, ',', '.') }} box tidak sesuai part, kapasitas, atau lokasi tujuan, {{ number_format($metrics['excess'], 0, ',', '.') }} alokasi box melebihi kebutuhan. Box yang tidak sesuai tidak dihitung terpenuhi.</div>@endif
     <section class="plan-panel fulfillment-total" aria-labelledby="fulfillment-progress-title">
         <div class="plan-panel-heading"><h2 id="fulfillment-progress-title">Progres pemenuhan</h2>@include('export.fulfillment.status', ['state' => $overview->fulfillment_status])</div>
         <div class="plan-panel-body">
@@ -73,9 +73,9 @@
     @php($readyCount = $pallets->filter(fn ($entry) => (bool) $entry['pallet']->ready_at)->count())
     <section class="plan-panel"><div class="plan-panel-heading"><h2>Kesiapan pengiriman</h2><span>{{ $readyCount }} / {{ $pallets->count() }} pallet siap</span></div><div class="plan-panel-body">
         <p>Setiap pallet harus dikonfirmasi siap beserta lokasi fisiknya. Selesaikan permintaan hanya setelah seluruh box keluar gudang.</p>
-        @if($overview->fulfillment_status !== 'paused')<a class="btn btn-outline-danger me-2" href="{{ route('export.fulfillment.cancel-form', $delivery) }}">Batalkan permintaan</a>@endif
+        @if($overview->fulfillment_status !== 'paused' && auth()->user()->canDeleteExportDeliveryPlan())<a class="btn btn-outline-danger me-2" href="{{ route('export.fulfillment.cancel-form', $delivery) }}">Batalkan permintaan</a>@endif
         @if($overview->fulfillment_status === 'complete' && $readyCount === $pallets->count() && $readyCount > 0)
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#complete-request-modal">Selesaikan permintaan</button>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#complete-request-modal" data-permission="export_fulfillment_complete">Selesaikan permintaan</button>
         @else<button type="button" class="btn btn-secondary" disabled>Selesaikan permintaan</button>@endif
     </div></section>
 </div>

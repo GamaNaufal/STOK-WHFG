@@ -18,7 +18,7 @@
         @else Penyiapan menunggu perencanaan pallet final dengan alokasi Not Full yang sesuai. Kebutuhan ini tetap wajib dipenuhi.
         @endif
     </div>
-    @if($covered)<div class="alert alert-success">{{ $state==='Terpenuhi' ? 'Box sudah tercatat sebagai stok dan penempatannya pada pallet rencana sudah dikonfirmasi. Tidak perlu penerimaan atau scan ulang.' : 'Box yang sesuai sudah direservasi. Ikuti antrean untuk konfirmasi penempatan; tidak perlu membuat box baru.' }}</div>@endif
+    @if($covered)<div class="alert alert-success">{{ $state==='Terpenuhi' ? 'Box sudah tercatat sebagai stok dan penempatannya pada pallet rencana sudah dikonfirmasi. Tidak perlu penerimaan atau scan ulang.' : 'Box yang sesuai sudah direservasi. Ikuti antrean untuk konfirmasi penempatan, tidak perlu membuat box baru.' }}</div>@endif
     @if($record->notes)<p>Catatan: {{ $record->notes }}</p>@endif
     @if($record->stockBox)<p>Box hasil approval terakhir: <strong>{{ $record->stockBox->box_number }}</strong> · {{ $record->stockBox->pcs_quantity }} PCS. Disetujui {{ $record->approver?->name }}.</p>@endif
     @if($p)
@@ -29,7 +29,7 @@
     @endif
     @if($canPrepare && $target && !$covered && $record->status!=='cancelled')
     <section class="plan-panel"><div class="plan-panel-body"><h2>Siapkan data Not Full</h2>
-        <p>Reservasi box penuh tetap diprioritaskan. Sumber FIFO diperiksa ulang saat approval; jika sudah terikat permintaan lain, penyiapan wajib diperbarui.</p>
+        <p>Reservasi box penuh tetap diprioritaskan. Sumber FIFO diperiksa ulang saat approval, jika sudah terikat permintaan lain, penyiapan wajib diperbarui.</p>
         @if($source)<p>Sumber penuh tertua yang tersedia: <strong>{{ $source->box_number }}</strong> · {{ $source->pcs_quantity }} PCS · {{ $source->currentPallet->location_code }} · diterima {{ $source->first_received_at->format('d/m/Y H:i') }}.</p>
         @else<div class="alert alert-warning">Tidak ada box penuh yang bebas untuk part ini. Opsi pemecahan belum tersedia. Kebutuhan penuh yang sudah direservasi tetap dipertahankan.</div>@endif
         <form method="POST" action="{{ route('box-not-full.export.prepare',$record) }}">@csrf<input type="hidden" name="revision" value="{{ $record->revision }}">

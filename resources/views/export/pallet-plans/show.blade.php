@@ -13,9 +13,10 @@
         @if($planning->status !== 'final')<a class="btn btn-primary" href="{{ route('export.pallet-plans.edit', $delivery) }}">{{ $planning->status === 'cancelled' ? 'Susun ulang perencanaan' : 'Lanjutkan perencanaan' }}</a>@endif
         @foreach(['reopen' => 'Buka revisi', 'cancel' => 'Batalkan perencanaan'] as $action => $label)
             @if(($action === 'reopen' && $planning->status === 'final') || ($action === 'cancel' && $planning->status !== 'cancelled'))
-                <form method="POST" action="{{ route('export.pallet-plans.transition', $delivery) }}" class="pallet-transition-form">@csrf<input type="hidden" name="revision" value="{{ $planning->revision }}"><input type="hidden" name="action" value="{{ $action }}"><button type="button" class="btn btn-outline-secondary pallet-transition" data-action="{{ $action }}">{{ $label }}</button></form>
+                <form method="POST" action="{{ route('export.pallet-plans.transition', $delivery) }}" class="pallet-transition-form" data-permission="export_pallet_{{ $action }}">@csrf<input type="hidden" name="revision" value="{{ $planning->revision }}"><input type="hidden" name="action" value="{{ $action }}"><button type="button" class="btn btn-outline-secondary pallet-transition" data-action="{{ $action }}">{{ $label }}</button></form>
             @endif
         @endforeach
+        @if(auth()->user()->canDeleteExportDeliveryPlan())<a class="btn btn-outline-danger" href="{{ route('export.delivery-plans.show', $delivery) }}#delete-delivery-plan" data-delete-delivery-preview data-preview-url="{{ route('export.delivery-plans.deletion-preview', $delivery) }}">Hapus rencana delivery</a>@endif
     </div>
     @unless($printReady)<p class="plan-help mb-3">Cetak delivery dan rincian pallet tersedia setelah perencanaan final.</p>@endunless
     <p class="plan-help mb-3">{{ $planning->pallets->count() }} pallet · {{ $planning->reservations->count() }} lokasi direservasi · Revisi {{ $planning->revision }}@if($planning->finalized_at) · Difinalisasi {{ $planning->finalizedBy?->name }} pada {{ $planning->finalized_at->format('d/m/Y H:i') }}@endif</p>
@@ -38,4 +39,5 @@ document.querySelectorAll('.pallet-transition').forEach(button=>button.addEventL
 }));
 </script>
 @vite('resources/js/export-pallet-planning.js')
+<script src="{{ asset('js/pages/export-delivery-delete.js') }}?v={{ filemtime(public_path('js/pages/export-delivery-delete.js')) }}"></script>
 @endsection

@@ -43,7 +43,7 @@
         </div>
     </section>
 
-    <section class="card delivery-assign-panel delivery-assign-new-box mt-4" aria-labelledby="deliveryAssignNewBoxTitle">
+    <section class="card delivery-assign-panel delivery-assign-new-box mt-4" data-permission="delivery_assign_new_box" aria-labelledby="deliveryAssignNewBoxTitle">
         <div class="card-body p-3 p-md-4">
             <div class="delivery-assign-section-head delivery-assign-section-head-split">
                 <span class="delivery-assign-step" aria-hidden="true">02</span>
@@ -97,7 +97,7 @@
                     <input type="hidden" id="deliveryAssignLocationId" value="">
                     <input type="hidden" id="deliveryAssignLocationCode" value="">
                     <div class="list-group mt-2" id="deliveryAssignLocationSearchResults" style="display: none; max-height: 220px; overflow-y: auto;"></div>
-                    <small class="text-muted d-block mt-1">Pilih dari Master Location; ketersediaannya diperiksa ulang saat assign.</small>
+                    <small class="text-muted d-block mt-1">Pilih dari Master Location, ketersediaannya diperiksa ulang saat assign.</small>
                 </div>
             </div>
 
@@ -182,7 +182,7 @@
                 </div>
                 <div class="delivery-assign-actions">
                     <button type="button" class="btn btn-outline-secondary" id="deliveryAssignClearBtn">Reset Pilihan</button>
-                    <button type="button" class="btn btn-primary" id="deliveryAssignSubmit">Assign Delivery</button>
+                    <button type="button" class="btn btn-primary" id="deliveryAssignSubmit" data-permission="delivery_assign_execute">Assign Delivery</button>
                 </div>
             </div>
 

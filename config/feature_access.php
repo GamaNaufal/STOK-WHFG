@@ -3,7 +3,7 @@
 $warehouse = ['warehouse_operator', 'admin_warehouse'];
 $supervisor = ['supervisi'];
 
-return [
+$config = [
     'roles' => [
         'warehouse_operator' => 'Warehouse Operator',
         'export_operator' => 'Operator Export',
@@ -55,7 +55,7 @@ return [
         'export_picking_verification' => ['label' => 'Picking Verification Ekspor', 'group' => 'Pengiriman Ekspor', 'icon' => 'search', 'route' => 'export.picking.index', 'routes' => ['export.picking.*'], 'roles' => ['export_operator'], 'requires' => ['export_stock_input']],
         'export_fulfillment' => ['label' => 'Delivery Schedule Ekspor', 'group' => 'Pengiriman Ekspor', 'icon' => 'calendar3', 'route' => 'export.fulfillment.index', 'routes' => ['export.fulfillment.*'], 'roles' => ['export_operator']],
         'export_locations' => ['label' => 'Master Lokasi Ekspor', 'group' => 'Master Data Ekspor', 'icon' => 'geo-alt', 'route' => 'export.locations.index', 'routes' => ['export.locations.*'], 'roles' => ['export_operator']],
-        'reports' => ['label' => 'Laporan dan Export Operasional', 'group' => 'Laporan', 'icon' => 'file-earmark-bar-graph', 'route' => 'reports.stock-input', 'routes' => ['reports.*'], 'roles' => ['admin_warehouse', 'supervisi']],
+        'reports' => ['label' => 'Laporan Barang Masuk', 'group' => 'Laporan', 'icon' => 'file-earmark-bar-graph', 'route' => 'reports.stock-input', 'routes' => ['reports.*'], 'roles' => ['admin_warehouse', 'supervisi']],
         'audit' => ['label' => 'Audit Trail', 'group' => 'Laporan', 'icon' => 'shield-check', 'route' => 'audit.index', 'routes' => ['audit.*'], 'roles' => $supervisor],
         'users' => ['label' => 'Kelola User', 'group' => 'Administrasi', 'icon' => 'people', 'route' => 'users.index', 'routes' => ['users.*'], 'roles' => [], 'admin_only' => true],
         'access_management' => ['label' => 'Hak Akses', 'group' => 'Administrasi', 'icon' => 'key', 'route' => 'access.index', 'routes' => ['access.*'], 'roles' => [], 'admin_only' => true],
@@ -72,3 +72,67 @@ return [
         'part-settings.search' => ['export_delivery_plans', 'export_stock_input', 'parts', 'stock_input', 'not_full_request', 'delivery_order', 'delivery_assign', 'stock_edit'],
     ],
 ];
+
+$config['features']['export_stock_view'] = ['label' => 'Lihat stok ekspor', 'group' => 'Pengiriman Ekspor',
+    'icon' => 'boxes', 'route' => 'export.stock.index', 'routes' => ['export.stock.index', 'export.stock.show', 'export.stock.pallet-boxes'],
+    'roles' => ['export_operator', 'admin_warehouse', 'supervisi'], 'legacy_sources' => ['export_stock_input', 'export_stock_manage']];
+unset($config['features']['export_stock_manage']['route']);
+$config['features']['export_stock_manage']['label'] = 'Akses pengelolaan stok ekspor';
+$config['features']['export_stock_manage']['requires'] = ['export_stock_view'];
+$actions = require __DIR__.'/feature_actions.php';
+$actions['export_stock_export'][0] = 'export_stock_view';
+foreach (['domestic' => ['expired_box', 'expired-box', 'Lokal'], 'export' => ['export_expired_box', 'export.expired-box', 'Ekspor']] as [$parent, $prefix, $scopeLabel]) {
+    foreach (['start' => ['Mulai penanganan QA', ['transactions.create', 'handle']], 'qa' => ['Putuskan hasil QA', ['qa']],
+        'packing' => ['Serahkan ke packing', ['packing']], 'receive' => ['Terima hasil packing', ['receive', 'transactions.scan']],
+        'print' => ['Cetak pengantar packing', ['print', 'transactions.print']]] as $action => [$label, $routes]) {
+        if ($parent === 'export_expired_box') {
+            if ($action === 'print') continue; // No print endpoint in the export workspace.
+            $routes = array_values(array_intersect($routes, ['transactions.create', 'transactions.scan']));
+        }
+        $actions[$parent.'_'.$action] = [$parent, $label.' '.$scopeLabel, array_map(fn ($route) => $prefix.'.'.$route, $routes),
+            'Menjalankan tahap '.$label.' untuk box expired '.$scopeLabel.'.'];
+    }
+}
+foreach (['stock_opname_local' => ['stock-opname', 'Lokal'], 'stock_opname_export' => ['export.stock-opname', 'Ekspor']] as $parent => [$prefix, $scopeLabel]) {
+    foreach (['start' => ['Mulai sesi', 'start'], 'scan' => ['Scan box', 'scan'], 'refresh' => ['Perbarui acuan sesi', 'refresh'], 'finish' => ['Selesaikan sesi', 'finish']] as $action => [$label, $route]) {
+        $actions[$parent.'_'.$action] = [$parent.'_manage', $label.' Stock Opname '.$scopeLabel, [$prefix.'.'.$route], 'Menjalankan tindakan '.$label.' pada sesi opname '.$scopeLabel.'.'];
+    }
+    $actions[$parent.'_download'] = [$parent, 'Unduh hasil Stock Opname '.$scopeLabel, [$prefix.'.export'], 'Mengunduh snapshot hasil sesi yang selesai.'];
+}
+$children = [];
+foreach ($actions as $key => [$parent, $label, $routes, $description]) {
+    $source = $config['features'][$parent];
+    $allowed = $actions[$key][4] ?? ($source['allowed_roles'] ?? null);
+    $children[$key] = ['label' => $label, 'description' => $description, 'group' => $source['group'],
+        'module' => $source['label'], 'parent' => $parent, 'legacy_parent' => $parent,
+        'routes' => $routes, 'roles' => array_values(array_filter($source['roles'], fn ($role) => !$allowed || in_array($role, $allowed, true))),
+        'requires' => [$parent]];
+    if ($allowed) $children[$key]['allowed_roles'] = $allowed;
+    if (isset($source['debug_roles'])) $children[$key]['debug_roles'] = array_values(array_filter($source['debug_roles'], fn ($role) => !$allowed || in_array($role, $allowed, true)));
+}
+$children['export_fulfillment_cancel']['requires'][] = 'export_delivery_delete';
+$children['export_stock_export']['legacy_sources'] = ['export_stock_input', 'export_stock_manage'];
+$children['dashboard_details']['requires'] = [];
+$children['dashboard_details']['legacy_always_roles'] = ['supervisi'];
+$children['dashboard_details']['roles'] = ['supervisi'];
+$config['features'] = $children + $config['features'];
+$config['lookups']['export.stock.index'] = ['export_stock_view'];
+$config['lookups']['export.stock.show'] = ['export_stock_view'];
+$config['lookups']['export.stock.pallet-boxes'] = ['export_stock_view'];
+$config['lookups']['export.stock.export'] = ['export_stock_export'];
+$config['lookups']['export.pallet-plans.edit'] = ['export_pallet_edit', 'export_pallet_finalize'];
+$config['action_dispatch'] = [
+    'delivery.status' => ['field' => 'status', 'choices' => ['approved' => 'delivery_approve', 'rejected' => 'delivery_reject', 'correction' => 'delivery_correction']],
+    'export.pallet-plans.update' => ['field' => 'action', 'choices' => ['draft' => 'export_pallet_edit', 'finalize' => 'export_pallet_finalize']],
+    'export.pallet-plans.transition' => ['field' => 'action', 'choices' => ['reopen' => 'export_pallet_reopen', 'cancel' => 'export_pallet_cancel']],
+];
+foreach (['expired-box' => 'expired_box', 'export.expired-box' => 'export_expired_box'] as $prefix => $parent) {
+    foreach (['bulk.review', 'bulk.store', 'transactions.update'] as $route) {
+        $choices = ['qa' => $parent.'_qa', 'packing' => $parent.'_packing', 'receive' => $parent.'_receive'];
+        if ($route !== 'transactions.update') $choices = ['start' => $parent.'_start'] + $choices;
+        if ($route === 'bulk.review') $choices = $prefix === 'expired-box'
+            ? $choices + ['print' => $parent.'_print', 'result' => $parent] : ['start' => $parent.'_start'];
+        $config['action_dispatch'][$prefix.'.'.$route] = ['field' => 'action', 'choices' => $choices];
+    }
+}
+return $config;

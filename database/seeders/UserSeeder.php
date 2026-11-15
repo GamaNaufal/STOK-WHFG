@@ -13,8 +13,10 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        // Test credentials have been disabled for production
-        // If needed, uncomment below to create test users
+        // Demo accounts are local/test fixtures, never a production bootstrap.
+        if (app()->environment('production')) {
+            return;
+        }
         
     
         // Admin User

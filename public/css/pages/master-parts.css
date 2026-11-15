@@ -24,9 +24,11 @@
 .warehouse-app .part-table { min-width: 650px; margin: 0; border-collapse: separate; border-spacing: 0; }
 .warehouse-app .part-table :is(th, td) { padding: .875rem 1rem; border-bottom: 1px solid var(--ui-border, #dfe1e5); color: var(--ui-ink, #202124); font-size: .8125rem; line-height: 1.45; vertical-align: middle; }
 .warehouse-app .part-table thead th { color: var(--ui-muted, #595d65); font-size: .75rem; font-weight: 700; white-space: nowrap; }
-.part-table thead th:nth-child(1) { width: 42%; }
+.part-table thead th:nth-child(1) { width: 28%; }
 .part-table thead th:nth-child(2) { width: 28%; }
-.part-table thead th:nth-child(3) { width: 30%; }
+.part-table thead th:nth-child(3) { width: 20%; }
+.part-table thead th:nth-child(4) { width: 24%; }
+.part-document-codes { overflow-wrap: anywhere; min-width: 10rem; }
 .warehouse-app .part-table tbody tr:last-child > :is(th, td) { border-bottom: 0; }
 .warehouse-app .part-table .part-table-code { position: sticky; left: 0; z-index: 1; background: #fff; box-shadow: inset -1px 0 var(--ui-border, #dfe1e5); color: var(--ui-ink, #202124); font-size: .875rem; font-weight: 700; overflow-wrap: anywhere; }
 .warehouse-app .part-table thead th:first-child { position: sticky; left: 0; z-index: 2; box-shadow: inset -1px 0 var(--ui-border, #dfe1e5); }

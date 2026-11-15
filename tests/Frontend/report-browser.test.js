@@ -68,3 +68,52 @@ test('a superseded failed request never overwrites a newer success', async () =>
     const pending = loader.load('/old'); await loader.load('/new'); old.resolve({ok: false, status: 403}); await pending;
     assert.deepEqual(states.at(-1), {busy: false});
 });
+
+test('report loading acknowledges immediately and explains a slow response without clearing existing results', async () => {
+    const request = deferred(), states = [], rendered = [], timers = new Map();
+    let sequence = 0;
+    const loader = createReportLoader({
+        fetcher: () => request.promise,
+        render: data => rendered.push(data.html), state: value => states.push(value),
+        setTimer(callback, delay) { const id = ++sequence; timers.set(id, {callback, delay}); return id; },
+        clearTimer(id) { timers.delete(id); },
+    });
+    const pending = loader.load('/reports?period=all');
+    assert.deepEqual(states, [{busy: true}]);
+    assert.deepEqual(rendered, []);
+    const waiting = timers.values().next().value;
+    assert.equal(waiting.delay, 1200);
+    waiting.callback();
+    assert.deepEqual(states.at(-1), {busy: true, slow: true});
+    assert.deepEqual(rendered, []);
+    request.resolve(reply('NEW RESULTS'));
+    assert.equal(await pending, true);
+    assert.deepEqual(rendered, ['NEW RESULTS']);
+    assert.deepEqual(states.at(-1), {busy: false});
+    assert.equal(timers.size, 0);
+});
+
+test('retry aborts the slow request and an old wait callback cannot overwrite the retry result', async () => {
+    const old = deferred(), states = [], requests = [], rendered = [], timers = new Map();
+    let sequence = 0;
+    const loader = createReportLoader({
+        fetcher(url, options) { requests.push(options.signal); return requests.length === 1 ? old.promise : Promise.resolve(reply('RETRY RESULTS')); },
+        render: data => rendered.push(data.html), state: value => states.push(value),
+        setTimer(callback) { const id = ++sequence; timers.set(id, callback); return id; },
+        clearTimer(id) { timers.delete(id); },
+    });
+    const first = loader.load('/reports');
+    const oldWait = timers.values().next().value;
+    oldWait();
+    assert.deepEqual(states.at(-1), {busy: true, slow: true});
+    assert.equal(await loader.load('/reports'), true);
+    assert.equal(requests[0].aborted, true);
+    const stateCount = states.length;
+    oldWait();
+    old.resolve(reply('STALE RESULTS'));
+    await first;
+    assert.equal(states.length, stateCount);
+    assert.deepEqual(states.at(-1), {busy: false});
+    assert.deepEqual(rendered, ['RETRY RESULTS']);
+    assert.equal(timers.size, 0);
+});

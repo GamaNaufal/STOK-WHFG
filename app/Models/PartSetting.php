@@ -19,6 +19,11 @@ class PartSetting extends Model
 
     // One shared catalog; part_number is globally unique.
 
+    public function documentNumbers()
+    {
+        return $this->hasMany(PartDocumentNumber::class);
+    }
+
     /**
      * Scope untuk cari by part number
      */

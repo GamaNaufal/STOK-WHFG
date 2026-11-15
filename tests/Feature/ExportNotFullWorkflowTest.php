@@ -407,7 +407,7 @@ class ExportNotFullWorkflowTest extends TestCase
         $preview = $s->cancellation($d);
         $loc = ExportMasterLocation::create(['code' => 'CANCEL-NF']);
         $s->cancel($d->id, ['revision' => 1, 'request_token' => (string) Str::uuid(), 'fingerprint' => $preview['fingerprint'], 'reason' => 'Customer cancelled',
-            'destination' => 'location:'.$loc->id, 'return_confirmed' => 1], $this->operator);
+            'destination' => 'location:'.$loc->id, 'return_confirmed' => 1], User::factory()->create(['role' => 'admin']));
         $this->assertSame('cancelled', $r->fresh()->status);
         $this->assertSame(20, ExportStockBox::sole()->pcs_quantity);
         $this->assertSame(0, app(ExportNotFullService::class)->pending()->count());

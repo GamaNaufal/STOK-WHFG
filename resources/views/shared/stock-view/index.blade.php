@@ -27,15 +27,15 @@
             <div>
                 <form method="GET" class="d-flex gap-2">
                     @if($viewMode === 'part' && $groupedByPart->count() > 0)
-                        <a href="{{ route('stock-view.export-part', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
+                        <a data-excel-download href="{{ route('stock-view.export-part', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
                             <i class="bi bi-download"></i> Export Excel
                         </a>
                     @elseif($viewMode === 'box_id' && $groupedByBoxId->count() > 0)
-                        <a href="{{ route('stock-view.export-box-id', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
+                        <a data-excel-download href="{{ route('stock-view.export-box-id', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
                             <i class="bi bi-download"></i> Export Excel
                         </a>
                     @elseif($viewMode === 'pallet' && $groupedByPallet->count() > 0)
-                        <a href="{{ route('stock-view.export-pallet', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
+                        <a data-excel-download href="{{ route('stock-view.export-pallet', request()->query()) }}" class="btn btn-light btn-lg" style="border-radius: 8px; padding: 12px 28px; font-weight: 600; text-decoration: none;">
                             <i class="bi bi-download"></i> Export Excel
                         </a>
                     @endif
@@ -376,7 +376,7 @@
                                         <td style="padding: 16px 20px; text-align: center;">
                                             <div class="d-inline-flex gap-1 flex-wrap justify-content-center">
                                                 @if(!empty($boxData['box_id']))
-                                                    <button type="button" class="btn btn-sm btn-outline-primary js-box-history"
+                                                    <button type="button" class="btn btn-sm btn-outline-primary js-box-history" data-permission="stock_history"
                                                             aria-label="Riwayat box {{ $boxData['box_number'] ?? 'Legacy' }}"
                                                             data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                             style="font-size: 12px;">
@@ -395,7 +395,7 @@
                                                         </button>
                                                     @endif
                                                     @if($canDeleteStock)
-                                                        <button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                                        <button type="button" class="btn btn-sm btn-outline-danger js-delete-box" data-permission="stock_delete_box"
                                                                 aria-label="Hapus box {{ $boxData['box_number'] ?? 'Legacy' }} dari stok aktif"
                                                                 data-box-id="{{ $boxData['box_id'] ?? '' }}"
                                                                 data-box-number="{{ $boxData['box_number'] ?? '' }}"

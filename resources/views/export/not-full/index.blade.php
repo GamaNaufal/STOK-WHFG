@@ -22,7 +22,7 @@
             <p class="warehouse-scope-description">Request wajib dari sisa PCS rencana delivery. Penyiapan oleh Admin Warehouse/Admin Utama, approval oleh Admin Utama/Supervisi.</p>
         </header>
     @endif
-    <div class="alert alert-info">Box baru dapat disiapkan setelah perencanaan pallet final. Stok Not Full yang sesuai diprioritaskan melalui FIFO; pemecahan hanya memakai box penuh yang bebas setelah reservasi.</div>
+    <div class="alert alert-info">Box baru dapat disiapkan setelah perencanaan pallet final. Stok Not Full yang sesuai diprioritaskan melalui FIFO, pemecahan hanya memakai box penuh yang bebas setelah reservasi.</div>
     <section class="plan-panel"><div class="plan-table-scroll" tabindex="0" role="region" aria-label="Request Not Full ekspor">
         <table class="table plan-table"><thead><tr><th>Rencana / customer</th><th>Nomor part</th><th>Kebutuhan</th><th>Tujuan</th><th>Status</th><th>Aksi</th></tr></thead><tbody>
         @forelse($requests as $r)

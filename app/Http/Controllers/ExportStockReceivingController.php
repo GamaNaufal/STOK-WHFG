@@ -53,17 +53,17 @@ class ExportStockReceivingController extends Controller
     {
         $this->normalize($request);
         $data = $request->validate(['box_number' => ['required', 'string', 'regex:/^[0-9]{8}$/'], 'batch_id' => 'nullable|integer|min:1']);
-        $box = ExportStockBox::where('box_number', $data['box_number'])->first();
+        $box = ExportStockBox::identityHeld()->where('box_number', $data['box_number'])->first();
         $inDraft = false;
         if (! empty($data['batch_id'])) {
             $batch = app(ExportReceivingBatchService::class)->owned((int) $data['batch_id'], $request->user());
             $inDraft = $batch->items()->where('box_number', $data['box_number'])->exists();
         }
         $held = \App\Models\ExportPickingIssue::open()->where('box_number', $data['box_number'])->exists();
-        $exists = $box || $inDraft || $held || \App\Support\BoxIdentity::unavailable($data['box_number']) || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists();
+        $exists = $box || $inDraft || $held || \App\Support\BoxIdentity::unavailable($data['box_number']);
 
         return response()->json(['available' => ! $exists, 'box_id' => $box?->id,
-            'message' => $held ? 'Box sedang ditahan oleh issue picking ekspor; selesaikan pengembalian.' : ($inDraft ? 'ID Box sudah ada dalam daftar scan.' : ($exists ? 'ID Box sudah tercatat atau disiapkan pada lokal/ekspor.' : 'ID Box siap. Scan nomor part.'))]);
+            'message' => $held ? 'Box sedang ditahan oleh issue picking ekspor, selesaikan pengembalian.' : ($inDraft ? 'ID Box sudah ada dalam daftar scan.' : ($exists ? 'ID Box sudah tercatat atau disiapkan pada lokal/ekspor.' : 'ID Box siap. Scan nomor part.'))]);
     }
 
     public function part(Request $request, ExportStockReceivingService $service)

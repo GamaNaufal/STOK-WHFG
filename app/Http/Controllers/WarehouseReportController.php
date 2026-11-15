@@ -22,6 +22,7 @@ class WarehouseReportController extends Controller
     public function index(Request $request, WarehouseReportService $service)
     {
         $filters=$service->filters($request);
+        if ($filters['kind'] === 'shipments') return app(ShipmentReportController::class)->index($request, app(\App\Services\ShipmentReportService::class));
         if($route=$this->domesticRoute($filters))return redirect()->route($route, array_filter($filters,fn($v)=>$v!==''));
         $query=$service->query($filters);
         $totals=(clone $query)->reorder()->selectRaw('COUNT(*) AS records, COALESCE(SUM(box_quantity),0) AS boxes, COALESCE(SUM(pcs_quantity),0) AS pcs')->first();
@@ -32,17 +33,18 @@ class WarehouseReportController extends Controller
         if($filters['status']!=='')$statusOptions[$filters['status']]=$service::statusLabel($filters['status']);
         $hasDetail=$filters['kind']==='fulfillment'||($filters['kind']==='returns'&&$filters['scope']==='export');
         $periodNote=match($filters['kind']){
-            'receipts'=>'Tanggal mengikuti pertama kali box diterima. Satu baris mewakili satu box; pemindahan tidak menambah penerimaan.',
+            'receipts'=>'Tanggal mengikuti pertama kali box diterima. Satu baris mewakili satu box, pemindahan tidak menambah penerimaan.',
             'shipments'=>'Tanggal mengikuti Selesaikan permintaan. Pallet siap yang belum dikirim tidak dihitung sebagai barang keluar.',
-            'stock'=>'Tanggal mengikuti pertama kali diterima. Hanya stok aktif yang ditampilkan; penempatan fisik terpisah dari tujuan reservasi.',
+            'stock'=>'Tanggal mengikuti pertama kali diterima. Hanya stok aktif yang ditampilkan, penempatan fisik terpisah dari tujuan reservasi.',
             'fulfillment'=>'Tanggal mengikuti tenggat pengiriman. Terpenuhi berbeda dari sudah selesai dikirim.',
-            'returns'=>$filters['scope']==='export'?'Tanggal mengikuti konfirmasi revisi/pengembalian. Pengembalian tidak dihitung sebagai penerimaan baru.':'Catatan pengambilan berstatus dikembalikan/redo; tanggal perubahan terakhir dan operator pada catatan asal.'};
+            'returns'=>$filters['scope']==='export'?'Tanggal mengikuti konfirmasi revisi/pengembalian. Pengembalian tidak dihitung sebagai penerimaan baru.':'Catatan pengambilan berstatus dikembalikan/redo, tanggal perubahan terakhir dan operator pada catatan asal.'};
         return \App\Support\ReportPageResponse::make($request, 'operator.reports.records', compact('filters','rows','columns','totals','users','service','statusOptions','hasDetail','periodNote')+['kinds'=>$service::KINDS]);
     }
 
     public function export(Request $request, WarehouseReportService $service)
     {
         $filters=$service->filters($request);
+        if ($filters['kind'] === 'shipments') return app(ShipmentReportController::class)->export($request, app(\App\Services\ShipmentReportService::class));
         if($route=$this->domesticRoute($filters,true))return redirect()->route($route,array_filter($filters,fn($v)=>$v!==''));
         return Excel::download(new WarehouseRecordsExport($service->query($filters),$filters),
             'laporan_'.$filters['scope'].'_'.$filters['kind'].'_'.now()->format('Ymd_His').'.xlsx')->setPrivate();

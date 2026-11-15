@@ -1,5 +1,5 @@
 <!-- TABS: Barcode Scanner -->
-<div class="mb-4">
+<div class="mb-4" data-permission="stock_input_scan">
     <div class="app-section-heading card-header stock-scan-heading" style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                                      color: white;
                                      margin: 0 0 20px;

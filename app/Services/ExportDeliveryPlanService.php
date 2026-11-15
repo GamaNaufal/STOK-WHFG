@@ -20,7 +20,8 @@ class ExportDeliveryPlanService
             'duplicate_reason' => trim($data['duplicate_reason'] ?? ''),
             'duplicate_confirmed' => in_array($data['duplicate_confirmed'] ?? null, [true, 1, '1', 'yes', 'on'], true),
             'duplicate_review_token' => $data['duplicate_review_token'] ?? '',
-            'items' => array_map(fn ($row) => ['part_number' => $row['part_number'], 'pcs_quantity' => (int) $row['pcs_quantity']], $data['items']),
+            'items' => array_map(fn ($row) => array_merge(['part_number' => $row['part_number'], 'pcs_quantity' => (int) $row['pcs_quantity']],
+                isset($row['expected_part_setting_id']) ? ['expected_part_setting_id' => (int) $row['expected_part_setting_id']] : []), $data['items']),
         ], JSON_THROW_ON_ERROR));
     }
 
@@ -33,7 +34,7 @@ class ExportDeliveryPlanService
             'revision' => $plan->revision, 'total_pcs' => $plan->total_pcs, 'total_boxes' => $plan->total_boxes,
             'source_type' => $plan->source_type, 'source_name' => $plan->source_name,
             'items' => $plan->items->map(fn ($item) => $item->only([
-                'part_setting_id', 'part_number', 'pcs_quantity', 'pcs_per_box', 'box_quantity', 'not_full_pcs', 'box_composition',
+                'part_setting_id', 'part_number', 'document_part_number', 'pcs_quantity', 'pcs_per_box', 'box_quantity', 'not_full_pcs', 'box_composition',
             ]))->all(),
         ];
     }
@@ -56,16 +57,38 @@ class ExportDeliveryPlanService
             }
             $before = $id ? $this->snapshot($plan) : [];
             $existing = $id ? $plan->items->keyBy('part_setting_id') : collect();
-            $parts = PartSetting::whereIn('part_number', array_column($data['items'], 'part_number'))
-                ->orderBy('id')->lockForUpdate()->get()->keyBy('part_number');
+            $numbers = array_column($data['items'], 'part_number');
+            $parts = PartSetting::with('documentNumbers')->where(fn ($q) => $q->whereIn('part_number', $numbers)
+                ->orWhereHas('documentNumbers', fn ($aliases) => $aliases->whereIn('document_number', $numbers))
+                ->orWhereIn('id', $existing->keys()))->orderBy('id')->lockForUpdate()->get();
+            $mapping = app(PartDocumentNumberService::class);
+            $savedDocuments = $existing->keyBy(fn ($item) => $item->document_part_number ?? $item->part_number);
             $items = [];
             $errors = [];
+            $seen = [];
             foreach ($data['items'] as $index => $row) {
-                $part = $parts->get($row['part_number']);
-                if (! $part || (string) $part->part_number !== $row['part_number']) {
+                // A saved document code remains bound to its historical product on edit.
+                $savedItem = $savedDocuments->get($row['part_number']);
+                try {
+                    $part = $savedItem ? $parts->firstWhere('id', $savedItem->part_setting_id)
+                        : $mapping->resolve($row['part_number'], $parts);
+                } catch (ValidationException $error) {
+                    $errors["items.{$index}.part_number"] = implode(' ', \Illuminate\Support\Arr::flatten($error->errors()));
+                    continue;
+                }
+                if (! $part) {
                     $errors["items.{$index}.part_number"] = 'Nomor part belum terdaftar pada master bersama.';
                     continue;
                 }
+                if (isset($row['expected_part_setting_id']) && (int) $row['expected_part_setting_id'] !== (int) $part->id) {
+                    $errors["items.{$index}.part_number"] = 'Pemetaan kode dokumen berubah setelah pratinjau. Muat ulang dan periksa kembali produk tujuan.';
+                    continue;
+                }
+                if (isset($seen[$part->id])) {
+                    $errors["items.{$index}.part_number"] = 'Beberapa kode mengacu ke part yang sama. Gabungkan jumlah PCS dalam satu baris.';
+                    continue;
+                }
+                $seen[$part->id] = true;
                 // Existing rows keep their capacity snapshot when the master changes.
                 $capacity = (int) ($existing->get($part->id)?->pcs_per_box ?? $part->qty_box);
                 $quantity = (int) $row['pcs_quantity'];
@@ -74,6 +97,8 @@ class ExportDeliveryPlanService
                     continue;
                 }
                 $items[] = ['part_setting_id' => $part->id, 'part_number' => $part->part_number,
+                    'document_part_number' => $row['part_number'] === $part->part_number
+                        ? ($existing->get($part->id)?->document_part_number ?? $row['part_number']) : $row['part_number'],
                     'position' => $index + 1, 'pcs_quantity' => $quantity,
                     'pcs_per_box' => $capacity, 'box_quantity' => (int) ceil($quantity / $capacity), 'not_full_pcs' => $quantity % $capacity];
             }
@@ -83,7 +108,7 @@ class ExportDeliveryPlanService
             $code = \App\Support\DeliveryPlanCode::normalize(array_key_exists('plan_code', $data) ? $data['plan_code'] : $plan->plan_code);
             if ($code === '') throw ValidationException::withMessages(['plan_code' => 'Kode rencana delivery wajib diisi.']);
             if (DB::table('export_delivery_plan_codes')->where('code',$code)->when($id,fn($q)=>$q->where('export_delivery_plan_id','!=',$id))->exists()) {
-                throw ValidationException::withMessages(['plan_code' => 'Kode rencana delivery sudah pernah digunakan. Gunakan kode lain; kode tetap unik setelah selesai, dibatalkan atau diarsipkan.']);
+                throw ValidationException::withMessages(['plan_code' => 'Kode rencana delivery sudah pernah digunakan. Gunakan kode lain, kode tetap unik setelah selesai, dibatalkan atau diarsipkan.']);
             }
             $plan->fill([
                 'plan_code' => $code,

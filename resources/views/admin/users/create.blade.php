@@ -70,7 +70,7 @@
                                 value="{{ old('email') }}" maxlength="255" autocomplete="email" required
                                 placeholder="nama@perusahaan.com" aria-invalid="{{ $errors->has('email') ? 'true' : 'false' }}"
                                 aria-describedby="user-email-help @error('email') user-email-error @enderror">
-                            <p id="user-email-help" class="user-form-help">Digunakan untuk masuk; email harus unik.</p>
+                            <p id="user-email-help" class="user-form-help">Digunakan untuk masuk, email harus unik.</p>
                             @error('email')<div id="user-email-error" class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                         </div>
                     </div>

@@ -17,16 +17,18 @@ function setup() {
     const split = element({ value: 'delivery_split', checked: false, dataset: { requires: '["delivery_schedule"]' } });
     const stock = element({ value: 'stock_view', checked: true, dataset: { requires: '[]' } });
     const boxes = [schedule, picking, split, stock];
+    const rows = ['Jadwal delivery lokal', 'Picking verifikasi lokal', 'Split delivery lokal', 'Lihat stok ekspor']
+        .map(text => element({dataset: {permissionSearch: text}, hidden: false}));
     const deliveryCount = element();
     const stockCount = element();
     const groups = [
-        { querySelector: () => deliveryCount, querySelectorAll: () => [schedule, picking, split] },
-        { querySelector: () => stockCount, querySelectorAll: () => [stock] },
+        { querySelector: () => deliveryCount, querySelectorAll: selector => selector === '[data-permission-row]' ? rows.slice(0, 3) : [schedule, picking, split] },
+        { querySelector: () => stockCount, querySelectorAll: selector => selector === '[data-permission-row]' ? rows.slice(3) : [stock] },
     ];
     let submitted = 0;
     const form = element({
         dataset: { roleLabel: 'Operator Warehouse' },
-        querySelectorAll(selector) { return selector === '[data-access-group]' ? groups : boxes; },
+        querySelectorAll(selector) { return selector === '[data-access-group]' ? groups : selector === '[data-permission-row]' ? rows : boxes; },
         submit() { submitted += 1; },
     });
     const selectedCount = element();
@@ -34,6 +36,11 @@ function setup() {
     const saveButton = element({ disabled: false });
     const selectAll = element();
     const clearAll = element();
+    const search = element({value: ''});
+    const searchStatus = element();
+    const expandGroups = element();
+    const collapseGroups = element();
+    const groupControls = element({hidden: true});
     const elements = {
         featureAccessForm: form,
         accessSelectedCount: selectedCount,
@@ -41,6 +48,11 @@ function setup() {
         saveFeatureAccess: saveButton,
         selectAllFeatures: selectAll,
         clearAllFeatures: clearAll,
+        accessPermissionSearch: search,
+        accessSearchStatus: searchStatus,
+        expandAccessGroups: expandGroups,
+        collapseAccessGroups: collapseGroups,
+        accessGroupControls: groupControls,
     };
     const alerts = [];
     const windowEvents = {};
@@ -62,7 +74,8 @@ function setup() {
     });
 
     return { schedule, picking, split, stock, selectedCount, changeStatus, deliveryCount,
-        selectAll, clearAll, form, alerts, saveButton, windowEvents,
+        selectAll, clearAll, form, alerts, saveButton, windowEvents, search, rows, groups,
+        searchStatus, expandGroups, collapseGroups, groupControls,
         get submitted() { return submitted; } };
 }
 
@@ -98,4 +111,91 @@ test('empty access is explained before saving and dirty navigation stays guarded
     ui.alerts[0].onConfirm();
     assert.equal(ui.submitted, 1);
     assert.equal(ui.saveButton.disabled, true);
+});
+
+test('search matches all words and hides empty groups without changing grants', () => {
+    const ui = setup();
+    ui.search.value = '  stok  EKSPOR ';
+    ui.search.events.input();
+    assert.deepEqual(ui.rows.map(row => row.hidden), [true, true, true, false]);
+    assert.equal(ui.groups[0].hidden, true);
+    assert.equal(ui.stock.checked, true);
+    ui.search.value = '';
+    ui.search.events.input();
+    assert.ok(ui.rows.every(row => !row.hidden));
+    assert.equal(ui.groups[0].hidden, false);
+});
+
+test('nested actions select and revoke all prerequisite levels', () => {
+    const ui = setup();
+    ui.split.dataset.requires = '["delivery_pick"]';
+    ui.schedule.checked = false;
+    ui.split.checked = true;
+    ui.split.events.change();
+    assert.equal(ui.picking.checked, true);
+    assert.equal(ui.schedule.checked, true);
+    ui.schedule.checked = false;
+    ui.schedule.events.change();
+    assert.equal(ui.picking.checked, false);
+    assert.equal(ui.split.checked, false);
+});
+
+test('pasted full-width search and non-breaking spaces preserve the selected permissions', () => {
+    const ui = setup();
+    ui.search.value = '\u3000ＳＴＯＫ\u00a0ＥＫＳＰＯＲ\u3000';
+    ui.search.events.input();
+    assert.deepEqual(ui.rows.map(row => row.hidden), [true, true, true, false]);
+    assert.equal(ui.stock.checked, true);
+    assert.equal(ui.schedule.checked, true);
+    assert.equal(ui.picking.checked, false);
+    assert.equal(ui.changeStatus.textContent, 'Belum ada perubahan.');
+    ui.search.value = '';
+    ui.search.events.input();
+    assert.ok(ui.rows.every(row => !row.hidden));
+    assert.equal(ui.selectedCount.textContent, '2 dari 4 fitur dipilih');
+});
+
+test('search opens matching chunks and restores the chosen disclosure state when cleared', () => {
+    const ui = setup();
+    assert.equal(ui.groupControls.hidden, false);
+    assert.deepEqual(ui.groups.map(group => group.open), [true, false]);
+    ui.collapseGroups.events.click();
+    assert.ok(ui.groups.every(group => !group.open));
+    ui.search.value = 'stok';
+    ui.search.events.input();
+    assert.equal(ui.groups[1].open, true);
+    assert.equal(ui.expandGroups.disabled, true);
+    assert.match(ui.searchStatus.textContent, /1 dari 4/);
+    ui.search.value = 'stok ekspor';
+    ui.search.events.input();
+    ui.search.value = '';
+    ui.search.events.input();
+    assert.ok(ui.groups.every(group => !group.open));
+    assert.equal(ui.expandGroups.disabled, false);
+    ui.expandGroups.events.click();
+    assert.ok(ui.groups.every(group => group.open));
+    assert.equal(ui.schedule.checked, true);
+    assert.equal(ui.stock.checked, true);
+    assert.equal(ui.changeStatus.textContent, 'Belum ada perubahan.');
+});
+
+test('empty search results explain recovery while hidden permissions retain dependency behavior', () => {
+    const ui = setup();
+    ui.search.value = 'tidak ditemukan';
+    ui.search.events.input();
+    assert.ok(ui.groups.every(group => group.hidden));
+    assert.match(ui.searchStatus.textContent, /Tidak ada menu/);
+    ui.selectAll.events.click();
+    assert.equal(ui.selectedCount.textContent, '4 dari 4 fitur dipilih');
+    ui.clearAll.events.click();
+    assert.equal(ui.selectedCount.textContent, '0 dari 4 fitur dipilih');
+    ui.picking.checked = true;
+    ui.picking.events.change();
+    assert.equal(ui.schedule.checked, true);
+    ui.search.value = '';
+    ui.search.events.input();
+    assert.equal(ui.picking.checked, true);
+    assert.equal(ui.schedule.checked, true);
+    assert.equal(ui.stock.checked, false);
+    assert.equal(ui.selectedCount.textContent, '2 dari 4 fitur dipilih');
 });

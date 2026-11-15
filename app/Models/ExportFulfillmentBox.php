@@ -8,6 +8,15 @@ use Illuminate\Database\Eloquent\Model;
 /** Active reservation or confirmed placement; not an inventory receipt. */
 class ExportFulfillmentBox extends Model
 {
+    protected static function booted(): void
+    {
+        static::creating(function ($row) {
+            $row->identity_cycle = $row->export_stock_box_id
+                ? ExportStockBox::withTrashed()->whereKey($row->export_stock_box_id)->value('identity_cycle')
+                : max(1, \App\Support\BoxIdentity::lastCycle($row->box_number));
+        });
+    }
+
     protected $guarded = ['id'];
 
     protected $casts = [

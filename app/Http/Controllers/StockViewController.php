@@ -20,7 +20,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use Maatwebsite\Excel\Facades\Excel;
 
 class StockViewController extends Controller
 {
@@ -954,7 +953,7 @@ class StockViewController extends Controller
             'pallet_number' => $pallet->pallet_number,
             'location' => $pallet->stockLocation->warehouse_location ?? 'Unknown',
             'items' => $items->values(),
-            'history' => $this->buildPalletHistory($pallet),
+            'history' => auth()->user()->canAccess('stock_history') ? $this->buildPalletHistory($pallet) : [],
         ]);
     }
 
@@ -1352,6 +1351,13 @@ class StockViewController extends Controller
         return response()->json([
             'box_id' => $box->id,
             'box_number' => $box->box_number,
+            'identity_cycle' => (int) $box->identity_cycle,
+            'uses' => Box::withTrashed()->where('box_number', $box->box_number)->orderByDesc('identity_cycle')
+                ->get(['id', 'identity_cycle', 'part_number', 'pcs_quantity', 'created_at', 'deleted_at'])->map(fn ($use) => [
+                    'id' => $use->id, 'cycle' => (int) $use->identity_cycle, 'part_number' => $use->part_number,
+                    'pcs_quantity' => (int) $use->pcs_quantity, 'received_at' => $use->created_at?->format('d/m/Y H:i'),
+                    'archived' => $use->trashed(),
+                ]),
             'history' => $allHistory,
         ]);
     }
@@ -1634,8 +1640,7 @@ class StockViewController extends Controller
         $stocks = $this->buildStockItems($search);
         $sortMode = $this->normalizeSortMode('part', $request->query('sort'));
 
-        return Excel::download(
-            new StockViewByPartExport($this->buildPartGroups($stocks), $sortMode),
+        return (new StockViewByPartExport($this->buildPartGroups($stocks), $sortMode))->download(
             'stock_by_part_'.now()->format('Ymd_His').'.xlsx'
         );
     }
@@ -1649,8 +1654,7 @@ class StockViewController extends Controller
         $sortMode = $this->normalizeSortMode('box_id', $request->query('sort'));
         $stocks = $this->buildStockItems($search);
 
-        return Excel::download(
-            new StockViewByBoxIdExport($stocks, $sortMode),
+        return (new StockViewByBoxIdExport($stocks, $sortMode))->download(
             'stock_by_box_id_'.now()->format('Ymd_His').'.xlsx'
         );
     }
@@ -1671,8 +1675,7 @@ class StockViewController extends Controller
             ->unique()
             ->toArray();
 
-        return Excel::download(
-            new StockViewByPalletExport($this->buildPalletGroups($stocks, $mergedPalletIds), $sortMode),
+        return (new StockViewByPalletExport($this->buildPalletGroups($stocks, $mergedPalletIds), $sortMode))->download(
             'stock_by_pallet_'.now()->format('Ymd_His').'.xlsx'
         );
     }

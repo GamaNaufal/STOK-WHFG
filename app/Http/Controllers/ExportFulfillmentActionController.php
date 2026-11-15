@@ -100,6 +100,7 @@ class ExportFulfillmentActionController extends Controller
 
     public function cancelForm(ExportDeliveryPlan $deliveryPlan, ExportFulfillmentCompletionService $service)
     {
+        abort_unless(auth()->user()->canDeleteExportDeliveryPlan(), 403);
         abort_unless($deliveryPlan->palletPlan?->isFinalFor($deliveryPlan), 404);
         $preview = $service->cancellation($deliveryPlan);
         $choices = app(ExportStockViewService::class)->choices();
@@ -114,7 +115,7 @@ class ExportFulfillmentActionController extends Controller
             'reason' => 'required|string|max:500', 'request_token' => 'required|uuid', 'return_confirmed' => 'sometimes|accepted',
             'destination' => ['nullable', 'required_if:return_confirmed,1', 'regex:/^(location|pallet):[1-9][0-9]*$/']]);
         $service->cancel($deliveryPlan, $data, $request->user());
-        return redirect()->route('export.fulfillment.index')->with('success', 'Permintaan dibatalkan. Reservasi dan lokasi dilepas; box tetap sebagai stok cadangan dan riwayat tersimpan.');
+        return redirect()->route('export.fulfillment.index')->with('success', 'Permintaan dibatalkan. Reservasi dan lokasi dilepas, box tetap sebagai stok cadangan dan riwayat tersimpan.');
     }
 
     public function reopen(Request $request, ExportDeliveryPlan $deliveryPlan, ExportPlannedPallet $pallet, ExportFulfillmentCompletionService $service)

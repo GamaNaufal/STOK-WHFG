@@ -88,7 +88,7 @@
                 </tbody>
             </table>
         </div>
-        <p class="verification-list-footnote">Geser tabel untuk melihat semua kolom. Nomor order tetap terlihat; pada ponsel, tombol aksi juga tetap terlihat.</p>
+        <p class="verification-list-footnote">Geser tabel untuk melihat semua kolom. Nomor order tetap terlihat, pada ponsel, tombol aksi juga tetap terlihat.</p>
     </section>
 </div>
 @endsection

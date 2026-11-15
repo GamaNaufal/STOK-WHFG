@@ -12,7 +12,7 @@
 
         <div class="receiving-workspace receiving-bulk-workspace">
             <section class="plan-panel" aria-labelledby="receiving-scan-title"><div class="plan-panel-heading"><h2 id="receiving-scan-title">Scan box dan part</h2><span class="plan-help">PCS otomatis</span></div><div class="plan-panel-body">
-                <form id="export-bulk-scan-form" novalidate data-scan-feedback data-progress-user="{{ auth()->id() }}" data-batches-url="{{ route('export.receiving.batches.start') }}" data-check-url="{{ route('export.receiving.check-box') }}" data-stock-url="{{ route('export.stock.index') }}">
+                <form id="export-bulk-scan-form" data-permission="export_receiving_scan" novalidate data-scan-feedback data-progress-user="{{ auth()->id() }}" data-batches-url="{{ route('export.receiving.batches.start') }}" data-check-url="{{ route('export.receiving.check-box') }}" data-stock-url="{{ route('export.stock.index') }}">
                     @csrf
                     <div class="mb-3"><label class="form-label" for="receive-box-number">1. Scan ID Box</label><div class="receiving-field-action"><input class="form-control" id="receive-box-number" type="text" inputmode="numeric" autocomplete="off" maxlength="8" pattern="[0-9]{8}" aria-describedby="receive-box-help"><button class="btn btn-outline-primary" type="button" id="scan-box-button">Cek box</button></div><p class="plan-help" id="receive-box-help">ID Box 8 digit. Enter untuk lanjut ke nomor part.</p></div>
                     <div class="mb-3"><label class="form-label" for="receive-part-number">2. Scan nomor part</label><input class="form-control" id="receive-part-number" type="text" autocomplete="off" maxlength="256"><p class="plan-help">Enter menambahkan box ke daftar, lalu scan box berikutnya.</p></div>
@@ -35,8 +35,8 @@
                             aria-describedby="receiving-date-help" @error('input_date') aria-invalid="true" @enderror>
                         <p class="plan-help mb-0" id="receiving-date-help">Berlaku untuk semua box dalam daftar. Kosongkan untuk memakai waktu saat diproses.</p>
                     </div>
-                    <button class="btn btn-primary" type="submit" id="process-batch-button" disabled>Proses penerimaan</button>
-                    <button class="btn btn-outline-danger" type="button" id="discard-batch-button" disabled>Kosongkan daftar</button>
+                    <button class="btn btn-primary" type="submit" id="process-batch-button" data-permission="export_receiving_process" disabled>Proses penerimaan</button>
+                    <button class="btn btn-outline-danger" type="button" id="discard-batch-button" data-permission="export_receiving_clear" disabled>Kosongkan daftar</button>
                 </form>
                 <p class="plan-help receiving-table-note">Tujuan lokasi/pallet muncul setelah Proses penerimaan. Scan belum menambah stok fisik atau pemenuhan.</p>
             </section>

@@ -30,7 +30,7 @@
     @if($auditLogs->isEmpty())
         <div class="dashboard-stock-empty"><strong>Tidak ada aktivitas pada halaman ini.</strong><p>Periksa filter di atas atau gunakan navigasi halaman bila tersedia.</p></div>
     @else
-        <p class="dashboard-stock-hint" id="dashboard-audit-log-help">Geser tabel untuk melihat semua kolom. Jenis aktivitas tetap terlihat; deskripsi ditampilkan lengkap.</p>
+        <p class="dashboard-stock-hint" id="dashboard-audit-log-help">Geser tabel untuk melihat semua kolom. Jenis aktivitas tetap terlihat, deskripsi ditampilkan lengkap.</p>
         <div class="dashboard-stock-scroll" tabindex="0" role="region" aria-labelledby="dashboard-audit-log-title" aria-describedby="dashboard-audit-log-help">
             <table class="table dashboard-stock-table dashboard-stock-table--audit mb-0">
                 <caption class="visually-hidden">Riwayat audit sesuai filter, diurutkan dari aktivitas terbaru</caption>

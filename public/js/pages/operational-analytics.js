@@ -89,8 +89,9 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
         if (detailFallback) detailFallback.hidden = false;
 
         dashboard.querySelector('.od-detail-tabs').setAttribute('role', 'tablist');
-        const selectDetail = (key, focus = false) => {
+        const selectDetail = (key, focus = false, animate = false) => {
             if (!tabs.some(tab => tab.dataset.detailTab === key)) return;
+            dashboard.dataset.detailMotion = animate ? 'on' : 'off';
             state.detail = key;
             tabs.forEach(tab => {
                 const active = tab.dataset.detailTab === key;
@@ -166,7 +167,7 @@ export function initOperationalAnalytics({documentRef = globalThis.document, win
         tabs.forEach((tab, index) => {
             tab.addEventListener('click', event => {
                 if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
-                event.preventDefault(); selectDetail(tab.dataset.detailTab);
+                event.preventDefault(); selectDetail(tab.dataset.detailTab, false, event.detail > 0);
                 loadDetails();
             }, options);
             tab.addEventListener('keydown', event => {

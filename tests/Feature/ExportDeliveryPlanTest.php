@@ -99,12 +99,13 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_successful_update_retry_does_not_increment_revision_twice_even_after_archive(): void
     {
-        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());
+        PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$actor=$this->operator();$this->actingAs($actor);
         $this->post(route('export.delivery-plans.store'),$this->payload())->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
         $data=$this->payload(['revision'=>1,'items'=>[['part_number'=>'EXP-001','pcs_quantity'=>120]]]);$url=route('export.delivery-plans.update',$plan);
         $this->put($url,$data)->assertSessionHasNoErrors();$this->put($url,$data)->assertSessionHasNoErrors();
         $this->assertSame(2,$plan->fresh()->revision);$this->assertSame(120,$plan->fresh()->total_pcs);
-        $this->delete(route('export.delivery-plans.destroy',$plan),['revision'=>2])->assertSessionHasNoErrors();
+        $this->actingAs(User::factory()->create(['role'=>'admin']))->delete(route('export.delivery-plans.destroy',$plan),['revision'=>2])->assertSessionHasNoErrors();
+        $this->actingAs($actor);
         $this->put($url,$data)->assertSessionHasNoErrors()->assertRedirect(route('export.delivery-plans.index'));
         $this->assertDatabaseCount('export_delivery_plan_requests',2);
         $this->assertSame(1,AuditLog::where('type','export_delivery_plan')->where('action','updated')->count());
@@ -112,9 +113,10 @@ class ExportDeliveryPlanTest extends TestCase
 
     public function test_create_retry_resolves_archived_plan_before_rechecking_changed_master_capacity(): void
     {
-        $part=PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$this->actingAs($this->operator());$data=$this->payload();
+        $part=PartSetting::create(['part_number'=>'EXP-001','qty_box'=>20]);$actor=$this->operator();$this->actingAs($actor);$data=$this->payload();
         $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors();$plan=ExportDeliveryPlan::sole();
-        $this->delete(route('export.delivery-plans.destroy',$plan),['revision'=>1])->assertSessionHasNoErrors();
+        $this->actingAs(User::factory()->create(['role'=>'admin']))->delete(route('export.delivery-plans.destroy',$plan),['revision'=>1])->assertSessionHasNoErrors();
+        $this->actingAs($actor);
         $this->put(route('part-settings.update',$part),['part_number'=>$part->part_number,'qty_box'=>30])->assertSessionHasNoErrors();
         $this->post(route('export.delivery-plans.store'),$data)->assertSessionHasNoErrors()->assertRedirect(route('export.delivery-plans.index'));
         $this->assertSame(1,ExportDeliveryPlan::withTrashed()->count());$this->assertSame(0,ExportDeliveryPlan::count());
@@ -293,7 +295,7 @@ class ExportDeliveryPlanTest extends TestCase
         $this->put(route('part-settings.update', $part), ['part_number' => 'RENAMED', 'qty_box' => 20])
             ->assertSessionHas('error');
         $this->delete(route('part-settings.destroy', $part))->assertSessionHas('error');
-        $this->delete(route('export.delivery-plans.destroy', $plan), ['revision' => 1])->assertRedirect();
+        $this->actingAs(User::factory()->create(['role'=>'admin']))->delete(route('export.delivery-plans.destroy', $plan), ['revision' => 1])->assertRedirect();
         $this->assertSoftDeleted('export_delivery_plans', ['id' => $plan->id]);
         $this->assertDatabaseCount('export_delivery_plan_items', 1);
         $this->get(route('export.delivery-plans.show', $plan))->assertNotFound();

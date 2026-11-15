@@ -262,7 +262,7 @@ class StockTruthRegressionTest extends TestCase
         ]);
     }
 
-    public function test_withdrawn_box_id_cannot_be_scanned_back_into_stock(): void
+    public function test_withdrawn_box_number_can_be_scanned_for_a_new_receipt_without_restoring_the_old_box(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $pallet = Pallet::create(['pallet_number' => 'PLT-RESCAN-GUARD']);
@@ -274,8 +274,12 @@ class StockTruthRegressionTest extends TestCase
         $this->actingAs($operator)
             ->withSession(['current_pallet_id' => $pallet->id])
             ->postJson(route('stock-input.scan-barcode'), ['barcode' => $box->box_number])
-            ->assertStatus(400)
-            ->assertJson(['success' => false]);
+            ->assertOk()
+            ->assertJson(['success' => true]);
+        $this->assertTrue($box->fresh()->is_withdrawn);
+        $this->assertNull(session('pending_box.box_id'));
+        $this->assertSame(1, session('pending_box.expected_cycle'));
+        $this->assertDatabaseCount('boxes', 1);
     }
 
     private function createOrder(User $sales, string $partNumber, int $quantity, string $status = 'approved'): DeliveryOrder

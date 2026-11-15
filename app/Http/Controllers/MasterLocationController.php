@@ -73,7 +73,7 @@ class MasterLocationController extends Controller
             DB::transaction(function () use ($request, $location, $validated, $model) {
                 $locked = $model::whereKey($location->id)->lockForUpdate()->firstOrFail();
                 if ($locked instanceof ExportMasterLocation && ($locked->plannedPallets()->exists() || $locked->stockPalletHistory()->exists())) {
-                    throw new \RuntimeException('Lokasi ini tercatat pada perencanaan atau stok ekspor; identitasnya tidak dapat diubah.');
+                    throw new \RuntimeException('Lokasi ini tercatat pada perencanaan atau stok ekspor, identitasnya tidak dapat diubah.');
                 }
                 if ($locked->is_occupied) {
                     throw new \RuntimeException('Gagal edit! Lokasi ini sedang terisi.');

@@ -1,6 +1,363 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 10 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 15 November 2026 (pembaruan inkremental).
+
+Penyelesaian sisa rules UI/UX, 15 November 2026:
+
+- Template Excel rencana delivery ikut helper download existing. Target tombol
+  tutup bersama dan aksi tabel/modal minimal 44 px, validasi tetap merah saat
+  fokus, teks panjang membungkus dan jarak footer modal konsisten.
+- Master part mengelompokkan identitas/kapasitas serta pemetaan dokumen native.
+  Kode berbeda/error terbuka; invalid membuka bagian sebelum fokus. Field tetap
+  dikirim saat diringkas dan fallback markup terbuka tanpa script enhancement.
+  Rencana delivery diberi urutan tiga bagian, koreksi box memakai dua fieldset.
+  Tidak mengubah name/payload, validasi bisnis, scanner atau hak akses.
+- 70 tes backend / 1.301 assertions dan seluruh 162 tes frontend lulus.
+  Render fixture/stream template asli terpisah lulus satu tes / 12 assertions.
+  Testing memakai SQLite in-memory, browser memakai data fiktif. Desktop dan
+  viewport 390 px memeriksa keyboard, error, FormData, target klik dan overflow.
+  Before/after: docs/UI_RULES_COMPLETION_2026-11-15.md.
+
+Feedback download Excel, 15 November 2026:
+
+- Helper `public/js/excel-download.js` memberi feedback persiapan dan menahan
+  request URL sama selama pending serta 1 detik setelah ready untuk mencegah
+  klik beruntun pada respons cepat; filter/GET/filename/isi/izin tetap. Mencakup
+  laporan/dashboard, Stock View, stok Ekspor, audit dan stock opname selesai.
+- Global `ExcelDownloadStatus` hanya menambahkan cookie acknowledgement untuk
+  GET bertoken acak valid dengan respons attachment Excel sukses. Cookie
+  non-rahasia dipasang sesudah enkripsi cookie web, Secure pada HTTPS,
+  SameSite Lax dan berumur 120 detik. Tidak mengubah cookie sesi atau database.
+- Browser tetap mengunduh native melalui iframe, tanpa buffer Blob JS. Ready
+  berarti respons diserahkan ke browser, bukan file sudah tersimpan di disk.
+  Error/sesi berakhir menyediakan retry/native; timer tidak menciptakan sukses
+  atau progres persentase. Bila ack tak terbaca selama 60 detik, pemantauan dan
+  spinner berhenti, tombol pulih dan status Belum terkonfirmasi muncul. Iframe
+  dipertahankan agar request native tetap berjalan; cek daftar unduhan browser.
+- Atas arahan pengguna, status Excel siap menutup otomatis setelah 3 detik,
+  tanpa tertahan hover/fokus dan tanpa tombol Tutup. Fokus panel dikembalikan
+  ke tombol asal; error tetap menyediakan tindakan pemulihan.
+- Verifikasi: seluruh frontend lulus; enam tes middleware/34 assertions dan
+  37 regresi ekspor/564 assertions lulus pada testing. Browser mengunduh XLSX
+  fiktif valid, memeriksa duplicate, form/filter, auth/error dan desktop/390 px.
+  Tidak menjalankan migration/deployment. Dokumen: docs/EXCEL_DOWNLOAD_FEEDBACK.md.
+
+Perbaikan keamanan terarah, 15 November 2026:
+
+- Tidak menambah migration atau mengubah data operasional. Withdrawal delivery
+  langsung mengunci parent sebelum item/stock dan hanya menerima approved,
+  processing atau partial. Split menolak Not Full pending sebelum mutasi, sesuai UI.
+- Payload relokasi Redo legacy tetap dapat menyampaikan lokasi, tetapi key pallet
+  dari client tidak menentukan target. Relokasi memakai pallet konsolidasi server.
+  Shared box legacy tidak dipindah ulang ke pallet asal setelah konsolidasi,
+  ringkasan asal dihitung dari box aktif tersisa agar tidak ada stok terhitung ganda.
+  History dan hasil Redo lama tidak ditulis ulang.
+- Bootstrap stock-view memakai JSON_HEX flags; picker/status/box/FIFO meng-escape
+  teks dinamis; toast dan fallback error memperlakukan pesan sebagai teks.
+- TextSafeExport melindungi StockInput, AuditTrail dan tiga StockView exporter:
+  string tetap teks termasuk leading zero/formula, angka tetap numerik. Download
+  memulihkan binder global pada finally. Master audit Lokal/Ekspor ikut terlindungi.
+- Penerima default email expired menyaring akun aktif; konfigurasi override tetap.
+  Seeder user contoh tidak berjalan pada environment production, tanpa reset akun
+  existing. Laporan lama memvalidasi tanggal dan memakai tanggal beraktivitas untuk
+  grafik rentang panjang, tanpa membatasi pembacaan history/agregat.
+- Tiga gap audit ditelusuri: master-to-audit Excel ditutup oleh binder, sedangkan
+  persistence delivery Ekspor dan planning/finalisasi/acknowledge FIFO sudah memiliki
+  kontrol actor/target/revision, mutex, scope/reservasi dan committed box yang relevan.
+- Verifikasi source/sintaks saja. Tes regresi ditambahkan tetapi BELUM dijalankan,
+  karena sandbox target-code sesuai panduan security-audit tidak tersedia. Tidak
+  mengadopsi jumlah tes development sebelumnya sebagai hasil verifikasi patch ini.
+  Status audit lama tetap incomplete. Rincian: docs/SECURITY_FIXES_2026-11-15.md.
+
+Penggunaan ulang ID Box Lokal/Ekspor, 15 November 2026:
+
+- Atas persetujuan pengguna, nomor dapat dipakai lagi setelah penggunaan lama
+  berakhir dalam segala kondisi, termasuk hapus manual, pengambilan/kirim,
+  penolakan QA dan label asal setelah packing selesai. Penerimaan baru boleh
+  memiliki part/PCS berbeda sesuai validasi biasa. Stok aktif/expired yang belum
+  dilepas, QA/packing berjalan, request Not Full pending/prepared dan issue picking
+  terbuka tetap memblokir penerimaan baru. Izin hapus dan penguncian proses aktif
+  tetap berlaku. Bagian ini menggantikan larangan reuse pada catatan lama.
+- Migration 2026_11_15_000001_allow_box_number_reuse menambah last_cycle pada
+  registry dan identity_cycle pada Box, ExportStockBox serta ExportFulfillmentBox.
+  Data lama bernilai 1, PK/FK/tanggal/kuantitas tidak ditulis ulang. Unique stock
+  menjadi nomor + penggunaan, unique label QA diganti index biasa, unique Not Full
+  hanya untuk request pending melalui kolom terhitung. Rollback yang meratakan
+  beberapa penggunaan menjadi satu nomor ditolak.
+- BoxIdentity mengunci registry global serta memeriksa pemilik aktif memakai
+  locking read saat klaim dalam transaksi insert. Registry dipertahankan sesudah
+  penghapusan, penghitung bertambah untuk penerimaan baru, origin_scope menunjukkan
+  lingkup penerimaan terakhir. Klaim gagal tidak mengonsumsi penghitung. Pencatatan
+  fisik komitmen ekspor legacy tetap adopsi penggunaan yang sama, bukan receipt baru.
+- Riwayat lokal (modal) dan ekspor (halaman history) dapat memilih penggunaan dalam
+  lingkup masing-masing. Picking history ekspor dibaca lewat FK fulfillment agar
+  nomor sama tidak mencampur scan. Detail dan Excel Rincian Box Laporan Pengiriman
+  memuat Penggunaan ID Box. QA hard delete tetap memakai snapshot penanganan.
+- Redo/restore penggunaan lama ditolak jika nomor pernah digunakan oleh penerimaan
+  lain, walaupun penerimaan berikutnya juga dihapus. Sebelum reuse, Redo mengikuti
+  aturan existing. Scan input lokal/draft ekspor menyimpan penghitung saat scan dan
+  menolak daftar yang stale. Retry token receipt lama mengembalikan record lama,
+  tidak membuat box baru. Stock opname mempertahankan snapshot awal/scan, mengganti
+  snapshot kondisi kini bila PK berbeda, dan mewajibkan scan ulang penggunaan baru.
+- inventory:unification-check pada schema baru hanya melaporkan benturan pemilik
+  aktif lintas lingkup. Sebelum migrasi shared master, pemeriksaan legacy tetap.
+- Barcode fisik tetap delapan digit sehingga label lama dan baru bernomor sama
+  tidak dapat dibedakan scanner. Label lama harus disingkirkan sebelum reuse.
+  Dokumen: docs/BOX_NUMBER_REUSE.md. Belum dijalankan pada DB operasional/production.
+- Verifikasi akhir: 697 tes backend / 7.428 assertions, 694 lulus, tiga kegagalan
+  UiReviewPreviewTest dashboard sesuai baseline, tanpa error atau kegagalan fitur
+  reuse. Seluruh 147 tes frontend lulus, diff --check lulus. Tes mencakup migration
+  berisi data lama/draft, reuse lintas lingkup, hapus/kirim/QA, FK laporan/history,
+  Excel numerik penggunaan, pending Not Full, stale scan, Redo/restore, rollback
+  klaim dan kompatibilitas sesi opname existing. Pengujian memakai SQLite in-memory,
+  bukan database operasional. DDL production tetap perlu diuji pada engine yang sama.
+
+Laporan Pengiriman per kejadian Lokal/Ekspor, 15 November 2026:
+
+- Menu Laporan Pengambilan menjadi Laporan Pengiriman. URL reports.withdrawal
+  dan export-nya tetap kompatibel, serta reports.records dengan kind=shipments
+  mendelegasikan ke ShipmentReportController. Jenis laporan shipments diberi label
+  Pengiriman. Route reports.shipments.show/export menyediakan detail dan unduhan
+  satu kejadian, menggunakan izin reports dan reports_download existing.
+- ShipmentReportService hanya membaca data. Lokal dikelompokkan per sesi selesai,
+  termasuk beberapa sesi pada order yang sama dan histori Redo terpisah. Ekspor
+  per planning completed_at, termasuk delivery/box yang sudah diarsipkan. Pallet
+  siap atau pemenuhan lengkap saja tidak dicatat sebagai sudah dikirim.
+- Ringkasan seluruh histori per lingkup memuat jumlah delivery selesai, PCS/box
+  kirim netto dan kejadian Redo. Redo tidak menambah netto. Status campuran dalam
+  satu kejadian ditandai Perlu diperiksa. Catatan lama tanpa sesi dikelompokkan per
+  batch atau withdrawal asli, tanpa menebak customer/order. Kuantitas tetap dibaca
+  sesuai status, tetapi catatan ini tidak menambah jumlah delivery berreferensi.
+- Filter tanggal memakai waktu selesai kirim, bukan tenggat delivery. Pencarian
+  part/box/lokasi/operator memilih seluruh kejadian terkait, sehingga kuantitas
+  daftar, rincian dan Excel tetap mencakup seluruh isinya. Filter tabel/Excel tidak
+  mengubah kartu ringkasan seluruh histori. Default Pengiriman selesai, tersedia
+  tab Histori Redo/pengembalian dan Semua catatan. Status kosong dipertahankan pada
+  link agar tab Semua tidak kembali ke default saat pagination/unduhan.
+- Tombol Lihat seluruh keterangan membuka metadata delivery/sesi, waktu proses,
+  catatan delivery/approval, agregasi part, semua box, pallet/lokasi tercatat,
+  scan/verifikasi/penempatan dan petugas yang tersedia. Part dan box dipaginasi
+  terpisah. Data yang tidak tersedia pada catatan lama ditandai belum tercatat.
+  Agregasi part memakai identitas biner agar kode yang berbeda huruf tetap terpisah.
+  Kode dokumen ekspor memakai snapshot delivery, tidak membaca ulang alias master.
+- ShipmentReportExport/ShipmentReportSheet menghasilkan Ringkasan Delivery,
+  Rincian Part dan Rincian Box, seluruh halaman filter atau satu delivery pilihan.
+  ID/kode dan teks formula tetap teks, kuantitas numerik (box pecahan tidak dibulatkan
+  ke atas), waktu berupa tanggal Excel. Ekspor memakai transaksi baca tanpa mutex
+  inventory. Binder PhpSpreadsheet yang bersifat global dikembalikan melalui event
+  BeforeWriting dan finally controller, sehingga tidak memengaruhi Excel berikutnya.
+- delivery:purge-completions kini mempertahankan sesi dan item selesai, command
+  tetap tersedia untuk scheduler lama. Masa Redo operasional tidak diperpanjang.
+  Riwayat yang sudah terhapus sebelumnya tidak direkonstruksi secara spekulatif.
+  Tidak ada migration baru, perubahan ini tidak dijalankan pada database production.
+- UI mengikuti Bootstrap/teal dan preferensi Apple existing, kartu ringkas, filter,
+  tabel per kejadian, tombol rincian tetap terlihat saat tabel digulir, fokus dan
+  target sentuh, catatan ringkas di daftar serta catatan utuh di detail/Excel.
+  File UI: operator/reports/shipments, shipment-detail beserta partials dan
+  public/css/pages/report-shipments.css. CSS dimuat melalui ajax-styles bersama
+  seluruh laporan agar pergantian jenis/lingkup lewat AJAX tidak kehilangan gaya.
+  Panduan: docs/SHIPMENT_REPORTS.md.
+- Verifikasi: 58 tes terkait laporan/impor/ekspor lulus (608 assertions), termasuk
+  regresi isolasi binder, semua halaman, leading zero/formula, arsip, pembatasan
+  izin baca/unduh, fallback catatan lama, Redo, retensi dan pembacaan tanpa mutasi.
+  Verifikasi akhir 15 November: 681 tes backend/7.295 assertions, 678 lulus,
+  tiga kegagalan dashboard UiReviewPreviewTest sesuai baseline, tanpa error atau
+  kegagalan impor Excel baru. Seluruh 147 frontend lulus. Sembilan tes khusus
+  ShipmentReportTest (102 assertions) juga lulus setelah penambahan pemeriksaan
+  pemuatan CSS sebelum pergantian laporan lewat AJAX. Diff --check lulus.
+  Template HTML berhasil
+  dirender dengan data uji, pemeriksaan visual browser terhalang kebijakan file lokal.
+
+Perincian Hak Akses seluruh Lokal/Ekspor, 13 November 2026:
+
+- Bagian ini menggantikan acuan izin menu pada catatan terdahulu di bawah.
+  Ada 141 izin, termasuk 100 tindakan rinci. `config/feature_actions.php` berisi
+  tindakan tambah/ubah/hapus/cetak, scan/simpan/clear penerimaan, assignment stok
+  vs input box baru, keputusan PPC/issue/Not Full, split/restore, tahap expired
+  QA/packing/receive, tahap opname, serta seluruh tindakan planning/pemenuhan.
+  `config/feature_access.php` membangun dependensi dan default dari izin existing.
+- `FeatureAccessService` memilih tindakan spesifik sebelum wildcard menu. Route
+  bersama memeriksa payload action/status, termasuk draft/finalize, reopen/cancel,
+  approve/reject/correction, dan tahap expired. Preview/search murni tetap dapat
+  dibaca pemilik modul. POST assignment dengan new_boxes memerlukan izin tersendiri.
+  Stok ekspor kini memiliki izin baca `export_stock_view` tersendiri; akses baca
+  existing dari receiving/manage dikonversi, tanpa memberi izin kelola baru.
+- Izin revisi pallet `export_fulfillment_revise` dapat diatur untuk semua role.
+  `export_delivery_delete` tetap dibatasi admin_warehouse/supervisi (admin penuh).
+  `export_fulfillment_cancel` memerlukan izin hapus. Revisi menolkan pallet terakhir
+  memerlukan keduanya; revisi sebagian tidak memerlukan izin pembatalan seluruh
+  permintaan. Hapus planning berlokasi memerlukan `export_pallet_cancel`, pelepasan
+  box juga memerlukan `export_fulfillment_cancel`. Aturan pengembalian fisik tetap.
+- Service planning dan completion memeriksa lagi izin tindakan sebelum mutasi.
+  Rincian dashboard `dashboard_details` bisa dicabut dari Supervisi; jalur fallback
+  `?show_details=1`/audit pagination juga tidak memuat data detail saat dicabut.
+  Izin stock_history juga menyaring history yang tertanam pada API detail pallet;
+  akses membaca stok tidak membuka ulang histori yang telah dicabut.
+  Admin Utama tetap penuh; users/access_management/delivery_locks tetap khusus admin.
+- `GranularFeaturePermissions::expand` mempertahankan akses efektif data role
+  versi lama. Migration `2026_11_12_000002_version_granular_feature_permissions.php`
+  menambah `role_feature_access.permissions_version`, mengonversi grant lama dan
+  mencatat audit. Versi 2 menyimpan daftar tindakan eksplisit, sehingga pencabutan
+  tidak diwariskan ulang dari menu. Row versi 2 dilewati saat migration diulang.
+  Tidak mengubah data stok, transaksi, reservasi atau delivery. Pembacaan row lama
+  sebelum migration tetap didukung; menyimpan form rinci memerlukan kolom versi.
+  Downgrade otomatis ditolak karena kode lama dapat mengaktifkan kembali tindakan
+  melalui grant menu. Migration BELUM diterapkan pada database operasional.
+- Admin mengatur peran melalui pencarian menu/tindakan, uraian dan dependency
+  otomatis pada `admin/access/index`, `public/js/pages/feature-access.js` dan CSS.
+  Form mengirim permissions_version=2; integrasi admin lama tanpa versi masih
+  ditafsirkan sebagai daftar menu lama. Save dan audit satu transaksi; audit gagal
+  membatalkan perubahan. Panduan dan katalog: `docs/FEATURE_ACCESS_MATRIX.md`.
+- Layout mengirim kebijakan route/feature server ke `public/js/action-permissions.mjs`.
+  Script menyembunyikan link/form/button terlarang, memeriksa action pada form
+  bersama, dan mengamati kontrol modal/AJAX. Kontrol scanner/JS memakai data-permission.
+  Middleware tetap otoritatif; kontrol tidak dihapus agar inisialisasi modul aman.
+- Verifikasi regresi: 672 tes backend/7.193 assertions, 669 lulus, tiga kegagalan
+  UiReviewPreviewTest dashboard yang sudah ada; tidak ada error baru. Tes cakupan
+  route yang sebelumnya gagal pada dashboard/details kini lulus. Seluruh 147 tes
+  frontend dan npm build lulus. Tes khusus mencakup konversi/idempotensi, izin baca
+  vs tulis, action payload, prasyarat, role tetap, revoke tanpa regrant, pemanggilan
+  service, fallback dashboard, audit rollback, filter pencarian, dependency bertingkat
+  serta kontrol AJAX. Visual browser belum diverifikasi karena batas akses sesi.
+
+Pembatasan role penghapusan delivery ekspor, 12 November 2026:
+
+- Hanya Admin Utama (admin), Admin Warehouse (admin_warehouse), dan Supervisi
+  (supervisi) yang boleh menghapus rencana. User::canDeleteExportDeliveryPlan
+  juga memeriksa izin export_delivery_plans existing dan status akun aktif.
+  Tidak menambahkan izin default baru atau mengabaikan pencabutan Hak Akses.
+- Tombol/section hapus pada daftar/detail delivery dan hasil planning disembunyikan
+  untuk role lain. FeatureAccessService membatasi route deletion-preview, destroy,
+  fulfillment.cancel-form dan fulfillment.cancel sebelum controller/validasi.
+  Service preview/delete/cancel memeriksa lagi role agar pemanggilan langsung
+  serta token review lama setelah perubahan role tidak melewati pembatasan.
+- Pembatalan seluruh permintaan ikut dibatasi karena mengarsipkan delivery.
+  Revisi yang menolkan pallet terakhir ditolak 403 untuk role lain sebelum mutasi;
+  preview revisi menampilkan penjelasan dan menonaktifkan Simpan. Pengurangan
+  sebagian/penghapusan satu pallet ketika masih ada pallet lain dan pengiriman
+  selesai tetap mengikuti hak serta aturan operasional existing.
+- Admin Warehouse/Supervisi tetap memerlukan akses fitur yang relevan; pelepasan
+  lokasi/box mempertahankan pemeriksaan export_pallet_plans/export_fulfillment.
+  Tidak memerlukan migration atau perubahan data akun/database operasional.
+- Verifikasi: matriks tiga role diizinkan dan empat role ditolak mencakup tombol,
+  preview, DELETE, pembatalan, akses service langsung, perubahan role setelah
+  review, pencabutan izin, akun nonaktif dan revisi pallet terakhir. Regresi penuh
+  657 tes/6.305 assertions: 653 lulus, empat kegagalan yang sama seperti verifikasi
+  sebelumnya pada aturan dashboard/details dan tiga tampilan UiReviewPreviewTest.
+  Tidak ada error baru. Seluruh 141 tes frontend lulus; diff --check lulus.
+
+Tinjauan penghapusan dua tahap, 12 November 2026:
+
+- Klik Hapus pada daftar/detail delivery atau hasil planning membuka popup
+  tinjauan terlebih dahulu melalui GET deletion-preview dengan izin
+  export_delivery_plans existing. Tinjauan tidak melepas reservasi/mengubah stok.
+  Daftar mencakup setiap ID Box, part, PCS, pallet/lokasi asal tercatat, tujuan,
+  dampak, reservasi lokasi tujuan, serta kebutuhan/persiapan Not Full terkait.
+- Setelah Konfirmasi tinjauan, alert kedua menjelaskan bahwa rencana akan
+  dihapus dari daftar aktif dan kode tidak dapat dipakai ulang. Batal pada
+  salah satu tahap tidak mengirim penghapusan. Script memakai data preview
+  server, validasi alasan, escaping Blade/text alert, serta pencegahan klik ganda.
+- Reservasi box yang belum dipicking/ditempatkan kini dapat dilepas melalui
+  tinjauan ini bila planning final, versi sesuai dan operator memiliki izin
+  export_pallet_plans serta export_fulfillment. Alasan wajib. Penghapusan memakai
+  ExportFulfillmentCompletionService::cancel existing, tanpa tujuan pengembalian,
+  menjaga ID/part/PCS, lokasi asal dan FIFO, menaikkan revisi box untuk membatalkan
+  instruksi lama, lalu mengarsipkan delivery. Audit tambahan mencatat daftar box
+  dan lokasi yang dilepas. Histori pengurangan/pembatalan mengikuti service ini.
+- Box yang sudah mulai picking, terverifikasi, ditempatkan, atau menunggu
+  verifikasi merge ditampilkan sebagai wajib pengembalian fisik. Popup tidak
+  menyediakan konfirmasi hapus langsung; gunakan tautan pembatalan/pengembalian
+  existing. Pallet siap, issue terbuka, izin kurang, dan shipment selesai tetap
+  dilindungi. Hapus tanpa token tinjauan tetap hanya mengizinkan kondisi kosong
+  seperti implementasi sebelumnya, bukan pelepasan box tanpa review.
+- Tinjauan memakai token terenkripsi terikat akun, delivery, fingerprint box,
+  lokasi, versi dan Not Full, dengan masa berlaku 15 menit. Server membandingkan
+  ulang dalam mutex inventory sebelum mutasi; perubahan sejak popup dibuka wajib
+  ditinjau ulang. Kegagalan audit me-rollback pelepasan box, perubahan planning,
+  lokasi, delivery, dan token aksi pembatalan. Tidak memerlukan migration baru.
+- Verifikasi: 92 tes backend terkait (998 assertions) dan 141 frontend lulus.
+  Mencakup GET tanpa mutasi, dua konfirmasi/batal/retry, posisi stok tersimpan di
+  lokasi asal, FIFO, picking yang memerlukan pengembalian, box baru setelah
+  preview, token kedaluwarsa/akun lain/tamper, izin/alasan dan rollback audit.
+  Template popup diuji melalui respons HTTP; visual browser belum diverifikasi
+  karena batas akses browser pada sesi ini.
+
+Hapus rencana delivery ekspor, 12 November 2026:
+
+- Daftar rencana dan hasil Perencanaan Pallet menyediakan tautan Hapus menuju
+  bagian penghapusan pada detail delivery. Tombol Hapus rencana meminta
+  konfirmasi dengan kode yang di-escape, kemudian menghapus dari daftar aktif
+  melalui soft delete. Histori item, audit, dan ledger kode tetap dipertahankan;
+  kode delivery yang dihapus tidak dapat digunakan ulang.
+- Delivery draft tanpa komitmen box boleh dihapus meski sudah mempunyai planning
+  draft/final. Planning kosong otomatis dibatalkan lewat transition existing,
+  lalu reservasi lokasi dilepas dalam satu transaksi inventory yang sama dengan
+  penghapusan dan audit. Tidak perlu membatalkan planning secara terpisah.
+- Pembatalan planning otomatis tetap memerlukan izin export_pallet_plans selain
+  izin route export_delivery_plans. Revisi delivery dan pallet diperiksa lagi
+  saat simpan. Planning baru/berubah sejak halaman dibuka, box berreservasi atau
+  ditempatkan, issue picking terbuka, pallet siap, dan pengiriman selesai
+  melindungi data dari hapus langsung. Jika final dan pengguna memiliki izin
+  export_fulfillment, detail menyediakan tautan ke tinjauan pembatalan existing
+  untuk pelepasan reservasi/pengembalian fisik. Tidak ada perluasan hak akses.
+- ExportDeliveryPlanDeletionService memakai mutex inventory sebelum lock parent
+  dan planning, memeriksa ulang kondisi terkini, menyinkronkan pengumuman serta
+  kebutuhan Not Full, dan mencatat audit. Kegagalan audit me-rollback soft delete,
+  pembatalan planning dan pelepasan lokasi sekaligus. Tidak memerlukan migration.
+- Verifikasi: 52 tes backend terkait (508 assertions) dan 136 frontend lulus.
+  Pengujian mencakup planning kosong draft/final, box masuk setelah pratinjau,
+  revisi lama, hak akses terpisah, pengiriman selesai, rollback audit, histori,
+  konfirmasi batal, escaping kode serta pencegahan submit ganda. Pemeriksaan
+  visual browser belum dilakukan karena batas akses browser pada sesi ini.
+
+Perbaikan tinjauan FIFO kosong, 12 November 2026:
+
+- Setelah finalisasi tanpa rekomendasi box, tombol Oke tetap mengonfirmasi
+  tinjauan dan menutup modal. stock-review.mjs hanya memperbarui petunjuk
+  alokasi bila elemen tersebut ada; view stok kosong memang tidak merendernya.
+  Ini memperbaiki error textContent null setelah acknowledgment berhasil.
+- Aturan reservasi, antrean, FIFO dan hak akses tidak berubah. Tes regresi
+  mereproduksi kegagalan sebelum perbaikan dan lulus setelahnya; seluruh
+  135 tes frontend lulus. Tidak memerlukan perubahan schema/database.
+
+Kode label dan dokumen Master Part, 12 November 2026:
+
+- Master bersama mempertahankan part_settings.id dan part_number existing sebagai
+  identitas operasional/kode label scan. Satu form tambah/edit juga mengelola kode
+  dokumen melalui part_document_numbers. Opsi sama dengan label tidak memerlukan
+  alias; beberapa kode diisi satu per baris, maksimal 100 kode x 100 karakter.
+  Tanda / diperlakukan literal, tidak dipecah atau dipetakan otomatis dari Excel.
+- Pencarian master mencakup kode dokumen dan mengembalikan kode label existing.
+  Izin CRUD, larangan rename/hapus master terpakai, serta perlindungan perubahan
+  kapasitas pada delivery aktif tetap berlaku. Master dan pemetaan disimpan
+  atomik di mutex inventory ekspor, beserta snapshot audit sebelum/sesudah.
+  Kode dokumen tidak boleh bertabrakan dengan kode label/alias master lain.
+- Input manual dan Excel Rencana Delivery Ekspor menerima kode dokumen atau
+  kode label. Preview menampilkan label tujuan; server memeriksa ulang pemetaan
+  dan expected_part_setting_id dari preview. Alias berbeda yang mengarah ke
+  master sama wajib digabung operator, bukan membuat baris kebutuhan ganda.
+  Kode tidak dikenal/ambigu ditolak. Penerimaan tetap memakai kode label existing.
+- Item delivery menyimpan part_number operasional, FK master existing dan
+  document_part_number sebagai snapshot kode input. Detail/cetak delivery memakai
+  kode dokumen dengan label pendamping bila berbeda. Item lama bernilai null
+  memakai snapshot part_number semula. Edit kode dokumen yang sama pada delivery
+  existing mempertahankan identitas dan kapasitas historis meski alias berubah;
+  transaksi baru memakai pemetaan terbaru. Replay token tetap memakai payload
+  asli dan diselesaikan sebelum memeriksa pemetaan/master terbaru.
+- Migration 2026_11_12_000001 hanya menambah tabel alias dan kolom nullable.
+  Tidak mengisi ulang master dari workbook, menggabungkan master/stok, mengganti
+  ID, atau mengubah PCS/FIFO/reservasi/transaksi lama. Belum diterapkan pada
+  database operasional lokal maupun production; pengujian memakai SQLite
+  in-memory. Panduan: docs/PART_DOCUMENT_MAPPING.md.
+- Verifikasi: 49 tes backend terkait / 437 assertions dan 134 frontend lulus;
+  Vite build serta diff --check lulus. Uji tambahan mencakup penerimaan label,
+  alokasi ke delivery dokumen, cetak, dan migrasi populated tanpa perubahan
+  master/box/item lama. Regresi lengkap pada tahap sebelumnya menjalankan 635
+  tes: 631 lulus, 4 gagal pada FeatureAccessManagementTest (aturan dashboard/details)
+  dan tiga tes dashboard UiReviewPreviewTest. Keempatnya juga gagal saat
+  dijalankan terpisah; file dashboard/aturan akses tidak diubah oleh pekerjaan ini.
+  HTML empat halaman berhasil dirender; verifikasi visual browser belum dilakukan
+  karena IAB tidak menjangkau server lokal dan akses Brave tidak diizinkan.
 
 Posisi stok dan kesiapan customer ekspor, 10 November 2026
 
@@ -206,7 +563,8 @@ Expired Box dan Handle Lokal / Ekspor 5 November 2026:
 - Tiga tabel penanganan/transaction/receipt memakai scope default domestic.
   Model lokal memakai HasMasterScope; subclass ExportExpiredBox* menetapkan
   export. Unique source/replacement PK menjadi per scope karena PK stok lokal
-  dan ekspor dapat sama. ID Box tetap unik global dan tidak dapat dipakai ulang.
+  dan ekspor dapat sama. Sejak 15 November, ID Box unik global selama penggunaan
+  aktif dan dapat dipakai ulang setelah penggunaan sebelumnya berakhir.
   Route/payload tidak dapat memindahkan histori atau keanggotaan lintas lingkup.
 - ExportExpiredBoxService memakai first_received_at asli: warning >=9 bulan,
   expired >=12 bulan, atau mengikuti reactivated_until jika pernah packing.
@@ -507,10 +865,12 @@ Penyatuan master dan identitas 3 November 2026 (keputusan terbaru pengguna):
   termasuk soft-deleted dan fulfillment legacy tanpa physical stock, dibackfill.
   Histori hard-delete lokal pada ledger tetap dipertahankan. Insert ledger
   dan model atomik, identitas tidak dapat diubah. BoxIdentity juga memeriksa
-  pending Not Full lintas lingkup. Penerimaan, scan, Not Full dan approval koreksi
+  pending Not Full lintas lingkup. Sejak 15 November registry mengunci penggunaan
+  aktif dan menghitung reuse, bukan melarang nomor sepanjang histori.
+  Penerimaan, scan, Not Full dan approval koreksi
   picking menolak ID milik lingkup lain. Stok/operasi tetap di tabel masing-masing.
 - registerLegacyIdentity hanya mengadopsi ID asal ekspor dengan fulfillment aktif
-  tanpa stock, part/PCS sesuai, dan tanpa physical box/history stock lain. Tanggal
+  tanpa stock, part/PCS sesuai, dan tanpa physical box aktif lain. Tanggal
   FIFO lama dipertahankan; bukan jalur untuk menduplikasi identitas lokal.
 - Kode delivery wajib, trim dan uppercase, unik sepanjang histori termasuk arsip/
   cancelled/completed. Generated plan_code_key berindeks unique ditambah ledger
@@ -608,6 +968,37 @@ Dashboard analitik Admin Utama/Supervisi 3 November 2026:
   state tab/view/seri/filter terbuka dipertahankan. Mendukung pemulihan BFCache;
   fokus filter kembali sesudah panel fallback dibuka. Tidak mengubah sidebar,
   role, izin reports, expiry admin, reservasi/picking atau operasi inventory.
+- Koreksi presentasi 15 November 2026 setelah penilaian pengguna: ritme before
+  dipulihkan, KPI count-up 700 ms, garis 850 ms, ring 800 ms, batang 700 ms.
+  Popup/ikon, modal, toast dan scope kembali ke animasi before. Feedback tekan
+  langsung dan pelepasan tombol 120 ms dipertahankan. Klik tab memakai transisi
+  220 ms; keyboard dan pemulihan panel tetap langsung. Reduced motion mengikuti
+  OS. Koreksi lulus 14 tes frontend terkait dan pratinjau komponen; hasil 13 tes
+  backend/138 assertions adalah verifikasi iterasi awal, tidak dijalankan ulang.
+  Rincian before/after dan batas verifikasi: docs/MOTION_REFINEMENTS_2026-11-15.md.
+- Tahap rules UI lanjutan 15 November: flash success server memakai toast
+  penutup dengan penegasan centang 240 ms, judul/pesan dan permukaan hijau terang.
+  API showToast biasa/scan tetap tanpa emphasis. Target kontrol grafik/tutup
+  diperbesar ke 44 px; pencarian Hak Akses menormalisasi NFKC hanya pada teks
+  pencarian, tanpa mengubah grant/key. 20 tes frontend terkait lulus. Status
+  seluruh rules dan before/after: docs/UI_RULES_STATUS_2026-11-15.md.
+- Tahap pengelompokan Hak Akses 15 November: details/summary native membuka satu
+  kelompok awal; jumlah terpilih tetap tampil. Pencarian membuka hasil, memberi
+  status jumlah/kosong, dan memulihkan keadaan kelompok saat dibersihkan.
+  Pilihan/grant/dependency dan cakupan tindakan massal tetap. Tanpa JS seluruh
+  kelompok terbuka. 22 tes frontend terkait dan 12 tes backend Hak Akses
+  (360 assertions, SQLite in-memory) lulus; pratinjau desktop/390 px diperiksa.
+- Tahap volume badge sukses 15 November: centang memakai squash/stretch
+  sumbu X/Y berbeda selama 240 ms, rim/cahaya/bayangan badge memberi volume
+  statis. Tombol, analitik dan pemanggilan scan biasa tetap. 22 tes frontend
+  terkait dijalankan ulang dan lulus; pose serta desktop/390 px diperiksa.
+  Wind-up/arcs tidak dipilih untuk area saat ini. Rincian pada status rules UI.
+- Feedback pemuatan laporan 15 November: acknowledgement tetap langsung,
+  setelah 1.200 ms muncul penjelasan hasil lama dan tombol retry. Retry
+  membatalkan request browser lama dengan version guard existing, timer lama
+  dibersihkan, fokus retry dipindah ke status saat tombol disembunyikan.
+  Tidak menambah timeout atau mutasi data. 24 tes frontend terkait lulus;
+  simulasi cepat/lambat/gagal/retry serta keyboard/390 px diperiksa.
 - HTML dan JSON menggunakan judul Dashboard Analitik - Warehouse FG. Deploy
   view, CSS, modul analytics serta DashboardController terbaru; tidak ada schema,
   seeder atau konfigurasi PC tambahan. Skill apple-design tetap tidak tersedia;
@@ -1921,7 +2312,7 @@ Alur normal:
 Aturan penting:
 
 - ID Box harus delapan angka.
-- ID Box yang pernah dipakai tidak boleh digunakan ulang, termasuk jika box lama sudah di-soft-delete.
+- Sejak 15 November, ID Box dapat dipakai ulang setelah penggunaan sebelumnya berakhir, termasuk soft-delete. Penerimaan baru memakai PK dan nomor penggunaan berbeda.
 - Box yang sudah tersimpan di palet berlokasi tidak dapat dimasukkan ulang.
 - Box withdrawn, expired, handled, atau archived tidak dapat dimasukkan ulang melalui scan.
 - Nomor part wajib terdaftar di master part.
@@ -2316,7 +2707,7 @@ Penanganan per transaksi (revisi UX 23 Oktober 2026):
 - Surat pengantar mencantumkan nomor transaksi dan satu baris per anggota lolos. QA/packing tetap tidak memerlukan akun; jejak petugas, waktu, snapshot, dan pasangan ID tersedia per detail.
 - Migration tambahan `2026_10_23_000002_create_expired_box_transactions` menambah header dan FK tanpa mengubah stok/deadline. Untuk riwayat sebelum pengelompokan permanen, setiap detail lama dibackfill menjadi satu transaksi tersendiri dengan tanggal/petugas asal; kedekatan timestamp atau pilihan massal pada tahap lain tidak dipakai untuk menebak kelompok. Backfill dapat dilanjutkan untuk detail yang masih null. Rollback ditolak bila sudah ada header agar pengelompokan tidak hilang. Database kerja belum dimigrasikan.
 
-`box_identities` menyimpan semua nomor yang pernah dipakai, termasuk soft-delete dan penolakan QA permanen. Pembuatan melalui model Box mendaftarkan identitas atomik bersama box; unique constraint mencegah pemakaian bersamaan. Stock Input, direct Delivery Assign, dan pengajuan Not Full memeriksa identitas yang telah dipakai. Jangan membuat box melalui raw insert yang melewati model.
+`box_identities` menyimpan semua nomor yang pernah dipakai, termasuk soft-delete dan penolakan QA permanen. Sejak 15 November, registry menjadi pengunci global dan penghitung penggunaan. Pembuatan melalui model Box mengklaim penggunaan atomik bersama box, pemeriksaan pemilik aktif serta unique nomor/penggunaan mencegah duplikasi. Stock Input, direct Delivery Assign, dan pengajuan Not Full memeriksa pemilik/proses aktif. Jangan membuat box melalui raw insert yang melewati model.
 
 Transisi data lama: migration `2026_10_23_000001_create_expired_box_handlings` menyimpan deadline lama pada `legacy_reactivated_until` lalu mengakhiri deadline reaktivasi box non-withdrawn/non-deleted pada saat cutover. Box tersebut langsung tidak eligible delivery; sinkronisasi expiry memasukkannya ke daftar QA. Riwayat `expired_box_reports` lama tetap dipisahkan dari proses QA baru. Tidak ada transaksi QA fiktif yang dibuat. Data handled legacy yang tidak memiliki deadline tetap nonaktif.
 

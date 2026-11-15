@@ -10,6 +10,10 @@ class ExportOperatorSeeder extends Seeder
 {
     public function run(): void
     {
+        if (app()->environment('production')) {
+            return;
+        }
+
         User::firstOrCreate(
             ['email' => 'export@warehouse.local'],
             [

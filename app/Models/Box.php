@@ -29,6 +29,12 @@ class Box extends Model
 
     public const INVENTORY_SCOPE = 'domestic';
 
+    public function scopeIdentityHeld($query)
+    {
+        return $query->whereNull('boxes.deleted_at')->where('boxes.is_withdrawn', false)
+            ->whereDoesntHave('expiredHandling', fn ($qa) => $qa->whereIn('status', ['completed', 'rejected']));
+    }
+
     protected $fillable = [
         'box_number',
         'part_number',

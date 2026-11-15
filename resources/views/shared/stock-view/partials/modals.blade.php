@@ -141,7 +141,7 @@
                         </div>
                     </div>
 
-                    <div class="row g-3 mt-2">
+                    <div class="row g-3 mt-2" data-permission="stock_history">
                         <div class="col-12">
                             <h6 class="fw-bold text-dark mb-3" style="color: #0C7779; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px;">
                                 <i class="bi bi-clock-history"></i> Riwayat Pallet
@@ -182,6 +182,8 @@
                 <div class="modal-body" style="padding: 20px;">
                     <input type="hidden" id="editBoxId" name="box_id">
                     <div id="editBoxInlineAlert" tabindex="-1" class="alert d-none" role="alert" style="margin-bottom: 12px;"></div>
+                    <fieldset class="ui-form-section">
+                        <legend class="ui-form-section-title"><span class="ui-step" aria-hidden="true">01</span> Data box</legend>
                     <div class="mb-3">
                         <label for="editBoxNumber" class="form-label">ID Box</label>
                         <input type="text" id="editBoxNumber" class="form-control" disabled>
@@ -203,11 +205,15 @@
                         <label for="editStoredAt" class="form-label">Tanggal Masuk</label>
                         <input type="datetime-local" id="editStoredAt" name="stored_at" class="form-control" required>
                     </div>
+                    </fieldset>
+                    <fieldset class="ui-form-section mb-0">
+                        <legend class="ui-form-section-title"><span class="ui-step" aria-hidden="true">02</span> Alasan koreksi</legend>
                     <div class="mb-1">
                         <label for="editReason" class="form-label">Alasan Perubahan (wajib)</label>
                         <textarea id="editReason" aria-describedby="editReasonHint" name="reason" rows="3" class="form-control" minlength="3" required></textarea>
                     </div>
                     <small id="editReasonHint" class="text-muted">Jelaskan alasan koreksi minimal 3 karakter. Perubahan tercatat di Audit Trail.</small>
+                    </fieldset>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
@@ -227,6 +233,11 @@
             </div>
             <div class="modal-body" style="padding: 20px;">
                 <div id="boxHistoryLoading" role="status" class="text-center text-muted py-3">Memuat riwayat...</div>
+                <div id="boxHistoryUseField" class="mb-3" hidden>
+                    <label class="form-label" for="boxHistoryUse">Pilih riwayat penggunaan ID Box</label>
+                    <select id="boxHistoryUse" class="form-select" aria-describedby="boxHistoryUseHelp"></select>
+                    <small id="boxHistoryUseHelp" class="text-muted">Setiap penggunaan memiliki penerimaan dan transaksi terpisah.</small>
+                </div>
                 <div class="table-responsive" tabindex="0" role="region" aria-label="Tabel rincian, geser untuk melihat kolom lainnya">
                     <table class="table table-sm table-hover" style="margin:0;">
                         <thead style="background:#f9fafb;">

@@ -28,6 +28,10 @@ if(page) {
         [...body.children].forEach((tr,i)=>{
             const part=tr.querySelector('.plan-part'),qty=tr.querySelector('.plan-quantity'),result=data.rows[i];
             part.name='items['+i+'][part_number]';qty.name='items['+i+'][pcs_quantity]';
+            const expected=tr.querySelector('.plan-expected-part');
+            expected.name='items['+i+'][expected_part_setting_id]';expected.value=result.partSettingId ?? '';
+            const mapping=tr.querySelector('.plan-part-mapping');
+            mapping.textContent=result.scanPartNumber ? 'Label / scan: '+result.scanPartNumber : '';
             part.setAttribute('aria-label','Nomor part baris '+(i+1));qty.setAttribute('aria-label','Jumlah PCS baris '+(i+1));
             tr.querySelector('.plan-row-number').textContent=i+1;
             tr.querySelector('.plan-capacity').textContent=result.capacity ? format(result.capacity) : '—';
@@ -36,8 +40,8 @@ if(page) {
             const error=tr.querySelector('.plan-row-error');error.id='plan-row-error-'+i;
             error.textContent=tr.dataset.touched==='1' ? result.error : '';
             part.setAttribute('aria-describedby',error.id);qty.setAttribute('aria-describedby',error.id);
-            part.setCustomValidity(result.error && !initial.parts.some(p=>p.part_number===result.part_number) ? result.error : '');
-            qty.setCustomValidity(result.error && initial.parts.some(p=>p.part_number===result.part_number) ? result.error : '');
+            part.setCustomValidity(result.error && !result.partKnown ? result.error : '');
+            qty.setCustomValidity(result.error && result.partKnown ? result.error : '');
         });
         byId('plan-row-count').textContent=data.rows.length;
         byId('plan-total-pcs').textContent=data.valid ? format(data.totalPcs) : '—';
@@ -53,9 +57,9 @@ if(page) {
         const quantity=parseCount(row.pcs_quantity);
         tr.querySelector('.plan-quantity').value=quantity ?? (row.pcs_quantity ?? '');
         tr.dataset.touched=touched ? '1':'0';body.append(fragment);
-        attachSuggestions(tr.querySelector('.plan-part'), {options: initial.parts.map(part => ({
-            value: part.part_number, label: part.part_number, detail: Number(part.qty_box).toLocaleString('id-ID') + ' PCS / box',
-        }))});
+        attachSuggestions(tr.querySelector('.plan-part'), {options: initial.parts.flatMap(part => [...new Set([
+            part.part_number, ...(part.document_numbers ?? []).map(alias => alias.document_number),
+        ])].map(code => ({value:code,label:code,detail:'Label: '+part.part_number+' · '+Number(part.qty_box).toLocaleString('id-ID')+' PCS / box'})))});
     };
     const setBusy=value=>{
         busy=value;

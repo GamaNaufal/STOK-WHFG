@@ -202,7 +202,9 @@ class ExpiredBoxBulkHandlingTest extends TestCase
         $this->assertSame(2, ExpiredBoxHandling::where('status', 'at_packing')->count());
         $this->assertDatabaseMissing('audit_logs', ['action' => 'packing_received']);
         $payload['rows'][1]['pcs_quantity'] = 20;
-        $payload['rows'][1]['box_number'] = $boxes[0]->box_number;
+        $active = Box::create(['box_number' => '99000099', 'part_number' => $boxes[0]->part_number,
+            'pcs_quantity' => 20, 'qr_code' => '99000099', 'user_id' => $user->id]);
+        $payload['rows'][1]['box_number'] = $active->box_number;
         $this->post(route('expired-box.bulk.store'), $payload)->assertSessionHasErrors('rows.1.box_number');
         $this->assertDatabaseMissing('boxes', ['box_number' => '99000001']);
     }

@@ -58,7 +58,7 @@ class StockOpnameInventory
             $reason = $present ? '' : 'Box sudah keluar, diarsipkan, atau ID lama sudah diganti.';
         }
 
-        return ['id' => $box->id, 'box_number' => $box->box_number, 'part_number' => $box->part_number,
+        return ['id' => $box->id, 'identity_cycle' => (int) $box->identity_cycle, 'box_number' => $box->box_number, 'part_number' => $box->part_number,
             'pcs_quantity' => (int) $box->pcs_quantity, 'pallet' => $pallet ?: 'Belum ada pallet',
             'location' => $location ?: 'Belum ada lokasi', 'status' => $status, 'present' => $present, 'reason' => $reason];
     }

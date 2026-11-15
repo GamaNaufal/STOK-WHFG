@@ -9,6 +9,48 @@ document.addEventListener('DOMContentLoaded', () => {
     const changeStatus = document.getElementById('accessChangeStatus');
     const saveButton = document.getElementById('saveFeatureAccess');
     let saving = false;
+    // Search tolerates pasted full-width text; permission keys and form values stay exact.
+    const normalizeSearch = value => String(value ?? '').normalize('NFKC').toLocaleLowerCase('id-ID');
+    const search = document.getElementById('accessPermissionSearch');
+    const groups = [...form.querySelectorAll('[data-access-group]')];
+    const rows = [...form.querySelectorAll('[data-permission-row]')];
+    const searchStatus = document.getElementById('accessSearchStatus');
+    const expandGroups = document.getElementById('expandAccessGroups');
+    const collapseGroups = document.getElementById('collapseAccessGroups');
+    const groupControls = document.getElementById('accessGroupControls');
+    let searching = false, openBeforeSearch = new Map();
+    // All groups stay open without JavaScript. Enhanced view starts with one chunk.
+    groups.forEach((group, index) => { group.open = index === 0; });
+    if (groupControls) groupControls.hidden = false;
+
+    function filterGroups() {
+        const terms = normalizeSearch(search?.value).trim().split(/\s+/).filter(Boolean);
+        if (terms.length && !searching) openBeforeSearch = new Map(groups.map(group => [group, group.open]));
+        rows.forEach(row => {
+            const text = normalizeSearch(row.dataset.permissionSearch);
+            row.hidden = !terms.every(term => text.includes(term));
+        });
+        groups.forEach(group => {
+            group.hidden = ![...group.querySelectorAll('[data-permission-row]')].some(row => !row.hidden);
+            if (terms.length) group.open = !group.hidden;
+            else if (searching) group.open = openBeforeSearch.get(group) ?? group.open;
+        });
+        searching = terms.length > 0;
+        if (expandGroups) expandGroups.disabled = searching;
+        if (collapseGroups) collapseGroups.disabled = searching;
+        const matches = rows.filter(row => !row.hidden).length;
+        if (searchStatus) searchStatus.textContent = searching
+            ? (matches ? `${matches} dari ${rows.length} menu atau tindakan cocok. Kelompok hasil dibuka otomatis.`
+                : 'Tidak ada menu atau tindakan yang cocok. Coba kata lain atau hapus pencarian.')
+            : `${rows.length} menu atau tindakan dalam ${groups.length} kelompok. Buka kelompok yang ingin diperiksa.`;
+    }
+    search?.addEventListener('input', filterGroups);
+    expandGroups?.addEventListener('click', () => {
+        if (!searching) groups.forEach(group => { group.open = true; });
+    });
+    collapseGroups?.addEventListener('click', () => {
+        if (!searching) groups.forEach(group => { group.open = false; });
+    });
 
     const dependencies = (box) => JSON.parse(box.dataset.requires || '[]');
     const changedCount = () => boxes.filter((box) => box.checked !== initial.get(box.value)).length;
@@ -105,4 +147,5 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     updateStatus();
+    filterGroups();
 });

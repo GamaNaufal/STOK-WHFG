@@ -18,7 +18,8 @@ export function initStockReview({documentRef = globalThis.document, fetcher = (.
             const close = documentRef.createElement('button'); close.type = 'button'; close.className = 'btn btn-primary';
             close.textContent = 'Tutup'; close.setAttribute('data-bs-dismiss', 'modal'); form.replaceWith(close);
             element.querySelector('[data-stock-review-note]').textContent = data.message;
-            element.querySelector('[data-stock-review-help]').textContent = 'Daftar alokasi FIFO tersimpan. Lakukan pemindahan melalui antrean, kemudian konfirmasikan penempatan fisik.';
+            const help = element.querySelector('[data-stock-review-help]');
+            if (help) help.textContent = 'Daftar alokasi FIFO tersimpan. Lakukan pemindahan melalui antrean, kemudian konfirmasikan penempatan fisik.';
             element.querySelectorAll('[data-allocation-status]').forEach(cell => {
                 cell.textContent = cell.dataset.placed === 'true' ? 'Sudah ditempatkan' : 'Menunggu penempatan';
             });
@@ -27,7 +28,7 @@ export function initStockReview({documentRef = globalThis.document, fetcher = (.
             element.dataset.bsBackdrop = 'true'; element.dataset.bsKeyboard = 'true'; element.dataset.autoOpen = 'false';
             documentRef.querySelector('[data-bs-target="#stock-allocation-modal"]')?.focus({preventScroll: true});
         } catch (failure) {
-            error.textContent = failure.message || 'Koneksi bermasalah. Konfirmasi belum selesai; coba lagi.'; error.hidden = false;
+            error.textContent = failure.message || 'Koneksi bermasalah. Konfirmasi belum selesai, coba lagi.'; error.hidden = false;
         } finally { busy = false; button.disabled = false; form.removeAttribute('aria-busy'); }
     });
 }

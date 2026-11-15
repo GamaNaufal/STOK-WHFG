@@ -164,9 +164,11 @@
                 @if($preview['total'] === 0)
                     <p class="alert alert-warning">Pallet ini akan dihapus. Jika ini pallet terakhir, permintaan dibatalkan.</p>
                 @endif
+                @php($deleteRestricted = $preview['total'] === 0 && $delivery->palletPlan->pallets()->count() === 1 && (!auth()->user()->canDeleteExportDeliveryPlan() || !auth()->user()->canAccess('export_fulfillment_cancel')))
+                @if($deleteRestricted)<p class="alert alert-danger">Menghapus pallet terakhir memerlukan izin Hapus rencana delivery dan Batalkan seluruh permintaan ekspor, hanya tersedia untuk Admin Utama, Admin Warehouse, dan Supervisi.</p>@endif
                 <div class="d-flex flex-wrap gap-2">
                     <button class="btn btn-outline-secondary" type="submit" name="edit" value="1" formaction="{{ route('export.fulfillment.revise', [$delivery, $pallet]) }}" formnovalidate>Ubah jumlah</button>
-                    <button class="btn btn-primary" type="submit">{{ $preview['recommended'] ? 'Simpan dan masukkan stok FIFO ke antrean' : 'Simpan revisi' }}</button>
+                    <button class="btn btn-primary" type="submit" @disabled($deleteRestricted)>{{ $preview['recommended'] ? 'Simpan dan masukkan stok FIFO ke antrean' : 'Simpan revisi' }}</button>
                 </div>
             </form>
         </section>

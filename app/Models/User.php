@@ -24,6 +24,12 @@ class User extends Authenticatable
         return app(\App\Services\FeatureAccessService::class)->allowsRoute($this, $route);
     }
 
+    public function canDeleteExportDeliveryPlan(): bool
+    {
+        return in_array($this->role, ['admin', 'admin_warehouse', 'supervisi'], true)
+            && $this->canAccess('export_delivery_delete');
+    }
+
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable;
 

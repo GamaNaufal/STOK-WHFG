@@ -73,7 +73,7 @@
                                 value="{{ old('email', $user->email) }}" maxlength="255" autocomplete="email" required
                                 aria-invalid="{{ $errors->has('email') ? 'true' : 'false' }}"
                                 aria-describedby="user-email-help @error('email') user-email-error @enderror">
-                            <p id="user-email-help" class="user-form-help">Digunakan untuk masuk; email harus unik.</p>
+                            <p id="user-email-help" class="user-form-help">Digunakan untuk masuk, email harus unik.</p>
                             @error('email')<div id="user-email-error" class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                         </div>
                     </div>
@@ -103,7 +103,7 @@
                                 <option value="1" @selected($selectedStatus === '1')>Aktif</option>
                                 <option value="0" @selected($selectedStatus === '0')>Nonaktif</option>
                             </select>
-                            <p id="user-status-help" class="user-form-help">Nonaktif membatasi login; riwayat aktivitas tetap disimpan.</p>
+                            <p id="user-status-help" class="user-form-help">Nonaktif membatasi login, riwayat aktivitas tetap disimpan.</p>
                             @error('is_active')<div id="user-status-error" class="invalid-feedback" role="alert">{{ $message }}</div>@enderror
                         </div>
                     </div>
@@ -122,7 +122,7 @@
                                     aria-describedby="user-password-help @error('password') user-password-error @enderror">
                                 <button type="button" class="user-password-toggle" data-password-target="user-password" aria-controls="user-password" aria-pressed="false">Tampilkan</button>
                             </div>
-                            <p id="user-password-help" class="user-form-help">Kosongkan jika tidak diubah; minimal 6 karakter jika diisi.</p>
+                            <p id="user-password-help" class="user-form-help">Kosongkan jika tidak diubah, minimal 6 karakter jika diisi.</p>
                             @error('password')<div id="user-password-error" class="invalid-feedback d-block" role="alert">{{ $message }}</div>@enderror
                         </div>
                         <div class="user-form-field">

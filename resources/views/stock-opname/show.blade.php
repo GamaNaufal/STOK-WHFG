@@ -12,7 +12,7 @@
         <div class="plan-inline-actions">
             <span class="opname-scope">{{ $opname->status === 'active' ? 'Sesi aktif' : 'Selesai' }} · {{ $scopeLabel }}</span>
             @if($opname->status === 'completed')
-                <a class="btn btn-outline-primary" href="{{ route($base.'.export', $opname) }}"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Export Excel</a>
+                <a data-excel-download class="btn btn-outline-primary" href="{{ route($base.'.export', $opname) }}"><i class="bi bi-file-earmark-spreadsheet" aria-hidden="true"></i> Export Excel</a>
             @endif
         </div>
     </header>
@@ -62,7 +62,7 @@
             <div class="opname-results" data-opname-results>@include('stock-opname.results')</div>
         </section>
     </div>
-    <p class="plan-help">Jumlah box dihitung unik. Duplikat dicatat terpisah. Box yang sudah keluar atau berganti ID selama sesi ditampilkan pada perubahan, terpisah dari box belum terscan. Pemeriksaan ID Box mencocokkan keberadaan box; part, PCS, dan lokasi pada rincian mengikuti catatan sistem.</p>
+    <p class="plan-help">Jumlah box dihitung unik. Duplikat dicatat terpisah. Box yang sudah keluar atau berganti ID selama sesi ditampilkan pada perubahan, terpisah dari box belum terscan. Pemeriksaan ID Box mencocokkan keberadaan box, part, PCS, dan lokasi pada rincian mengikuti catatan sistem.</p>
 </div>
 @endsection
 @section('scripts')

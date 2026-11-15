@@ -75,6 +75,7 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::get('delivery-plans/template', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'template'])->name('delivery-plans.template');
         Route::post('delivery-plans/import-excel', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'importExcel'])->name('delivery-plans.import-excel');
         Route::get('delivery-plans/{deliveryPlan}/print', [\App\Http\Controllers\ExportPlanPrintController::class, 'delivery'])->whereNumber('deliveryPlan')->name('delivery-plans.print');
+        Route::get('delivery-plans/{deliveryPlan}/deletion-preview', [\App\Http\Controllers\ExportDeliveryPlanController::class, 'deletionPreview'])->whereNumber('deliveryPlan')->name('delivery-plans.deletion-preview');
         Route::resource('delivery-plans', \App\Http\Controllers\ExportDeliveryPlanController::class);
         Route::get('pallet-plans', [\App\Http\Controllers\ExportPalletPlanController::class, 'index'])->name('pallet-plans.index');
         Route::get('pallet-plans/{deliveryPlan}', [\App\Http\Controllers\ExportPalletPlanController::class, 'show'])->name('pallet-plans.show');
@@ -258,6 +259,8 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
 
     // Reports - Supervisi + Admin IT
     Route::group([], function () {
+        Route::get('/reports/shipments/{shipment}/export', [\App\Http\Controllers\ShipmentReportController::class, 'export'])->name('reports.shipments.export');
+        Route::get('/reports/shipments/{shipment}', [\App\Http\Controllers\ShipmentReportController::class, 'show'])->name('reports.shipments.show');
         Route::get('/reports/withdrawal', [ReportController::class, 'withdrawalReport'])->name('reports.withdrawal');
         Route::get('/reports/stock-input', [ReportController::class, 'stockInputReport'])->name('reports.stock-input');
         Route::get('/reports/records', [\App\Http\Controllers\WarehouseReportController::class, 'index'])->name('reports.records');

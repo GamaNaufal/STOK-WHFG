@@ -408,7 +408,7 @@
                             palletSaveStatus.style.background = "#ecfdf5";
                             palletSaveStatus.style.border = "2px solid #86efac";
                             palletSaveStatus.style.color = "#166534";
-                            palletSaveStatus.innerHTML = `<i class="bi bi-check-circle"></i> Status pallet: <strong>Sudah tersimpan</strong> di lokasi <strong>${pallet.warehouse_location || "-"}</strong>`;
+                            palletSaveStatus.innerHTML = `<i class="bi bi-check-circle"></i> Status pallet: <strong>Sudah tersimpan</strong> di lokasi <strong>${escapeHtml(pallet.warehouse_location || "-")}</strong>`;
                         } else {
                             palletSaveStatus.style.background = "#fff7ed";
                             palletSaveStatus.style.border = "2px solid #fdba74";
@@ -435,20 +435,20 @@
                             boxRow.innerHTML = `
                                 <div class="col-md-3">
                                     <small class="text-muted">Box</small>
-                                    <div class="fw-bold">${box.box_number}</div>
+                                    <div class="fw-bold">${escapeHtml(box.box_number)}</div>
                                     <span class="badge bg-success mt-1">Sudah diinput</span>
                                 </div>
                                 <div class="col-md-3">
                                     <small class="text-muted">Part</small>
-                                    <div class="fw-bold">${box.part_number}</div>
+                                    <div class="fw-bold">${escapeHtml(box.part_number)}</div>
                                 </div>
                                 <div class="col-md-3">
                                     <small class="text-muted">PCS</small>
-                                    <div class="fw-bold">${box.pcs_quantity}</div>
+                                    <div class="fw-bold">${escapeHtml(box.pcs_quantity)}</div>
                                 </div>
                                 <div class="col-md-3">
                                     <small class="text-muted">Qty Box</small>
-                                    <div class="fw-bold">${box.qty_box ?? "-"} ${box.is_not_full ? '<span class="badge bg-warning text-dark ms-1">Not Full</span>' : ""}</div>
+                                    <div class="fw-bold">${escapeHtml(box.qty_box ?? "-")} ${box.is_not_full ? '<span class="badge bg-warning text-dark ms-1">Not Full</span>' : ""}</div>
                                 </div>
                             `;
                             itemsList.appendChild(boxRow);
@@ -632,10 +632,10 @@
                     item.href = "#";
                     item.className = "list-group-item list-group-item-action";
                     item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
-                                        <strong>${row.pallet_number}</strong>
-                                        <span class="badge bg-secondary">${row.total_boxes} box</span>
+                                        <strong>${escapeHtml(row.pallet_number)}</strong>
+                                        <span class="badge bg-secondary">${escapeHtml(row.total_boxes)} box</span>
                                       </div>
-                                      <small class="text-muted">Lokasi: ${row.warehouse_location || "-"}</small>`;
+                                      <small class="text-muted">Lokasi: ${escapeHtml(row.warehouse_location || "-")}</small>`;
                     item.onclick = (e) => {
                         e.preventDefault();
                         selectedExistingPalletId.value = row.id;
@@ -1079,7 +1079,7 @@
                         item.className =
                             "list-group-item list-group-item-action";
                         item.innerHTML = `<div class="d-flex justify-content-between align-items-center">
-                                            <strong>${loc.code}</strong>
+                                            <strong>${escapeHtml(loc.code)}</strong>
                                             <span class="badge bg-success rounded-pill" style="font-size: 0.7em;">Available</span>
                                           </div>`;
                         item.style.cursor = "pointer";

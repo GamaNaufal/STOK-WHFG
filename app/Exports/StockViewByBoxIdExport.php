@@ -10,7 +10,7 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithStyles;
 
-class StockViewByBoxIdExport implements FromCollection, WithHeadings, WithStyles
+class StockViewByBoxIdExport extends TextSafeExport implements FromCollection, WithHeadings, WithStyles
 {
     protected $stocks;
     protected $sortMode;

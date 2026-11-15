@@ -192,8 +192,9 @@ class ExpiredBoxPackingReceiptTest extends TestCase
         $part = PartSetting::sole();
         $export = ExportStockBox::create(['box_number' => '00900002', 'part_number' => $part->part_number, 'part_setting_id' => $part->id,
             'pcs_quantity' => 80, 'first_received_at' => now(), 'received_by' => $user->id, 'receive_token' => (string) Str::uuid()]);
-        $export->forceDelete();
         $this->postJson($url, ['box_number' => '00900002', 'group_key' => $group])->assertUnprocessable();
+        $export->forceDelete();
+        $this->postJson($url, ['box_number' => '00900002', 'group_key' => $group])->assertOk();
         $this->postJson($url, ['box_number' => '00900003', 'group_key' => str_repeat('a', 64)])->assertConflict();
         $this->actingAs(User::factory()->create(['role' => 'warehouse_operator']))->postJson($url, ['box_number' => '00900001', 'group_key' => $group])->assertForbidden();
     }

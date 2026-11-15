@@ -1,10 +1,19 @@
-export function createReportLoader({fetcher = (...args) => globalThis.fetch(...args), render, state}) {
-    let version = 0, controller;
-    const cancel = () => { ++version; controller?.abort(); controller = null; };
+export function createReportLoader({fetcher = (...args) => globalThis.fetch(...args), render, state,
+    setTimer = (callback, delay) => globalThis.setTimeout(callback, delay),
+    clearTimer = timer => globalThis.clearTimeout(timer)}) {
+    let version = 0, controller, slowTimer;
+    const cancel = () => {
+        ++version; controller?.abort(); controller = null;
+        clearTimer(slowTimer); slowTimer = undefined;
+    };
     const load = async (url, mode = 'push') => {
         cancel(); const current = version;
         controller = new AbortController();
         state({busy: true});
+        const requestTimer = setTimer(() => {
+            if (current === version) state({busy: true, slow: true});
+        }, 1200);
+        slowTimer = requestTimer;
         try {
             const response = await fetcher(url, {headers: {'Accept': 'application/json'}, signal: controller.signal});
             if (!response.ok) {
@@ -26,7 +35,10 @@ export function createReportLoader({fetcher = (...args) => globalThis.fetch(...a
                 error: error.name === 'SyntaxError' ? 'Respons laporan tidak dapat dibaca. Muat ulang untuk memeriksa sesi.'
                     : error.name === 'TypeError' ? 'Koneksi bermasalah. Coba lagi.' : error.message || 'Koneksi bermasalah. Coba lagi.'});
             return false;
-        } finally { if (current === version) controller = null; }
+        } finally {
+            clearTimer(requestTimer);
+            if (current === version) { controller = null; slowTimer = undefined; }
+        }
     };
     return {load, cancel};
 }
@@ -43,14 +55,23 @@ export function initReportBrowser({documentRef = globalThis.document, windowRef 
     if (!root) return;
     const message = documentRef.querySelector('[data-report-message]');
     const retry = documentRef.querySelector('[data-report-retry]');
+    const feedback = documentRef.querySelector('[data-report-feedback]');
     let timer, composing = false, pending = false, lastUrl = windowRef.location.href, lastMode = 'push';
     const enhance = () => root.querySelectorAll('[data-report-scope-form] button[type="submit"], [data-report-filter-form] button[type="submit"]')
         .forEach(button => { button.hidden = true; });
-    const state = ({busy, error}) => {
+    const state = ({busy, error, slow = false}) => {
         pending = busy || Boolean(error);
         root.setAttribute('aria-busy', String(busy));
-        message.textContent = busy ? 'Memperbarui laporan…' : error ? 'Hasil sebelumnya tetap ditampilkan. '+error : 'Laporan diperbarui. Excel mengikuti filter ini.';
-        retry.hidden = !error;
+        feedback?.setAttribute('data-report-state', error ? 'error' : slow ? 'slow' : busy ? 'loading' : 'ready');
+        message.textContent = error ? 'Hasil sebelumnya tetap ditampilkan. '+error
+            : slow ? 'Masih memuat laporan. Hasil sebelumnya tetap ditampilkan. Anda dapat menunggu atau mencoba lagi.'
+                : busy ? 'Memperbarui laporan…' : 'Laporan diperbarui. Excel mengikuti filter ini.';
+        const retryHadFocus = documentRef.activeElement === retry;
+        retry.hidden = !error && !slow;
+        if (retry.hidden && retryHadFocus) {
+            message.setAttribute('tabindex', '-1');
+            message.focus({preventScroll: true});
+        }
         root.querySelectorAll('[data-report-export], .pagination a[href]').forEach(link => {
             link.setAttribute('aria-disabled', String(pending)); link.classList.toggle('disabled', pending);
             if (pending) link.setAttribute('tabindex', '-1'); else link.removeAttribute('tabindex');

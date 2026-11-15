@@ -64,19 +64,23 @@ class ExportStockReceivingTest extends TestCase
         foreach (['export_stock_boxes', 'export_stock_pallets', 'export_fulfillment_boxes', 'audit_logs'] as $table) $this->assertDatabaseCount($table, 0);
     }
 
-    public function test_domestic_and_export_numbers_are_globally_reserved_including_deleted_history(): void
+    public function test_deleted_numbers_are_reusable_across_scopes_while_active_numbers_remain_reserved(): void
     {
         $domestic=Box::create(['box_number'=>'00000001','part_number'=>'DOM','pcs_quantity'=>20,'qr_code'=>'TEST','user_id'=>$this->operator->id]);
-        $domestic->delete();
         $this->postJson(route('export.receiving.check-box'),['box_number'=>'00000001'])->assertJsonPath('available',false);
         $this->postJson(route('export.receiving.store'),['box_number'=>'00000001','part_number'=>'EX-A','receive_token'=>(string)Str::uuid()])
             ->assertUnprocessable()->assertJsonValidationErrors('box_number');
+        $domestic->delete();
+        $this->postJson(route('export.receiving.check-box'),['box_number'=>'00000001'])->assertJsonPath('available',true);
+        $reused = $this->receive('00000001');
+        $this->assertSame(2, (int) $reused->identity_cycle);
+        $this->assertSame(20, (int) $domestic->fresh()->pcs_quantity);
         $export=$this->receive('00000002');$export->delete();
-        $this->postJson(route('export.receiving.check-box'),['box_number'=>'00000002'])->assertJsonPath('available',false);
+        $this->postJson(route('export.receiving.check-box'),['box_number'=>'00000002'])->assertJsonPath('available',true);
         $this->assertDatabaseCount('box_identities',2);
-        $this->assertDatabaseCount('export_stock_boxes',1);
+        $this->assertDatabaseCount('export_stock_boxes',2);
         $this->actingAs(User::factory()->create(['role'=>'warehouse_operator']))
-            ->postJson(route('stock-input.scan-barcode'),['barcode'=>'00000002'])->assertStatus(400);
+            ->postJson(route('stock-input.scan-barcode'),['barcode'=>'00000002'])->assertOk();
     }
 
     public function test_invalid_identity_unknown_part_and_client_quantity_are_rejected(): void

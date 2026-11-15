@@ -444,13 +444,26 @@ class StockWithdrawalController extends Controller
                 $deliveryOrderItemId = (int) $request->input('delivery_order_item_id');
                 if ($deliveryOrderItemId > 0) {
                     $deliveryItem = DeliveryOrderItem::whereKey($deliveryOrderItemId)
-                        ->lockForUpdate()
                         ->first();
                 }
 
                 $deliveryOrderId = (int) $request->input('delivery_order_id');
                 if ($deliveryOrderId <= 0 && $deliveryItem) {
                     $deliveryOrderId = (int) $deliveryItem->delivery_order_id;
+                }
+
+                // Match the picking flow: lock the parent before its items and stock.
+                if ($deliveryOrderId > 0) {
+                    $order = DeliveryOrder::whereKey($deliveryOrderId)->lockForUpdate()->first();
+                    if (! $order || ! in_array($order->status, ['approved', 'processing', 'partial'], true)) {
+                        throw new \RuntimeException('Delivery belum disetujui atau sudah tidak dapat diproses.');
+                    }
+                }
+                if ($deliveryOrderItemId > 0) {
+                    $deliveryItem = DeliveryOrderItem::whereKey($deliveryOrderItemId)->lockForUpdate()->first();
+                    if (! $deliveryItem) {
+                        throw new \RuntimeException('Item delivery sudah berubah. Muat ulang sebelum mengambil stok.');
+                    }
                 }
 
                 if ($deliveryItem) {

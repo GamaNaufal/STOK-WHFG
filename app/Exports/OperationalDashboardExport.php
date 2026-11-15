@@ -31,7 +31,7 @@ class OperationalDashboardExport implements WithMultipleSheets
             'Masuk periode (box)', 'Masuk periode (PCS)', 'Keluar periode (box)', 'Keluar periode (PCS)', 'Permintaan sesuai filter', 'Permintaan penuh', 'Issue sesuai periode', 'Issue masih terbuka'], $stock),
             new DashboardDataSheet('Filter', ['Lingkup', 'Periode', 'Tanggal mulai', 'Tanggal akhir', 'Kelompok grafik', 'Status pemenuhan', 'Pemenuhan penuh (%)', 'Jenis audit', 'Aksi audit', 'ID petugas audit', 'Catatan stok'], [[
                 $label($d['filters']['scope']), $d['rangeLabel'], $d['start']?->format('Y-m-d'), $d['end']?->format('Y-m-d'), $d['filters']['group_by'], $d['filters']['fulfillment_filter'], $d['fulfillmentRate'],
-                $d['filters']['audit_type'], $d['filters']['audit_action'], $d['filters']['audit_user'], 'Stok saat ini tidak mengikuti periode. Reservasi belum dihitung terpenuhi; pallet siap belum dihitung keluar.']]),
+                $d['filters']['audit_type'], $d['filters']['audit_action'], $d['filters']['audit_user'], 'Stok saat ini tidak mengikuti periode. Reservasi belum dihitung terpenuhi, pallet siap belum dihitung keluar.']]),
             new DashboardDataSheet('Stok', ['Lingkup', 'ID Box', 'Nomor part', 'Box', 'PCS', 'Pallet', 'Lokasi', 'Pertama diterima', 'Status'], $d['stockRows']->map(fn ($r) => [
                 $label($r->scope), $r->box_number ?? 'Rincian pallet lama', $r->part_number, (int) $r->box_quantity, (int) $r->pcs_quantity, $pallet($r), $r->warehouse_location, $r->occurred_at, WarehouseReportService::statusLabel($r->status)])->all()),
             new DashboardDataSheet('Pallet', ['Lingkup', 'Pallet', 'Lokasi', 'Box', 'PCS', 'Penerimaan tertua'], $d['palletRows']->map(fn ($r) => [

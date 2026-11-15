@@ -45,7 +45,7 @@
             <h1 class="h4 mb-1">Operational Warehouse Reports</h1>
             <div class="text-muted small">Periode: {{ $rangeLabel }} @if($start && $end) ({{ $start->format('d M Y') }} - {{ $end->format('d M Y') }}) @endif</div>
         </div>
-        <a href="{{ route('reports.operational.export', request()->query()) }}" class="btn btn-success">
+        <a data-excel-download href="{{ route('reports.operational.export', request()->query()) }}" class="btn btn-success">
             <i class="bi bi-download"></i> Export Excel
         </a>
     </div>

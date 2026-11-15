@@ -16,7 +16,7 @@
         <p class="warehouse-scope-description">Gabungkan seluruh box dari beberapa pallet. Tinjau perubahan rencana sebelum mengonfirmasi pemindahan fisik.</p>
     </header>
     @if($errors->any())<div class="alert alert-danger" role="alert"><strong>Merge belum diproses.</strong><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul><p class="mb-0 mt-2">Periksa pilihan dan tinjau ulang data sebelum melanjutkan.</p></div>@endif
-    <div class="alert alert-info">Pallet permintaan harus berada dalam <strong>rencana delivery yang sama</strong>. Stok cadangan boleh digabung; reservasi delivery lain tetap dilindungi.</div>
+    <div class="alert alert-info">Pallet permintaan harus berada dalam <strong>rencana delivery yang sama</strong>. Stok cadangan boleh digabung, reservasi delivery lain tetap dilindungi.</div>
     <form method="POST" action="{{ route('export.merge.preview') }}" id="export-merge-form">@csrf
         <section class="plan-panel"><div class="plan-panel-heading"><h2>1. Pilih minimal 2 pallet sumber</h2><span id="merge-selection-count" role="status" aria-live="polite">0 pallet dipilih</span></div>
             <div class="plan-panel-body"><label class="form-label" for="merge-search">Cari pallet, lokasi, part, kode delivery atau customer</label><input type="search" id="merge-search" class="form-control" placeholder="Ketik untuk menyaring daftar…" autocomplete="off"></div>
@@ -47,7 +47,7 @@
             <fieldset class="col-lg-7" id="merge-plan-options"><legend class="fs-6 fw-semibold">Jika stok cadangan cocok dengan sisa kebutuhan yang belum direservasi</legend>
                 <label class="merge-option"><input type="radio" name="spare_mode" value="fill" @checked(old('spare_mode','fill')==='fill')><span><strong>Penuhi kebutuhan lebih dahulu</strong><small>Isi sisa kebutuhan pada pallet yang dipilih. Hanya kelebihan box atau part baru yang menambah delivery.</small></span></label>
                 <label class="merge-option"><input type="radio" name="spare_mode" value="add" @checked(old('spare_mode')==='add')><span><strong>Tambahkan seluruhnya sebagai kebutuhan baru</strong><small>Kebutuhan lama tetap ada. Seluruh stok cadangan yang digabung menambah jumlah delivery.</small></span></label>
-                <p class="plan-help">Contoh: sisa 5 box, cadangan masuk 8 box. Pilihan pertama menambah 3 box; pilihan kedua menambah 8 box.</p>
+                <p class="plan-help">Contoh: sisa 5 box, cadangan masuk 8 box. Pilihan pertama menambah 3 box, pilihan kedua menambah 8 box.</p>
             </fieldset></div>
         </div></section>
         <div class="merge-actions"><span class="plan-help">Pemeriksaan FIFO dan reservasi dilakukan sebelum pratinjau.</span><button type="submit" class="btn btn-primary" disabled>Tinjau merge <i class="bi bi-arrow-right" aria-hidden="true"></i></button></div>

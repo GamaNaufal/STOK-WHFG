@@ -49,7 +49,7 @@ if (form) {
         const response = await fetch(url, {method, headers: {'Accept': 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf},
             ...(data === undefined ? {} : {body: JSON.stringify(data)})});
         let body;
-        try { body = await response.json(); } catch (_) { throw new Error('Sesi atau koneksi bermasalah. Muat ulang halaman; daftar scan tetap tersimpan.'); }
+        try { body = await response.json(); } catch (_) { throw new Error('Sesi atau koneksi bermasalah. Muat ulang halaman, daftar scan tetap tersimpan.'); }
         if (!response.ok) {
             const error = new Error(Object.values(body.errors ?? {}).flat()[0] ?? body.message ?? 'Permintaan belum berhasil.');
             error.fields = body.errors ?? {}; error.httpStatus = response.status;
@@ -69,7 +69,7 @@ if (form) {
             });
             const cell = document.createElement('td'), button = document.createElement('button');
             button.type = 'button'; button.className = 'btn btn-sm btn-outline-danger'; button.textContent = 'Hapus';
-            button.dataset.removeScan = item.id; button.disabled = busy;
+            button.dataset.permission = 'export_receiving_scan'; button.dataset.removeScan = item.id; button.disabled = busy;
             button.setAttribute('aria-label', 'Hapus scan box ' + item.box_number);
             cell.append(button); row.append(cell); items.append(row);
         });

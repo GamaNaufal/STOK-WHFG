@@ -62,6 +62,10 @@ class StockOpnameService
     {
         $item = $session->items()->firstOrNew(['box_number' => $number]);
         $initial = $item->initial_snapshot;
+        if ($item->exists && (int) data_get($item->current_snapshot, 'id') !== (int) $snapshot['id']) {
+            $item->first_scanned_at = null;
+            $item->first_scanned_by = null;
+        }
         $kind = $this->changeKind($initial, $snapshot);
         $item->fill(['current_snapshot' => $snapshot, 'present' => $snapshot['present'], 'change_kind' => $kind])->save();
         return $item;
@@ -82,7 +86,7 @@ class StockOpnameService
             $outcome = 'ng';
             $reason = 'ID Box harus tepat 8 angka.';
             if (preg_match('/^[0-9]{8}$/D', $input)) {
-                $box = $this->inventory->catalogue($session->scope)->where('box_number', $input)->first();
+                $box = $this->inventory->catalogue($session->scope)->where('box_number', $input)->orderByDesc('identity_cycle')->first();
                 if ($box) {
                     $snapshot = $this->inventory->snapshot($box, $session->scope);
                     if ($snapshot['present']) {
@@ -126,13 +130,17 @@ class StockOpnameService
             $rows = [];
             foreach ($chunk as $number => $snapshot) {
                 $initial = $items->get($number)?->initial_snapshot;
+                $item = $items->get($number);
+                $sameUse = $item && (int) data_get($item->current_snapshot, 'id') === (int) $snapshot['id'];
                 $rows[] = ['stock_opname_session_id' => $session->id, 'box_number' => (string) $number,
+                    'first_scanned_at' => $sameUse ? $item->first_scanned_at : null,
+                    'first_scanned_by' => $sameUse ? $item->first_scanned_by : null,
                     'initial_snapshot' => $initial === null ? null : json_encode($initial, JSON_THROW_ON_ERROR),
                     'current_snapshot' => json_encode($snapshot, JSON_THROW_ON_ERROR), 'present' => $snapshot['present'],
                     'change_kind' => $this->changeKind($initial, $snapshot), 'created_at' => now(), 'updated_at' => now()];
             }
             DB::table('stock_opname_items')->upsert($rows, ['stock_opname_session_id', 'box_number'],
-                ['current_snapshot', 'present', 'change_kind', 'updated_at']);
+                ['current_snapshot', 'present', 'change_kind', 'first_scanned_at', 'first_scanned_by', 'updated_at']);
         }
     }
 
@@ -140,6 +148,10 @@ class StockOpnameService
     {
         if ($initial === null) return $snapshot['present'] ? 'received' : 'received_left';
         if (!$snapshot['present']) return 'left';
+        if (! array_key_exists('identity_cycle', $initial)) {
+            // Sessions opened before the migration must not mark unchanged stock as changed.
+            unset($snapshot['identity_cycle']);
+        }
         return $initial === $snapshot ? 'unchanged' : 'changed';
     }
 

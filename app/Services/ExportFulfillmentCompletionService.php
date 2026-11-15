@@ -115,6 +115,7 @@ class ExportFulfillmentCompletionService
 
     public function ready(int $deliveryId, int $palletId, array $data, User $actor): void
     {
+        abort_unless($actor->canAccess('export_fulfillment_ready'), 403);
         $this->run('ready', $deliveryId, $palletId, $data, $actor, function ($delivery, $plan, $pallet) use ($data, $actor) {
             if ($pallet->ready_at) {
                 $this->fail('Pallet sudah dikonfirmasi siap.');
@@ -156,12 +157,13 @@ class ExportFulfillmentCompletionService
                 'ready_by' => $actor->id, 'fulfillment_revision' => $pallet->fulfillment_revision + 1]);
             AuditService::record('export_fulfillment', 'ready', 'ExportPlannedPallet', $pallet->id, $actor->id, $before,
                 ['plan_code' => $delivery->plan_code, 'pallet_number' => $pallet->position, 'location' => $target->code,
-                    'status' => 'siap', 'total_boxes' => $commitments->count()], 'Pallet ekspor dikonfirmasi siap; lokasi fisik dikonfirmasi dan isi dikunci.');
+                    'status' => 'siap', 'total_boxes' => $commitments->count()], 'Pallet ekspor dikonfirmasi siap, lokasi fisik dikonfirmasi dan isi dikunci.');
         });
     }
 
     public function reopen(int $deliveryId, int $palletId, array $data, User $actor): void
     {
+        abort_unless($actor->canAccess('export_fulfillment_reopen'), 403);
         $this->run('reopened', $deliveryId, $palletId, $data, $actor, function ($delivery, $plan, $pallet) use ($actor) {
             if (! $pallet->ready_at) {
                 $this->fail('Pallet belum dikonfirmasi siap.');
@@ -170,7 +172,7 @@ class ExportFulfillmentCompletionService
             $pallet->update(['ready_at' => null, 'ready_by' => null, 'fulfillment_revision' => $pallet->fulfillment_revision + 1]);
             AuditService::record('export_fulfillment', 'reopened', 'ExportPlannedPallet', $pallet->id, $actor->id,
                 ['status' => 'siap'], ['plan_code' => $delivery->plan_code, 'pallet_number' => $pallet->position,
-                    'location' => $pallet->location_code, 'status' => 'menunggu konfirmasi ulang'], 'Kesiapan pallet dibuka ulang untuk koreksi lokasi atau revisi; stok dan jumlah tidak berubah.');
+                    'location' => $pallet->location_code, 'status' => 'menunggu konfirmasi ulang'], 'Kesiapan pallet dibuka ulang untuk koreksi lokasi atau revisi, stok dan jumlah tidak berubah.');
         });
     }
 
@@ -181,8 +183,13 @@ class ExportFulfillmentCompletionService
 
     public function reduce(int $deliveryId, int $palletId, array $data, User $actor): void
     {
+        abort_unless($actor->canAccess('export_fulfillment_revise'), 403);
         $this->run('reduced', $deliveryId, $palletId, $data, $actor, function ($delivery, $plan, $pallet) use ($data, $actor) {
             $preview = $this->reduction($pallet, $data['quantities'], $data['additions'] ?? []);
+            if ($preview['total'] === 0 && $plan->pallets()->count() === 1) {
+                abort_unless($actor->canDeleteExportDeliveryPlan(), 403, 'Hanya Admin Utama, Admin Warehouse, dan Supervisi yang dapat membatalkan seluruh rencana delivery.');
+                abort_unless($actor->canAccess('export_fulfillment_cancel'), 403, 'Menghapus pallet terakhir memerlukan izin Batalkan seluruh permintaan ekspor.');
+            }
             if (! hash_equals($preview['fingerprint'], $data['fingerprint'])) {
                 $this->fail('Stok atau isi pallet berubah. Tinjau ulang revisi sebelum menyimpan.');
             }
@@ -244,6 +251,8 @@ class ExportFulfillmentCompletionService
 
     public function cancel(int $deliveryId, array $data, User $actor): void
     {
+        abort_unless($actor->canAccess('export_fulfillment_cancel'), 403);
+        abort_unless($actor->canDeleteExportDeliveryPlan(), 403, 'Hanya Admin Utama, Admin Warehouse, dan Supervisi yang dapat membatalkan seluruh rencana delivery.');
         $this->run('cancelled', $deliveryId, null, $data, $actor, function ($delivery, $plan) use ($data, $actor) {
             $preview = $this->cancellation($delivery);
             if (! hash_equals($preview['fingerprint'], $data['fingerprint'])) {
@@ -274,6 +283,7 @@ class ExportFulfillmentCompletionService
 
     private function archiveCancelled($delivery, $plan, User $actor, array $before, string $reason): void
     {
+        abort_unless($actor->canDeleteExportDeliveryPlan(), 403);
         $plan->reservations()->delete();
         $plan->update(['status' => 'cancelled']);
         $delivery->update(['status' => 'cancelled', 'updated_by' => $actor->id]);
@@ -282,11 +292,12 @@ class ExportFulfillmentCompletionService
         app(ExportNotFullService::class)->sync($delivery, $actor);
         AuditService::record('export_fulfillment', 'cancelled', 'ExportDeliveryPlan', $delivery->id, $actor->id, $before,
             ['plan_code' => $delivery->plan_code, 'customer_name' => $delivery->customer_name, 'status' => 'cancelled', 'reason' => $reason],
-            'Permintaan ekspor dibatalkan setelah pengembalian fisik dan pelepasan reservasi; tidak dicatat sebagai pengiriman.');
+            'Permintaan ekspor dibatalkan setelah pengembalian fisik dan pelepasan reservasi, tidak dicatat sebagai pengiriman.');
     }
 
     public function complete(int $deliveryId, array $data, User $actor): void
     {
+        abort_unless($actor->canAccess('export_fulfillment_complete'), 403);
         $this->run('completed', $deliveryId, null, $data, $actor, function ($delivery, $plan) use ($actor) {
             $pallets = $plan->pallets()->get();
             if ($pallets->isEmpty() || $pallets->contains(fn ($p) => ! $p->ready_at)) {
@@ -301,7 +312,7 @@ class ExportFulfillmentCompletionService
                     'total_boxes' => $rows->count(), 'ready_at' => $pallet->ready_at->toDateTimeString(), 'ready_by' => $pallet->ready_by];
                 foreach ($rows as $f) {
                     $box = $f->stockBox;
-                    $snapshot['boxes'][] = ['box_number' => $box->box_number, 'part_number' => $box->part_number,
+                    $snapshot['boxes'][] = ['box_number' => $box->box_number, 'box_id' => $box->id, 'identity_cycle' => (int) $box->identity_cycle, 'part_number' => $box->part_number,
                         'pcs_quantity' => $box->pcs_quantity, 'warehouse_location' => $pallet->location_code,
                         'pallet_number' => $pallet->position, 'first_received_at' => $box->first_received_at->toDateTimeString()];
                     $box->update(['state' => 'shipped', 'current_pallet_id' => null, 'revision' => $box->revision + 1]);

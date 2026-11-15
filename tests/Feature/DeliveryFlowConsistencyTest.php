@@ -665,6 +665,11 @@ class DeliveryFlowConsistencyTest extends TestCase
 
         $this->assertDatabaseHas('pallet_items', [
             'id' => $palletItem->id,
+            'box_quantity' => 0,
+            'pcs_quantity' => 0,
+        ]);
+        $this->assertDatabaseHas('pallet_items', [
+            'pallet_id' => $box->fresh()->pallets()->firstOrFail()->id,
             'box_quantity' => 1,
             'pcs_quantity' => 100,
         ]);
@@ -881,7 +886,13 @@ class DeliveryFlowConsistencyTest extends TestCase
         ]);
     }
 
-    public function test_redo_can_relocate_pallet_when_original_location_is_occupied(): void
+    public static function redoRelocationSelectors(): array
+    {
+        return ['legacy source key' => [false], 'unrelated pallet key' => [true]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('redoRelocationSelectors')]
+    public function test_redo_can_relocate_pallet_when_original_location_is_occupied(bool $useUnrelatedPallet): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
@@ -973,7 +984,7 @@ class DeliveryFlowConsistencyTest extends TestCase
         $redo = $this->actingAs($adminWarehouse)
             ->post(route('delivery.pick.redo', $session->id), [
                 'relocation_locations' => [
-                    $oldPallet->id => 'B1',
+                    ($useUnrelatedPallet ? $newPallet->id : $oldPallet->id) => 'B1',
                 ],
             ]);
 
@@ -993,6 +1004,11 @@ class DeliveryFlowConsistencyTest extends TestCase
 
         $this->assertDatabaseHas('pallet_items', [
             'id' => $palletItem->id,
+            'box_quantity' => 0,
+            'pcs_quantity' => 0,
+        ]);
+        $this->assertDatabaseHas('pallet_items', [
+            'pallet_id' => $box->fresh()->pallets()->firstOrFail()->id,
             'box_quantity' => 1,
             'pcs_quantity' => 100,
         ]);
@@ -1013,16 +1029,20 @@ class DeliveryFlowConsistencyTest extends TestCase
             'is_occupied' => 1,
         ]);
 
+        $restoredPalletId = $box->fresh()->pallets()->firstOrFail()->id;
+        $this->assertNotEquals($oldPallet->id, $restoredPalletId);
+        $this->assertNotEquals($newPallet->id, $restoredPalletId);
         $this->assertDatabaseHas('master_locations', [
             'code' => 'B1',
-            'current_pallet_id' => $oldPallet->id,
+            'current_pallet_id' => $restoredPalletId,
             'is_occupied' => 1,
         ]);
 
         $this->assertDatabaseHas('stock_locations', [
-            'pallet_id' => $oldPallet->id,
+            'pallet_id' => $restoredPalletId,
             'warehouse_location' => 'B1',
         ]);
+        $this->assertDatabaseHas('stock_locations', ['pallet_id' => $newPallet->id, 'warehouse_location' => 'A1']);
     }
 
     public function test_redo_ignores_stale_occupied_location_and_still_executes(): void

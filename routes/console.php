@@ -55,19 +55,10 @@ Artisan::command('locations:sync', function () {
 })->purpose('Sync master_locations occupancy from latest stock_locations');
 
 Artisan::command('delivery:purge-completions', function () {
-    $expiredSessions = \App\Models\DeliveryPickSession::where('completion_status', 'completed')
-        ->whereNotNull('redo_until')
-        ->where('redo_until', '<', now())
-        ->get();
-
-    foreach ($expiredSessions as $session) {
-        $sessionId = $session->id;
-        \App\Models\DeliveryPickItem::where('pick_session_id', $sessionId)->delete();
-        \App\Models\DeliveryPickSession::where('id', $sessionId)->delete();
-    }
-
-    $this->info('Expired completion data purged.');
-})->purpose('Purge completed delivery data after redo window');
+    // Preserve shipping events and their box references beyond the Redo window.
+    // Keep the legacy command available for existing scheduler configurations.
+    $this->info('Riwayat delivery selesai dipertahankan untuk Laporan Pengiriman. Tidak ada sesi atau rincian box yang dihapus.');
+})->purpose('Preserve completed delivery history after the Redo window');
 
 Artisan::command('expired-box:send-summary', function () {
     $sent = app(\App\Services\ExpiredBoxSummaryService::class)->sendDailySummary();

@@ -15,7 +15,7 @@ export function initExportPicking({documentRef = globalThis.document, fetcher = 
         event.preventDefault(); if (busy) return;
         const input = form.querySelector('[name="box_number"]');
         const number = input.value.trim();
-        if (!/^[0-9]{8}$/.test(number)) { report(false, 'NG · ID Box harus tepat 8 angka. Scan ulang; input ini tidak membuat approval.'); input.focus(); input.select(); return; }
+        if (!/^[0-9]{8}$/.test(number)) { report(false, 'NG · ID Box harus tepat 8 angka. Scan ulang, input ini tidak membuat approval.'); input.focus(); input.select(); return; }
         busy = true; form.setAttribute('aria-busy', 'true');
         const controls = [...form.querySelectorAll('input,button')];
         const payload = Object.fromEntries(formData(form)); payload.box_number = number;
@@ -35,7 +35,7 @@ export function initExportPicking({documentRef = globalThis.document, fetcher = 
             report(data.success === true, data.message ?? 'Scan selesai.');
             const next = root.querySelector('[name="box_number"]');
             if (next) { next.value = ''; next.focus({preventScroll: true}); }
-        } catch (error) { report(false, error.message || 'Koneksi bermasalah. Coba scan ulang; token permintaan tetap dipertahankan.'); }
+        } catch (error) { report(false, error.message || 'Koneksi bermasalah. Coba scan ulang, token permintaan tetap dipertahankan.'); }
         finally {
             busy = false;
             if (form.isConnected) { controls.forEach(control => { control.disabled = false; }); form.removeAttribute('aria-busy'); input.focus({preventScroll: true}); }

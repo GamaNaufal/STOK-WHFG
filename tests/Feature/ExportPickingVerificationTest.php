@@ -121,6 +121,7 @@ class ExportPickingVerificationTest extends TestCase
         $preview=$service->reduction($pallet,[$pallet->items()->sole()->id=>0]);$this->assertCount(1,$preview['returns']);
         $data=['revision'=>1,'fulfillment_revision'=>1,'request_token'=>(string)Str::uuid(),'quantities'=>$preview['quantities'],
             'fingerprint'=>$preview['fingerprint'],'destination'=>'pallet:'.$source->id];
+        $this->actingAs(User::factory()->create(['role'=>'admin']));
         $this->post(route('export.fulfillment.reduce',[$delivery,$pallet]),$data)->assertSessionHasErrors('return_confirmed');
         $this->post(route('export.fulfillment.reduce',[$delivery,$pallet]),$data+['return_confirmed'=>1])->assertSessionHasNoErrors();
         $this->assertSame($source->id,$first->fresh()->current_pallet_id);$this->assertNull($first->fresh()->fulfillment);
@@ -132,8 +133,11 @@ class ExportPickingVerificationTest extends TestCase
         [$pallet,,$wrong]=$this->mixed();$this->scan($pallet,$wrong->box_number)->assertStatus(423);
         $issue=ExportPickingIssue::sole();$this->approve($issue)->assertSessionHasNoErrors();
         $delivery=$pallet->palletPlan->deliveryPlan;
+        $this->actingAs(User::factory()->create(['role'=>'admin']));
         $this->get(route('export.fulfillment.cancel-form',$delivery))->assertSessionHasErrors('fulfillment');
+        $this->actingAs($this->operator);
         $this->confirm($issue)->assertSessionHasNoErrors();
+        $this->actingAs(User::factory()->create(['role'=>'admin']));
         $this->get(route('export.fulfillment.cancel-form',$delivery))->assertOk();
     }
 

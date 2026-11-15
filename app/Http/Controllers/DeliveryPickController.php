@@ -43,19 +43,19 @@ class DeliveryPickController extends Controller
     {
         if ($box->is_withdrawn) {
             return $finalScan
-                ? 'Box sudah withdrawn. Sesi diblokir; tunggu penanganan issue oleh admin.'
-                : 'Box sudah withdrawn dan tidak dapat diverifikasi. Gunakan box lain di picklist; sesi tetap aktif.';
+                ? 'Box sudah withdrawn. Sesi diblokir, tunggu penanganan issue oleh admin.'
+                : 'Box sudah withdrawn dan tidak dapat diverifikasi. Gunakan box lain di picklist, sesi tetap aktif.';
         }
 
         if ($box->reactivated_until && $box->reactivated_until->lte(now())) {
             return $finalScan
-                ? 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dikirim; sesi diblokir. Hubungi Admin Warehouse/Admin untuk menangani issue dan penggantian box.'
-                : 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist; sesi tetap aktif. Laporkan box ini ke Supervisi/Admin.';
+                ? 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dikirim, sesi diblokir. Hubungi Admin Warehouse/Admin untuk menangani issue dan penggantian box.'
+                : 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist, sesi tetap aktif. Laporkan box ini ke Supervisi/Admin.';
         }
 
         return $finalScan
-            ? 'Box expired tidak dapat dikirim. Sesi diblokir; hubungi Admin Warehouse/Admin untuk menangani issue.'
-            : 'Box expired tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist; sesi tetap aktif.';
+            ? 'Box expired tidak dapat dikirim. Sesi diblokir, hubungi Admin Warehouse/Admin untuk menangani issue.'
+            : 'Box expired tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist, sesi tetap aktif.';
     }
 
     private function authorizePickSessionView(DeliveryPickSession $session): void
@@ -870,7 +870,7 @@ class DeliveryPickController extends Controller
             $boxNumber = is_scalar($submittedCode) ? trim((string) $submittedCode) : '';
             $scannedCode = $boxNumber === '' ? '(kosong)' : mb_substr($boxNumber, 0, 255);
             $box = $boxNumber !== '' && mb_strlen($boxNumber) <= 255
-                ? Box::where('box_number', $boxNumber)->lockForUpdate()->first()
+                ? Box::where('box_number', $boxNumber)->orderByDesc('identity_cycle')->lockForUpdate()->first()
                 : null;
 
             if ($box && ($box->is_withdrawn || $box->isExpiryUnavailable())) {
@@ -1017,7 +1017,7 @@ class DeliveryPickController extends Controller
             $submittedCode = $request->input('box_number');
             $boxNumber = is_scalar($submittedCode) ? trim((string) $submittedCode) : '';
             $box = $boxNumber !== '' && mb_strlen($boxNumber) <= 255
-                ? Box::where('box_number', $boxNumber)->lockForUpdate()->first()
+                ? Box::where('box_number', $boxNumber)->orderByDesc('identity_cycle')->lockForUpdate()->first()
                 : null;
             $isUnavailable = $box && ($box->is_withdrawn || $box->isExpiryUnavailable());
             $pickItemExists = $box && ! $isUnavailable && DeliveryPickItem::where('pick_session_id', $session->id)
@@ -1112,7 +1112,7 @@ class DeliveryPickController extends Controller
                 ['status' => 'approved', 'session_status' => 'scanning', 'delivery_order_id' => $session->delivery_order_id,
                     'pick_session_id' => $session->id, 'scanned_code' => $issue->scanned_code,
                     'issue_type' => $issue->issue_type, 'notes' => $issue->notes],
-                "Issue scan #{$issue->id} disetujui; sesi #{$session->id} dibuka kembali.");
+                "Issue scan #{$issue->id} disetujui, sesi #{$session->id} dibuka kembali.");
 
             return true;
         });
@@ -1434,13 +1434,8 @@ class DeliveryPickController extends Controller
                 $consolidatedPallet = $this->restoreBoxesToConsolidatedPallet(
                     $redoContext['allSessionBoxes'],
                 );
-                $this->normalizeSharedRedoBoxes(
-                    $redoContext['allSessionBoxes'],
-                    $withdrawals,
-                    $redoContext['palletItemsById'],
-                    $redoContext['boxPalletIdsByBoxId']
-                );
-                $affectedPalletIds = [(int) $consolidatedPallet->id];
+                // Keep shared legacy boxes on the same server-created restoration pallet.
+                $affectedPalletIds = [(int) $consolidatedPallet->id, ...$targetPalletIds];
 
                 $this->reverseWithdrawalsAndRestorePalletItems($withdrawals, $redoContext['palletItemsById']);
                 $this->restorePalletItemSummariesFromWithdrawals($withdrawals, $redoContext['palletItemsById']);
@@ -1472,16 +1467,9 @@ class DeliveryPickController extends Controller
 
                 $this->releaseEmptyPalletLocations($targetPalletIds);
                 if (! empty($locationCheck['location_code'])) {
-                    $assignmentPalletId = (int) $consolidatedPallet->id;
-                    if ($singleRelocationCode !== '' && ! empty($legacyRelocationCodes)) {
-                        $legacyPalletId = (int) array_key_first($legacyRelocationCodes);
-                        if ($legacyPalletId > 0) {
-                            $assignmentPalletId = $legacyPalletId;
-                        }
-                    }
-
+                    // Legacy payloads may supply a location, never the pallet to mutate.
                     $this->applyRedoLocationAssignments([
-                        $assignmentPalletId => $locationCheck['location_code'],
+                        (int) $consolidatedPallet->id => $locationCheck['location_code'],
                     ]);
                 }
             }

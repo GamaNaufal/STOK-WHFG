@@ -95,7 +95,7 @@
 
             <!-- Action Buttons -->
             <div class="stock-input-actions mt-4">
-                <button type="button" class="btn btn-lg" id="cancel-btn"
+                <button type="button" class="btn btn-lg" id="cancel-btn" data-permission="stock_input_clear"
                         style="background: #6b7280;
                                color: white;
                                border: none;
@@ -106,7 +106,7 @@
                                transition: all 0.3s ease;">
                     <i class="bi bi-x-circle"></i> Batal
                 </button>
-                <button type="button" class="btn btn-lg" id="print-pallet-btn"
+                <button type="button" class="btn btn-lg" id="print-pallet-btn" data-permission="stock_input_print"
                        style="background: linear-gradient(135deg, #f59e0b 0%, #f97316 100%);
                            color: white;
                            border: none;
@@ -118,7 +118,7 @@
                            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.22);">
                     <i class="bi bi-printer"></i> Print Keterangan Pallet
                 </button>
-                <button type="button" class="btn btn-lg" id="save-btn"
+                <button type="button" class="btn btn-lg" id="save-btn" data-permission="stock_input_save"
                         style="background: linear-gradient(135deg, #0C7779 0%, #249E94 100%);
                                color: white;
                                border: none;

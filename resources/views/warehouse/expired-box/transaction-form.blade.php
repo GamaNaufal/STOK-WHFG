@@ -38,7 +38,7 @@
             @endif
             <div class="form-check my-3"><input id="batch-confirm" class="form-check-input" type="checkbox" name="confirmed" value="1" required><label for="batch-confirm" class="form-check-label">
                 @if($action === 'start')Seluruh box dalam transaksi sudah diserahkan ke QA.
-                @elseif($action === 'qa')Hasil QA setiap box sudah diperiksa. Box lolos sudah kembali ke warehouse; saya memahami box ditolak akan dihapus permanen.
+                @elseif($action === 'qa')Hasil QA setiap box sudah diperiksa. Box lolos sudah kembali ke warehouse, saya memahami box ditolak akan dihapus permanen.
                 @elseif($action === 'packing')Seluruh box dalam transaksi sudah diserahkan ke packing.
                 @endif
             </label></div>

@@ -18,7 +18,7 @@
                 <tbody>@forelse($plans as $plan)
                     <tr><th scope="row">{{ $plan->plan_code ?? '—' }}</th><td>{{ $plan->customer_name }}</td><td>{{ $plan->delivery_deadline->format('d/m/Y') }}</td>
                         <td>{{ number_format($plan->total_pcs, 0, ',', '.') }}</td><td><strong>{{ number_format($plan->total_boxes, 0, ',', '.') }}</strong></td>
-                        <td>{{ $plan->creator->name }}</td><td><a class="btn btn-sm btn-outline-primary" href="{{ route('export.delivery-plans.show', $plan) }}">Lihat rencana</a></td></tr>
+                        <td>{{ $plan->creator->name }}</td><td><div class="plan-inline-actions"><a class="btn btn-sm btn-outline-primary" href="{{ route('export.delivery-plans.show', $plan) }}">Lihat rencana</a>@if($plan->status === 'draft' && auth()->user()->canDeleteExportDeliveryPlan())<a class="btn btn-sm btn-outline-danger" href="{{ route('export.delivery-plans.show', $plan) }}#delete-delivery-plan" data-delete-delivery-preview data-preview-url="{{ route('export.delivery-plans.deletion-preview', $plan) }}" aria-label="Hapus rencana {{ $plan->plan_code }}">Hapus</a>@endif</div></td></tr>
                 @empty
                     <tr><td colspan="7" class="plan-empty"><i class="bi bi-truck" aria-hidden="true"></i><strong>{{ $search ? 'Tidak ada rencana yang cocok' : 'Belum ada rencana delivery' }}</strong><span>{{ $search ? 'Coba kode rencana atau nama customer lain.' : 'Buat rencana melalui input manual atau Excel.' }}</span></td></tr>
                 @endforelse</tbody>
@@ -27,4 +27,7 @@
         @if($plans->hasPages())<div class="plan-panel-body">{{ $plans->links('pagination::bootstrap-5') }}</div>@endif
     </section>
 </div>
+@endsection
+@section('scripts')
+<script src="{{ asset('js/pages/export-delivery-delete.js') }}?v={{ filemtime(public_path('js/pages/export-delivery-delete.js')) }}"></script>
 @endsection

@@ -1,6 +1,6 @@
 @extends('shared.layouts.app')
 
-@section('title', 'Laporan Pengambilan Stok - Warehouse FG Yamato')
+@section('title', 'Laporan Pengiriman - Warehouse FG Yamato')
 
 @section('styles')@include('operator.reports.ajax-styles')@endsection
 

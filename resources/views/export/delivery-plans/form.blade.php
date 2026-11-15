@@ -15,7 +15,7 @@
             <a class="plan-back" href="{{ route('export.delivery-plans.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Rencana delivery</a>
             <span class="plan-eyebrow">Pengiriman ekspor</span>
             <h1>{{ $plan ? 'Ubah rencana delivery' : 'Rencana delivery baru' }}</h1>
-            <p>Isi kebutuhan pengiriman. Kapasitas box mengikuti master part bersama.</p>
+            <p>Isi kode part dari dokumen atau label. Pemetaan dan kapasitas box mengikuti master part bersama.</p>
         </div>
     </header>
     @if($errors->any())
@@ -25,11 +25,11 @@
         </div>
     @endif
     <section class="plan-panel" aria-labelledby="plan-import-title">
-        <div class="plan-panel-heading"><div><h2 id="plan-import-title">Mulai dari input atau dokumen</h2><p>Satu dokumen untuk satu customer. Hasil pembacaan dapat dikoreksi sebelum disimpan.</p></div></div>
+        <div class="plan-panel-heading"><div><h2 id="plan-import-title"><span class="ui-step" aria-hidden="true">01</span> Mulai dari input atau dokumen</h2><p>Satu dokumen untuk satu customer. Hasil pembacaan dapat dikoreksi sebelum disimpan.</p></div></div>
         <div class="plan-panel-body">
             <div class="plan-input-methods" aria-label="Cara mengisi rencana">
                 <button type="button" class="btn btn-outline-secondary is-selected" data-input-mode="manual" aria-pressed="true">Isi manual</button>
-                <button type="button" class="btn btn-outline-secondary" data-input-mode="excel" aria-pressed="false"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Dari Excel</button>
+                <button type="button" class="btn btn-outline-secondary" data-input-mode="excel" data-permission="export_delivery_import" aria-pressed="false"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i> Dari Excel</button>
             </div>
             <div id="plan-excel-panel" class="plan-import-panel" hidden>
                 <label class="form-label" for="plan-excel-file">File Excel</label>
@@ -37,7 +37,7 @@
                 <p class="plan-help" id="excel-help">Format .xlsx atau .xls, maksimal 5 MB dan 500 baris part. Gunakan satu sheet untuk satu customer.</p>
                 <div class="plan-inline-actions">
                     <button type="button" class="btn btn-primary" id="plan-read-excel">Baca Excel</button>
-                    <a class="btn btn-outline-secondary" href="{{ route('export.delivery-plans.template') }}">Unduh template Excel</a>
+                    <a data-excel-download class="btn btn-outline-secondary" href="{{ route('export.delivery-plans.template') }}"><i class="bi bi-download" aria-hidden="true"></i> Unduh template Excel</a>
                 </div>
             </div>
             <p id="plan-import-status" class="plan-import-status" role="status" aria-live="polite"></p>
@@ -56,7 +56,7 @@
         <input type="hidden" name="source_type" id="plan-source-type" value="{{ $initialSource }}">
         <input type="hidden" name="source_name" id="plan-source-name" value="{{ old('source_name', $plan?->source_name) }}">
         <section class="plan-panel" aria-labelledby="plan-customer-title">
-            <div class="plan-panel-heading"><div><h2 id="plan-customer-title">Tujuan pengiriman</h2><p>Lengkapi kode rencana, customer dan batas tanggal pengiriman.</p></div></div>
+            <div class="plan-panel-heading"><div><h2 id="plan-customer-title"><span class="ui-step" aria-hidden="true">02</span> Tujuan pengiriman</h2><p>Lengkapi kode rencana, customer dan batas tanggal pengiriman.</p></div></div>
             <div class="plan-panel-body plan-fields">
                 <div><label class="form-label" for="plan-code">Kode rencana delivery</label>
                     <input type="text" class="form-control" name="plan_code" id="plan-code" required maxlength="100" value="{{ old('plan_code', $plan?->plan_code) }}" placeholder="Contoh: RDYR0925" autocomplete="off" aria-describedby="plan-code-help">
@@ -72,7 +72,7 @@
         </section>
         <section class="plan-panel" aria-labelledby="plan-items-title">
             <div class="plan-panel-heading">
-                <div><h2 id="plan-items-title">Nomor part dan kebutuhan</h2><p>Sisa PCS otomatis menjadi kebutuhan 1 box Not Full. Setelah simpan, hubungi admin untuk menyiapkannya setelah perencanaan pallet final.</p></div>
+                <div><h2 id="plan-items-title"><span class="ui-step" aria-hidden="true">03</span> Nomor part dan kebutuhan</h2><p>Sisa PCS otomatis menjadi kebutuhan 1 box Not Full. Setelah simpan, hubungi admin untuk menyiapkannya setelah perencanaan pallet final.</p></div>
                 <button type="button" class="btn btn-outline-primary" id="plan-add-item"><i class="bi bi-plus-lg" aria-hidden="true"></i> Tambah part</button>
             </div>
             <div class="plan-table-scroll" role="region" aria-label="Daftar part rencana delivery, geser untuk melihat semua kolom" tabindex="0">
@@ -96,7 +96,7 @@
         </div>
     </form>
     <template id="plan-row-template">
-        <tr><td class="plan-row-number"></td><td><input type="search" class="form-control plan-part" maxlength="100" placeholder="Ketik atau pilih nomor part" autocomplete="off" required><p class="plan-row-error" aria-live="polite"></p></td>
+        <tr><td class="plan-row-number"></td><td><input type="search" class="form-control plan-part" maxlength="100" placeholder="Kode dokumen atau label" autocomplete="off" required><input type="hidden" class="plan-expected-part"><p class="plan-help plan-part-mapping"></p><p class="plan-row-error" aria-live="polite"></p></td>
             <td><input type="number" class="form-control plan-quantity" min="1" max="4294967295" step="1" inputmode="numeric" required></td>
             <td class="plan-capacity">—</td><td class="plan-boxes">—</td><td><button type="button" class="btn btn-sm btn-outline-danger plan-remove"><i class="bi bi-x-lg" aria-hidden="true"></i><span class="visually-hidden">Hapus baris</span></button></td>
         </tr>

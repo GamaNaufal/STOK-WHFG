@@ -5,7 +5,7 @@ export function distributeSpareBoxes(boxes, allocations, {requireDestination = t
         throw new Error('Jumlah box setiap tujuan harus berupa angka bulat minimal 1.');
     }
     const total = allocations.reduce((sum, row) => sum + Number(row.quantity), 0);
-    if (total !== boxes.length) throw new Error(`Pembagian harus tepat ${boxes.length} box; saat ini ${total} box.`);
+    if (total !== boxes.length) throw new Error(`Pembagian harus tepat ${boxes.length} box, saat ini ${total} box.`);
     if (allocations.some(row => row.destination && !/^(pallet|location):[1-9][0-9]*$/.test(row.destination))) throw new Error('Pilih tujuan dari lokasi atau pallet yang tersedia.');
     if (requireDestination && allocations.some(row => !row.destination)) throw new Error('Pilih lokasi atau pallet untuk setiap tujuan.');
     let offset = 0;

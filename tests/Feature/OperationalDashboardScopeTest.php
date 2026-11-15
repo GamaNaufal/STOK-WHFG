@@ -213,7 +213,7 @@ class OperationalDashboardScopeTest extends TestCase
         $preview = $service->cancellation($delivery);
         $loc = ExportMasterLocation::create(['code' => 'DASH-CANCEL']);
         $service->cancel($delivery->id, ['revision' => 2, 'request_token' => (string) Str::uuid(), 'fingerprint' => $preview['fingerprint'], 'reason' => 'Customer cancel',
-            'destination' => 'location:'.$loc->id, 'return_confirmed' => 1], $this->operator);
+            'destination' => 'location:'.$loc->id, 'return_confirmed' => 1], User::factory()->create(['role' => 'admin']));
         $d = $this->data(['scope' => 'export']);
         $this->assertSame(4, (int) $d['stockTotals']['export']->boxes);
         $this->assertSame(0, (int) $d['domains']['export']['outbound']->boxes);

@@ -58,13 +58,13 @@ class ExpiredBoxTransactionController extends Controller
                 throw $e;
             }
 
-            return back()->withInput()->with('error', 'ID atau lokasi sedang digunakan. Transaksi belum disimpan; periksa dan coba kembali.');
+            return back()->withInput()->with('error', 'ID atau lokasi sedang digunakan. Transaksi belum disimpan, periksa dan coba kembali.');
         } catch (\RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
         return redirect()->route('expired-box.transactions.show', $transaction)->with('success', $request->input('action') === 'receive'
-            ? 'Penerimaan tersimpan. Box aktif satu bulan sejak diterima; sisa box mengikuti status QA dan packing.'
+            ? 'Penerimaan tersimpan. Box aktif satu bulan sejak diterima, sisa box mengikuti status QA dan packing.'
             : 'Transaksi berhasil diperbarui.');
     }
 

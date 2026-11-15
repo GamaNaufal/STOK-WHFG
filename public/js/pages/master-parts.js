@@ -23,7 +23,7 @@
 
     const renderRows = (items) => {
         if (!items.length) {
-            tableBody.innerHTML = '<tr><td colspan="3" class="part-table-empty"><i class="bi bi-search" aria-hidden="true"></i><strong>Tidak ada nomor part yang cocok</strong><span>Coba kata kunci lain atau bersihkan pencarian.</span></td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="4" class="part-table-empty"><i class="bi bi-search" aria-hidden="true"></i><strong>Tidak ada nomor part yang cocok</strong><span>Coba kata kunci lain atau bersihkan pencarian.</span></td></tr>';
             return;
         }
 
@@ -32,10 +32,12 @@
             if (!Number.isSafeInteger(id) || id < 1) return '';
             const partNumber = escapeHtml(item.part_number ?? '');
             const quantity = Number(item.qty_box).toLocaleString('id-ID');
+            const documents = escapeHtml(item.document_numbers?.map(code => code.document_number).join(', ') || item.part_number || '');
             const resourceUrl = `${baseUrl}/${id}`;
 
             return `<tr>
                 <th scope="row" class="part-table-code">${partNumber}</th>
+                <td class="part-document-codes">${documents}</td>
                 <td><span class="part-quantity"><strong>${quantity}</strong> PCS / box</span></td>
                 <td><div class="part-row-actions">
                     <a href="${resourceUrl}/edit" class="btn btn-sm btn-outline-primary" aria-label="Edit nomor part ${partNumber}"><i class="bi bi-pencil" aria-hidden="true"></i> Edit</a>
@@ -79,7 +81,7 @@
                 : `${items.length} nomor part cocok dengan pencarian.`;
         } catch (error) {
             if (error.name === 'AbortError' || version !== requestVersion) return;
-            status.textContent = 'Pencarian gagal. Daftar sebelumnya tetap ditampilkan; coba lagi.';
+            status.textContent = 'Pencarian gagal. Daftar sebelumnya tetap ditampilkan, coba lagi.';
         } finally {
             if (version === requestVersion) activeRequest = null;
         }

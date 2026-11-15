@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {initStockReview} from '../../resources/js/export-delivery/stock-review.mjs';
 
-function setup(fetcher) {
-    const button = {}, error = {hidden: true}, note = {}, help = {}, status = {};
-    const states = [{dataset: {placed: 'false'}}, {dataset: {placed: 'true'}}];
+function setup(fetcher, {hasAssignments = true} = {}) {
+    const button = {}, error = {hidden: true}, note = {}, help = hasAssignments ? {} : null, status = {};
+    const states = hasAssignments ? [{dataset: {placed: 'false'}}, {dataset: {placed: 'true'}}] : [];
     const form = {action: '/pallet-plans/1/stock-allocation/1/acknowledge',
         querySelector: selector => selector === 'button' ? button : {value: 'csrf'},
         setAttribute() {}, removeAttribute() {}, replaceWith(node) {this.replacement = node;},
@@ -18,7 +18,7 @@ function setup(fetcher) {
         querySelector: selector => selector === '[data-stock-review-status]' ? status : {focus() {}}};
     const payload = {revision: '1', _token: 'csrf'};
     initStockReview({documentRef: doc, fetcher, modalApi: {getOrCreateInstance: () => modal}, formData: () => payload});
-    return {form, button, error, states, modal, element, payload, submit: () => form.submit({preventDefault() {}})};
+    return {form, button, error, note, states, modal, element, payload, submit: () => form.submit({preventDefault() {}})};
 }
 
 test('mandatory review rejects duplicate clicks and closes locally only after acknowledgment succeeds', async () => {
@@ -49,4 +49,17 @@ test('failed acknowledgment keeps mandatory review open and permits retry with t
     await ui.submit();
     assert.equal(ui.modal.hidden, 1); assert.equal(ui.error.hidden, true);
     assert.equal(bodies[0], bodies[1]);
+});
+
+test('empty FIFO review closes after successful acknowledgment without an allocation help element', async () => {
+    const message = 'Tinjauan stok FIFO selesai.';
+    const ui = setup(async () => ({ok: true, json: async () => ({message})}), {hasAssignments: false});
+    await ui.submit();
+    assert.equal(ui.error.hidden, true);
+    assert.equal(ui.note.textContent, message);
+    assert.equal(ui.modal.hidden, 1);
+    assert.equal(ui.form.replacement.textContent, 'Tutup');
+    assert.equal(ui.element.dataset.autoOpen, 'false');
+    assert.equal(ui.element.dataset.bsBackdrop, 'true');
+    assert.equal(ui.element.dataset.bsKeyboard, 'true');
 });

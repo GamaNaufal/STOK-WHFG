@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\RoleFeatureAccess;
 use App\Services\FeatureAccessService;
+use App\Services\GranularFeaturePermissions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -28,7 +29,14 @@ class FeatureAccessController extends Controller
 
     private function featuresForRole(mixed $role): array
     {
-        return array_filter(config('feature_access.features'), fn ($feature) => ! isset($feature['allowed_roles'])
+        $all = config('feature_access.features');
+        $ordered = [];
+        foreach ($all as $key => $feature) {
+            if (isset($feature['parent'])) continue;
+            $ordered[$key] = $feature;
+            foreach ($all as $childKey => $child) if (($child['parent'] ?? null) === $key) $ordered[$childKey] = $child;
+        }
+        return array_filter($ordered, fn ($feature) => ! isset($feature['allowed_roles'])
             || in_array($role, $feature['allowed_roles'], true));
     }
 
@@ -43,9 +51,13 @@ class FeatureAccessController extends Controller
         $validated = $request->validate([
             'role' => ['required', Rule::in(array_keys(config('feature_access.roles')))],
             'permissions' => ['present', 'array'],
+            'permissions_version' => ['sometimes', 'integer', 'in:2'],
             'permissions.*' => ['string', 'distinct', Rule::in($editable)],
         ]);
         $permissions = array_values($validated['permissions']);
+        if (!$request->has('permissions_version')) {
+            $permissions = GranularFeaturePermissions::expand($validated['role'], $permissions);
+        }
         foreach ($permissions as $permission) {
             foreach ($features[$permission]['requires'] ?? [] as $dependency) {
                 if (! in_array($dependency, $permissions, true)) {
@@ -61,7 +73,7 @@ class FeatureAccessController extends Controller
             $record = RoleFeatureAccess::firstOrCreate(['role' => $role], ['permissions' => $access->defaults($role)]);
             $record = RoleFeatureAccess::whereKey($record->id)->lockForUpdate()->firstOrFail();
             $previous = $record->permissions;
-            $record->update(['permissions' => $permissions]);
+            $record->update(['permissions' => $permissions, 'permissions_version' => GranularFeaturePermissions::VERSION]);
             // Fail the transaction if its audit record cannot be saved.
             AuditLog::create([
                 'type' => 'role_feature_access', 'action' => 'updated',

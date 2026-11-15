@@ -62,6 +62,7 @@ class ExportPalletPlanningService
 
     public function save(int $deliveryId, array $data, User $actor): ExportPalletPlan
     {
+        abort_unless($actor->canAccess(($data['action'] ?? '') === 'finalize' ? 'export_pallet_finalize' : 'export_pallet_edit'), 403);
         return app(ExportInventoryService::class)->transaction(function () use ($deliveryId, $data, $actor) {
             // All delivery/planning writes lock this parent first, including revisions and archive.
             $delivery = ExportDeliveryPlan::with('items')->lockForUpdate()->findOrFail($deliveryId);
@@ -135,7 +136,7 @@ class ExportPalletPlanningService
             if ($final) {
                 foreach ($this->requirements($delivery, $rows) as $requirement) {
                     if ($requirement['remaining'] !== 0) {
-                        $this->fail('pallets', 'Alokasi '.$requirement['part_number'].' harus tepat '.$requirement['required'].' box; saat ini '.$requirement['allocated'].' box.');
+                        $this->fail('pallets', 'Alokasi '.$requirement['part_number'].' harus tepat '.$requirement['required'].' box, saat ini '.$requirement['allocated'].' box.');
                     }
                 }
             }
@@ -183,6 +184,7 @@ class ExportPalletPlanningService
 
     public function transition(int $deliveryId, int $revision, User $actor, bool $cancel = false): void
     {
+        abort_unless($actor->canAccess($cancel ? 'export_pallet_cancel' : 'export_pallet_reopen'), 403);
         app(ExportInventoryService::class)->transaction(function () use ($deliveryId, $revision, $actor, $cancel) {
             $delivery = ExportDeliveryPlan::lockForUpdate()->findOrFail($deliveryId);
             $plan = ExportPalletPlan::where('export_delivery_plan_id', $deliveryId)->lockForUpdate()->firstOrFail();
@@ -200,7 +202,7 @@ class ExportPalletPlanningService
                 'updated_by' => $actor->id, 'finalized_by' => null, 'finalized_at' => null]);
             app(DeliveryAnnouncementService::class)->sync($delivery);
             AuditService::record('export_pallet_plan', $cancel ? 'cancelled' : 'reopened', 'ExportPalletPlan', $plan->id,
-                $actor->id, $before, $this->snapshot($plan), $cancel ? 'Perencanaan dibatalkan dan reservasi lokasi dilepas.' : 'Perencanaan dibuka untuk revisi; reservasi lokasi tetap ditahan.');
+                $actor->id, $before, $this->snapshot($plan), $cancel ? 'Perencanaan dibatalkan dan reservasi lokasi dilepas.' : 'Perencanaan dibuka untuk revisi, reservasi lokasi tetap ditahan.');
         });
     }
 
@@ -214,6 +216,6 @@ class ExportPalletPlanningService
         $plan->update(['status' => 'draft', 'revision' => $plan->revision + 1, 'updated_by' => $actor->id,
             'finalized_by' => null, 'finalized_at' => null]);
         AuditService::record('export_pallet_plan', 'delivery_revised', 'ExportPalletPlan', $plan->id,
-            $actor->id, $before, $this->snapshot($plan), 'Delivery direvisi; pembagian dan reservasi tetap disimpan untuk disesuaikan.');
+            $actor->id, $before, $this->snapshot($plan), 'Delivery direvisi, pembagian dan reservasi tetap disimpan untuk disesuaikan.');
     }
 }

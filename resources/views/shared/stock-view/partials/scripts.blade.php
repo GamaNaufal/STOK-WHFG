@@ -417,7 +417,7 @@
                 id: dataset.boxNumber || boxId,
                 part_number: dataset.partNumber || '-',
                 pcs_quantity: dataset.pcsQuantity || 0,
-                note: 'Dikeluarkan dari stok aktif; riwayat tetap tersimpan',
+                note: 'Dikeluarkan dari stok aktif, riwayat tetap tersimpan',
             }],
             action: {
                 type: 'box',
@@ -710,7 +710,7 @@
                                         data-pallet-id="${pallet.pallet_id}">
                                         Detail Pallet
                                     </button>
-                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-danger js-delete-pallet ms-1"
+                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-danger js-delete-pallet ms-1" data-permission="stock_delete_pallet"
                                         aria-label="Hapus pallet ${escapeHtml(pallet.pallet_number)} dari stok aktif"
                                         data-pallet-id="${pallet.pallet_id}"
                                         data-pallet-number="${escapeHtml(pallet.pallet_number || '')}">
@@ -785,10 +785,10 @@
                                         data-pallet-id="${palletId || ''}"
                                         data-pallet-number="${escapeHtml(data.pallet_number || '')}"
                                         data-location="${escapeHtml(data.location || '')}">Edit</button>` : ''}
-                                    <button type="button" class="btn btn-sm btn-outline-secondary js-box-history"
+                                    <button type="button" class="btn btn-sm btn-outline-secondary js-box-history" data-permission="stock_history"
                                         aria-label="Riwayat box ${escapeHtml(item.box_number || '-')}"
                                         data-box-id="${item.box_id}">Riwayat</button>
-                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-box"
+                                    ${canDeleteStock ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-box" data-permission="stock_delete_box"
                                         aria-label="Hapus box ${escapeHtml(item.box_number || '-')} dari stok aktif"
                                         data-box-id="${item.box_id}"
                                         data-box-number="${escapeHtml(item.box_number || '')}"
@@ -926,18 +926,31 @@
         if (!boxHistoryModal) return;
         const loading = document.getElementById('boxHistoryLoading');
         const tableBody = document.getElementById('boxHistoryTableBody');
+        const useField = document.getElementById('boxHistoryUseField');
+        const useSelect = document.getElementById('boxHistoryUse');
+        const historyTitle = document.getElementById('boxHistoryTitle');
         if (!tableBody || !loading) return;
 
         const requestId = ++historyRequest;
         loading.textContent = 'Memuat riwayat...';
         loading.style.display = 'block';
         tableBody.innerHTML = '';
+        if (useField) useField.hidden = true;
+        if (historyTitle) historyTitle.textContent = 'Riwayat Aktivitas Box';
         showStockModal(boxHistoryModal, boxHistoryModalEl);
 
         try {
             const response = await fetch(`/stock-view/boxes/${boxId}/history`);
             const data = await readStockResponse(response);
             if (requestId !== historyRequest) return;
+
+            if (historyTitle) historyTitle.textContent = `ID Box ${data.box_number} · Penggunaan ${data.identity_cycle}`;
+            if (useSelect && useField) {
+                const uses = data.uses || [];
+                useSelect.innerHTML = uses.map((use) => `<option value="${Number(use.id)}" ${Number(use.id) === Number(data.box_id) ? 'selected' : ''}>Penggunaan ${Number(use.cycle)} · ${escapeHtml(use.part_number)} · ${Number(use.pcs_quantity)} PCS · ${escapeHtml(use.received_at || '')}${use.archived ? ' · Diarsipkan' : ''}</option>`).join('');
+                useField.hidden = uses.length < 2;
+                useSelect.onchange = () => openBoxHistoryModal(Number(useSelect.value));
+            }
 
             const historyRows = data.history || [];
             if (historyRows.length === 0) {

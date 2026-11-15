@@ -11,6 +11,11 @@ class ExportStockBox extends Model
 
     public const INVENTORY_SCOPE = 'export';
 
+    public function scopeIdentityHeld($query)
+    {
+        return $query->whereNull('export_stock_boxes.deleted_at')->whereNotIn('state', ['shipped', 'removed']);
+    }
+
     protected bool $legacyIdentity = false;
 
     protected function adoptsLegacyIdentity(): bool
@@ -22,10 +27,10 @@ class ExportStockBox extends Model
     {
         return \Illuminate\Support\Facades\DB::transaction(function () use ($attributes) {
             $number = $attributes['box_number'];
-            $legacy = ExportFulfillmentBox::where('box_number', $number)->whereNull('export_stock_box_id')
-                ->whereHas('plannedItem.pallet.palletPlan.deliveryPlan', fn ($q) => $q->whereNotIn('status', ['completed', 'cancelled']))->lockForUpdate()->first();
+            $legacy = \App\Support\BoxIdentity::legacyCommitment($number)->lockForUpdate()->first();
             $registered = \Illuminate\Support\Facades\DB::table('box_identities')->where('box_number', $number)->where('origin_scope', 'export')->exists();
-            if (! $legacy || ! $registered || static::withTrashed()->where('box_number', $number)->exists()
+            if (! $legacy || ! $registered || static::identityHeld()->where('box_number', $number)->exists()
+                || Box::identityHeld()->where('box_number', $number)->exists()
                 || (int) $legacy->part_setting_id !== (int) $attributes['part_setting_id'] || (int) $legacy->pcs_quantity !== (int) $attributes['pcs_quantity']) {
                 throw \Illuminate\Validation\ValidationException::withMessages(['issue' => 'Identitas box lama tidak tersedia untuk pencatatan fisik ekspor.']);
             }

@@ -90,7 +90,7 @@ class AuthorizationAndReportExportSanityTest extends TestCase
         $withdrawalExport = $this->actingAs($supervisi)->get(route('reports.withdrawal.export'));
         $withdrawalExport->assertOk();
         $this->assertStringContainsString(
-            'stock_withdrawal_report_20260214_101112.xlsx',
+            'laporan_pengiriman_lokal_20260214_101112.xlsx',
             (string) $withdrawalExport->headers->get('content-disposition')
         );
 

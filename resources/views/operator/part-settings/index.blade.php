@@ -14,7 +14,7 @@
         <div>
             <span class="part-page-eyebrow">Master data / Bersama</span>
             <h1>Master No Part & Qty</h1>
-            <p>Satu master nomor part dan PCS standar per box untuk lokal dan ekspor.</p>
+            <p>Kelola kode label, kode dokumen delivery, dan PCS standar untuk lokal dan ekspor.</p>
         </div>
         <a href="{{ route('part-settings.create') }}" class="btn btn-primary part-primary-action">
             <i class="bi bi-plus-lg" aria-hidden="true"></i> Tambah nomor part
@@ -49,7 +49,8 @@
             <table class="table table-hover align-middle part-table">
                 <thead>
                     <tr>
-                        <th scope="col">Nomor part</th>
+                        <th scope="col">Nomor part label / scan</th>
+                        <th scope="col">Kode dokumen delivery</th>
                         <th scope="col">Kapasitas standar</th>
                         <th scope="col">Aksi</th>
                     </tr>
@@ -58,6 +59,7 @@
                     @forelse($parts as $part)
                         <tr>
                             <th scope="row" class="part-table-code">{{ $part->part_number }}</th>
+                            <td class="part-document-codes">{{ $part->documentNumbers->pluck('document_number')->implode(', ') ?: $part->part_number }}</td>
                             <td><span class="part-quantity"><strong>{{ number_format($part->qty_box, 0, ',', '.') }}</strong> PCS / box</span></td>
                             <td>
                                 <div class="part-row-actions">
@@ -75,7 +77,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="3" class="part-table-empty">
+                            <td colspan="4" class="part-table-empty">
                                 <i class="bi bi-box-seam" aria-hidden="true"></i>
                                 @if($parts->total() > 0)
                                     <strong>Halaman ini kosong</strong>

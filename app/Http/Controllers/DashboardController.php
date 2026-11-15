@@ -17,8 +17,8 @@ class DashboardController extends Controller
 {
     private function operational(Request $request, array $extra = [])
     {
-        $includeDetails = $request->boolean('show_details')
-            || $request->anyFilled(['audit_page', 'audit_type', 'audit_action', 'audit_user']);
+        $includeDetails = $request->user()->canAccess('dashboard_details') && ($request->boolean('show_details')
+            || $request->anyFilled(['audit_page', 'audit_type', 'audit_action', 'audit_user']));
         $data = array_merge(app(OperationalDashboardService::class)->build($request, includeDetails: $includeDetails), $extra);
         $response = $request->expectsJson()
             ? response()->json(['html' => view('shared.partials.operational-dashboard-content', $data)->render(),

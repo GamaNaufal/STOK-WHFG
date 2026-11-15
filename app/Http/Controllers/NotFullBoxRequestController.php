@@ -174,12 +174,11 @@ class NotFullBoxRequestController extends Controller
             'box_number.regex' => 'ID Box hanya boleh berisi angka.',
         ]);
 
-        if (\App\Support\BoxIdentity::unavailable($request->box_number)
-            || Box::withTrashed()->where('box_number', $request->box_number)->exists()) {
+        if (\App\Support\BoxIdentity::unavailable($request->box_number)) {
             return redirect()->back()->with('error', 'ID Box sudah terdaftar di sistem.')->withInput();
         }
 
-        if (NotFullBoxRequest::where('box_number', $request->box_number)->exists()) {
+        if (NotFullBoxRequest::where('box_number', $request->box_number)->where('status', 'pending')->exists()) {
             return redirect()->back()->with('error', 'ID Box sudah pernah diajukan.')->withInput();
         }
 
@@ -362,7 +361,7 @@ class NotFullBoxRequestController extends Controller
                     }
                 }
 
-                if (Box::withTrashed()->where('box_number', $request->box_number)->lockForUpdate()->exists()) {
+                if (\App\Support\BoxIdentity::occupied($request->box_number, null, true)) {
                     throw new \RuntimeException('ID Box sudah terdaftar di sistem.');
                 }
 

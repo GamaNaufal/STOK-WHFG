@@ -118,9 +118,8 @@ class ExpiredBoxHandlingService
             if ($data['part_number'] !== $handling->part_number || (int) $data['pcs_quantity'] !== (int) $handling->pcs_quantity) {
                 throw new \RuntimeException('Part dan PCS hasil packing harus sama dengan box asal.');
             }
-            if (BoxIdentity::unavailable($data['box_number'])
-                || DB::table('not_full_box_requests')->where('box_number', $data['box_number'])->exists()) {
-                throw ValidationException::withMessages(['box_number' => 'ID Box baru sudah pernah digunakan atau diajukan.']);
+            if (BoxIdentity::unavailable($data['box_number'])) {
+                throw ValidationException::withMessages(['box_number' => 'ID Box masih digunakan atau sedang diajukan.']);
             }
             $receivedAt = isset($data['received_at']) ? Carbon::parse($data['received_at']) : now();
             $issuedAt = ! empty($data['label_issued_at']) ? Carbon::parse($data['label_issued_at']) : null;
@@ -187,7 +186,7 @@ class ExpiredBoxHandlingService
             AuditService::record('expired_box', 'replacement_created', 'Box', $replacement->id, $userId, [],
                 ['handling_id' => $handling->id, 'source_box_number' => $handling->source_box_number, 'usable_until' => $until->toDateTimeString(),
                     'replacement_mapping' => $handling->replacement_mapping, 'receipt_id' => $handling->receipt_id],
-                "Box {$replacement->box_number} diterima dari packing; asal {$handling->source_box_number} ({$handling->reference}).");
+                "Box {$replacement->box_number} diterima dari packing, asal {$handling->source_box_number} ({$handling->reference}).");
         });
     }
 

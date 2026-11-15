@@ -146,7 +146,7 @@ class ExpiredBoxWorkspaceController extends Controller
                 throw $error;
             }
 
-            return back()->withInput()->with('error', 'ID atau lokasi sedang dipakai. Periksa kembali; penerimaan belum disimpan.');
+            return back()->withInput()->with('error', 'ID atau lokasi sedang dipakai. Periksa kembali, penerimaan belum disimpan.');
         } catch (\RuntimeException $error) {
             return back()->withInput()->with('error', $error->getMessage());
         }

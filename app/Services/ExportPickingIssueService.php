@@ -26,7 +26,8 @@ class ExportPickingIssueService
         return app(ExportInventoryService::class)->transaction(function () use ($id, $data, $actor) {
             $issue = ExportPickingIssue::whereKey($id)->lockForUpdate()->firstOrFail();
             if ($issue->isClosed() || $issue->revision !== (int) $data['revision']) $this->fail('revision', 'Issue sudah berubah atau selesai. Muat ulang halaman approval.');
-            $box = ExportStockBox::with('currentPallet.location')->where('box_number', $issue->box_number)->first();
+            $box = ExportStockBox::identityHeld()->with('currentPallet.location')->where('box_number', $issue->box_number)->first();
+            if ($issue->export_stock_box_id && (int) $issue->export_stock_box_id !== (int) $box?->id) $this->fail('issue', 'Penggunaan ID Box sudah berubah. Tinjau ulang box fisik sebelum melanjutkan.');
             $source = $box?->currentPallet;
             $knownSource = $source && !$source->retired_at && $source->location;
             if ($knownSource) {
@@ -35,17 +36,17 @@ class ExportPickingIssueService
                 [$pallet, $location] = $this->destination($data['destination'] ?? null);
                 $pallet?->assertSpaceForIncomingBox();
             }
-            if (!$box && ExportStockBox::onlyTrashed()->where('box_number', $issue->box_number)->exists()) $this->fail('issue', 'ID Box ini sudah keluar gudang pada permintaan yang selesai. Periksa identitas box; riwayat tidak dapat didaftarkan ulang.');
             $part = !$box ? app(ExportStockReceivingService::class)->part(trim($data['part_number'] ?? ''), true) : null;
-            $legacy = !$box ? ExportFulfillmentBox::where('box_number', $issue->box_number)->first() : null;
-            if (!$box && \App\Support\BoxIdentity::registered($issue->box_number) && (!$legacy || !\Illuminate\Support\Facades\DB::table('box_identities')->where('box_number',$issue->box_number)->where('origin_scope','export')->exists())) $this->fail('issue','ID Box sudah digunakan pada lokal/ekspor dan tidak dapat didaftarkan ulang.');
+            $legacy = !$box ? \App\Support\BoxIdentity::legacyCommitment($issue->box_number)->first() : null;
+            if (!$box && !$legacy && \App\Support\BoxIdentity::occupied($issue->box_number)) $this->fail('issue', 'ID Box masih digunakan oleh box aktif pada lokal/ekspor.');
             if ($legacy && ((int) $legacy->part_setting_id !== $part->id || $legacy->pcs_quantity !== (int) $part->qty_box)) $this->fail('part_number', 'Nomor ini memiliki komitmen ekspor lama. Part dan kapasitas harus sesuai histori komitmen tersebut.');
             $before = $issue->only(['status', 'revision', 'return_pallet_id', 'return_location_id', 'part_setting_id', 'pcs_quantity']);
             $issue->update(['export_stock_box_id' => $box?->id, 'issue_type' => !$box ? 'unknown_box' : ($knownSource ? 'wrong_box' : 'missing_location'),
                 'return_pallet_id' => $pallet?->id, 'return_location_id' => $location->id, 'return_location_code' => $location->code,
                 'part_setting_id' => $part?->id ?? $box->part_setting_id, 'pcs_quantity' => $part?->qty_box ?? $box->pcs_quantity,
                 'approved_by' => $actor->id, 'approved_at' => now(), 'notes' => $data['notes'],
-                'status' => 'awaiting_return', 'revision' => $issue->revision + 1]);
+                'status' => 'awaiting_return', 'revision' => $issue->revision + 1,
+                'context' => array_merge($issue->context ?? [], ['identity_cycle' => \App\Support\BoxIdentity::lastCycle($issue->box_number)])]);
             AuditService::record('export_picking_issue', 'approved', 'ExportPickingIssue', $issue->id, $actor->id, $before,
                 $issue->only(['status', 'revision', 'return_pallet_id', 'return_location_id', 'part_setting_id', 'pcs_quantity', 'notes']),
                 'Approval ekspor dicatat. Blokir tetap aktif sampai operator mengonfirmasi penempatan pengembalian.');
@@ -73,7 +74,7 @@ class ExportPickingIssueService
                 ])]);
             AuditService::record('export_picking_issue', 'input_error_closed', 'ExportPickingIssue', $issue->id, $actor->id,
                 $before, $issue->only(['status', 'revision', 'notes', 'approved_by', 'approved_at']) + ['no_physical_box' => true],
-                'Admin menutup salah input tanpa box fisik. Tidak ada registrasi stok atau pengembalian box; blokir issue dilepas.');
+                'Admin menutup salah input tanpa box fisik. Tidak ada registrasi stok atau pengembalian box, blokir issue dilepas.');
             return $issue->fresh();
         });
     }
@@ -95,12 +96,16 @@ class ExportPickingIssueService
             [$target, $location] = $this->destination($destination);
             if ($location->id !== (int) $issue->return_location_id || $location->code !== $issue->return_location_code) $this->fail('destination', 'Tujuan pengembalian berubah. Minta admin memperbarui approval.');
 
-            $box = ExportStockBox::where('box_number', $issue->box_number)->lockForUpdate()->first();
+            $box = ExportStockBox::identityHeld()->where('box_number', $issue->box_number)->lockForUpdate()->first();
+            if (($issue->export_stock_box_id && (int) $issue->export_stock_box_id !== (int) $box?->id)
+                || (array_key_exists('identity_cycle', $issue->context ?? [])
+                    && (int) $issue->context['identity_cycle'] !== \App\Support\BoxIdentity::lastCycle($issue->box_number))) {
+                $this->fail('issue', 'Penggunaan ID Box berubah setelah approval. Minta admin meninjau ulang.');
+            }
             if (!$box) {
-                if (ExportStockBox::onlyTrashed()->where('box_number', $issue->box_number)->exists()) $this->fail('issue', 'Box sudah keluar gudang. Riwayat box tidak dapat didaftarkan ulang.');
                 $part = $issue->part;
                 if (!$part || (int) $part->qty_box !== $issue->pcs_quantity) $this->fail('part_number', 'Kapasitas part berubah. Minta admin memperbarui approval sebelum konfirmasi.');
-                $legacy = ExportFulfillmentBox::where('box_number', $issue->box_number)->whereNull('export_stock_box_id')->first();
+                $legacy = \App\Support\BoxIdentity::legacyCommitment($issue->box_number)->first();
                 $attributes = ['box_number' => $issue->box_number, 'part_setting_id' => $part->id, 'part_number' => $part->part_number,
                     'pcs_quantity' => $issue->pcs_quantity, 'receive_token' => $issue->registration_token,
                     'first_received_at' => $legacy?->first_received_at ?? $issue->created_at, 'received_by' => $actor->id, 'state' => 'received', 'revision' => 1];
@@ -146,7 +151,7 @@ class ExportPickingIssueService
             app(ExportStockAllocationService::class)->allocate($actor, [(int) $box->part_setting_id]);
             AuditService::record('export_picking_issue', 'returned', 'ExportPickingIssue', $issue->id, $actor->id,
                 ['status' => 'awaiting_return'], ['status' => 'returned', 'box_number' => $box->box_number, 'pallet_id' => $target->id, 'location' => $location->code],
-                'Operator mengonfirmasi box sudah ditempatkan sesuai approval; blokir issue ini dilepas.');
+                'Operator mengonfirmasi box sudah ditempatkan sesuai approval, blokir issue ini dilepas.');
             return $issue->fresh();
         });
     }

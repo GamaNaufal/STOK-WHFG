@@ -85,6 +85,14 @@ final class InventoryUnificationCheck
         $export = DB::table('export_stock_boxes')->select('box_number')->union(DB::table('export_fulfillment_boxes')->whereNull('export_stock_box_id')->select('box_number'));
         $boxConflicts = DB::query()->fromSub($export, 'export_ids')->joinSub($domestic, 'domestic_ids', 'export_ids.box_number', '=', 'domestic_ids.box_number')
             ->distinct()->pluck('export_ids.box_number')->all();
+        if (Schema::hasColumn('box_identities', 'last_cycle') && Schema::hasColumn('box_identities', 'origin_scope')) {
+            // Once reuse is enabled, historical overlap between scopes is expected.
+            $legacy = BoxIdentity::legacyCommitment()->select('box_number')->toBase();
+            $export = \App\Models\ExportStockBox::identityHeld()->select('box_number')->toBase()->union($legacy);
+            $domestic = \App\Models\Box::identityHeld()->select('box_number')->toBase();
+            $boxConflicts = DB::query()->fromSub($export, 'export_ids')->joinSub($domestic, 'domestic_ids', 'export_ids.box_number', '=', 'domestic_ids.box_number')
+                ->distinct()->pluck('export_ids.box_number')->all();
+        }
         $codes = DB::table('export_delivery_plans')->select('id', 'plan_code')->orderBy('id')->get();
         $missing = $codes->filter(fn ($plan) => DeliveryPlanCode::normalize($plan->plan_code) === '')->pluck('id')->all();
         $duplicates = array_filter(self::codeClaims(), fn ($ids) => count($ids) > 1);

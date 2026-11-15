@@ -47,7 +47,7 @@
     <header class="stock-input-report-filter-heading">
         <div>
             <h2 id="stock-input-filter-title">Filter catatan</h2>
-            <p>Filter membatasi tabel dan file Excel; angka ringkasan di atas mencakup seluruh histori.</p>
+            <p>Filter membatasi tabel dan file Excel, angka ringkasan di atas mencakup seluruh histori.</p>
         </div>
         <span>{{ $activeFilterCount }} filter aktif</span>
     </header>

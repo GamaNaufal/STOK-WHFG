@@ -463,14 +463,14 @@
 
                         <div class="action-buttons ppc-queue-actions" role="group" aria-label="Keputusan untuk Order #{{ $order->id }}">
                             <span>Pilih keputusan</span>
-                            <button class="btn-approve js-open-status-modal" data-order-id="{{ $order->id }}" data-status="approved" type="button">
+                            <button class="btn-approve js-open-status-modal" data-order-id="{{ $order->id }}" data-status="approved" data-permission="delivery_approve" type="button">
                                 <i class="bi bi-check-circle" aria-hidden="true"></i> Setujui
                             </button>
                             <div class="btn-group-horizontal">
-                                <button class="btn-correction js-open-status-modal" data-order-id="{{ $order->id }}" data-status="correction" type="button">
+                                <button class="btn-correction js-open-status-modal" data-order-id="{{ $order->id }}" data-status="correction" data-permission="delivery_correction" type="button">
                                     <i class="bi bi-pencil" aria-hidden="true"></i> Minta koreksi
                                 </button>
-                                <button class="btn-reject js-open-status-modal" data-order-id="{{ $order->id }}" data-status="rejected" type="button">
+                                <button class="btn-reject js-open-status-modal" data-order-id="{{ $order->id }}" data-status="rejected" data-permission="delivery_reject" type="button">
                                     <i class="bi bi-x-circle" aria-hidden="true"></i> Tolak
                                 </button>
                             </div>

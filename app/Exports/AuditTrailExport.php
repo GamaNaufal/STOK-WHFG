@@ -13,7 +13,7 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 
-class AuditTrailExport implements FromCollection, WithHeadings, WithStyles, ShouldAutoSize
+class AuditTrailExport extends TextSafeExport implements FromCollection, WithHeadings, WithStyles, ShouldAutoSize
 {
     protected $auditLogs;    protected $groupEndRows = []; // Track the last row of each audit log group
     public function __construct($auditLogs)

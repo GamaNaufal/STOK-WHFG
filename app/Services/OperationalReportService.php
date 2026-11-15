@@ -34,6 +34,10 @@ class OperationalReportService
         $label = 'All Time';
 
         if ($request->filled('start_date') || $request->filled('end_date')) {
+            $request->validate([
+                'start_date' => 'nullable|date_format:Y-m-d',
+                'end_date' => ['nullable', 'date_format:Y-m-d', ...($request->filled('start_date') ? ['after_or_equal:start_date'] : [])],
+            ]);
             $start = $request->filled('start_date') ? Carbon::parse($request->input('start_date'))->startOfDay() : null;
             $end = $request->filled('end_date') ? Carbon::parse($request->input('end_date'))->endOfDay() : null;
             $label = 'Custom Range';
@@ -180,6 +184,17 @@ class OperationalReportService
         return [$inboundQuery, $outboundQuery];
     }
 
+    /** Long history retains all observed dates without materializing years of empty rows. */
+    private function reportDays(Carbon $start, Carbon $end, $firstSeries, $secondSeries): iterable
+    {
+        if ($start->diffInDays($end) <= 366) {
+            return $start->copy()->startOfDay()->daysUntil($end->copy()->startOfDay()->addDay());
+        }
+
+        return $firstSeries->keys()->merge($secondSeries->keys())->unique()->sort()
+            ->map(fn ($date) => Carbon::parse($date));
+    }
+
     private function buildThroughputDays(?Carbon $start, ?Carbon $end, $inboundQuery, $outboundQuery): array
     {
         $inboundByDay = $inboundQuery->clone()
@@ -194,7 +209,7 @@ class OperationalReportService
 
         $throughputDays = [];
         if ($start && $end) {
-            $period = Carbon::parse($start)->daysUntil($end->copy()->addDay());
+            $period = $this->reportDays($start, $end, $inboundByDay, $outboundByDay);
             foreach ($period as $day) {
                 $key = $day->format('Y-m-d');
                 $throughputDays[] = [
@@ -230,7 +245,7 @@ class OperationalReportService
 
         $deliveryTrend = [];
         if ($start && $end) {
-            $period = Carbon::parse($start)->daysUntil($end->copy()->addDay());
+            $period = $this->reportDays($start, $end, $deliveryPlanByDay, $deliveryActualByDay);
             foreach ($period as $day) {
                 $key = $day->format('Y-m-d');
                 $planQty = (int) ($deliveryPlanByDay[$key] ?? 0);

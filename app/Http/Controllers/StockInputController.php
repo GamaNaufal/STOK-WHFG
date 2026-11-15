@@ -181,18 +181,11 @@ class StockInputController extends Controller
         }
 
         // Jika box sudah ada di DB dan sudah tersimpan, tolak
-        $existingBox = Box::withTrashed()->where('box_number', $barcode)->first();
+        $existingBox = Box::identityHeld()->where('box_number', $barcode)->first();
         if (! $existingBox && \App\Support\BoxIdentity::unavailable($barcode)) {
-            return response()->json(['success' => false, 'message' => 'ID Box sudah pernah digunakan atau sedang disiapkan pada lokal/ekspor. Gunakan ID Box baru.'], 400);
+            return response()->json(['success' => false, 'message' => 'ID Box masih digunakan atau sedang disiapkan pada lokal/ekspor.'], 400);
         }
         if ($existingBox) {
-            if ($existingBox->trashed()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'ID Box ini sudah pernah digunakan dan telah diarsipkan. Gunakan ID Box baru.',
-                ], 400);
-            }
-
             if (
                 $existingBox->is_withdrawn
                 || $existingBox->isExpiryUnavailable()
@@ -241,6 +234,8 @@ class StockInputController extends Controller
         // Simpan sementara sebagai pending box sampai no part di-scan
         session(['pending_box' => [
             'box_number' => $barcode,
+            'box_id' => $existingBox?->id,
+            'expected_cycle' => \App\Support\BoxIdentity::lastCycle($barcode),
         ]]);
 
         return response()->json([
@@ -271,6 +266,13 @@ class StockInputController extends Controller
         }
 
         $partNumber = $validated['part_number'];
+
+        if (! array_key_exists('expected_cycle', $pendingBox)
+            && \App\Support\BoxIdentity::lastCycle($pendingBox['box_number']) > 0) {
+            session()->forget('pending_box');
+
+            return response()->json(['success' => false, 'message' => 'Acuan penggunaan ID Box belum tercatat pada scan lama. Scan ID Box ulang.'], 422);
+        }
 
         $partSetting = $this->findExactPartSetting($partNumber);
         if (! $partSetting) {
@@ -320,6 +322,8 @@ class StockInputController extends Controller
 
         $scannedBoxes[] = [
             'box_number' => $pendingBox['box_number'],
+            'box_id' => $pendingBox['box_id'] ?? null,
+            'expected_cycle' => $pendingBox['expected_cycle'] ?? \App\Support\BoxIdentity::lastCycle($pendingBox['box_number']),
             'part_number' => $partNumber,
             'pcs_quantity' => $pcsQuantity,
             'qty_box' => $fixedQty,
@@ -377,7 +381,7 @@ class StockInputController extends Controller
         }
 
         // Verify box exists in database
-        $box = Box::withTrashed()->where('box_number', $box_number)->first();
+        $box = Box::identityHeld()->where('box_number', $box_number)->first();
 
         if (! $box || $box->trashed()) {
             return response()->json([
@@ -452,6 +456,7 @@ class StockInputController extends Controller
         // Akan di-attach saat user klik Save
         $scannedBoxes[] = [
             'box_id' => $box->id,
+            'expected_cycle' => (int) $box->identity_cycle,
             'box_number' => $box_number,
             'part_number' => $part_number,
             'pcs_quantity' => $pcs_quantity,
@@ -627,13 +632,30 @@ class StockInputController extends Controller
 
         $existingBoxesByNumber = $boxNumbers->isEmpty()
             ? collect()
-            : Box::withTrashed()->whereIn('box_number', $boxNumbers)->get()->keyBy('box_number');
+            : Box::identityHeld()->whereIn('box_number', $boxNumbers)->lockForUpdate()->get()->keyBy('box_number');
 
         $attachedBoxIds = [];
 
         foreach ($scannedBoxes as $scannedBox) {
             $boxNumber = (string) ($scannedBox['box_number'] ?? '');
+            if (! array_key_exists('expected_cycle', $scannedBox) && ! isset($scannedBox['box_id'])
+                && \App\Support\BoxIdentity::lastCycle($boxNumber) > 0) {
+                throw new \RuntimeException("Daftar scan ID Box {$boxNumber} dibuat sebelum pembaruan aturan. Hapus dari daftar lalu scan ulang.");
+            }
+            if (array_key_exists('expected_cycle', $scannedBox)) {
+                \App\Support\BoxIdentity::guardSnapshot($boxNumber, (int) $scannedBox['expected_cycle']);
+            }
             $box = $existingBoxesByNumber->get($boxNumber);
+            if ((isset($scannedBox['box_id']) && (int) $scannedBox['box_id'] !== (int) $box?->id)
+                || (array_key_exists('expected_cycle', $scannedBox)
+                    && ((int) $scannedBox['expected_cycle'] !== \App\Support\BoxIdentity::lastCycle($boxNumber)
+                        || (! isset($scannedBox['box_id']) && $box)))) {
+                throw new \RuntimeException("Penggunaan ID Box {$boxNumber} telah berubah. Hapus dari daftar scan lalu scan ulang.");
+            }
+            if ($box && ((string) $box->part_number !== (string) $scannedBox['part_number']
+                || (int) $box->pcs_quantity !== (int) $scannedBox['pcs_quantity'])) {
+                throw new \RuntimeException("Part atau PCS box {$boxNumber} berbeda dari daftar scan. Scan ulang box.");
+            }
             if ($box && (
                 $box->trashed()
                 || $box->is_withdrawn
@@ -921,6 +943,10 @@ class StockInputController extends Controller
                 'box_ids' => $attachedBoxIds,
             ], 200);
 
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            DB::rollBack();
+
+            return response()->json(['success' => false, 'message' => collect($e->errors())->flatten()->first(), 'errors' => $e->errors()], 422);
         } catch (\RuntimeException $e) {
             DB::rollBack();
 

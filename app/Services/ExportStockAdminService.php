@@ -109,7 +109,7 @@ class ExportStockAdminService
 
     private function snapshot(ExportStockBox $box, ?ExportStockPallet $pallet): array
     {
-        return $box->only(['box_number', 'part_setting_id', 'part_number', 'pcs_quantity', 'standard_pcs_quantity', 'state', 'current_pallet_id'])
+        return $box->only(['box_number', 'identity_cycle', 'part_setting_id', 'part_number', 'pcs_quantity', 'standard_pcs_quantity', 'state', 'current_pallet_id'])
             + ['first_received_at' => $box->first_received_at->toDateTimeString(), 'warehouse_location' => $pallet?->location_code];
     }
 

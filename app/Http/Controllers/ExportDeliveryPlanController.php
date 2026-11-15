@@ -5,12 +5,11 @@ namespace App\Http\Controllers;
 use App\Services\DeliveryAnnouncementService;
 use App\Models\ExportDeliveryPlan;
 use App\Models\PartSetting;
-use App\Services\AuditService;
 use App\Services\ExportDeliveryPlanImportService;
 use App\Services\ExportDeliveryPlanService;
+use App\Services\ExportDeliveryPlanDeletionService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
-use App\Services\ExportInventoryService;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
@@ -30,8 +29,13 @@ class ExportDeliveryPlanController extends Controller
 
     private function form(?ExportDeliveryPlan $plan = null)
     {
-        $parts = PartSetting::orderBy('part_number')->get(['id', 'part_number', 'qty_box']);
-        $rows = $plan?->items->map(fn ($item) => $item->only(['part_number', 'pcs_quantity', 'pcs_per_box']))->all() ?? [];
+        $parts = PartSetting::with('documentNumbers')->orderBy('part_number')->get(['id', 'part_number', 'qty_box']);
+        $rows = $plan?->items->map(fn ($item) => [
+            'part_number' => $item->document_part_number ?? $item->part_number,
+            'scan_part_number' => $item->part_number,
+            'part_setting_id' => $item->part_setting_id,
+            'pcs_quantity' => $item->pcs_quantity, 'pcs_per_box' => $item->pcs_per_box,
+        ])->all() ?? [];
 
         return view('export.delivery-plans.form', compact('plan', 'parts', 'rows'));
     }
@@ -57,6 +61,14 @@ class ExportDeliveryPlanController extends Controller
             'printReady' => $deliveryPlan->palletPlan?->isFinalFor($deliveryPlan) ?? false]);
     }
 
+    public function deletionPreview(ExportDeliveryPlan $deliveryPlan, ExportDeliveryPlanDeletionService $service)
+    {
+        $review = $service->preview($deliveryPlan->id, auth()->user());
+        return response()->json(['can_delete' => $review['can_delete'], 'plan_code' => $deliveryPlan->plan_code,
+            'html' => view('export.delivery-plans.deletion-preview', compact('review'))->render()])
+            ->header('Cache-Control', 'private, no-store');
+    }
+
     private function validated(Request $request, ?ExportDeliveryPlan $plan = null): array
     {
         $sources = ['manual', 'excel'];
@@ -79,6 +91,7 @@ class ExportDeliveryPlanController extends Controller
             'revision' => $plan ? 'required|integer|min:1' : 'sometimes|integer|min:1',
             'items' => 'required|array|min:1|max:500',
             'items.*.part_number' => 'required|string|max:100|distinct:strict',
+            'items.*.expected_part_setting_id' => 'sometimes|nullable|integer|min:1',
             'items.*.pcs_quantity' => 'required|integer|min:1|max:4294967295',
         ], [
             'request_token.required' => 'Muat ulang formulir rencana sebelum menyimpan. Isian yang belum tersimpan dapat diperiksa kembali.',
@@ -93,7 +106,7 @@ class ExportDeliveryPlanController extends Controller
         catch (ValidationException $error) { return $this->validationResponse($request, $error); }
 
         return ($plan->trashed() ? redirect()->route('export.delivery-plans.index') : redirect()->route('export.delivery-plans.show', $plan))
-            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat; rencana tersebut sudah diarsipkan.' : $this->savedMessage($plan));
+            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat, rencana tersebut sudah diarsipkan.' : $this->savedMessage($plan));
     }
 
     public function update(Request $request, int $deliveryPlan, ExportDeliveryPlanService $service)
@@ -103,7 +116,7 @@ class ExportDeliveryPlanController extends Controller
         catch (ValidationException $error) { return $this->validationResponse($request, $error); }
 
         return ($plan->trashed() ? redirect()->route('export.delivery-plans.index') : redirect()->route('export.delivery-plans.show', $plan))
-            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat; rencana tersebut sudah diarsipkan.' : $this->savedMessage($plan));
+            ->with('success', $plan->trashed() ? 'Penyimpanan sebelumnya sudah tercatat, rencana tersebut sudah diarsipkan.' : $this->savedMessage($plan));
     }
 
     private function savedMessage(ExportDeliveryPlan $plan): string
@@ -119,29 +132,16 @@ class ExportDeliveryPlanController extends Controller
         // A Back/restored form may carry an already-used token. Preserve the operator's edits,
         // but require another deliberate submit with a fresh token and the normal duplicate review.
         return redirect()->back()->withInput(array_replace($request->except('_token'), ['request_token' => (string) \Illuminate\Support\Str::uuid()]))
-            ->withErrors(array_replace($error->errors(), ['request_token' => 'Formulir sebelumnya tidak dapat dipakai untuk isian ini. Isian tetap dipertahankan; periksa lalu simpan kembali.']));
+            ->withErrors(array_replace($error->errors(), ['request_token' => 'Formulir sebelumnya tidak dapat dipakai untuk isian ini. Isian tetap dipertahankan, periksa lalu simpan kembali.']));
     }
 
-    public function destroy(Request $request, ExportDeliveryPlan $deliveryPlan, ExportDeliveryPlanService $service)
+    public function destroy(Request $request, ExportDeliveryPlan $deliveryPlan, ExportDeliveryPlanDeletionService $service)
     {
-        $data = $request->validate(['revision' => 'required|integer|min:1']);
-        app(ExportInventoryService::class)->transaction(function () use ($deliveryPlan, $data, $request, $service) {
-            $locked = ExportDeliveryPlan::with('items')->lockForUpdate()->findOrFail($deliveryPlan->id);
-            abort_unless($locked->status === 'draft' && $locked->revision === (int) $data['revision'], 409, 'Rencana sudah berubah. Muat ulang halaman.');
-            $before = $service->snapshot($locked);
-            if ($locked->palletPlan()->where('status', '!=', 'cancelled')->exists()) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'pallet_plan' => 'Batalkan perencanaan pallet terlebih dahulu sebelum mengarsipkan rencana delivery.',
-                ]);
-            }
-            $locked->delete();
-            app(DeliveryAnnouncementService::class)->sync($locked);
-            app(\App\Services\ExportNotFullService::class)->sync($locked, $request->user());
-            AuditService::record('export_delivery_plan', 'deleted', 'ExportDeliveryPlan', $locked->id,
-                $request->user()->id, $before, [], 'Rencana delivery ekspor diarsipkan.');
-        });
+        $data = $request->validate(['revision' => 'required|integer|min:1', 'pallet_revision' => 'nullable|integer|min:1',
+            'review_token' => 'nullable|string|max:16384', 'reason' => 'nullable|string|max:500']);
+        $service->delete($deliveryPlan->id, $data, $request->user());
 
-        return redirect()->route('export.delivery-plans.index')->with('success', 'Rencana delivery berhasil diarsipkan.');
+        return redirect()->route('export.delivery-plans.index')->with('success', 'Rencana delivery berhasil dihapus dari daftar aktif. Riwayat tetap tersimpan.');
     }
 
     public function importExcel(Request $request, ExportDeliveryPlanImportService $importer)

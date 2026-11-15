@@ -8,7 +8,6 @@ use App\Models\User;
 use App\Services\AuditService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Maatwebsite\Excel\Facades\Excel;
 
 class AuditController extends Controller
 {
@@ -102,6 +101,6 @@ class AuditController extends Controller
         // Export ke Excel
         $fileName = 'audit-trail-'.now()->format('Y-m-d-H-i-s').'.xlsx';
 
-        return Excel::download(new AuditTrailExport($auditLogs), $fileName);
+        return (new AuditTrailExport($auditLogs))->download($fileName);
     }
 }

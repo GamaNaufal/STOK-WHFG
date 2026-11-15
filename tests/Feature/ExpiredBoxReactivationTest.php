@@ -254,8 +254,10 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->get(route('expired-box.trace', $handling))->assertOk()->assertJsonPath('source_box_number', $box->box_number);
         $this->post(route('expired-box.qa', $handling), ['decision' => 'rejected', 'notes' => 'Tidak lolos QA', 'confirmed' => 1])->assertSessionHas('success');
         $this->assertSame(1, AuditLog::where('action', 'qa_rejected')->count());
-        $this->expectException(\RuntimeException::class);
-        Box::create($box->only(['box_number', 'part_number', 'pcs_quantity', 'qty_box', 'qr_code', 'user_id']));
+        $replacement = Box::create($box->only(['box_number', 'part_number', 'pcs_quantity', 'qty_box', 'qr_code', 'user_id']));
+        $this->assertNotSame($box->id, $replacement->id);
+        $this->assertSame(2, (int) $replacement->identity_cycle);
+        $this->assertSame($box->id, $handling->fresh()->source_box_id);
     }
 
     public function test_qa_requires_confirmation_and_rejection_reason_and_cannot_skip_stages(): void
@@ -432,7 +434,7 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->actingAs($operator)->postJson(route('delivery.pick.verify.scan', $session->id), ['box_number' => $box->box_number])
             ->assertStatus(422)
             ->assertJson(['success' => false, 'session_status' => null])
-            ->assertJsonPath('message', 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist; sesi tetap aktif. Laporkan box ini ke Supervisi/Admin.');
+            ->assertJsonPath('message', 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dipakai untuk delivery dan scan tidak dihitung. Gunakan box lain di picklist, sesi tetap aktif. Laporkan box ini ke Supervisi/Admin.');
         $this->assertSame('scanning', $session->fresh()->status);
         $this->assertNull($session->fresh()->verification_box_ids);
         $this->assertDatabaseMissing('delivery_issues', ['pick_session_id' => $session->id]);
@@ -440,7 +442,7 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->postJson(route('delivery.pick.scan.submit', $session->id), ['box_number' => $box->box_number])
             ->assertStatus(422)
             ->assertJson(['session_status' => 'blocked'])
-            ->assertJsonPath('message', 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dikirim; sesi diblokir. Hubungi Admin Warehouse/Admin untuk menangani issue dan penggantian box.');
+            ->assertJsonPath('message', 'Masa aktif hasil packing box ini sudah habis. Box tidak dapat dikirim, sesi diblokir. Hubungi Admin Warehouse/Admin untuk menangani issue dan penggantian box.');
         $this->postJson(route('delivery.pick.complete', $session->id))->assertStatus(423);
         $this->assertSame('blocked', $session->fresh()->status);
         $this->assertDatabaseHas('delivery_issues', ['pick_session_id' => $session->id, 'issue_type' => 'box_expired']);

@@ -9,7 +9,7 @@
     @if($issueList->isEmpty())
         <div class="dashboard-stock-empty"><strong>Tidak ada issue pada periode ini.</strong><p>Pilih periode lain untuk melihat riwayat mismatch.</p></div>
     @else
-        <p class="dashboard-stock-hint" id="dashboard-issues-help">Alasan ditampilkan bersama kode issue untuk audit. Geser tabel untuk melihat semua kolom; Order tetap terlihat dan catatan admin ditampilkan lengkap.</p>
+        <p class="dashboard-stock-hint" id="dashboard-issues-help">Alasan ditampilkan bersama kode issue untuk audit. Geser tabel untuk melihat semua kolom, Order tetap terlihat dan catatan admin ditampilkan lengkap.</p>
         <div class="dashboard-stock-scroll" tabindex="0" role="region" aria-labelledby="dashboard-issues-title" aria-describedby="dashboard-issues-help">
             <table class="table dashboard-stock-table dashboard-stock-table--issues mb-0">
                 <caption class="visually-hidden">Maksimal 50 issue scan terbaru sesuai periode laporan</caption>

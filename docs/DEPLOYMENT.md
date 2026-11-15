@@ -1,10 +1,16 @@
 # Deployment Guide
 
+Panduan di bawah untuk instalasi baru. Untuk production existing dengan migration
+sampai 15 Oktober 2026, gunakan [panduan upgrade](PRODUCTION_UPGRADE_FROM_2026_10_15.md).
+Pertahankan database, .env dan APP_KEY existing. Jangan menjalankan key:generate
+atau membuat ulang database sebagai bagian upgrade.
+
 ## Target: Ubuntu VPS (Nginx/Apache)
 
 ### 1. Server Preparation
 
-- Install: PHP 8.2, Composer, MySQL, Node.js 18+, Nginx/Apache.
+- Install: PHP sesuai composer.lock (minimal 8.2), Composer, MySQL, Nginx/Apache.
+- Untuk build Vite 7 pada lockfile saat ini: Node.js ^20.19.0 atau >=22.12.0.
 - Enable extensions: pdo_mysql, mbstring, zip, intl, gd.
 
 ### 2. Deploy Code

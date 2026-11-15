@@ -38,7 +38,7 @@ class ExportStockReceivingService
     public function receive(array $data, User $actor, bool $allocate = true, ?\DateTimeInterface $receivedAt = null): ExportStockBox
     {
         return app(ExportInventoryService::class)->transaction(function () use ($data, $actor, $allocate, $receivedAt) {
-            $replay = ExportStockBox::where('receive_token', $data['receive_token'])->first();
+            $replay = ExportStockBox::withTrashed()->where('receive_token', $data['receive_token'])->first();
             if ($replay) {
                 if ($replay->box_number !== $data['box_number'] || $replay->part_number !== $data['part_number']
                     || (int) $replay->received_by !== $actor->id) {
@@ -49,11 +49,10 @@ class ExportStockReceivingService
             }
             app(ExportPickingService::class)->assertReceiptAllowed($data['box_number']);
             if (\App\Models\ExportNotFullRequest::where('status', 'prepared')->where('preparation->box_number', $data['box_number'])->exists()) {
-                $this->fail('box_number', 'ID ini sedang disiapkan untuk Box Not Full. Selesaikan approval; box hasil tidak perlu diterima ulang.');
+                $this->fail('box_number', 'ID ini sedang disiapkan untuk Box Not Full. Selesaikan approval, box hasil tidak perlu diterima ulang.');
             }
-            if (\App\Support\BoxIdentity::unavailable($data['box_number']) || ExportStockBox::withTrashed()->where('box_number', $data['box_number'])->exists()
-                || ExportFulfillmentBox::where('box_number', $data['box_number'])->exists()) {
-                $this->fail('box_number', 'ID Box sudah tercatat atau disiapkan pada lokal/ekspor. Gunakan ID Box yang belum pernah dipakai.');
+            if (\App\Support\BoxIdentity::unavailable($data['box_number'])) {
+                $this->fail('box_number', 'ID Box sudah tercatat pada box atau proses aktif di lokal/ekspor.');
             }
             $part = $this->part($data['part_number'], true);
             if (isset($data['expected_pcs_quantity']) && (int) $data['expected_pcs_quantity'] !== (int) $part->qty_box) {
@@ -65,8 +64,8 @@ class ExportStockReceivingService
                 'receive_token' => $data['receive_token'], 'first_received_at' => $receivedAt ?? now(), 'received_by' => $actor->id,
             ]);
             AuditService::record('export_stock_receipt', 'received', 'ExportStockBox', $box->id, $actor->id,
-                [], $box->only(['box_number', 'part_setting_id', 'part_number', 'pcs_quantity', 'state', 'first_received_at']),
-                'Box baru diterima untuk ekspor; menunggu konfirmasi penempatan.');
+                [], $box->only(['box_number', 'identity_cycle', 'part_setting_id', 'part_number', 'pcs_quantity', 'state', 'first_received_at']),
+                'Box baru diterima untuk ekspor, menunggu konfirmasi penempatan.');
             if ($allocate) {
                 app(ExportStockAllocationService::class)->allocate($actor, [(int) $part->id]);
             }

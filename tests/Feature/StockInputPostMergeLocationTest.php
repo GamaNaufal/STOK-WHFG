@@ -63,6 +63,7 @@ class StockInputPostMergeLocationTest extends TestCase
                 'scanned_boxes' => [
                     [
                         'box_number' => '12345678',
+                        'box_id' => $box->id,
                         'part_number' => 'PART-A',
                         'pcs_quantity' => 50,
                     ],
@@ -143,6 +144,7 @@ class StockInputPostMergeLocationTest extends TestCase
                 'scanned_boxes' => [
                     [
                         'box_number' => '99999999',
+                        'box_id' => $newBox->id,
                         'part_number' => 'PART-NEW',
                         'pcs_quantity' => 10,
                     ],

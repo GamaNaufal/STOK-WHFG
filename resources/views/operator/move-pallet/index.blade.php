@@ -140,7 +140,7 @@
                     </div>
                     <p class="move-pallet-note mt-4 mb-0"><i class="bi bi-info-circle" aria-hidden="true"></i> Lokasi tujuan harus tetap kosong saat pemindahan dikonfirmasi. Sistem akan memeriksanya kembali sebelum menyimpan.</p>
                     <div class="move-pallet-action mt-4">
-                        <button type="button" id="moveButton" class="btn btn-primary" disabled>
+                        <button type="button" id="moveButton" data-permission="{{ $exportMove ? 'export_move_execute' : 'move_pallet_execute' }}" class="btn btn-primary" disabled>
                             <i class="bi bi-arrow-left-right" aria-hidden="true"></i> Konfirmasi Pemindahan
                         </button>
                     </div>
@@ -475,7 +475,7 @@
                     <div class="move-pallet-confirm-contents">Isi tetap sama: <strong>${boxCount} Box</strong> · <strong>${pcsCount} PCS</strong></div>
                 </div>
                 ${pallet.ready ? '<p class="alert alert-warning text-start"><strong>Status Siap akan dibatalkan.</strong> Konfirmasikan ulang pallet di lokasi baru melalui Delivery Schedule Ekspor.</p>' : ''}
-                <p class="move-pallet-confirm-note">Saat dikonfirmasi, lokasi asal dilepas dan lokasi tujuan ditempati pallet ini. Server memeriksa ulang kelayakan pallet dan ketersediaan lokasi; jika ada konflik, perpindahan ditolak tanpa mengubah stok.</p>
+                <p class="move-pallet-confirm-note">Saat dikonfirmasi, lokasi asal dilepas dan lokasi tujuan ditempati pallet ini. Server memeriksa ulang kelayakan pallet dan ketersediaan lokasi, jika ada konflik, perpindahan ditolak tanpa mengubah stok.</p>
             </div>`;
 
         if (window.Swal && typeof window.Swal.fire === 'function') {

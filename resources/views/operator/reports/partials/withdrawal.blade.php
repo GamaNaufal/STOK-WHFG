@@ -1,7 +1,7 @@
 <header class="withdrawal-report-header">
     <div class="withdrawal-report-intro">
         <span class="withdrawal-report-eyebrow">Laporan stok</span>
-        <h1>Laporan Pengambilan Stok</h1>
+        <h1>Laporan Pengiriman</h1>
         <p>Telusuri pengambilan, pengembalian/redo, jumlah PCS, dan catatan operator.</p>
     </div>
     <div class="withdrawal-report-export">
@@ -46,7 +46,7 @@
     <header class="withdrawal-report-filter-heading">
         <div>
             <h2 id="withdrawal-filter-title">Filter catatan</h2>
-            <p>Filter membatasi tabel dan Excel; ringkasan mencakup seluruh histori.</p>
+            <p>Filter membatasi tabel dan Excel, ringkasan mencakup seluruh histori.</p>
         </div>
         <span>{{ $activeFilterCount }} filter aktif</span>
     </header>

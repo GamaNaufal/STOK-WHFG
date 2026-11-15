@@ -43,7 +43,7 @@
     </div>
 
     <div class="mb-3">
-        <button type="button" class="btn w-100" id="clear-pallet-btn"
+        <button type="button" class="btn w-100" id="clear-pallet-btn" data-permission="stock_input_clear"
                 style="background: #f59e0b;
                        color: white;
                        border: none;

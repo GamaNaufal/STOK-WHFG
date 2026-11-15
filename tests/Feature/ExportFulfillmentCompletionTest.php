@@ -149,6 +149,7 @@ class ExportFulfillmentCompletionTest extends TestCase
 
     public function test_untouched_reservations_release_in_place_preserve_fifo_and_invalidate_old_placement(): void
     {
+        $this->operator = User::factory()->create(['role' => 'admin']);$this->actingAs($this->operator);
         $box = $this->receive();
         $location = ExportMasterLocation::create(['code' => 'SPARE-RELEASE']);
         $this->place($box, ['location_id' => $location->id]);
@@ -201,6 +202,7 @@ class ExportFulfillmentCompletionTest extends TestCase
 
     public function test_cancellation_returns_multiple_pallets_to_one_spare_releases_all_and_is_idempotent(): void
     {
+        $this->operator = User::factory()->create(['role' => 'admin']);$this->actingAs($this->operator);
         $delivery = $this->plan([2, 2]);
         $dates = ExportStockBox::pluck('first_received_at', 'id')->map->toDateTimeString()->all();
         $this->get(route('export.fulfillment.cancel-form', $delivery))->assertOk()->assertSee('Konfirmasi pembatalan permintaan');
@@ -222,6 +224,7 @@ class ExportFulfillmentCompletionTest extends TestCase
 
     public function test_cancellation_without_stock_needs_no_return_and_new_receipt_invalidates_old_preview(): void
     {
+        $this->operator = User::factory()->create(['role' => 'admin']);$this->actingAs($this->operator);
         $delivery = $this->plan([3], false);
         $data = $this->cancellationData($delivery);
         unset($data['destination'],$data['return_confirmed']);
@@ -240,6 +243,7 @@ class ExportFulfillmentCompletionTest extends TestCase
 
     public function test_cancellation_cannot_return_to_its_own_pallet_or_bypass_permissions(): void
     {
+        $this->operator = User::factory()->create(['role' => 'admin']);$this->actingAs($this->operator);
         $delivery = $this->plan();
         $data = $this->cancellationData($delivery);
         $physical = ExportStockPallet::whereNull('retired_at')->sole();
@@ -252,6 +256,7 @@ class ExportFulfillmentCompletionTest extends TestCase
 
     public function test_cancellation_audit_failure_rolls_back_every_return_and_reservation_release(): void
     {
+        $this->operator = User::factory()->create(['role' => 'admin']);$this->actingAs($this->operator);
         $delivery = $this->plan([1, 1]);
         $data = $this->cancellationData($delivery);
         AuditLog::creating(function ($log) {
@@ -290,6 +295,7 @@ class ExportFulfillmentCompletionTest extends TestCase
         $this->assertSame('stored', $box->fresh()->state);
         $this->post(route('export.fulfillment.reopen', [$delivery, $pallet]), $this->versions($pallet))->assertSessionHasNoErrors();
         $data = $this->reduction($pallet, 0);
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
         $this->post(route('export.fulfillment.reduce', [$delivery, $pallet]), $data)->assertSessionHasNoErrors();
         $box->refresh();
         $this->assertFalse($box->fulfillment()->exists());

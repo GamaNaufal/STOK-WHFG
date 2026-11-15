@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PartSetting;
 use App\Services\AuditService;
 use App\Services\ExportInventoryService;
+use App\Services\PartDocumentNumberService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -30,7 +31,7 @@ class PartSettingController extends Controller
 
     public function index()
     {
-        return view('operator.part-settings.index', ['parts' => PartSetting::orderBy('part_number')->paginate(10)]);
+        return view('operator.part-settings.index', ['parts' => PartSetting::with('documentNumbers')->orderBy('part_number')->paginate(10)]);
     }
 
     public function create()
@@ -47,24 +48,31 @@ class PartSettingController extends Controller
     {
         $search = trim((string) $request->get('q', ''));
 
-        return response()->json(['data' => PartSetting::when($search !== '', fn ($q) => $q->where('part_number', 'like', '%'.$search.'%'))->orderBy('part_number')->limit(50)->get(['id', 'part_number', 'qty_box'])]);
+        return response()->json(['data' => PartSetting::with('documentNumbers')->when($search !== '', fn ($q) => $q->where(fn ($match) => $match
+            ->where('part_number', 'like', '%'.$search.'%')->orWhereHas('documentNumbers', fn ($alias) => $alias->where('document_number', 'like', '%'.$search.'%'))))
+            ->orderBy('part_number')->limit(50)->get(['id', 'part_number', 'qty_box'])]);
     }
 
     private function validatePart(Request $request, ?int $id = null): array
     {
-        return $request->validate(['part_number' => ['required', 'string', 'max:100', Rule::unique('part_settings', 'part_number')->ignore($id)], 'qty_box' => 'required|integer|min:1|max:4294967295']);
+        return $request->validate(['part_number' => ['required', 'string', 'max:100', Rule::unique('part_settings', 'part_number')->ignore($id)], 'qty_box' => 'required|integer|min:1|max:4294967295',
+            'document_numbers' => 'sometimes|nullable|string|max:10200', 'same_document_number' => 'sometimes|boolean']);
     }
 
     private function snapshot(PartSetting $part): array
     {
-        return ['scope' => 'shared', 'part_number' => $part->part_number, 'qty_box' => (int) $part->qty_box];
+        return ['scope' => 'shared', 'part_number' => $part->part_number, 'qty_box' => (int) $part->qty_box,
+            'document_numbers' => $part->documentNumbers()->orderBy('document_number')->pluck('document_number')->all()];
     }
 
     public function store(Request $request)
     {
         $data = $this->validatePart($request);
         app(ExportInventoryService::class)->transaction(function () use ($data, $request) {
-            $part = PartSetting::create($data);
+            $mapping = app(PartDocumentNumberService::class);
+            $mapping->assertScanNumberAvailable($data['part_number']);
+            $part = PartSetting::create(\Illuminate\Support\Arr::only($data, ['part_number', 'qty_box']));
+            $mapping->sync($part, $data);
             AuditService::record('master_part', 'created', 'PartSetting', $part->id, $request->user()->id, [], $this->snapshot($part), 'Master part bersama dibuat.');
         });
 
@@ -85,7 +93,10 @@ class PartSettingController extends Controller
                 return false;
             }
             $before = $this->snapshot($part);
-            $part->update($data);
+            $mapping = app(PartDocumentNumberService::class);
+            $mapping->assertScanNumberAvailable($data['part_number'], $part->id);
+            $part->update(\Illuminate\Support\Arr::only($data, ['part_number', 'qty_box']));
+            $mapping->sync($part, $data);
             AuditService::record('master_part', 'updated', 'PartSetting', $part->id, $request->user()->id, $before, $this->snapshot($part), 'Master part bersama diperbarui.');
 
             return true;

@@ -99,12 +99,14 @@ class ExportStockAdminController extends Controller
     public function history(Request $request, ExportStockHistoryService $service)
     {
         $this->actor($request);
-        $data = $request->validate(['box_number' => ['nullable', 'string', 'regex:/^[0-9]{8}$/']]);
+        $data = $request->validate(['box_number' => ['nullable', 'string', 'regex:/^[0-9]{8}$/'], 'box_id' => ['nullable', 'integer', 'min:1']]);
         $number = $data['box_number'] ?? '';
-        $box = $number !== '' ? ExportStockBox::withTrashed()->with(['currentPallet', 'receiver'])->where('box_number', $number)->first() : null;
+        $uses = $number !== '' ? ExportStockBox::withTrashed()->with(['currentPallet', 'receiver'])
+            ->where('box_number', $number)->orderByDesc('identity_cycle')->get() : collect();
+        $box = isset($data['box_id']) ? $uses->firstWhere('id', (int) $data['box_id']) : $uses->first();
         $events = $box ? $service->events($box) : collect();
 
-        return response()->view('export.stock.box-history', compact('number', 'box', 'events'))
+        return response()->view('export.stock.box-history', compact('number', 'box', 'events', 'uses'))
             ->header('Cache-Control', 'private, no-store');
     }
 }

@@ -74,6 +74,8 @@ class ExportExpiredBoxTest extends TestCase
 
     private function plan(PartSetting $part, User $actor, int $boxes = 1)
     {
+        // Planning is performed by an authorized planner; the QA actor manages inventory.
+        $actor = User::factory()->create(['role' => 'admin']);
         $delivery = app(ExportDeliveryPlanService::class)->save(['plan_code' => 'QA-PLAN', 'customer_name' => 'QA Customer',
             'delivery_deadline' => now()->addDays(5)->toDateString(), 'source_type' => 'manual',
             'items' => [['part_number' => $part->part_number, 'pcs_quantity' => 80 * $boxes]]], $actor);

@@ -1348,7 +1348,7 @@
             }
 
             const fallbackDetails = overages.map((entry) =>
-                `Part ${entry.part_number || "-"}: dipilih ${formatQty(entry.selected_quantity)} PCS, sisa ${formatQty(entry.remaining_quantity)} PCS, kelebihan ${formatQty(entry.overage_quantity)} PCS; request order ${formatQty(entry.requested_quantity)} → ${formatQty(entry.new_requested_quantity)} PCS.`,
+                `Part ${entry.part_number || "-"}: dipilih ${formatQty(entry.selected_quantity)} PCS, sisa ${formatQty(entry.remaining_quantity)} PCS, kelebihan ${formatQty(entry.overage_quantity)} PCS, request order ${formatQty(entry.requested_quantity)} → ${formatQty(entry.new_requested_quantity)} PCS.`,
             ).join("\n");
             const fallbackMessage = `Pilihan melebihi sisa order.\n${fallbackDetails}\n\nJika dilanjutkan, quantity request order bertambah dan server mencoba assign pilihan box setelah validasi ulang. Stok belum ditarik.\n\nTambah request dan assign?`;
 
@@ -1504,7 +1504,7 @@
             <div class="delivery-assign-confirm-body">
                 <p class="delivery-assign-confirm-order">${escapeHtml(orderLabel)}</p>
                 <p>${existingBoxes.length} box stok dan ${payload.new_boxes.length} box baru akan diajukan untuk assign${palletNames ? `, termasuk dari pallet ${palletNames}` : ""}.</p>
-                <p>Box stok yang lolos validasi akan dihubungkan ke order dan sesi picking pending. ${escapeHtml(newBoxDestination)} Stok belum ditarik; server akan memvalidasi ulang ketersediaan dan kebutuhan part saat diproses.</p>
+                <p>Box stok yang lolos validasi akan dihubungkan ke order dan sesi picking pending. ${escapeHtml(newBoxDestination)} Stok belum ditarik, server akan memvalidasi ulang ketersediaan dan kebutuhan part saat diproses.</p>
                 <div class="delivery-assign-confirm-list-label">Box yang terlibat (${boxRows.length})</div>
                 <ul class="delivery-assign-confirm-list">${listHtml}</ul>
                 <p class="delivery-assign-confirm-note">Jika jumlah melebihi sisa request, akan muncul konfirmasi tambahan sebelum quantity order dinaikkan.</p>

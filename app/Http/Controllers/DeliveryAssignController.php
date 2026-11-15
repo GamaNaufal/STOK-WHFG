@@ -473,13 +473,7 @@ class DeliveryAssignController extends Controller
             }
         }
 
-        $existingBoxNumbers = Box::withTrashed()
-            ->whereIn('box_number', $boxNumbers)
-            ->pluck('box_number')
-            ->map(fn ($value) => (string) $value)
-            ->all();
-        $reservedNumbers = DB::table('box_identities')->whereIn('box_number', $boxNumbers)->pluck('box_number')->all();
-        $existingLookup = array_fill_keys(array_merge($existingBoxNumbers, $reservedNumbers), true);
+        $existingLookup = array_fill_keys(array_filter($boxNumbers, fn ($number) => \App\Support\BoxIdentity::unavailable((string) $number)), true);
 
         $partSettings = PartSetting::query()
             ->whereIn('part_number', $partNumbers)

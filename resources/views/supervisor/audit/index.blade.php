@@ -24,7 +24,7 @@
     </div>
     <div class="audit-page-export">
         <span>Ekspor mengikuti filter yang sedang diterapkan.</span>
-        <a href="{{ route('audit.export', array_filter($filters)) }}" class="btn btn-outline-primary">
+        <a data-excel-download href="{{ route('audit.export', array_filter($filters)) }}" class="btn btn-outline-primary">
             <i class="bi bi-download" aria-hidden="true"></i> Export Excel
         </a>
     </div>
@@ -34,7 +34,7 @@
     <div class="audit-overview-heading">
         <div>
             <h2 id="audit-overview-title">Ringkasan aktivitas</h2>
-            <p>Angka mengikuti rentang tanggal; filter jenis, aksi, dan petugas hanya berlaku pada tabel riwayat.</p>
+            <p>Angka mengikuti rentang tanggal, filter jenis, aksi, dan petugas hanya berlaku pada tabel riwayat.</p>
         </div>
         <span class="audit-overview-period">
             @if($filters['start_date'] || $filters['end_date'])
