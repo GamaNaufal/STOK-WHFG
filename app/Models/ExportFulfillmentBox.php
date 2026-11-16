@@ -14,7 +14,18 @@ class ExportFulfillmentBox extends Model
             $row->identity_cycle = $row->export_stock_box_id
                 ? ExportStockBox::withTrashed()->whereKey($row->export_stock_box_id)->value('identity_cycle')
                 : max(1, \App\Support\BoxIdentity::lastCycle($row->box_number));
+            if ($row->export_stock_box_id) {
+                app(\App\Services\ExportCustomerStockPolicy::class)->assertForItem(ExportStockBox::findOrFail($row->export_stock_box_id), $row->plannedItem);
+            }
         });
+        static::created(function ($row) {
+            if (app(\App\Services\ExportCustomerStockPolicy::class)->ready()) {
+                ExportCustomerStockException::where('export_stock_box_id', $row->export_stock_box_id)
+                    ->where('export_planned_pallet_item_id', $row->export_planned_pallet_item_id)->where('status', 'active')
+                    ->whereNull('fulfillment_id')->update(['fulfillment_id' => $row->id]);
+            }
+        });
+        static::deleting(fn ($row) => app(\App\Services\ExportCustomerStockPolicy::class)->closeException($row));
     }
 
     protected $guarded = ['id'];

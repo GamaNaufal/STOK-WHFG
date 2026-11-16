@@ -95,6 +95,13 @@ Route::middleware(['auth', 'active', 'features'])->group(function () {
         Route::post('receiving/recommendations/{notice}/pallets/{pallet}/start-picking', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'startPicking'])->whereNumber(['notice', 'pallet'])->name('receiving.transactions.start-picking');
         Route::get('receiving/recommendations/{notice}/pallets/{pallet}/print', [\App\Http\Controllers\ExportReceivingTransactionController::class, 'printRecommendation'])->whereNumber(['notice', 'pallet'])->name('receiving.transactions.recommendation-print');
         Route::get('stock', [\App\Http\Controllers\ExportStockController::class, 'index'])->name('stock.index');
+        Route::get('customers/options', [\App\Http\Controllers\ExportCustomerController::class, 'options'])->name('customers.options');
+        Route::resource('customers', \App\Http\Controllers\ExportCustomerController::class)->except(['show', 'destroy']);
+        Route::post('stock/customer-reservations', [\App\Http\Controllers\ExportCustomerStockController::class, 'change'])->name('stock.customer-reservations');
+        Route::post('fulfillment/{deliveryPlan}/customer', [\App\Http\Controllers\ExportCustomerStockController::class, 'link'])->whereNumber('deliveryPlan')->name('customer-delivery.link');
+        Route::get('fulfillment/{deliveryPlan}/customer-exceptions', [\App\Http\Controllers\ExportCustomerStockController::class, 'exception'])->whereNumber('deliveryPlan')->name('customer-exceptions.preview');
+        Route::post('fulfillment/{deliveryPlan}/customer-exceptions', [\App\Http\Controllers\ExportCustomerStockController::class, 'createException'])->whereNumber('deliveryPlan')->name('customer-exceptions.store');
+        Route::post('fulfillment/{deliveryPlan}/customer-exceptions/{exception}/cancel', [\App\Http\Controllers\ExportCustomerStockController::class, 'cancelException'])->whereNumber(['deliveryPlan', 'exception'])->name('customer-exceptions.cancel');
         Route::get('picking-verification', [\App\Http\Controllers\ExportPickingController::class, 'index'])->name('picking.index');
         Route::get('picking-verification/{pallet}', [\App\Http\Controllers\ExportPickingController::class, 'helper'])->whereNumber('pallet')->name('picking.show');
         Route::post('picking-verification/{pallet}/seek', [\App\Http\Controllers\ExportPickingController::class, 'seek'])->whereNumber('pallet')->name('picking.seek');

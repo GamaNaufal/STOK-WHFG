@@ -23,10 +23,15 @@ class ExportStockCustomerReadiness
 
     public function customers(): Collection
     {
-        return $this->activeDeliveries()
+        $legacy = $this->activeDeliveries()
+            ->when(app(ExportCustomerStockPolicy::class)->ready(), fn ($q) => $q->whereDoesntHave('customerLink'))
             ->selectRaw('LOWER(TRIM(customer_name)) AS customer_key, MIN(TRIM(customer_name)) AS customer_label')
             ->groupByRaw('LOWER(TRIM(customer_name))')->orderBy('customer_label')
             ->pluck('customer_label', 'customer_key');
+        if (! app(ExportCustomerStockPolicy::class)->ready()) return $legacy;
+        $mapped = \App\Models\ExportDeliveryCustomerLink::with('customer')->whereIn('export_delivery_plan_id', $this->activeDeliveries()->select('id'))
+            ->get()->unique('export_customer_id')->mapWithKeys(fn ($link) => ['customer:'.$link->export_customer_id => $link->customer->code.' · '.$link->customer->name]);
+        return $legacy->merge($mapped)->sort();
     }
 
     public function forCustomer(string $customer): array
@@ -37,8 +42,11 @@ class ExportStockCustomerReadiness
             return compact('customer', 'deliveries', 'shortages');
         }
 
-        $plans = $this->activeDeliveries()->whereRaw('LOWER(TRIM(customer_name)) = ?', [$customer])
-            ->with(['items', 'palletPlan'])->orderBy('delivery_deadline')->orderBy('id')->get();
+        $query = $this->activeDeliveries();
+        $selectedCustomerId = preg_match('/^customer:([1-9][0-9]*)$/D', $customer, $match) ? (int) $match[1] : null;
+        if ($selectedCustomerId && app(ExportCustomerStockPolicy::class)->ready()) $query->whereHas('customerLink', fn ($q) => $q->where('export_customer_id', $selectedCustomerId));
+        else $query->whereRaw('LOWER(TRIM(customer_name)) = ?', [$customer]);
+        $plans = $query->with(['items', 'palletPlan'])->orderBy('delivery_deadline')->orderBy('id')->get();
         $metrics = $this->fulfillment->itemMetrics(stockBacked: true)
             ->whereIn('pallet.export_pallet_plan_id', $plans->pluck('palletPlan.id')->filter()->all())
             ->get()->groupBy('plan_id');
@@ -82,7 +90,9 @@ class ExportStockCustomerReadiness
                 'is_not_full' => $rows->contains('is_not_full', true),
             ]));
         if ($shortages->isNotEmpty()) {
-            $free = $this->stock->freeBoxes(ExportStockBox::query())
+            $linkedIds = app(ExportCustomerStockPolicy::class)->ready()
+                ? \App\Models\ExportDeliveryCustomerLink::whereIn('export_delivery_plan_id', $plans->modelKeys())->pluck('export_customer_id')->unique() : collect();
+            $free = app(ExportCustomerStockPolicy::class)->candidates($this->stock->freeBoxes(ExportStockBox::query()), $linkedIds->count() === 1 ? (int) $linkedIds->first() : null, false)
                 ->whereIn('part_setting_id', $shortages->pluck('part_setting_id')->unique())
                 ->whereIn('pcs_quantity', $shortages->pluck('pcs_per_box')->unique())
                 ->groupBy('part_setting_id', 'pcs_quantity')

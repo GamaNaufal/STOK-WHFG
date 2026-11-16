@@ -143,14 +143,15 @@ class ExportNotFullService
 
     public function source(ExportNotFullRequest $request): ?ExportStockBox
     {
-        return ExportStockBox::with('currentPallet.location')->eligible()->where('part_setting_id', $request->part_setting_id)
+        $query = ExportStockBox::with('currentPallet.location')->eligible()->where('part_setting_id', $request->part_setting_id)
             ->where('pcs_quantity', $request->fixed_qty)->where('is_not_full', false)->where('state', 'stored')
             ->whereNotNull('stored_at')->whereNotNull('stored_by')->whereDoesntHave('fulfillment')
             ->whereHas('currentPallet', fn ($q) => $q->whereNull('retired_at')->whereNotNull('master_location_id'))
             ->whereHas('currentPallet.location', fn ($q) => $q->where('is_occupied', true)->whereNull('current_pallet_id')->whereDoesntHave('stockLocations'))
             ->whereDoesntHave('currentPallet.plannedPallet', fn ($q) => $q->whereNotNull('ready_at'))
             ->whereNotIn('box_number', ExportPickingIssue::open()->select('box_number'))
-            ->orderBy('first_received_at')->orderBy('id')->first();
+            ->orderBy('first_received_at')->orderBy('id');
+        return app(ExportCustomerStockPolicy::class)->candidates($query, app(ExportCustomerStockPolicy::class)->customerId($request->delivery))->first();
     }
 
     private function context(ExportNotFullRequest $request): ExportPlannedPalletItem

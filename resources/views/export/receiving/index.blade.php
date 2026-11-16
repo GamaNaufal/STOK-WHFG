@@ -10,6 +10,12 @@
     <header class="plan-header"><div><span class="plan-eyebrow">Pengiriman ekspor</span><h1>Penerimaan Transfer Box Ekspor</h1><p>Scan banyak box terlebih dahulu, lalu proses untuk melihat pembagian lokasi dan pallet.</p></div><a class="btn btn-outline-primary" href="{{ route('export.stock.index') }}">Stok ekspor</a></header>
     @if($errors->any())<div class="alert alert-danger" id="receiving-errors" role="alert" tabindex="-1"><strong>Daftar belum berhasil diproses.</strong><ul class="mb-0 mt-2">@foreach($errors->all() as $message)<li>{{ $message }}</li>@endforeach</ul></div>@endif
 
+        @if($customerReady)
+        <section class="plan-panel mb-3 customer-receipt-context" aria-labelledby="receipt-customer-title"><div class="plan-panel-heading"><h2 id="receipt-customer-title">Pemilik stok untuk scan berikutnya</h2></div><div class="plan-panel-body">
+            <label class="form-label" for="receiving-customer">Reservasi customer</label><select class="form-select" id="receiving-customer" aria-describedby="receiving-customer-help"><option value="">Umum, tidak dikhususkan untuk customer</option>@foreach($masterCustomers as $masterCustomer)<option value="{{ $masterCustomer->id }}">{{ $masterCustomer->code }} · {{ $masterCustomer->name }}</option>@endforeach</select>
+            <p class="plan-help mb-0" id="receiving-customer-help">Pilihan melekat per box saat ditambahkan. Mengganti pilihan tidak mengubah customer pada baris yang sudah ada. Customer disimpan sebelum alokasi FIFO.</p>
+        </div></section>
+        @endif
         <div class="receiving-workspace receiving-bulk-workspace">
             <section class="plan-panel" aria-labelledby="receiving-scan-title"><div class="plan-panel-heading"><h2 id="receiving-scan-title">Scan box dan part</h2><span class="plan-help">PCS otomatis</span></div><div class="plan-panel-body">
                 <form id="export-bulk-scan-form" data-permission="export_receiving_scan" novalidate data-scan-feedback data-progress-user="{{ auth()->id() }}" data-batches-url="{{ route('export.receiving.batches.start') }}" data-check-url="{{ route('export.receiving.check-box') }}" data-stock-url="{{ route('export.stock.index') }}">
@@ -24,7 +30,7 @@
             </div></section>
             <section class="plan-panel" aria-labelledby="receiving-draft-title"><div class="plan-panel-heading"><h2 id="receiving-draft-title">Daftar scan</h2><strong><span id="scan-count">{{ count($state['items']) }}</span> / 1.000 box</strong></div>
                 <p class="plan-help receiving-table-note" id="scan-summary">Daftar tersimpan sebagai draft sampai diproses.</p>
-                <div class="receiving-draft-scroll" role="region" tabindex="0" aria-label="Daftar box yang sudah di-scan"><table class="table plan-table receiving-draft-table"><thead><tr><th>No.</th><th>ID Box</th><th>Nomor part</th><th>PCS</th><th>Aksi</th></tr></thead><tbody id="scan-items"></tbody></table><p class="receiving-draft-empty" id="scan-empty">Belum ada box dalam daftar scan.</p></div>
+                <div class="receiving-draft-scroll" role="region" tabindex="0" aria-label="Daftar box yang sudah di-scan"><table class="table plan-table receiving-draft-table"><thead><tr><th>No.</th><th>ID Box</th><th>Nomor part</th><th>PCS</th>@if($customerReady)<th>Pemilik customer</th>@endif<th>Aksi</th></tr></thead><tbody id="scan-items"></tbody></table><p class="receiving-draft-empty" id="scan-empty">Belum ada box dalam daftar scan.</p></div>
                 <form method="POST" class="receiving-bulk-actions" id="process-batch-form" action="{{ $batch ? route('export.receiving.batches.process', $batch) : '#' }}">
                     @csrf
                     <input type="hidden" name="revision" id="batch-revision" value="{{ $state['revision'] }}">

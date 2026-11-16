@@ -135,4 +135,16 @@ foreach (['expired-box' => 'expired_box', 'export.expired-box' => 'export_expire
         $config['action_dispatch'][$prefix.'.'.$route] = ['field' => 'action', 'choices' => $choices];
     }
 }
+$config['features']['export_customers'] = ['label' => 'Master Customer', 'group' => 'Master Data Ekspor', 'icon' => 'people',
+    'route' => 'export.customers.index', 'routes' => ['export.customers.index'], 'roles' => ['export_operator', 'admin_warehouse', 'supervisi']];
+$config['features']['export_customers_manage'] = ['label' => 'Kelola master customer Ekspor', 'group' => 'Master Data Ekspor',
+    'routes' => ['export.customers.create', 'export.customers.edit', 'export.customers.store', 'export.customers.update'],
+    'roles' => [], 'requires' => ['export_customers'], 'description' => 'Menambah atau memperbarui kode, nama, alias dan status customer.'];
+$config['features']['export_stock_customer_manage'] = ['label' => 'Kelola reservasi customer Ekspor', 'group' => 'Pengiriman Ekspor',
+    'routes' => ['export.stock.customer-reservations', 'export.customer-delivery.link'], 'roles' => [], 'requires' => ['export_stock_view'],
+    'description' => 'Menetapkan/melepas pemilik box yang bebas dan memetakan customer delivery lama, dengan alasan dan audit.'];
+$config['features']['export_stock_customer_exception'] = ['label' => 'Gunakan stok customer lain', 'group' => 'Pengiriman Ekspor',
+    'routes' => ['export.customer-exceptions.*'], 'roles' => [], 'requires' => ['export_fulfillment'],
+    'description' => 'Mengizinkan box customer sumber untuk satu delivery, dengan alasan wajib tanpa mengubah pemilik.'];
+$config['lookups']['export.customers.options'] = ['export_delivery_plans', 'export_stock_input', 'export_stock_view', 'export_customers'];
 return $config;

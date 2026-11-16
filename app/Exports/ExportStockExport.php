@@ -18,7 +18,7 @@ class ExportStockExport extends DefaultValueBinder implements FromQuery, WithMap
     public function headings(): array
     {
         return ['ID Box', 'Nomor part', 'Qty (PCS)', 'Pertama diterima', 'Pallet fisik', 'Lokasi fisik',
-            'Kategori stok', 'Rencana delivery (reservasi)', 'Pallet tujuan', 'Lokasi tujuan'];
+            'Kategori stok', 'Rencana delivery (reservasi)', 'Pallet tujuan', 'Lokasi tujuan', 'Customer pemilik'];
     }
 
     public function map($box): array
@@ -27,7 +27,7 @@ class ExportStockExport extends DefaultValueBinder implements FromQuery, WithMap
         return [$box->box_number, $box->part_number, $box->pcs_quantity, Date::dateTimeToExcel($box->first_received_at),
             $box->currentPallet?->display_name ?? 'Menunggu penempatan', $box->currentPallet?->location_code ?? '-',
             $box->stock_category_label, $target?->palletPlan?->deliveryPlan?->plan_code ?? '-',
-            $target ? 'Pallet '.$target->position : '-', $target?->location_code ?? '-'];
+            $target ? 'Pallet '.$target->position : '-', $target?->location_code ?? '-', $box->customer_owner_label];
     }
 
     public function bindValue(Cell $cell, $value): bool
@@ -44,19 +44,19 @@ class ExportStockExport extends DefaultValueBinder implements FromQuery, WithMap
 
     public function columnWidths(): array
     {
-        return ['A' => 16, 'B' => 22, 'C' => 14, 'D' => 22, 'E' => 22, 'F' => 20, 'G' => 40, 'H' => 28, 'I' => 20, 'J' => 20];
+        return ['A' => 16, 'B' => 22, 'C' => 14, 'D' => 22, 'E' => 22, 'F' => 20, 'G' => 40, 'H' => 28, 'I' => 20, 'J' => 20, 'K' => 30];
     }
 
     public function styles(Worksheet $sheet)
     {
         $lastRow = $sheet->getHighestRow();
-        $sheet->getStyle('A1:J'.$lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
-        $sheet->getStyle('A1:J1')->applyFromArray([
+        $sheet->getStyle('A1:K'.$lastRow)->getAlignment()->setVertical(Alignment::VERTICAL_TOP)->setWrapText(true);
+        $sheet->getStyle('A1:K1')->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '0C7779']],
         ]);
         $sheet->getRowDimension(1)->setRowHeight(32);
         $sheet->freezePane('A2');
-        $sheet->setAutoFilter('A1:J'.$lastRow);
+        $sheet->setAutoFilter('A1:K'.$lastRow);
     }
 }

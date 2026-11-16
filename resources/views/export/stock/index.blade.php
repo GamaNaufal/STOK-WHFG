@@ -19,6 +19,9 @@
             @endif
         </div>
     </header>
+    @if(app(\App\Services\ExportCustomerStockPolicy::class)->ready())
+    <nav class="plan-inline-actions mb-3" aria-label="Tampilan stok"><span class="btn btn-primary" aria-current="page">Daftar stok</span><a class="btn btn-outline-primary" href="{{ route('export.stock.index', ['customer_view'=>'reservations']) }}">Reservasi customer</a></nav>
+    @endif
     <div class="stock-summary" id="export-stock-summary" aria-label="Ringkasan seluruh stok ekspor">
         @foreach(['free' => ['Stok Bersih', 'box-seam'], 'in_progress' => ['Sedang Diproses', 'hourglass-split'], 'stored' => ['Siap Kirim', 'check2-circle']] as $key => [$label, $icon])
             <a class="stock-summary-item" href="{{ route('export.stock.index', ['customer' => $customer, 'mode' => $filters['mode'], 'status' => $key]) }}#export-stock-results"

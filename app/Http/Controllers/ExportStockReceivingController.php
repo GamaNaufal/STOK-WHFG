@@ -46,7 +46,8 @@ class ExportStockReceivingController extends Controller
             $transaction->placed_boxes = (int) $transaction->total_boxes - (int) $transaction->pending_boxes - (int) $transaction->waiting_boxes - (int) $transaction->recommendation_boxes;
         }
 
-        return view('export.receiving.index', compact('batch', 'state', 'transactions', 'sort'));
+        return view('export.receiving.index', compact('batch', 'state', 'transactions', 'sort') + ['masterCustomers' => app(\App\Services\ExportCustomerService::class)->options(),
+            'customerReady' => app(\App\Services\ExportCustomerStockPolicy::class)->ready()]);
     }
 
     public function checkBox(Request $request)
@@ -89,7 +90,7 @@ class ExportStockReceivingController extends Controller
     {
         $this->normalize($request);
         $data = $request->validate(['box_number' => ['required', 'string', 'regex:/^[0-9]{8}$/'],
-            'part_number' => 'required|string|max:100', 'revision' => 'required|integer|min:1', 'scan_token' => 'required|uuid']);
+            'part_number' => 'required|string|max:100', 'revision' => 'required|integer|min:1', 'scan_token' => 'required|uuid', 'customer_id' => 'nullable|integer|min:1']);
 
         return response()->json($service->state($service->scan($batch, $data, $request->user())));
     }
@@ -131,7 +132,7 @@ class ExportStockReceivingController extends Controller
     {
         $this->normalize($request);
         $data = $request->validate(['box_number' => ['required', 'string', 'regex:/^[0-9]{8}$/'],
-            'part_number' => 'required|string|max:100', 'receive_token' => 'required|uuid', 'pcs_quantity' => 'prohibited']);
+            'part_number' => 'required|string|max:100', 'receive_token' => 'required|uuid', 'pcs_quantity' => 'prohibited', 'customer_id' => 'nullable|integer|min:1']);
         $box = $service->receive($data, $request->user());
 
         return redirect()->route('export.stock.index', ['box' => $box->id])->with('success', 'Box diterima. Konfirmasikan penempatan fisiknya.');

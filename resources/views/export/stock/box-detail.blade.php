@@ -3,6 +3,7 @@
 @endif
 @include('export.receiving.placement', ['inModal' => true, 'stockContext' => true])
 <dl class="receiving-detail-facts mt-3 mb-0">
+    @if(app(\App\Services\ExportCustomerStockPolicy::class)->ready())<div><dt>Customer pemilik stok</dt><dd>{{ $selected->customer_owner_label }}</dd></div>@endif
     <div><dt>Pertama diterima</dt><dd>{{ $selected->first_received_at->format('d/m/Y H:i') }}</dd></div>
     <div><dt>Penempatan terakhir</dt><dd>{{ $selected->stored_at?->format('d/m/Y H:i') ?? 'Belum ditempatkan' }}</dd></div>
 </dl>

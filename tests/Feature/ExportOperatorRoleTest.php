@@ -63,7 +63,7 @@ class ExportOperatorRoleTest extends TestCase
     {
         $operator = User::factory()->create(['role' => 'export_operator']);
         $access = app(FeatureAccessService::class);
-        $permissions = ['stock_opname_export_manage', 'stock_opname_export', 'export_move_pallet', 'parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_merge_pallet', 'export_picking_verification', 'export_fulfillment', 'export_locations'];
+        $permissions = ['export_customers', 'stock_opname_export_manage', 'stock_opname_export', 'export_move_pallet', 'parts', 'export_delivery_plans', 'export_pallet_plans', 'export_stock_input', 'export_merge_pallet', 'export_picking_verification', 'export_fulfillment', 'export_locations'];
         $permissions = \App\Services\GranularFeaturePermissions::expand($operator->role, $permissions);
         $this->assertEqualsCanonicalizing($permissions, $access->defaults($operator->role));
         foreach (array_keys(config('feature_access.features')) as $feature) {

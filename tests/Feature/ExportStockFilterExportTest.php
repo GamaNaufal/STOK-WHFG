@@ -149,7 +149,9 @@ class ExportStockFilterExportTest extends TestCase
         $this->assertSame('Menunggu penempatan', $sheet->getCell('E2')->getValue());
         $this->assertSame('Stok cadangan', $sheet->getCell('G2')->getValue());
         $this->assertSame('A2', $sheet->getFreezePane());
-        $this->assertSame('A1:J2', $sheet->getAutoFilter()->getRange());
+        $this->assertSame('A1:K2', $sheet->getAutoFilter()->getRange());
+        $this->assertSame('Customer pemilik', $sheet->getCell('K1')->getValue());
+        $this->assertSame('Umum', $sheet->getCell('K2')->getValue());
     }
 
     public function test_empty_stock_and_empty_export_keep_filters_and_readable_headers(): void

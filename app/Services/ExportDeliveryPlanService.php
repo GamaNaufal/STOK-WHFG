@@ -12,6 +12,8 @@ class ExportDeliveryPlanService
 {
     private function requestHash(array $data, User $actor, ?int $id): string
     {
+        $identity = array_key_exists('customer_id', $data) ? ['customer_id' => ! empty($data['customer_id']) ? (int) $data['customer_id'] : null,
+            'customer_source_name' => $data['customer_source_name'] ?? null] : [];
         return hash('sha256', json_encode([
             'actor' => $actor->id, 'target' => $id, 'revision' => $id ? (int) $data['revision'] : null,
             'plan_code' => trim((string) ($data['plan_code'] ?? '')),
@@ -22,12 +24,12 @@ class ExportDeliveryPlanService
             'duplicate_review_token' => $data['duplicate_review_token'] ?? '',
             'items' => array_map(fn ($row) => array_merge(['part_number' => $row['part_number'], 'pcs_quantity' => (int) $row['pcs_quantity']],
                 isset($row['expected_part_setting_id']) ? ['expected_part_setting_id' => (int) $row['expected_part_setting_id']] : []), $data['items']),
-        ], JSON_THROW_ON_ERROR));
+        ] + $identity, JSON_THROW_ON_ERROR));
     }
 
     public function snapshot(ExportDeliveryPlan $plan): array
     {
-        return [
+        $state = [
             'plan_code' => $plan->plan_code,
             'customer_name' => $plan->customer_name,
             'delivery_deadline' => $plan->delivery_deadline->format('Y-m-d'),
@@ -37,6 +39,10 @@ class ExportDeliveryPlanService
                 'part_setting_id', 'part_number', 'document_part_number', 'pcs_quantity', 'pcs_per_box', 'box_quantity', 'not_full_pcs', 'box_composition',
             ]))->all(),
         ];
+        if (app(ExportCustomerStockPolicy::class)->ready() && ($customerId = app(ExportCustomerStockPolicy::class)->customerId($plan))) {
+            $state += ['customer_id' => $customerId, 'customer_source_name' => $plan->customerLink()->value('source_name')];
+        }
+        return $state;
     }
 
     public function save(array $data, User $actor, ?int $id = null): ExportDeliveryPlan
@@ -56,6 +62,23 @@ class ExportDeliveryPlanService
                 throw ValidationException::withMessages(['revision' => 'Rencana sudah berubah. Muat ulang halaman sebelum menyimpan.']);
             }
             $before = $id ? $this->snapshot($plan) : [];
+            $customerReady = app(ExportCustomerStockPolicy::class)->ready();
+            $customerId = ! empty($data['customer_id']) ? (int) $data['customer_id'] : null;
+            $previousCustomerId = $id ? app(ExportCustomerStockPolicy::class)->customerId($plan) : null;
+            if (! array_key_exists('customer_id', $data) && $previousCustomerId) {
+                $customerId = $previousCustomerId;
+                if (trim($data['customer_name']) !== $plan->customer_name) throw ValidationException::withMessages(['customer_id' => 'Pilih identitas master untuk mengganti customer rencana yang sudah dipetakan.']);
+            }
+            $masterCustomer = null;
+            if ($customerId) {
+                if (! $customerReady) throw ValidationException::withMessages(['customer_id' => 'Master customer belum tersedia.']);
+                $masterCustomer = $customerId === $previousCustomerId ? \App\Models\ExportCustomer::findOrFail($customerId) : app(ExportCustomerService::class)->active($customerId);
+            } elseif ($customerReady && (int) ($data['customer_reference_version'] ?? 0) === 1 && (! $id || $previousCustomerId || trim($data['customer_name']) !== $plan->customer_name)) {
+                throw ValidationException::withMessages(['customer_id' => 'Pilih customer master sebelum menyimpan rencana.']);
+            }
+            if ($id && $previousCustomerId !== $customerId && \App\Models\ExportFulfillmentBox::whereHas('plannedItem.pallet.palletPlan', fn ($q) => $q->where('export_delivery_plan_id', $plan->id))->exists()) {
+                throw ValidationException::withMessages(['customer_id' => 'Customer delivery berkomitmen tidak boleh diganti sebelum komitmen dilepas.']);
+            }
             $existing = $id ? $plan->items->keyBy('part_setting_id') : collect();
             $numbers = array_column($data['items'], 'part_number');
             $parts = PartSetting::with('documentNumbers')->where(fn ($q) => $q->whereIn('part_number', $numbers)
@@ -112,13 +135,18 @@ class ExportDeliveryPlanService
             }
             $plan->fill([
                 'plan_code' => $code,
-                'customer_name' => trim($data['customer_name']), 'delivery_deadline' => $data['delivery_deadline'],
+                'customer_name' => $masterCustomer ? ($id && $previousCustomerId === $customerId ? $plan->customer_name : $masterCustomer->name) : trim($data['customer_name']), 'delivery_deadline' => $data['delivery_deadline'],
                 'status' => 'draft', 'revision' => $id ? $plan->revision + 1 : 1,
                 'source_type' => $data['source_type'], 'source_name' => $data['source_name'] ?? null,
                 'total_pcs' => array_sum(array_column($items, 'pcs_quantity')),
                 'total_boxes' => array_sum(array_column($items, 'box_quantity')),
                 'created_by' => $id ? $plan->created_by : $actor->id, 'updated_by' => $actor->id,
             ])->save();
+            if ($customerReady && array_key_exists('customer_id', $data)) {
+                if ($customerId) $plan->customerLink()->updateOrCreate([], ['export_customer_id' => $customerId, 'source_name' => $data['customer_source_name'] ?? trim($data['customer_name'])]);
+                elseif (! $previousCustomerId) { /* Legacy unlinked plans remain unlinked. */ }
+                else throw ValidationException::withMessages(['customer_id' => 'Hubungan customer tidak boleh dihapus dari rencana yang sudah dipetakan.']);
+            }
             $plan->items()->whereNotIn('part_setting_id', array_column($items, 'part_setting_id'))->delete();
             foreach ($items as $item) {
                 $plan->items()->updateOrCreate(['part_setting_id' => $item['part_setting_id']], $item);

@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ExportDeliveryPlan extends Model
 {
+    public function customerLink() { return $this->hasOne(ExportDeliveryCustomerLink::class); }
+
     use SoftDeletes;
     use \App\Models\Concerns\ClaimsDeliveryPlanCode;
 

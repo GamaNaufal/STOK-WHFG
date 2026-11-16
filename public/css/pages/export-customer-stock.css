@@ -1,0 +1,13 @@
+.customer-stock-tabs {display:flex;gap:1.5rem;flex-wrap:wrap;border-bottom:1px solid var(--ui-border);margin-bottom:1.25rem;}
+.customer-stock-tabs a {padding:.75rem 0;color:var(--ui-muted);text-decoration:none;min-height:44px;}
+.customer-stock-tabs [aria-current=page] {color:var(--ui-accent);border-bottom:2px solid var(--ui-accent);font-weight:600;}
+.customer-stock-selection {display:flex;gap:1rem;justify-content:space-between;align-items:center;flex-wrap:wrap;padding:1rem 1.25rem;background:var(--ui-soft);border-block:1px solid var(--ui-border);}
+.customer-owner-label {display:inline-block;background:var(--ui-soft);color:var(--ui-accent);padding:.25rem .5rem;border-radius:.375rem;overflow-wrap:anywhere;}
+.customer-stock-page .plan-table {min-width:680px;}
+.customer-stock-page .form-check-input {width:1.125rem;height:1.125rem;}
+.customer-reservation-editor {border-top:1px solid var(--ui-border);}
+.customer-reservation-actions:not([hidden]) {display:flex;gap:.5rem;flex-wrap:wrap;}
+.customer-stock-page .btn-primary {--bs-btn-bg:var(--ui-accent);--bs-btn-border-color:var(--ui-accent);--bs-btn-hover-bg:#075b5d;--bs-btn-hover-border-color:#075b5d;--bs-btn-disabled-bg:var(--ui-accent);--bs-btn-disabled-border-color:var(--ui-accent);}
+.customer-stock-page .btn {min-height:44px;}
+.customer-stock-page .plan-help {overflow-wrap:anywhere;}
+@media(max-width:575px){.customer-stock-selection{padding:1rem}.customer-stock-tabs{gap:1rem}.customer-stock-page .plan-inline-actions{flex-wrap:wrap}}

@@ -63,7 +63,14 @@
                     <p class="plan-help" id="plan-code-help">Wajib diisi dan unik sepanjang histori. Huruf besar/kecil dan spasi awal/akhir dianggap sama. Kode dari dokumen dapat dikoreksi sebelum disimpan.</p>
                 </div>
                 <div><label class="form-label" for="plan-customer">Nama customer</label>
-                    <input type="text" class="form-control" name="customer_name" id="plan-customer" maxlength="255" value="{{ old('customer_name', $plan?->customer_name) }}" required autocomplete="off">
+                    <input type="text" class="form-control" name="customer_name" id="plan-customer" maxlength="255" value="{{ old('customer_name', $plan?->customer_name) }}" required autocomplete="off" @if($customerReady) list="plan-customer-options" aria-describedby="plan-customer-match" @endif>
+                    @if($customerReady)
+                        <datalist id="plan-customer-options">@foreach($masterCustomers as $mc)<option value="{{ $mc->name }}">{{ $mc->code }}{{ $mc->is_active ? '' : ', riwayat nonaktif' }}</option>@endforeach</datalist>
+                        <input type="hidden" name="customer_reference_version" value="1">
+                        <input type="hidden" name="customer_id" id="plan-customer-id" value="{{ old('customer_id', $customerId) }}" data-required="{{ !$plan || $customerId ? '1' : '0' }}" data-legacy-name="{{ $plan && !$customerId ? $plan->customer_name : '' }}">
+                        <input type="hidden" name="customer_source_name" id="plan-customer-source" value="{{ old('customer_source_name', $plan?->customerLink?->source_name) }}">
+                        <p class="plan-help" id="plan-customer-match" role="status" aria-live="polite">Nama/alias Excel yang cocok terhubung otomatis. Pilih customer master jika belum cocok.</p>
+                    @endif
                 </div>
                 <div><label class="form-label" for="plan-deadline">Batas tanggal pengiriman</label>
                     <input type="date" class="form-control" name="delivery_deadline" id="plan-deadline" value="{{ old('delivery_deadline', $plan?->delivery_deadline?->format('Y-m-d')) }}" required>
@@ -102,6 +109,7 @@
         </tr>
     </template>
     <script type="application/json" id="plan-bootstrap">@json(['parts' => $parts, 'rows' => $initialRows, 'snapshots' => $rows])</script>
+    @if($customerReady)<script type="application/json" id="plan-customer-bootstrap">{!! json_encode($masterCustomers->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'active' => $c->is_active, 'labels' => $c->aliases->pluck('normalized')->all()])->values(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) !!}</script>@endif
     <noscript><div class="alert alert-warning">Aktifkan JavaScript untuk mengisi dan memeriksa rencana delivery.</div></noscript>
 </div>
 @endsection

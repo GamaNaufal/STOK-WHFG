@@ -11,6 +11,25 @@ class ExportStockBox extends Model
 
     public const INVENTORY_SCOPE = 'export';
 
+    protected static function booted(): void
+    {
+        static::created(function (self $box) {
+            if ($box->source_box_id && app(\App\Services\ExportCustomerStockPolicy::class)->ready()) {
+                $source = self::withTrashed()->findOrFail($box->source_box_id);
+                app(\App\Services\ExportCustomerReservationService::class)->inherit($source, $box, User::findOrFail($box->received_by));
+            }
+        });
+    }
+
+    public function customerReservation() { return $this->hasOne(ExportBoxCustomerReservation::class); }
+
+    public function getCustomerOwnerLabelAttribute(): string
+    {
+        if (! app(\App\Services\ExportCustomerStockPolicy::class)->ready()) return 'Umum';
+        $this->loadMissing('customerReservation.customer');
+        return $this->customerReservation?->customer?->name ?? 'Umum';
+    }
+
     public function scopeIdentityHeld($query)
     {
         return $query->whereNull('export_stock_boxes.deleted_at')->whereNotIn('state', ['shipped', 'removed']);

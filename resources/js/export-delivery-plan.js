@@ -8,6 +8,16 @@ if(page) {
     const byId=id=>document.getElementById(id);
     const form=byId('delivery-plan-form'),body=byId('plan-items'),template=byId('plan-row-template');
     const planCode=byId('plan-code'),customer=byId('plan-customer'),deadline=byId('plan-deadline'),sourceType=byId('plan-source-type'),sourceName=byId('plan-source-name');
+    const customerId=byId('plan-customer-id'),customerSource=byId('plan-customer-source');
+    const customerCatalog=JSON.parse(byId('plan-customer-bootstrap')?.textContent ?? '[]');
+    const initialCustomerId=customerId?.value ?? '';
+    const normalizeCustomer=value=>value.trim().replace(/\s+/gu,' ').toLocaleLowerCase();
+    const resolveCustomer=()=>{
+        if(!customerId)return;
+        const matches=customerCatalog.filter(c=>c.labels.includes(normalizeCustomer(customer.value))&&(c.active||String(c.id)===initialCustomerId));
+        customerId.value=matches.length===1?String(matches[0].id):'';
+        byId('plan-customer-match').textContent=matches.length===1?'Terhubung ke '+matches[0].name:customer.value===customerId.dataset.legacyName?'Customer historis belum dipetakan, stok umum tetap dapat dipakai.':'Belum cocok, pilih customer master pada kolom ini.';
+    };
     const reviewed=byId('plan-reviewed'),reviewPanel=byId('plan-review'),save=byId('plan-save');
     const status=byId('plan-import-status');
     const statusMessage=status.querySelector('[data-import-message]'),statusIcon=status.querySelector('[data-import-icon]');
@@ -56,7 +66,8 @@ if(page) {
         byId('plan-total-pcs').textContent=data.valid ? format(data.totalPcs) : '—';
         byId('plan-total-boxes').textContent=data.valid ? format(data.totalBoxes) : '—';
         reviewPanel.hidden=sourceType.value==='manual';reviewed.required=sourceType.value!=='manual';
-        save.disabled=submitting || busy || !data.valid || !planCode.value.trim() || (reviewed.required && !reviewed.checked);
+        const needsCustomer=customerId&&(customerId.dataset.required==='1'||customer.value!==customerId.dataset.legacyName);
+        save.disabled=submitting || busy || !data.valid || !planCode.value.trim() || (needsCustomer&&!customerId.value) || (reviewed.required && !reviewed.checked);
         if(!submitting)save.textContent='Simpan rencana';
         byId('plan-add-item').disabled=busy || data.rows.length>=500;
     };
@@ -76,11 +87,19 @@ if(page) {
         form.setAttribute('aria-busy',String(value));
         refresh();
     };
-    const capture=()=>({plan_code:planCode.value,customer_name:customer.value,delivery_deadline:deadline.value,items:rows(),source_type:sourceType.value,source_name:sourceName.value,reviewed:reviewed.checked,warnings:[...importWarnings]});
+    const capture=()=>({plan_code:planCode.value,customer_name:customer.value,customer_id:customerId?.value ?? '',customer_source_name:customerSource?.value ?? '',delivery_deadline:deadline.value,items:rows(),source_type:sourceType.value,source_name:sourceName.value,reviewed:reviewed.checked,warnings:[...importWarnings]});
     const apply=(data,type,name)=>{
         undo=capture();
         planCode.value=data.plan_code ?? '';
-        if(data.customer_name) customer.value=data.customer_name;
+        customer.value=data.customer_name ?? '';
+        if(customerSource)customerSource.value=data.customer_name ?? '';
+        if(customerId){
+            resolveCustomer();
+            if(data.customer_match?.status==='matched'){
+                customerId.value=String(data.customer_match.customer_id);customer.value=data.customer_match.customer_name;
+                byId('plan-customer-match').textContent='Terhubung ke '+data.customer_match.customer_name;
+            }else if(data.customer_match){customerId.value='';byId('plan-customer-match').textContent=data.customer_match.message ?? 'Pilih customer master.';}
+        }
         if(data.delivery_deadline) deadline.value=data.delivery_deadline;
         body.replaceChildren();data.items.forEach(row=>addRow(row,true));
         sourceType.value=type;sourceName.value=String(name).slice(0,255);reviewed.checked=false;dirty=true;
@@ -105,9 +124,12 @@ if(page) {
         addRow();dirty=true;reviewed.checked=false;refresh();body.lastElementChild.querySelector('.plan-part').focus();
     });
     [planCode,customer,deadline].forEach(input=>input.addEventListener('input',()=>{dirty=true;if(sourceType.value!=='manual')reviewed.checked=false;refresh();}));
+    customer.addEventListener('input',()=>{resolveCustomer();refresh();});
     reviewed.addEventListener('change',refresh);
     byId('plan-undo-import').addEventListener('click',()=>{
         if(!undo)return;planCode.value=undo.plan_code;customer.value=undo.customer_name;deadline.value=undo.delivery_deadline;
+        if(customerId)customerId.value=undo.customer_id;if(customerSource)customerSource.value=undo.customer_source_name;
+        if(customerId)byId('plan-customer-match').textContent=customerId.value?'Pemetaan customer sebelumnya dipulihkan.':'Customer belum dipetakan.';
         body.replaceChildren();undo.items.forEach(row=>addRow(row,true));
         sourceType.value=undo.source_type;sourceName.value=undo.source_name;reviewed.checked=undo.reviewed;
         displayWarnings(undo.warnings);

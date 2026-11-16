@@ -44,6 +44,13 @@ class ExportStockReceivingService
                     || (int) $replay->received_by !== $actor->id) {
                     $this->fail('receive_token', 'Permintaan penerimaan sudah dipakai untuk data lain.');
                 }
+                if (array_key_exists('customer_id', $data)) {
+                    $receipt = \App\Models\AuditLog::where('type', 'export_stock_receipt')->where('model', 'ExportStockBox')->where('model_id', $replay->id)->oldest('id')->first();
+                    $originalCustomer = $receipt?->getNewValuesArray()['customer_id'] ?? null;
+                    if (($originalCustomer ? (int) $originalCustomer : null) !== (! empty($data['customer_id']) ? (int) $data['customer_id'] : null)) {
+                        $this->fail('receive_token', 'Customer penerimaan berbeda dari permintaan yang sudah tersimpan.');
+                    }
+                }
 
                 return $replay;
             }
@@ -63,8 +70,13 @@ class ExportStockReceivingService
                 'pcs_quantity' => $part->qty_box, 'standard_pcs_quantity' => $part->qty_box, 'receipt_pcs_quantity' => $part->qty_box, 'state' => 'received', 'revision' => 1,
                 'receive_token' => $data['receive_token'], 'first_received_at' => $receivedAt ?? now(), 'received_by' => $actor->id,
             ]);
+            if (! empty($data['customer_id'])) {
+                app(ExportCustomerReservationService::class)->assertWrites();
+                app(ExportCustomerReservationService::class)->attach($box, (int) $data['customer_id'], $actor, 'Reservasi customer saat penerimaan box.');
+            }
             AuditService::record('export_stock_receipt', 'received', 'ExportStockBox', $box->id, $actor->id,
-                [], $box->only(['box_number', 'identity_cycle', 'part_setting_id', 'part_number', 'pcs_quantity', 'state', 'first_received_at']),
+                [], $box->only(['box_number', 'identity_cycle', 'part_setting_id', 'part_number', 'pcs_quantity', 'state', 'first_received_at'])
+                    + ['customer_id' => ! empty($data['customer_id']) ? (int) $data['customer_id'] : null],
                 'Box baru diterima untuk ekspor, menunggu konfirmasi penempatan.');
             if ($allocate) {
                 app(ExportStockAllocationService::class)->allocate($actor, [(int) $part->id]);
@@ -134,6 +146,7 @@ class ExportStockReceivingService
             }
             $box = ExportStockBox::with(['currentPallet', 'fulfillment.allocationNotice', 'fulfillment.plannedItem.pallet'])->findOrFail($boxId);
             $commitment = $box->fulfillment;
+            if ($commitment) app(ExportCustomerStockPolicy::class)->assertCommitment($commitment);
             $planned = $commitment?->plannedItem->pallet;
             if ($commitment?->awaitsQueueAcknowledgment()) {
                 $this->fail('allocation', 'Tinjau hasil stok FIFO pada perencanaan pallet dan klik Oke sebelum menempatkan box ini.');

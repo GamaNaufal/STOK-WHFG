@@ -46,7 +46,7 @@ class ExportStockAllocationService
                     if ($remaining <= 0) {
                         continue;
                     }
-                    $boxes = $this->availableBoxes($item->part_setting_id, $item->pcs_per_box)
+                    $boxes = $this->availableBoxes($item->part_setting_id, $item->pcs_per_box, $delivery)
                         ->limit($remaining)->lockForUpdate()->get();
                     if ($boxes->isEmpty()) {
                         continue;
@@ -75,11 +75,12 @@ class ExportStockAllocationService
         return $allocated;
     }
 
-    private function availableBoxes(int $partId, int $pcs): Builder
+    public function availableBoxes(int $partId, int $pcs, ?ExportDeliveryPlan $delivery = null): Builder
     {
-        return ExportStockBox::where('part_setting_id', $partId)->where('pcs_quantity', $pcs)->eligible()
+        $query = ExportStockBox::where('part_setting_id', $partId)->where('pcs_quantity', $pcs)->eligible()
             ->whereDoesntHave('fulfillment')->whereNotIn('box_number', ExportPickingIssue::open()->select('box_number'))
             ->with('currentPallet')->orderBy('first_received_at')->orderBy('id');
+        return app(ExportCustomerStockPolicy::class)->candidates($query, $delivery ? app(ExportCustomerStockPolicy::class)->customerId($delivery) : null);
     }
 
     /** Preview only the added need. Leave FIFO stock for earlier unmet demand. */
@@ -98,12 +99,20 @@ class ExportStockAllocationService
                                     ->orWhere(fn ($tie) => $tie->where('delivery_deadline', $deadline)->where('id', '<', $delivery->id)))));
                 });
             })
-            ->withCount('fulfillmentBoxes')->get()
-            ->sum(fn ($row) => max(0, $row->box_quantity - $row->fulfillment_boxes_count));
-
-        return $this->availableBoxes($partId, $pcs)
-            ->whereDoesntHave('currentPallet', fn ($source) => $source->whereNotNull('export_planned_pallet_id'))
-            ->offset($prior)->limit($count)->get();
+            ->with('pallet.palletPlan.deliveryPlan')->withCount('fulfillmentBoxes')->get()
+            ->sortBy(fn ($row) => [$row->pallet->palletPlan->deliveryPlan->delivery_deadline->format('Y-m-d'),
+                $row->pallet->palletPlan->deliveryPlan->id, $row->pallet->position, $row->id]);
+        // Eligibility differs per customer. Consume earlier demands in one shared simulation.
+        $used = [];
+        foreach ($prior as $row) {
+            $need = max(0, $row->box_quantity - $row->fulfillment_boxes_count);
+            if (! $need) continue;
+            $taken = $this->availableBoxes($partId, $pcs, $row->pallet->palletPlan->deliveryPlan)
+                ->whereNotIn('export_stock_boxes.id', $used)->limit($need)->pluck('export_stock_boxes.id')->all();
+            $used = array_merge($used, $taken);
+        }
+        return $this->availableBoxes($partId, $pcs, $delivery)->whereNotIn('export_stock_boxes.id', $used)
+            ->whereDoesntHave('currentPallet', fn ($source) => $source->whereNotNull('export_planned_pallet_id'))->limit($count)->get();
     }
 
     /** Commit the already validated preview while holding the inventory mutex. */
@@ -125,7 +134,7 @@ class ExportStockAllocationService
         ExportFulfillmentBox::whereKey($requiredIds->all())->update(['picking_required' => true]);
     }
 
-    private function reserve(ExportDeliveryPlan $delivery, ExportPlannedPallet $pallet, ExportPlannedPalletItem $item, ExportStockBox $box, User $actor, ?ExportStockAllocationNotice $notice): void
+    public function reserve(ExportDeliveryPlan $delivery, ExportPlannedPallet $pallet, ExportPlannedPalletItem $item, ExportStockBox $box, User $actor, ?ExportStockAllocationNotice $notice): void
     {
         if (($box->state === 'stored' && (! $box->currentPallet || $box->currentPallet->retired_at || ! $box->stored_at || ! $box->stored_by))
             || ($box->state === 'received' && $box->current_pallet_id !== null)) {

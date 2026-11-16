@@ -37,7 +37,14 @@ class ExportDeliveryPlanController extends Controller
             'pcs_quantity' => $item->pcs_quantity, 'pcs_per_box' => $item->pcs_per_box,
         ])->all() ?? [];
 
-        return view('export.delivery-plans.form', compact('plan', 'parts', 'rows'));
+        $customerReady = app(\App\Services\ExportCustomerStockPolicy::class)->ready();
+        $masterCustomers = app(\App\Services\ExportCustomerService::class)->options();
+        $customerId = $plan ? app(\App\Services\ExportCustomerStockPolicy::class)->customerId($plan) : null;
+        if ($customerReady) {
+            if ($customerId && ! $masterCustomers->contains('id', $customerId)) $masterCustomers->push(\App\Models\ExportCustomer::findOrFail($customerId));
+            $masterCustomers->load('aliases');
+        }
+        return view('export.delivery-plans.form', compact('plan', 'parts', 'rows', 'customerReady', 'masterCustomers', 'customerId'));
     }
 
     public function create()
@@ -84,6 +91,7 @@ class ExportDeliveryPlanController extends Controller
             'duplicate_confirmed' => 'nullable|in:1', 'duplicate_reason' => 'nullable|string|max:500',
             'plan_code' => 'required|string|max:100',
             'customer_name' => 'required|string|max:255',
+            'customer_id' => 'nullable|integer|min:1', 'customer_reference_version' => 'nullable|in:1', 'customer_source_name' => 'nullable|string|max:255',
             'delivery_deadline' => 'required|date_format:Y-m-d',
             'source_type' => 'required|in:'.implode(',', $sources),
             'source_name' => 'nullable|string|max:255',
@@ -148,7 +156,9 @@ class ExportDeliveryPlanController extends Controller
     {
         $request->validate(['file' => 'required|file|mimes:xlsx,xls|max:5120']);
 
-        return response()->json($importer->parse($request->file('file')));
+        $parsed = $importer->parse($request->file('file'));
+        if (app(\App\Services\ExportCustomerStockPolicy::class)->ready()) $parsed['customer_match'] = app(\App\Services\ExportCustomerService::class)->resolve($parsed['customer_name'], $parsed['customer_code'] ?? '');
+        return response()->json($parsed);
     }
 
     public function template()

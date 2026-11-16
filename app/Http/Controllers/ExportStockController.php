@@ -15,6 +15,7 @@ class ExportStockController extends Controller
 {
     public function index(Request $request, ExportStockViewService $view, ExportStockQueryService $stock, ExportStockCustomerReadiness $readiness)
     {
+        if ($request->query('customer_view') === 'reservations') return app(ExportCustomerStockController::class)->index($request);
         $filters = $stock->filters($request);
         $selection = $request->validate(['customer' => 'nullable|string|max:255']);
         $customer = mb_strtolower(trim($selection['customer'] ?? ''));
@@ -61,6 +62,7 @@ class ExportStockController extends Controller
         $filters = $stock->filters($request);
         $query = $stock->boxes($filters)
             ->with('fulfillment.plannedItem.pallet.palletPlan.deliveryPlan');
+        if (app(\App\Services\ExportCustomerStockPolicy::class)->ready()) $query->with('customerReservation.customer');
         if ($filters['mode'] === 'pallet') {
             $query->reorder()->orderByRaw('CASE WHEN current_pallet_id IS NULL THEN 1 ELSE 0 END')
                 ->orderBy('current_pallet_id')->orderBy('first_received_at')->orderBy('id');

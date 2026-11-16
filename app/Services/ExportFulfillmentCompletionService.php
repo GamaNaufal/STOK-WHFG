@@ -74,7 +74,9 @@ class ExportFulfillmentCompletionService
     public function contents(ExportPlannedPallet $pallet, bool $allowExpired = false): array
     {
         $items = $pallet->items()->get();
-        $commitments = $pallet->fulfillmentBoxes()->with('stockBox')->get();
+        $query = $pallet->fulfillmentBoxes()->with('stockBox');
+        if (app(ExportCustomerStockPolicy::class)->ready()) $query->with('stockBox.customerReservation.customer');
+        $commitments = $query->get();
         $physical = ExportStockPallet::where('export_planned_pallet_id', $pallet->id)->whereNull('retired_at')->first();
         if (! $physical || (int) $physical->master_location_id !== $pallet->master_location_id || $items->sum('box_quantity') < 1) {
             $this->fail('Pallet belum memiliki penempatan fisik yang sesuai.');
@@ -90,6 +92,7 @@ class ExportFulfillmentCompletionService
                 $this->fail('Seluruh kebutuhan setiap part harus terpenuhi tepat sebelum konfirmasi/revisi.');
             }
             foreach ($rows as $f) {
+                if (! $allowExpired) app(ExportCustomerStockPolicy::class)->assertCommitment($f);
                 $box = $f->stockBox;
                 if (! $allowExpired) {
                     $box?->assertEligible();
@@ -312,9 +315,13 @@ class ExportFulfillmentCompletionService
                     'total_boxes' => $rows->count(), 'ready_at' => $pallet->ready_at->toDateTimeString(), 'ready_by' => $pallet->ready_by];
                 foreach ($rows as $f) {
                     $box = $f->stockBox;
+                    $customerSnapshot = app(ExportCustomerStockPolicy::class)->ready() ? ['owner_customer' => $box->customer_owner_label,
+                        'owner_customer_id' => app(ExportCustomerStockPolicy::class)->ownerId($box),
+                        'recipient_customer_id' => app(ExportCustomerStockPolicy::class)->customerId($delivery)] : [];
                     $snapshot['boxes'][] = ['box_number' => $box->box_number, 'box_id' => $box->id, 'identity_cycle' => (int) $box->identity_cycle, 'part_number' => $box->part_number,
                         'pcs_quantity' => $box->pcs_quantity, 'warehouse_location' => $pallet->location_code,
-                        'pallet_number' => $pallet->position, 'first_received_at' => $box->first_received_at->toDateTimeString()];
+                        'pallet_number' => $pallet->position, 'first_received_at' => $box->first_received_at->toDateTimeString()] + $customerSnapshot;
+                    app(ExportCustomerStockPolicy::class)->closeException($f, 'consumed');
                     $box->update(['state' => 'shipped', 'current_pallet_id' => null, 'revision' => $box->revision + 1]);
                     $box->delete();
                 }

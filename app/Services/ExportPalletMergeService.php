@@ -149,6 +149,7 @@ class ExportPalletMergeService
                 'pcs_per_box' => $rows->first()->pcs_per_box, 'before' => $rows->sum('box_quantity'),
                 'reserved' => $rows->sum('fulfillment_boxes_count'), 'incoming' => 0, 'added' => 0]);
         $free = $boxes->filter(fn ($b) => ! $b->fulfillment);
+        foreach ($commitments as $commitment) app(ExportCustomerStockPolicy::class)->assertCommitment($commitment);
         if ($plan) {
             foreach ($free->groupBy(fn ($b) => ExportBoxRequirements::key($b->part_setting_id, $b->pcs_quantity)) as $key => $rows) {
                 $first = $rows->first();
@@ -158,10 +159,15 @@ class ExportPalletMergeService
                 $r['added'] = $mode === 'add' ? $rows->count() : max(0, $rows->count() - ($r['before'] - $r['reserved']));
                 $requirements->put($key, $r);
                 // Existing commitments stay intact. New commitments must use the oldest free exact-capacity stock.
-                $fifo = ExportStockBox::where('part_setting_id', $first->part_setting_id)->where('pcs_quantity', $first->pcs_quantity)
+                foreach ($rows as $incoming) {
+                    $owner = app(ExportCustomerStockPolicy::class)->ownerId($incoming);
+                    if ($owner && $owner !== app(ExportCustomerStockPolicy::class)->customerId($delivery)) $this->fail('Box '.$incoming->box_number.' milik customer lain. Gunakan pengecualian delivery sebelum merge.');
+                }
+                $fifoQuery = ExportStockBox::where('part_setting_id', $first->part_setting_id)->where('pcs_quantity', $first->pcs_quantity)
                     ->whereIn('state', ['received', 'stored'])->whereDoesntHave('fulfillment')
                     ->whereNotIn('box_number', ExportPickingIssue::open()->select('box_number'))
-                    ->orderBy('first_received_at')->orderBy('id')->limit($rows->count())->get();
+                    ->orderBy('first_received_at')->orderBy('id');
+                $fifo = app(ExportCustomerStockPolicy::class)->candidates($fifoQuery, app(ExportCustomerStockPolicy::class)->customerId($delivery))->limit($rows->count())->get();
                 if ($missing = $fifo->first(fn ($b) => ! $rows->contains('id', $b->id))) {
                     $this->fail('FIFO: ambil ID Box '.$missing->box_number.' terlebih dahulu dari '.($missing->currentPallet?->display_name ?? 'antrean penerimaan')
                         .' · '.($missing->currentPallet?->location_code ?? 'belum ditempatkan').'. Pallet yang dipilih melewati stok lebih tua.');
@@ -251,6 +257,10 @@ class ExportPalletMergeService
                             'pcs_per_box' => $r['pcs_per_box'], 'box_quantity' => $r['after']]);
                     }
                     ExportFulfillmentBox::whereIn('export_planned_pallet_item_id', $rows->pluck('id')->all())->update(['export_planned_pallet_item_id' => $item->id]);
+                    if (app(ExportCustomerStockPolicy::class)->ready()) {
+                        \App\Models\ExportCustomerStockException::where('export_delivery_plan_id', $c['delivery']->id)->where('status', 'active')
+                            ->whereIn('export_planned_pallet_item_id', $rows->pluck('id')->all())->update(['export_planned_pallet_item_id' => $item->id, 'revision' => \Illuminate\Support\Facades\DB::raw('revision + 1')]);
+                    }
                     foreach ($rows as $old) {
                         if ($old->id !== $item->id) {
                             $old->delete();

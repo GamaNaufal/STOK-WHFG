@@ -2,6 +2,43 @@
 
 Terakhir diverifikasi dari source code: 16 November 2026 (pembaruan inkremental).
 
+Reservasi box customer Ekspor, 16 November 2026:
+
+- Master Customer menjadi menu baru Master Data Ekspor. Kode/nama/alias menunjuk
+  satu ID, pilihan form dan hasil Excel terhubung bila cocok pasti. Rencana lama
+  mempertahankan nama/snapshot dan token request existing. Pemetaan historis
+  eksplisit; integrasi tanpa ID hanya mendapat stok Umum. Rename master tidak
+  mengganti snapshot delivery lama, termasuk edit quantity dengan customer sama.
+- Penerimaan menyimpan pemilik per box/draft sebelum allocator, mengganti pilihan
+  hanya memengaruhi scan berikutnya. Stok Ekspor > Reservasi customer menyediakan
+  tetapkan pada stok umum dan pelepasan, alasan wajib, revision dan audit. Hanya
+  cadangan tersimpan bebas yang dapat diubah; lokasi/PCS/tanggal FIFO tetap.
+- Alokasi memakai stok customer tujuan dahulu, lalu Umum, FIFO asli dalam setiap
+  kelompok. Reservasi customer terpisah dari komitmen delivery. Pengecualian
+  operator berizin hanya untuk box/penggunaan/delivery/item tertentu, tanpa
+  approval Supervisi baru, dengan alasan dan tinjauan FIFO existing. Pemilik
+  sumber tetap setelah pembatalan. Pengiriman menyimpan pemilik/penerima dan
+  menandai terpakai. Revisi/merge/Not Full/picking/placement/Siap/completion ikut
+  penjaga. Hasil pecah/packing mewarisi pemilik sumber, label reuse tidak.
+- Delapan tabel tambahan tanpa perubahan kolom/backfill stok/delivery lama.
+  Mutex inventory, FK/unique, idempotensi, revisi pengecualian dan audit atomik
+  melindungi konflik dan formulir stale. Retry penerimaan membaca snapshot customer
+  penerimaan asli, tidak menimpa perubahan reservasi berikutnya. down menolak data
+  fitur yang terpakai.
+  Tiga izin tulis baru diberikan Admin per role, tidak diwariskan otomatis dari
+  penerimaan/picking. Grant tersimpan existing tidak diubah oleh migration.
+- EXPORT_CUSTOMER_STOCK_WRITES_ENABLED=false menghentikan tindakan baru, tidak
+  membuka reservasi existing. Aktivasi wajib setelah semua instance/worker lama
+  selesai. Stok lama tetap Umum sampai dipetakan; komitmen existing tidak dihitung
+  ulang. Tidak menjalankan migration pada database operasional/production.
+- Verifikasi: 21 tes baru/98 assertions; seluruh 169 frontend dan build lulus.
+  Suite penuh SQLite: 754 tes/7.948 assertions, 747 lulus, tujuh kegagalan baseline
+  laporan/binder/seeder/dashboard yang sama, tanpa error. DDL dan dua koneksi
+  MySQL 8.4.3 memakai direktori/port probe terpisah, mempertahankan baris lama,
+  mutex dan unique ownership lulus. Browser Laravel memakai SQLite/akun fiktif,
+  desktop/390 px; bukan scanner/ponsel nyata atau rehearsal salinan production.
+  Rincian dan runbook: docs/CUSTOMER_BOX_RESERVATIONS.md.
+
 Retensi lokasi pallet berisi box expired, 16 November 2026:
 
 - Atas instruksi pengguna, expired tidak lagi melepas lokasi pallet. Lokasi adalah

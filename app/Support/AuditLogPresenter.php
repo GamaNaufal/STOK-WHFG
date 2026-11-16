@@ -61,6 +61,8 @@ class AuditLogPresenter
             'finalized' => 'Perencanaan difinalkan', 'saved' => 'Draft disimpan', 'delivery_revised' => 'Rencana delivery direvisi',
             'received' => 'Box diterima', 'placed' => 'Penempatan dikonfirmasi', 'reserved' => 'Box direservasi',
             'processed' => 'Transaksi diproses', 'acknowledged' => 'Rekomendasi dimasukkan ke antrean',
+            'released' => 'Reservasi customer dilepas', 'exception_created' => 'Pengecualian customer dibuat',
+            'exception_cancelled' => 'Pengecualian customer dibatalkan', 'exception_consumed' => 'Pengecualian customer terpakai', 'delivery_linked' => 'Customer delivery dipetakan',
             'returned' => 'Pengembalian dikonfirmasi', 'wrong' => 'Scan tidak sesuai',
             'terminated' => 'Lock dihentikan', 'timed_out' => 'Waktu habis',
             'deleted' => 'Dihapus', 'deactivated' => 'Dinonaktifkan',
@@ -76,6 +78,7 @@ class AuditLogPresenter
         return match ($type) {
             'stock_input' => 'Input stok', 'stock_withdrawal' => 'Pengambilan stok',
             'export_fulfillment' => 'Pemenuhan permintaan ekspor',
+            'export_customer' => 'Master customer Ekspor', 'export_customer_stock' => 'Reservasi customer Ekspor',
             'stock_opname' => 'Stock opname lokal', 'export_stock_opname' => 'Stock opname ekspor',
             'export_picking_issue' => 'Issue scan ekspor',
             'export_not_full' => 'Box Not Full ekspor',

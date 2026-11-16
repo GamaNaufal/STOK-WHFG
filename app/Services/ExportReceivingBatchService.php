@@ -18,9 +18,11 @@ class ExportReceivingBatchService
 
     public function state(ExportReceivingBatch $batch): array
     {
-        $batch->load('items');
+        $ready = app(ExportCustomerStockPolicy::class)->ready();
+        $batch->load($ready ? 'items.customerSelection.customer' : 'items');
         return $batch->only(['id', 'status', 'revision']) + ['items' => $batch->items->map(fn ($item) =>
-            $item->only(['id', 'box_number', 'part_number', 'pcs_quantity']))->values()->all()];
+            $item->only(['id', 'box_number', 'part_number', 'pcs_quantity']) + ['customer_id' => $ready ? $item->customerSelection?->export_customer_id : null,
+                'customer_name' => $ready ? ($item->customerSelection?->customer?->name ?? 'Umum') : 'Umum'])->values()->all()];
     }
 
     public function start(User $actor): ExportReceivingBatch
@@ -43,6 +45,7 @@ class ExportReceivingBatchService
             $replay = ExportReceivingBatchItem::where('receive_token', $data['scan_token'])->first();
             if ($replay) {
                 if ((int) $replay->export_receiving_batch_id !== $batch->id || $replay->box_number !== $data['box_number'] || $replay->part_number !== $data['part_number']) $this->fail('scan_token', 'Token scan sudah dipakai untuk data lain.');
+                if (array_key_exists('customer_id', $data) && (int) $replay->customerSelection?->export_customer_id !== (int) ($data['customer_id'] ?? 0)) $this->fail('scan_token', 'Token scan sudah dipakai dengan customer berbeda.');
                 return $batch;
             }
             $this->editable($batch, (int) $data['revision']);
@@ -52,9 +55,14 @@ class ExportReceivingBatchService
                 $this->fail('box_number', 'ID Box sudah tercatat atau disiapkan pada lokal/ekspor.');
             }
             $part = app(ExportStockReceivingService::class)->part($data['part_number'], true);
-            $batch->items()->create(['box_number' => $data['box_number'], 'expected_identity_cycle' => \App\Support\BoxIdentity::lastCycle($data['box_number']), 'part_setting_id' => $part->id,
+            if (! empty($data['customer_id'])) {
+                app(ExportCustomerReservationService::class)->assertWrites();
+                app(ExportCustomerService::class)->active((int) $data['customer_id']);
+            }
+            $item = $batch->items()->create(['box_number' => $data['box_number'], 'expected_identity_cycle' => \App\Support\BoxIdentity::lastCycle($data['box_number']), 'part_setting_id' => $part->id,
                 'part_number' => $part->part_number, 'pcs_quantity' => $part->qty_box,
                 'position' => ((int) $batch->items()->max('position')) + 1, 'receive_token' => $data['scan_token']]);
+            if (! empty($data['customer_id'])) $item->customerSelection()->create(['export_customer_id' => (int) $data['customer_id']]);
             $batch->increment('revision');
             return $batch;
         });
@@ -96,8 +104,10 @@ class ExportReceivingBatchService
             }
             $processedAt = now();
             $receivedAt ??= $processedAt;
+            $ready = app(ExportCustomerStockPolicy::class)->ready();
+            if ($ready) $items->load('customerSelection');
             $rows = $items->map(fn ($item) => $item->only(['box_number', 'part_number', 'receive_token'])
-                + ['expected_pcs_quantity' => $item->pcs_quantity])->all();
+                + ['expected_pcs_quantity' => $item->pcs_quantity, 'customer_id' => $ready ? $item->customerSelection?->export_customer_id : null])->all();
             $boxes = app(ExportStockReceivingService::class)->receiveMany($rows, $actor, $receivedAt);
             foreach ($items as $index => $item) {
                 $item->update(['export_stock_box_id' => $boxes[$index]->id]);

@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ExportReceivingBatchItem extends Model
 {
+    public function customerSelection() { return $this->hasOne(ExportReceivingItemCustomer::class); }
+
     protected $guarded = ['id'];
     protected $casts = ['position' => 'integer', 'pcs_quantity' => 'integer'];
     public function batch() { return $this->belongsTo(ExportReceivingBatch::class, 'export_receiving_batch_id'); }

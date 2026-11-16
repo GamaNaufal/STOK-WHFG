@@ -33,6 +33,7 @@ class ExportStockAllocationNoticeService
             if ($notice->acknowledged_at) {
                 return $notice;
             }
+            foreach ($notice->boxes()->get() as $commitment) app(ExportCustomerStockPolicy::class)->assertCommitment($commitment);
             $notice->update(['acknowledged_at' => now(), 'acknowledged_by' => $actor->id]);
             $transactions = $notice->boxes()->join('export_planned_pallet_items as item', 'item.id', '=', 'export_fulfillment_boxes.export_planned_pallet_item_id')
                 ->join('export_planned_pallets as pallet', 'pallet.id', '=', 'item.export_planned_pallet_id')

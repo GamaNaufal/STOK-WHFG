@@ -15,7 +15,7 @@ class ExportStockHistoryService
     public function events(ExportStockBox $box): Collection
     {
         $logs = AuditLog::where('model', 'ExportStockBox')->where('model_id', $box->id)
-            ->whereIn('type', ['export_stock_receipt', 'export_stock_reservation', 'export_stock_admin', 'export_expired_box', 'export_not_full'])
+            ->whereIn('type', ['export_stock_receipt', 'export_stock_reservation', 'export_stock_admin', 'export_expired_box', 'export_not_full', 'export_customer_stock'])
             ->with('user')->get();
 
         $events = $logs->map(fn ($log) => [
@@ -86,6 +86,11 @@ class ExportStockHistoryService
         $before = $log->getOldValuesArray();
         $after = $log->getNewValuesArray();
         $details = [];
+        if ($log->type === 'export_customer_stock') {
+            if (isset($before['customer_name'])) $details[] = 'Pemilik sebelumnya '.$before['customer_name'];
+            if (isset($after['customer_name'])) $details[] = 'Pemilik '.$after['customer_name'];
+            if (isset($after['snapshot']['owner_customer_name'])) $details[] = 'Pemilik '.$after['snapshot']['owner_customer_name'].', tujuan '.$after['snapshot']['recipient_customer_name'];
+        }
         foreach (['part_number' => 'Part', 'pcs_quantity' => 'PCS', 'first_received_at' => 'Waktu masuk'] as $key => $label) {
             if (isset($before[$key], $after[$key]) && $before[$key] !== $after[$key]) {
                 $details[] = $label.' '.$before[$key].' → '.$after[$key];

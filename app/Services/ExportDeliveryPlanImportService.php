@@ -151,6 +151,7 @@ class ExportDeliveryPlanImportService
             $this->failure('File berisi beberapa customer. Gunakan satu customer per file untuk tahap ini.');
         }
         $customer = '';
+        $customerCode = '';
         $deadline = '';
         $planCodes = [];
         $header = null;
@@ -159,6 +160,7 @@ class ExportDeliveryPlanImportService
         foreach (array_slice($grid, 0, 40, true) as $index => $cells) {
             foreach ($cells as $column => $value) {
                 $label = $this->label($value);
+                if (in_array($label, ['kodecustomer', 'customercode'], true)) $customerCode = trim((string) ($cells[$column + 1] ?? ''));
                 $code = '';
                 if (in_array($label, ['koderencana', 'koderencanadelivery', 'plancode', 'deliveryplancode'], true)) {
                     $code = trim((string) ($cells[$column + 1] ?? ''));
@@ -236,7 +238,7 @@ class ExportDeliveryPlanImportService
         }
 
         return ['plan_code' => (string) (array_key_first($planCodes) ?? ''),
-            'customer_name' => $customer, 'delivery_deadline' => $deadline,
+            'customer_name' => $customer, 'customer_code' => $customerCode, 'delivery_deadline' => $deadline,
             'items' => $items, 'source_name' => mb_substr($fileName, 0, 255),
             'skipped_rows' => $skipped, 'warnings' => $warnings];
     }

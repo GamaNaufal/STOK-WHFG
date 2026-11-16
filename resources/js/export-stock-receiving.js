@@ -36,6 +36,7 @@ if (form) {
     let state = JSON.parse(document.getElementById('receiving-batch-bootstrap').textContent);
     let busy = false, pendingBox = null;
     const inputDate = processForm.elements.input_date;
+    const customer = document.getElementById('receiving-customer');
     const progress = receivingScanProgress(form.dataset.progressUser);
     const persist = () => progress.save(state, {box: box.value, part: part.value, checked: pendingBox !== null, inputDate: inputDate.value});
     const format = value => Number(value).toLocaleString('id-ID');
@@ -61,7 +62,9 @@ if (form) {
         items.replaceChildren();
         [...state.items].reverse().forEach((item, index) => {
             const row = document.createElement('tr');
-            [state.items.length - index, item.box_number, item.part_number, format(item.pcs_quantity)].forEach((value, column) => {
+            const values = [state.items.length - index, item.box_number, item.part_number, format(item.pcs_quantity)];
+            if (customer) values.push(item.customer_name ?? 'Umum');
+            values.forEach((value, column) => {
                 const cell = document.createElement(column === 1 ? 'th' : 'td');
                 if (column === 1) cell.scope = 'row';
                 if (column === 2) cell.className = 'receiving-draft-part';
@@ -134,6 +137,7 @@ if (form) {
         const number = normalizedBox(), numberPart = part.value.trim();
         if (!/^[0-9]{8}$/.test(number)) { feedback(false, 'ID Box harus tepat 8 angka.'); resetInput(); return; }
         if (!numberPart || numberPart.length > 100) { feedback(false, 'Scan nomor part yang valid, maksimal 100 karakter.'); part.focus(); part.select(); return; }
+        const selectedCustomer = customer?.value || null;
         setBusy(true);
         try {
             if (!state.id) {
@@ -142,6 +146,7 @@ if (form) {
             }
             state = await request(base + '/' + state.id + '/scan', 'POST', {
                 box_number: number, part_number: numberPart, revision: state.revision, scan_token: scanToken(),
+                ...(customer ? {customer_id: selectedCustomer === null ? null : Number(selectedCustomer)} : {}),
             });
             const accepted = state.items.find(item => item.box_number === number);
             feedback(true, number + ' · ' + numberPart + ' · ' + format(accepted.pcs_quantity) + ' PCS masuk daftar scan.');
