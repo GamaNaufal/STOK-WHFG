@@ -132,7 +132,7 @@ class DeliveryPickController extends Controller
                 $masterLocation->autoVacateIfEmpty();
             }
 
-            if (! $linkedPallet->activeBoxes()->exists() && $linkedPallet->stockLocation) {
+            if (! $linkedPallet->hasStoredInventory() && $linkedPallet->stockLocation) {
                 $linkedPallet->stockLocation->delete();
             }
         }
@@ -1225,6 +1225,7 @@ class DeliveryPickController extends Controller
                 }
 
                 $validatedStock = [];
+                $auditBoxes = [];
                 foreach ($sessionItems as $pickItem) {
                     $box = Box::whereKey($pickItem->box_id)->lockForUpdate()->first();
                     if (
@@ -1264,6 +1265,14 @@ class DeliveryPickController extends Controller
                     $validatedStock[(int) $pickItem->id] = [
                         'box' => $box,
                         'pallet' => $pallet,
+                    ];
+                    $auditBoxes[(int) $pickItem->id] = [
+                        'box_id' => (int) $box->id,
+                        'box_number' => (string) $box->box_number,
+                        'identity_cycle' => (int) ($box->identity_cycle ?? 1),
+                        'part_number' => (string) $box->part_number,
+                        'pcs_quantity' => (int) $box->pcs_quantity,
+                        'warehouse_location' => $pallet->stockLocation->warehouse_location,
                     ];
                 }
 
@@ -1305,7 +1314,7 @@ class DeliveryPickController extends Controller
                             'part_number' => $box->part_number,
                             'pcs_quantity' => (int) $box->pcs_quantity,
                             'box_quantity' => 1,
-                            'warehouse_location' => $pallet?->stockLocation?->warehouse_location ?? 'Unknown',
+                            'warehouse_location' => $auditBoxes[(int) $pickItem->id]['warehouse_location'],
                             'status' => 'completed',
                             'notes' => 'Delivery fulfillment (scan)',
                             'withdrawn_at' => now(),
@@ -1328,7 +1337,7 @@ class DeliveryPickController extends Controller
                     $remainingAfterComplete += max(0, (int) $orderItem->quantity - (int) $orderItem->fulfilled_quantity);
                 }
 
-                AuditService::logBatchStockWithdrawal($session, 'completed');
+                AuditService::logBatchStockWithdrawal($session, $auditBoxes, 'completed');
 
                 $order->status = 'completed';
                 $order->save();
@@ -1431,6 +1440,20 @@ class DeliveryPickController extends Controller
                     return redirect()->back()->with('error', (string) ($locationCheck['message'] ?? 'Redo gagal karena konflik lokasi.'));
                 }
 
+                // Capture every restored identity before mutation, using the server-resolved
+                // destination rather than a stale first-pallet relation or a vacated origin.
+                if ($redoContext['allSessionBoxes']->count() !== count($boxIds)) {
+                    throw new \RuntimeException('Data box untuk Redo tidak lengkap. Stok tidak diubah.');
+                }
+                $auditBoxes = $redoContext['allSessionBoxes']->map(fn (Box $box) => [
+                    'box_id' => (int) $box->id,
+                    'box_number' => (string) $box->box_number,
+                    'identity_cycle' => (int) ($box->identity_cycle ?? 1),
+                    'part_number' => (string) $box->part_number,
+                    'pcs_quantity' => (int) $box->pcs_quantity,
+                    'warehouse_location' => $locationCheck['location_code'] ?? null,
+                ])->all();
+
                 $consolidatedPallet = $this->restoreBoxesToConsolidatedPallet(
                     $redoContext['allSessionBoxes'],
                 );
@@ -1446,11 +1469,12 @@ class DeliveryPickController extends Controller
 
                 // Log not_full boxes restoration if any were affected
                 if ($notFullBoxCount > 0 || $notFullRequestsCount > 0) {
-                    AuditService::log(
+                    AuditService::record(
                         'delivery_redo',
                         'not_full_restored',
                         'DeliveryPickSession',
                         $session->id,
+                        $user->id,
                         [],
                         [
                             'restored_not_full_boxes' => $notFullBoxCount,
@@ -1459,9 +1483,6 @@ class DeliveryPickController extends Controller
                         "Redo delivery: {$notFullBoxCount} box not_full dikembalikan ke stok, {$notFullRequestsCount} request dibatalkan"
                     );
                 }
-
-                // Log batch reversal satu kali dengan detail semua boxes
-                AuditService::logBatchStockWithdrawal($session, 'reversed');
 
                 $this->rollbackOrderFulfilledQuantities($session->order, $withdrawals);
 
@@ -1472,6 +1493,7 @@ class DeliveryPickController extends Controller
                         (int) $consolidatedPallet->id => $locationCheck['location_code'],
                     ]);
                 }
+                AuditService::logBatchStockWithdrawal($session, $auditBoxes, 'reversed');
             }
 
             $session->completion_status = 'redone';
@@ -1692,7 +1714,7 @@ class DeliveryPickController extends Controller
     {
         foreach (array_values(array_unique(array_filter($palletIds))) as $palletId) {
             $pallet = Pallet::find((int) $palletId);
-            if (! $pallet || $pallet->activeBoxes()->exists()) {
+            if (! $pallet || $pallet->hasStoredInventory()) {
                 continue;
             }
 
@@ -1852,7 +1874,7 @@ class DeliveryPickController extends Controller
         $locationCode = strtoupper((string) $masterLocation->code);
         $occupyingLocationCode = strtoupper((string) ($occupyingPallet->stockLocation?->warehouse_location ?? ''));
 
-        $hasInventory = $this->palletHasActiveInventory($occupyingPallet);
+        $hasInventory = $occupyingPallet->hasStoredInventory();
         $occupyingInAnotherLocation = $occupyingLocationCode !== '' && $occupyingLocationCode !== $locationCode;
 
         if (! $hasInventory || $occupyingInAnotherLocation) {
@@ -1876,33 +1898,6 @@ class DeliveryPickController extends Controller
             'occupying_pallet_id' => (int) $occupyingPallet->id,
             'occupying_pallet_number' => (string) ($occupyingPallet->pallet_number ?? ('ID '.$occupyingPallet->id)),
         ];
-    }
-
-    private function palletHasActiveInventory(Pallet $pallet): bool
-    {
-        $hasActiveBoxes = $pallet->boxes()
-            ->whereNull('boxes.deleted_at')
-            ->where('boxes.is_withdrawn', false)
-            ->where(function ($q) {
-                \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
-            })
-            ->exists();
-
-        if ($hasActiveBoxes) {
-            return true;
-        }
-
-        $hasAnyBoxHistory = $pallet->boxes()->exists();
-        if ($hasAnyBoxHistory) {
-            return false;
-        }
-
-        return $pallet->items()
-            ->where(function ($q) {
-                $q->where('pcs_quantity', '>', 0)
-                    ->orWhere('box_quantity', '>', 0);
-            })
-            ->exists();
     }
 
     private function applyRedoLocationAssignments(array $assignments): void

@@ -236,11 +236,17 @@ class MergePalletController extends Controller
                 ->where('status', 'pending')
                 ->update(['target_pallet_id' => $newPallet->id]);
 
-            StockInput::where('pallet_id', $sourcePallet->id)
-                ->update(['pallet_id' => $newPallet->id]);
-
             $sourcePallet->boxes()->detach($movedBoxIds);
             $sourcePallet->items()->delete();
+
+            // Only eligible boxes are merged. Expired boxes stay physically on
+            // the source pallet and must retain its location and input history.
+            if ($sourcePallet->hasStoredInventory()) {
+                continue;
+            }
+
+            StockInput::where('pallet_id', $sourcePallet->id)
+                ->update(['pallet_id' => $newPallet->id]);
 
             if ($sourcePallet->stockLocation) {
                 if ($sourcePallet->stockLocation->master_location_id) {

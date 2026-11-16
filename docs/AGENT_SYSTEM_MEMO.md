@@ -1,6 +1,49 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 15 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 16 November 2026 (pembaruan inkremental).
+
+Retensi lokasi pallet berisi box expired, 16 November 2026:
+
+- Atas instruksi pengguna, expired tidak lagi melepas lokasi pallet. Lokasi adalah
+  panduan letak fisik dan tetap terisi selama masih ada box tersimpan, walaupun
+  semua box expired atau masa reaktivasi sudah habis. FIFO/scan/delivery tetap
+  memakai kelayakan aktif; ringkasan pallet_items tidak memasukkan expired.
+- Pallet::storedBoxes/hasStoredInventory memisahkan okupansi fisik dari activeBoxes.
+  Box withdrawn, soft-deleted dan handled (sudah ke QA) tidak menahan lokasi.
+  Fallback pallet_items hanya untuk pallet legacy tanpa histori box tetap berlaku.
+- MasterLocation, sinkronisasi expiry, completion/withdrawal, pembersihan Redo,
+  penghapusan box dan klaim lokasi memakai okupansi fisik. Klaim lokasi tidak boleh
+  membersihkan baris milik pallet yang masih berisi expired sebagai data orphan.
+- Merge tetap memindahkan box eligible saja. Jika expired tertinggal, pallet sumber,
+  lokasi serta header input-nya dipertahankan; lokasi tersebut tidak dapat dipakai
+  pallet hasil merge. Semua perubahan dibatalkan bila tujuan masih terisi.
+- Penyerahan QA melepas lokasi hanya setelah box fisik terakhir meninggalkan pallet.
+  Tidak ada migration/backfill atau deployment. Lokasi yang sudah hilang sebelumnya
+  tidak ditebak dari history; perbaikannya memerlukan pemeriksaan lokasi fisik.
+- Verifikasi SQLite in-memory: sembilan tes baru / 107 assertions lulus. Suite penuh
+  733 tes / 7.810 assertions: 726 lulus, tujuh gagal pada laporan rentang/binder
+  Excel, seeder dan preview dashboard, tanpa error. Tes expiry/QA/pallet/lokasi,
+  withdrawal/Redo/merge serta perbaikan snapshot audit lulus. Rincian dan batas
+  verifikasi: docs/EXPIRED_PALLET_LOCATION_RETENTION.md.
+
+Perbaikan snapshot audit pengambilan delivery lokal, 16 November 2026:
+
+- Completion menyimpan PK, nomor label sebagai string, identity_cycle, part, PCS
+  dan lokasi canonical yang sudah divalidasi sebelum box/pallet dinonaktifkan.
+  Ledger withdrawal memakai lokasi snapshot yang sama. Pallet habis maupun relasi
+  shared legacy tidak menghilangkan/mengganti lokasi pada audit.
+- AuditService::logBatchStockWithdrawal mewajibkan snapshot eksplisit dari caller,
+  menghitung total dari rincian yang sama dan memakai record yang wajib tersimpan.
+  Tidak membaca ulang relasi inventory setelah mutasi atau melewatkan box terhapus.
+- Audit reversal Redo menyimpan nomor/penggunaan seluruh box dan lokasi tujuan
+  konsolidasi yang diselesaikan server; lokasi null pada legacy tanpa master tidak
+  ditebak dari lokasi asal. Redo menolak anggota yang tidak lengkap. Audit batch,
+  event Redo dan pemulihan Not Full wajib dalam transaksi; kegagalan tulis membatalkan
+  mutasi stok/order/sesi/pallet/lokasi. Izin serta aturan eligibility tetap.
+- Histori lama tidak ditulis ulang dan tidak dilengkapi dari stok terkini. Tidak ada
+  migration/deployment. Regresi SQLite in-memory: 104 tes / 1.627 assertions lulus,
+  termasuk 13 tes baru / 165 assertions. Bukti dan batas pemulihan data lama:
+  docs/AUDIT_WITHDRAWAL_DIAGNOSIS_2026-11-16.md.
 
 Lima animasi kontekstual, 15 November 2026:
 
@@ -2636,7 +2679,7 @@ Redo:
 - mengubah order menjadi `processing`;
 - membuat audit redo.
 
-Redo hanya berlaku satu kali untuk session `completed` dengan `completion_status=completed` dan `redo_until` yang belum lewat. Untuk shared box, seluruh box yang direstore dipindahkan ke pallet konsolidasi baru; pallet asal yang masih memiliki box aktif tetap mempertahankan lokasi dan ringkasannya, sedangkan pallet asal yang kosong dilepas dari lokasi dan stock location-nya. Session assignment pending yang tersisa dibatalkan saat redo.
+Redo hanya berlaku satu kali untuk session `completed` dengan `completion_status=completed` dan `redo_until` yang belum lewat. Untuk shared box, seluruh box yang direstore dipindahkan ke pallet konsolidasi baru; pallet asal yang masih memiliki box tersimpan, termasuk expired, tetap mempertahankan lokasi. Ringkasan kuantitas aktif tetap mengikuti eligibility; hanya pallet yang tidak lagi menyimpan box fisik dilepas dari lokasi dan stock location-nya. Session assignment pending yang tersisa dibatalkan saat redo.
 
 ### 15. Merge palet
 
@@ -2704,7 +2747,7 @@ Alur:
 3. Setelah lolos QA, tersedia surat pengantar cetak yang memuat nomor penanganan, ID lama, part, PCS, dan kolom ID baru/waktu penerbitan. Dokumen mengikuti box secara fisik. Warehouse mencatat penyerahan packing (`at_packing`). Packing tidak memerlukan akun atau akses aplikasi.
 4. Penerimaan wajib scan ID baru delapan digit, konfirmasi fisik, part dan PCS sama persis, serta waktu penerbitan ID sejak penyerahan packing sampai sekarang. Satu box lama selalu menjadi satu box baru. Tidak ada penerimaan bertahap atau perubahan PCS. Jika pasangan ID belum pasti, jangan mencatat penerimaan.
 5. Penerimaan membuat box baru, mewarisi part/PCS/atribut not-full dan tanggal asli. Batas `reactivated_until` = waktu penerbitan ID + satu bulan kalender (`addMonthNoOverflow`), bukan waktu penerimaan. Status active jika deadline belum lewat; bila terlambat diterima, status expired dan tidak eligible delivery. Lokasi tujuan wajib tersedia; pallet existing mempertahankan lokasi dan tunduk lock delivery. ID lama tetap handled, transaksi menjadi completed, dan hubungan ID lama-baru dapat ditelusuri antar siklus.
-6. Penerimaan packing dicatat di ledger penanganan dan audit, tidak membuat stock input produksi atau withdrawal customer. Karena itu throughput inbound tidak menghitung barang yang sama lagi. Penerimaan expired mengikuti aturan lokasi expired yang sudah ada: ringkasan aktif kosong dapat melepas lokasi, tetapi lokasi penerimaan tetap tersimpan di penanganan dan expired report.
+6. Penerimaan packing dicatat di ledger penanganan dan audit, tidak membuat stock input produksi atau withdrawal customer. Karena itu throughput inbound tidak menghitung barang yang sama lagi. Sejak perbaikan 16 November 2026, penerimaan expired tetap menahan lokasi pallet selama box fisik tersimpan; ringkasan aktif kosong tidak melepas lokasi. Lokasi penerimaan juga tersimpan di penanganan dan expired report.
 
 Seluruh transisi berjalan dalam transaksi dengan row lock. State tidak boleh dilewati; pengulangan keputusan/penyerahan/penerimaan yang sama tidak menggandakan transaksi atau memperpanjang deadline. Box assigned/pick-locked atau pallet dengan sesi scanning/blocked/approved menolak mutasi. Hapus/koreksi sumber melalui Stock View diblokir jika sudah memiliki penanganan.
 
@@ -2829,7 +2872,7 @@ Status yang digunakan:
 - `stock_input_boxes` adalah sumber mapping audit transaksi input yang paling akurat.
 - Box aktif adalah sumber utama perhitungan stok.
 - `pallet_items` merupakan ringkasan/fallback legacy, bukan satu-satunya sumber kebenaran.
-- Status lokasi kosong ditentukan dari box aktif; `pallet_items` hanya dipakai untuk pallet legacy yang tidak pernah memiliki histori box.
+- Status lokasi kosong ditentukan dari box fisik tersimpan (termasuk expired, mengecualikan withdrawn/deleted/handled); `pallet_items` hanya dipakai untuk pallet legacy yang tidak pernah memiliki histori box. Eligibility FIFO/delivery tetap memakai box aktif.
 - Box yang sama harus dihitung satu kali walaupun memiliki relasi ke lebih dari satu palet.
 - Canonical pallet box shared adalah relasi lokasi valid paling baru.
 - Box dalam sesi picking aktif tidak boleh dialokasikan ke order lain.

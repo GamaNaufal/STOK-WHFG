@@ -22,7 +22,7 @@ class RemainingIntegrityRegressionTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_expired_box_deactivation_clears_summary_and_vacates_location(): void
+    public function test_expired_box_deactivation_clears_active_summary_and_retains_location(): void
     {
         $operator = User::factory()->create(['role' => 'warehouse_operator']);
         $pallet = Pallet::create(['pallet_number' => 'PLT-EXP-SYNC']);
@@ -58,11 +58,11 @@ class RemainingIntegrityRegressionTest extends TestCase
             'box_quantity' => 0,
             'pcs_quantity' => 0,
         ]);
-        $this->assertDatabaseMissing('stock_locations', ['pallet_id' => $pallet->id]);
+        $this->assertDatabaseHas('stock_locations', ['pallet_id' => $pallet->id, 'warehouse_location' => $location->code]);
         $this->assertDatabaseHas('master_locations', [
             'id' => $location->id,
-            'is_occupied' => false,
-            'current_pallet_id' => null,
+            'is_occupied' => true,
+            'current_pallet_id' => $pallet->id,
         ]);
     }
 

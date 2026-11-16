@@ -48,7 +48,7 @@ class ExpiredBoxService
 
                         $ageMonths = Carbon::parse($row->stored_at)->diffInMonths(now());
                         $nextStatus = $this->statusFor($box->reactivated_until, $ageMonths);
-                        // Capture the old storage location before inactive stock vacates it.
+                        // Preserve the origin in history; expiry alone does not vacate storage.
                         if ($nextStatus === 'expired') {
                             $this->ensureReportExists($row, (int) $ageMonths, $nextStatus);
                         }
@@ -111,7 +111,7 @@ class ExpiredBoxService
                 $masterLocation->autoVacateIfEmpty();
             }
 
-            if (! $linkedPallet->activeBoxes()->exists() && $linkedPallet->stockLocation) {
+            if (! $linkedPallet->hasStoredInventory() && $linkedPallet->stockLocation) {
                 $linkedPallet->stockLocation->delete();
             }
         }

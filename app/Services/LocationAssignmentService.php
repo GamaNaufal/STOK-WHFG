@@ -32,11 +32,9 @@ class LocationAssignmentService
             ->first();
 
         if ($existingStockLocation) {
-            $existingPallet = Pallet::withTrashed()
-                ->withCount('activeBoxes')
-                ->find($existingStockLocation->pallet_id);
+            $existingPallet = Pallet::withTrashed()->find($existingStockLocation->pallet_id);
 
-            if ($existingPallet && ! $existingPallet->trashed() && $existingPallet->active_boxes_count > 0) {
+            if ($existingPallet && ! $existingPallet->trashed() && $existingPallet->hasStoredInventory()) {
                 if (
                     ! $location->is_occupied
                     || (int) $location->current_pallet_id !== (int) $existingPallet->id

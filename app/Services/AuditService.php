@@ -145,46 +145,21 @@ class AuditService
     }
 
     /**
-     * Log batch stock withdrawal (multiple boxes dalam satu session)
+     * Record the caller's immutable snapshot inside its inventory transaction.
+     * Never reload box/location relations here: completion may already have vacated them.
+     *
+     * @param array<int, array{box_id: int, box_number: string, identity_cycle: int, part_number: string, pcs_quantity: int, warehouse_location: ?string}> $boxDetails
      */
-    public static function logBatchStockWithdrawal($session, $action = 'completed', $description = null)
+    public static function logBatchStockWithdrawal($session, array $boxDetails, $action = 'completed', $description = null): AuditLog
     {
-        // Load box dengan palletnya, dan stock location
-        $items = $session->items()->with(['box' => function($q) {
-            $q->with('pallets.stockLocation');
-        }])->get();
-        
-        $totalPcs = 0;
-        $totalBox = $items->count();
-        $boxDetails = [];
-        $partNumbers = [];
-
-        foreach ($items as $item) {
-            $box = $item->box;
-            if ($box) {
-                $totalPcs += $box->pcs_quantity;
-                
-                // Get warehouse location dari pallet's stockLocation
-                $warehouseLocation = 'Unknown';
-                if ($box->pallets && $box->pallets->isNotEmpty()) {
-                    $pallet = $box->pallets->first();
-                    $warehouseLocation = $pallet->stockLocation?->warehouse_location ?? 'Unknown';
-                }
-                
-                $boxDetails[] = [
-                    'box_id' => $box->id,
-                    'part_number' => $box->part_number,
-                    'pcs_quantity' => (int)$box->pcs_quantity,
-                    'warehouse_location' => $warehouseLocation,
-                ];
-                // Collect unique part numbers
-                if ($box->part_number && !in_array($box->part_number, $partNumbers)) {
-                    $partNumbers[] = $box->part_number;
-                }
-            }
+        if (! $boxDetails) {
+            throw new \RuntimeException('Snapshot box pengambilan wajib tersedia.');
         }
-
-        $partNumberString = !empty($partNumbers) ? implode(', ', $partNumbers) : '-';
+        $boxDetails = array_values($boxDetails);
+        $totalPcs = (int) array_sum(array_column($boxDetails, 'pcs_quantity'));
+        $totalBox = count($boxDetails);
+        $partNumbers = array_values(array_unique(array_column($boxDetails, 'part_number')));
+        $partNumberString = implode(', ', $partNumbers);
 
         $newValues = [
             'session_id' => $session->id,
@@ -202,11 +177,12 @@ class AuditService
             default => $description ?? "Aksi pengambilan stok batch: {$action}",
         };
 
-        self::log(
+        return self::record(
             'stock_withdrawal',
             $action,
             'DeliveryPickSession',
             $session->id,
+            Auth::id(),
             [],
             $newValues,
             $description ?? $actionDescription
@@ -241,11 +217,12 @@ class AuditService
      */
     public static function logDeliveryRedo($sessionId, $description)
     {
-        self::log(
+        return self::record(
             'delivery_redo',
             'redo',
             'DeliveryPickSession',
             $sessionId,
+            Auth::id(),
             [],
             [],
             $description

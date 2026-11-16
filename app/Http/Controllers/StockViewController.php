@@ -1438,18 +1438,11 @@ class StockViewController extends Controller
                     continue;
                 }
 
-                $remainingActiveBoxes = (int) DB::table('pallet_boxes')
-                    ->join('boxes', 'boxes.id', '=', 'pallet_boxes.box_id')
-                    ->where('pallet_boxes.pallet_id', $palletId)
-                    ->whereNull('boxes.deleted_at')
-                    ->where('boxes.is_withdrawn', false)
-                    ->where(function ($q) {
-                        \App\Models\Box::applyUsableExpiryFilter($q, 'boxes');
-                    })
+                $remainingStoredBoxes = $pallet->storedBoxes()
                     ->lockForUpdate()
                     ->count();
 
-                if ($remainingActiveBoxes === 0) {
+                if ($remainingStoredBoxes === 0) {
                     $palletNumber = (string) $pallet->pallet_number;
 
                     \App\Models\MasterLocation::where('current_pallet_id', $palletId)

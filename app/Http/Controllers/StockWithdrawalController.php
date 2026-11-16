@@ -105,7 +105,7 @@ class StockWithdrawalController extends Controller
                 $masterLocation->autoVacateIfEmpty();
             }
 
-            if (! $linkedPallet->activeBoxes()->exists()) {
+            if (! $linkedPallet->hasStoredInventory()) {
                 if ($linkedPallet->stockLocation) {
                     $linkedPallet->stockLocation->delete();
                 }

@@ -96,12 +96,12 @@ class ExpiredBoxReactivationTest extends TestCase
         $this->assertTrue(Box::active()->whereKey($box->id)->exists());
     }
 
-    public function test_expired_stock_remains_visible_in_all_stock_views_and_details_after_location_is_released(): void
+    public function test_expired_stock_keeps_its_location_and_remains_unavailable_to_delivery(): void
     {
         [$operator, , $box, $pallet, , $order] = $this->inventory();
         $box->update(['is_not_full' => true]);
         app(ExpiredBoxService::class)->syncStatuses();
-        $this->assertDatabaseMissing('stock_locations', ['pallet_id' => $pallet->id]);
+        $this->assertDatabaseHas('stock_locations', ['pallet_id' => $pallet->id, 'warehouse_location' => 'RENEW-01']);
         foreach (['part', 'box_id', 'pallet', 'not_full'] as $mode) {
             $this->actingAs($operator)->get(route('stock-view.index', ['view_mode' => $mode]))
                 ->assertOk()->assertSee('Expired')->assertViewHas('summaryTotalBox', 1)

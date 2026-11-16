@@ -51,6 +51,31 @@ class Pallet extends Model
             ->where(function ($q) { \App\Models\Box::applyUsableExpiryFilter($q, 'boxes'); });
     }
 
+    // Physical occupancy includes expired stock, even after a reactivation deadline.
+    // Handled stock has left for QA; withdrawn/deleted stock no longer occupies storage.
+    public function storedBoxes()
+    {
+        return $this->belongsToMany(Box::class, 'pallet_boxes')
+            ->whereNull('boxes.deleted_at')
+            ->where('boxes.is_withdrawn', false)
+            ->where(fn ($query) => $query->whereNull('boxes.expired_status')
+                ->orWhere('boxes.expired_status', '!=', 'handled'));
+    }
+
+    public function hasStoredInventory(): bool
+    {
+        if ($this->storedBoxes()->exists()) {
+            return true;
+        }
+        // Ignore stale summaries once physical box history is available.
+        if ($this->boxes()->withTrashed()->exists()) {
+            return false;
+        }
+
+        return $this->items()->where(fn ($query) => $query
+            ->where('pcs_quantity', '>', 0)->orWhere('box_quantity', '>', 0))->exists();
+    }
+
     // Relationship ke stock inputs
     public function stockInputs()
     {
