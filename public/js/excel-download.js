@@ -56,10 +56,15 @@ export function initExcelDownloads({documentRef = globalThis.document, windowRef
     if (!container || !windowRef.bootstrap?.Toast || !windowRef.crypto?.getRandomValues) return;
     const jobs = new Map(), frames = new Set();
     const repeatGuard = createExcelRepeatGuard();
+    let pointerSubmitter = null;
+    documentRef.addEventListener('keydown', () => {
+        pointerSubmitter = null;
+        for (const panel of container.querySelectorAll('.excel-download-feedback')) panel.removeAttribute('data-ui-feedback-motion');
+    }, true);
     const eligible = control => !control.disabled && control.getAttribute('aria-disabled') !== 'true'
         && !control.classList.contains('disabled') && !control.closest('[data-access-denied="true"]');
 
-    const begin = (address, control) => {
+    const begin = (address, control, {animateFeedback = false} = {}) => {
         const url = new URL(address, windowRef.location.href);
         if (url.origin !== windowRef.location.origin || !['http:', 'https:'].includes(url.protocol)) return false;
         url.hash = ''; url.searchParams.delete('_excel_token');
@@ -70,8 +75,9 @@ export function initExcelDownloads({documentRef = globalThis.document, windowRef
         const token = [...windowRef.crypto.getRandomValues(new Uint8Array(16))].map(value => value.toString(16).padStart(2, '0')).join('');
         const panel = documentRef.createElement('div');
         panel.className = 'toast excel-download-feedback';
+        if (animateFeedback) panel.setAttribute('data-ui-feedback-motion', 'true');
         panel.setAttribute('role', 'status'); panel.setAttribute('aria-live', 'polite'); panel.setAttribute('aria-atomic', 'true');
-        panel.innerHTML = '<div class="toast-body"><div class="excel-download-heading"><i class="bi bi-file-earmark-excel" aria-hidden="true"></i><strong data-excel-title></strong><span class="excel-download-spinner" aria-hidden="true"></span></div><p data-excel-message></p><div class="excel-download-actions"><button type="button" class="btn btn-sm btn-outline-primary" data-excel-retry hidden>Coba lagi</button><a class="btn btn-sm btn-outline-primary" data-excel-direct hidden>Unduh langsung</a><button type="button" class="btn btn-sm btn-outline-secondary" data-excel-close>Tutup</button></div></div>';
+        panel.innerHTML = '<div class="toast-body"><div class="excel-download-heading"><span class="excel-download-symbol" aria-hidden="true"><i class="bi bi-file-earmark-excel excel-download-file"></i><i class="bi bi-check-circle-fill excel-download-ready"></i></span><strong data-excel-title></strong><span class="excel-download-spinner" aria-hidden="true"></span></div><p data-excel-message></p><div class="excel-download-actions"><button type="button" class="btn btn-sm btn-outline-primary" data-excel-retry hidden>Coba lagi</button><a class="btn btn-sm btn-outline-primary" data-excel-direct hidden>Unduh langsung</a><button type="button" class="btn btn-sm btn-outline-secondary" data-excel-close>Tutup</button></div></div>';
         const title = panel.querySelector('[data-excel-title]'), message = panel.querySelector('[data-excel-message]');
         const retry = panel.querySelector('[data-excel-retry]'), direct = panel.querySelector('[data-excel-direct]');
         const close = panel.querySelector('[data-excel-close]');
@@ -120,9 +126,10 @@ export function initExcelDownloads({documentRef = globalThis.document, windowRef
         job.tracker = tracker;
         close.addEventListener('click', () => toast.hide());
         panel.addEventListener('hidden.bs.toast', () => { if (!job.pending) removePanel(); });
-        retry.addEventListener('click', () => {
+        retry.addEventListener('click', event => {
             removePanel();
-            if (begin(key, control)) jobs.get(key)?.message.focus({preventScroll: true});
+            // Retry moves keyboard focus to the message immediately.
+            if (begin(key, control, {animateFeedback: event.detail > 0})) jobs.get(key)?.message.focus({preventScroll: true});
         });
         message.setAttribute('tabindex', '-1');
         frame.addEventListener('load', () => {
@@ -151,15 +158,17 @@ export function initExcelDownloads({documentRef = globalThis.document, windowRef
         const control = event.target.closest('a[data-report-export], a[data-excel-download], button[data-stock-export], button[data-excel-download]');
         if (!control || (control.target && control.target !== '_self') || control.formTarget || control.form?.target) return;
         if (!eligible(control) || event.detail > 1) { event.preventDefault(); return; }
-        if (control.matches('a[href]') && begin(control.href, control)) event.preventDefault();
+        pointerSubmitter = control.matches('button') && event.detail > 0 ? control : null;
+        if (control.matches('a[href]') && begin(control.href, control, {animateFeedback: event.detail > 0})) event.preventDefault();
     };
     const submit = event => {
         const button = event.submitter, form = event.target;
+        const animateFeedback = pointerSubmitter === button; pointerSubmitter = null;
         if (event.defaultPrevented || !button?.matches('[data-stock-export], [data-excel-download]')) return;
         if (!eligible(button)) { event.preventDefault(); return; }
         if ((button.getAttribute('formmethod') || form.method).toLowerCase() !== 'get' || (button.formTarget || form.target)) return;
         const url = excelFormUrl(form, button, windowRef.location.href, new FormData(form));
-        if (begin(url.href, button)) event.preventDefault();
+        if (begin(url.href, button, {animateFeedback})) event.preventDefault();
     };
     documentRef.addEventListener('click', click);
     documentRef.addEventListener('submit', submit);

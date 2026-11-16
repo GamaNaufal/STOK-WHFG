@@ -27,6 +27,8 @@ nama file, query bisnis, hak akses, status inventory, atau schema database.
 - Jakob's law: file tetap diserahkan ke sistem download browser.
 - Frequency of use: tanpa confetti, wind-up, atau animasi tambahan pada data.
 - Reduced motion: spinner statis dengan status teks tetap terbaca.
+- Penegasan lanjutan: ikon file crossfade ke centang 160 ms setelah ack untuk
+  pointer; keyboard/reduced motion langsung. Timer sukses tetap 3 detik.
 
 Spinner berputar linear hanya selama proses. Batas animasi transisi singkat
 tidak dijadikan batas durasi pembuatan file. Tidak menjanjikan selesai dalam

@@ -1,5 +1,6 @@
 import { parseCount, checkRows } from './export-delivery/document-parser.mjs';
 import {attachSuggestions} from './components/search-suggestions.mjs';
+import {createSurfaceMotion, animateCue} from '../../public/js/ui-motion.js';
 
 const page=document.getElementById('delivery-plan-editor');
 if(page) {
@@ -9,13 +10,21 @@ if(page) {
     const planCode=byId('plan-code'),customer=byId('plan-customer'),deadline=byId('plan-deadline'),sourceType=byId('plan-source-type'),sourceName=byId('plan-source-name');
     const reviewed=byId('plan-reviewed'),reviewPanel=byId('plan-review'),save=byId('plan-save');
     const status=byId('plan-import-status');
+    const statusMessage=status.querySelector('[data-import-message]'),statusIcon=status.querySelector('[data-import-icon]');
+    const excelPanel=createSurfaceMotion(byId('plan-excel-panel'));
+    let importMotion=false;
+    document.addEventListener('keydown',()=>{importMotion=false;},true);
     const format=n=>Number(n).toLocaleString('id-ID');
     let busy=false,undo=null,dirty=false,submitting=false;
     const rows=()=>[...body.querySelectorAll('tr')].map(tr=>({
         part_number:tr.querySelector('.plan-part').value.trim(),
         pcs_quantity:tr.querySelector('.plan-quantity').value,
     }));
-    const announce=(text,error=false)=>{status.textContent=text;status.classList.toggle('is-error',error);};
+    const announce=(text,error=false,success=false)=>{
+        statusMessage.textContent=text;status.classList.toggle('is-error',error);
+        status.classList.toggle('is-success',success);statusIcon.hidden=!success;
+        animateCue(statusIcon,{animate:success&&importMotion});
+    };
     let importWarnings=[];
     const displayWarnings=warnings=>{
         importWarnings=Array.isArray(warnings)?warnings:[];
@@ -78,7 +87,7 @@ if(page) {
         byId('plan-undo-import').hidden=false;
         displayWarnings(data.warnings);
         refresh();
-        announce(data.items.length+' baris dibaca. Cocokkan kode rencana, semua baris, customer dan tanggal dengan dokumen sumber.');
+        announce(data.items.length+' baris dibaca. Cocokkan kode rencana, semua baris, customer dan tanggal dengan dokumen sumber.',false,true);
     };
     body.addEventListener('input',event=>{
         const tr=event.target.closest('tr');if(!tr)return;
@@ -104,13 +113,14 @@ if(page) {
         displayWarnings(undo.warnings);
         undo=null;byId('plan-undo-import').hidden=true;announce('Hasil impor dibatalkan.');refresh();
     });
-    document.querySelectorAll('[data-input-mode]').forEach(button=>button.addEventListener('click',()=>{
+    document.querySelectorAll('[data-input-mode]').forEach(button=>button.addEventListener('click',event=>{
         document.querySelectorAll('[data-input-mode]').forEach(item=>{
             const active=item===button;item.classList.toggle('is-selected',active);item.setAttribute('aria-pressed',String(active));
         });
-        byId('plan-excel-panel').hidden=button.dataset.inputMode!=='excel';
+        excelPanel.setVisible(button.dataset.inputMode==='excel',{animate:event.detail>0});
     }));
-    byId('plan-read-excel').addEventListener('click',async()=>{
+    byId('plan-read-excel').addEventListener('click',async event=>{
+        importMotion=event.detail>0;
         const file=byId('plan-excel-file').files[0];
         if(!file)return announce('Pilih file Excel terlebih dahulu.',true);
         if(file.size>5*1024*1024)return announce('Maksimal ukuran Excel 5 MB.',true);

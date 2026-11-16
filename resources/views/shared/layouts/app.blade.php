@@ -59,6 +59,10 @@
     <script src="{{ asset('vendor/sweetalert2-11.26.25/dist/sweetalert2.all.min.js') }}"></script>
     <script src="{{ asset('js/alert-helper.js') }}"></script>
     @include('shared.layouts.partials.layout-shell-scripts')
+    <script type="module">
+        import {initAccountMenuMotion} from '{{ asset('js/ui-motion.js') }}?v={{ filemtime(public_path('js/ui-motion.js')) }}';
+        initAccountMenuMotion();
+    </script>
     <script type="module" src="{{ asset('js/excel-download.js') }}?v={{ filemtime(public_path('js/excel-download.js')) }}"></script>
     
     @yield('scripts')

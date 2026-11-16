@@ -79,6 +79,9 @@
     .warehouse-app .ui-disclosure > summary:focus-visible { outline: 3px solid var(--ui-accent); outline-offset: 3px; }
     .warehouse-app .ui-disclosure > summary::after { content: "+"; flex: none; margin-inline-start: auto; font-size: 1.25rem; color: var(--ui-muted); }
     .warehouse-app .ui-disclosure[open] > summary::after { content: "−"; }
+    .warehouse-app .ui-disclosure[data-ui-open] > summary::after { content: ""; width: .5rem; height: .5rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(-45deg); margin-inline-end: .25rem; }
+    .warehouse-app .ui-disclosure[data-ui-open="true"] > summary::after { transform: rotate(45deg); }
+    .warehouse-app .ui-disclosure[data-ui-motion="true"] > summary::after { transition: transform 160ms var(--ui-ease-out); }
     .warehouse-app .ui-disclosure > summary > span:not(.ui-step) { min-width: 0; overflow-wrap: anywhere; }
     .warehouse-app .ui-disclosure strong { display: block; font-size: .875rem; }
     .warehouse-app .ui-disclosure small { display: block; margin-top: .25rem; color: var(--ui-muted); font-size: .8125rem; }
@@ -181,15 +184,19 @@
         background: var(--ui-surface); color: var(--ui-ink); box-shadow: 0 6px 24px rgb(20 25 32 / 12%);
     }
     .warehouse-app .excel-download-heading { display: flex; align-items: center; gap: .5rem; }
-    .warehouse-app .excel-download-heading > i { color: var(--ui-accent); font-size: 1.25rem; }
+    .warehouse-app .excel-download-symbol { display: grid; flex: none; width: 1.25rem; height: 1.25rem; color: var(--ui-accent); font-size: 1.25rem; line-height: 1; }
+    .warehouse-app .excel-download-symbol > i { grid-area: 1 / 1; }
+    .warehouse-app .excel-download-ready { opacity: 0; color: #198754; }
     .warehouse-app .excel-download-heading strong { flex: 1; min-width: 0; font-size: .9375rem; }
     .warehouse-app .excel-download-feedback p { margin: .5rem 0 .75rem; font-size: .8125rem; line-height: 1.5; overflow-wrap: anywhere; }
     .warehouse-app .excel-download-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
     .warehouse-app .excel-download-actions .btn { min-height: 44px; }
     .warehouse-app .excel-download-actions [hidden] { display: none !important; }
-    .warehouse-app .excel-download-feedback[data-excel-state="ready"] .excel-download-heading > i { color: #198754; }
-    .warehouse-app .excel-download-feedback[data-excel-state="error"] .excel-download-heading > i { color: #b02a37; }
-    .warehouse-app .excel-download-feedback[data-excel-state="unconfirmed"] .excel-download-heading > i { color: #80551d; }
+    .warehouse-app .excel-download-feedback[data-excel-state="ready"] .excel-download-file { opacity: 0; }
+    .warehouse-app .excel-download-feedback[data-excel-state="ready"] .excel-download-ready { opacity: 1; }
+    .warehouse-app .excel-download-feedback[data-ui-feedback-motion] .excel-download-symbol > i { transition: opacity 160ms var(--ui-ease-out); }
+    .warehouse-app .excel-download-feedback[data-excel-state="error"] .excel-download-symbol { color: #b02a37; }
+    .warehouse-app .excel-download-feedback[data-excel-state="unconfirmed"] .excel-download-symbol { color: #80551d; }
     .warehouse-app .excel-download-feedback:is([data-excel-state="ready"], [data-excel-state="error"], [data-excel-state="unconfirmed"]) .excel-download-spinner { display: none; }
     @keyframes ui-excel-spin { to { transform: rotate(360deg); } }
     @keyframes ui-completion-settle {

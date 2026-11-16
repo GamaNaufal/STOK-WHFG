@@ -1,5 +1,5 @@
 <div class="dropdown">
-    <button class="avatar-trigger" aria-label="Menu akun" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="{{ auth()->user()->name }} · {{ $navigationContext['role_label'] }}">
+    <button class="avatar-trigger" aria-label="Menu akun" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false" title="{{ auth()->user()->name }} · {{ $navigationContext['role_label'] }}">
         <span class="avatar-circle" aria-hidden="true">{{ $avatarInitials }}</span>
         <span class="navigation-account-name">{{ auth()->user()->name }}</span>
         <i class="bi bi-chevron-down" aria-hidden="true"></i>

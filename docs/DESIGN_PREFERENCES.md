@@ -124,3 +124,12 @@ tetap terkirim saat disclosure ditutup, tanpa JS seluruh bagian tersedia.
 Rencana delivery menampilkan urutan tiga bagian, modal koreksi memisahkan data
 box dan alasan audit. Tidak menambah wind-up, arcs atau gerak pada scan.
 Catatan before/after dan verifikasi: `docs/UI_RULES_COMPLETION_2026-11-15.md`.
+
+Sesudah rencana lima animasi disetujui, tambahkan gerak kontekstual pada panel
+input Excel (180/120 ms), menu akun (160/120 ms, skala 97% dari pemicu),
+disclosure pemetaan master part (fade 160/120 ms dan chevron), penegasan ikon
+hasil impor (180 ms), serta crossfade file ke centang download (160 ms).
+Aktivasi keyboard, validasi, inisialisasi dan reduced motion tetap langsung.
+Gerak dapat dibalik dari pose saat ini, tanpa menahan aksi bisnis. Animasi tabel
+hasil, baris scan dan perpindahan input tidak ditambahkan. Before/after dan
+verifikasi: `docs/UI_CONTEXTUAL_MOTION_2026-11-15.md`.

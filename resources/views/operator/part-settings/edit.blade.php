@@ -83,5 +83,5 @@
 @endsection
 
 @section('scripts')
-<script src="{{ asset('js/pages/master-part-form.js') }}?v={{ filemtime(public_path('js/pages/master-part-form.js')) }}"></script>
+<script type="module" src="{{ asset('js/pages/master-part-form.js') }}?v={{ filemtime(public_path('js/pages/master-part-form.js')) }}"></script>
 @endsection

@@ -40,7 +40,7 @@
                     <a data-excel-download class="btn btn-outline-secondary" href="{{ route('export.delivery-plans.template') }}"><i class="bi bi-download" aria-hidden="true"></i> Unduh template Excel</a>
                 </div>
             </div>
-            <p id="plan-import-status" class="plan-import-status" role="status" aria-live="polite"></p>
+            <p id="plan-import-status" class="plan-import-status" role="status" aria-live="polite"><i class="bi bi-check-circle-fill" data-import-icon aria-hidden="true" hidden></i><span data-import-message></span></p>
             <div id="plan-import-warnings" class="alert alert-warning mt-3 mb-0" role="status" aria-live="polite" hidden>
                 <strong>Periksa hasil impor</strong><ul id="plan-warning-list" class="mb-0 mt-2"></ul>
             </div>

@@ -18,6 +18,9 @@
 .delivery-plan-page [hidden] { display:none!important; }
 .plan-import-status { color:var(--ui-muted,#595d65); font-size:.8125rem; margin:.85rem 0 0; overflow-wrap:anywhere; }
 .plan-import-status.is-error { color:#a52622; }
+.plan-import-status.is-success { display:flex; align-items:flex-start; gap:.5rem; color:#155b3b; }
+.plan-import-status [data-import-icon] { flex:none; margin-top:.15rem; }
+.plan-import-status [hidden] { display:none!important; }
 .plan-table-scroll { overflow-x:auto; position:relative; }
 .plan-table-scroll:focus-visible { outline:3px solid var(--ui-accent,#0b7072); outline-offset:-3px; }
 .warehouse-app .plan-table { min-width:720px; margin:0; }

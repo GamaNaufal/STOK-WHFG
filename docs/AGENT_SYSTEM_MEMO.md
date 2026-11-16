@@ -2,6 +2,22 @@
 
 Terakhir diverifikasi dari source code: 15 November 2026 (pembaruan inkremental).
 
+Lima animasi kontekstual, 15 November 2026:
+
+- Rencana pengguna diterapkan pada panel input Excel, menu akun Bootstrap,
+  disclosure pemetaan master part, ikon hasil impor dan centang download siap.
+  CSS/WAAPI memakai token existing, tanpa library baru. Keyboard, validasi,
+  inisialisasi dan reduced motion langsung; interupsi membatalkan completion lama.
+  Scan, data tabel, payload, fungsi server dan izin tetap.
+- `public/js/ui-motion.js` memusatkan helper. Form master part menjadi script
+  module, layout menginisialisasi menu dan Vite membundel helper panel/impor.
+  Ikon download mengikuti ack server, timer auto-close tetap 3 detik.
+- Seluruh 169 frontend dan 70 backend / 1.301 assertions lulus. Render/stream
+  fixture terpisah lulus 1 tes / 12 assertions, SQLite in-memory. Build lulus.
+  Browser memeriksa pointer/keyboard, pembalikan, validasi, download, preview 5×,
+  simulasi reduced motion dan viewport 390 px. Catatan dan batas verifikasi:
+  docs/UI_CONTEXTUAL_MOTION_2026-11-15.md.
+
 Penyelesaian sisa rules UI/UX, 15 November 2026:
 
 - Template Excel rencana delivery ikut helper download existing. Target tombol

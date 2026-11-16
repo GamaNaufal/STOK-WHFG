@@ -2,6 +2,12 @@
 
 Terakhir diverifikasi: 15 November 2026, termasuk penyelesaian empat prioritas sisa.
 
+Pembaruan berikutnya pada tanggal yang sama: lima animasi kontekstual sesuai
+rencana pengguna sudah diterapkan. Panel Excel, menu akun dan disclosure memakai
+transisi singkat; hasil impor/download memberi penegasan ikon. Keyboard, validasi
+dan reduced motion langsung. Detail before/after dan verifikasi terkini:
+`docs/UI_CONTEXTUAL_MOTION_2026-11-15.md`.
+
 Status berikut berlaku pada area yang disebutkan, bukan seluruh aplikasi.
 Ritme dashboard dan feedback tekan–lepas dipertahankan. Tidak mengubah transaksi,
 validasi barcode, payload, atau hak akses server.
