@@ -30,6 +30,7 @@ class StockOpnameService
                 $session->update(['source_max_id' => $this->inventory->catalogue($scope)->max('id') ?? 0]);
                 $query = $this->inventory->onHand($this->inventory->catalogue($scope), $scope);
                 $query->chunkById(500, function ($boxes) use ($session, $scope) {
+                    $this->inventory->preparePartNumbers($boxes);
                     $rows = $boxes->map(function ($box) use ($session, $scope) {
                         $snapshot = json_encode($this->inventory->snapshot($box, $scope), JSON_THROW_ON_ERROR);
                         return ['stock_opname_session_id' => $session->id, 'box_number' => $box->box_number,
@@ -152,6 +153,9 @@ class StockOpnameService
             // Sessions opened before the migration must not mark unchanged stock as changed.
             unset($snapshot['identity_cycle']);
         }
+        // Document aliases are display metadata, not a physical stock change.
+        unset($initial['document_part_numbers'], $initial['document_part_mapping']);
+        unset($snapshot['document_part_numbers'], $snapshot['document_part_mapping']);
         return $initial === $snapshot ? 'unchanged' : 'changed';
     }
 

@@ -5,23 +5,12 @@
 <link rel="stylesheet" href="{{ asset('css/pages/export-fulfillment.css') }}">
 <link rel="stylesheet" href="{{ asset('css/pages/export-receiving.css') }}">
 <link rel="stylesheet" href="{{ asset('css/pages/export-stock.css') }}?v={{ filemtime(public_path('css/pages/export-stock.css')) }}">
+<link rel="stylesheet" href="{{ asset('css/pages/export-stock-view-switch.css') }}?v={{ filemtime(public_path('css/pages/export-stock-view-switch.css')) }}">
+<script src="{{ asset('js/pages/export-stock-view-switch.js') }}?v={{ filemtime(public_path('js/pages/export-stock-view-switch.js')) }}"></script>
 @endsection
 @section('content')
 <div class="delivery-plan-page receiving-page export-stock-page">
-    <header class="plan-header stock-header">
-        <div><span class="plan-eyebrow">Pengiriman ekspor</span><h1>Stok ekspor</h1><p>Pantau stok yang tersedia dan kesiapan delivery per customer.</p></div>
-        <div class="plan-inline-actions">
-            @if(auth()->user()->canAccess('export_stock_manage'))
-                <a class="btn btn-outline-primary" href="{{ route('export.stock.box-history') }}"><i class="bi bi-clock-history" aria-hidden="true"></i> Riwayat box</a>
-            @endif
-            @if(auth()->user()->canAccessRoute('export.receiving.index'))
-                <a class="btn btn-outline-primary" href="{{ route('export.receiving.index') }}"><i class="bi bi-upc-scan" aria-hidden="true"></i> Penerimaan Transfer Box Ekspor</a>
-            @endif
-        </div>
-    </header>
-    @if(app(\App\Services\ExportCustomerStockPolicy::class)->ready())
-    <nav class="plan-inline-actions mb-3" aria-label="Tampilan stok"><span class="btn btn-primary" aria-current="page">Daftar stok</span><a class="btn btn-outline-primary" href="{{ route('export.stock.index', ['customer_view'=>'reservations']) }}">Reservasi customer</a></nav>
-    @endif
+    @include('export.stock.header', ['stockView' => 'stock'])
     <div class="stock-summary" id="export-stock-summary" aria-label="Ringkasan seluruh stok ekspor">
         @foreach(['free' => ['Stok Bersih', 'box-seam'], 'in_progress' => ['Sedang Diproses', 'hourglass-split'], 'stored' => ['Siap Kirim', 'check2-circle']] as $key => [$label, $icon])
             <a class="stock-summary-item" href="{{ route('export.stock.index', ['customer' => $customer, 'mode' => $filters['mode'], 'status' => $key]) }}#export-stock-results"

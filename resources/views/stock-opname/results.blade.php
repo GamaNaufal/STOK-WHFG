@@ -10,20 +10,27 @@
     <input id="opname-result-query" type="search" name="q" class="form-control" maxlength="100" value="{{ $search }}" placeholder="Cari ID Box pada rincian">
     <button class="btn btn-outline-primary" type="submit">Cari</button>
 </form>
+@if($usesCurrentPartMapping)
+    <p class="opname-part-note">Nomor dokumen pada catatan lama memakai pemetaan Master Part saat ini. Data stok dan hasil scan tetap mengikuti catatan sesi opname.</p>
+@endif
 <div class="opname-table-scroll" role="region" tabindex="0" aria-label="Rincian opname {{ $scopeLabel }}">
     <table class="table plan-table mb-0">
-        <thead><tr><th>ID Box / part</th><th>Pallet / lokasi</th><th>Hasil</th><th>Waktu / operator</th></tr></thead>
+        <thead><tr><th>ID Box / part dokumen</th><th>Pallet / lokasi</th><th>Hasil</th><th>Waktu / operator</th></tr></thead>
         <tbody>
         @forelse($rows as $row)
             @php
-                $snapshot = $scanTable ? $row->snapshot : $row->current_snapshot;
+                $snapshot = $row->display_snapshot;
                 $number = $scanTable ? $row->input : $row->box_number;
                 $labels = ['ok'=>'OK', 'ng'=>'NG', 'duplicate'=>'Duplikat'];
                 $changeLabels = ['unchanged'=>'Sesuai stok awal', 'changed'=>'Posisi / data berubah', 'received'=>'Masuk selama sesi', 'left'=>'Keluar / ID diganti', 'received_left'=>'Masuk lalu keluar / ID diganti'];
                 $result = $scanTable ? $labels[$row->outcome] : (!$row->present ? $changeLabels[$row->change_kind] : ($row->first_scanned_at ? 'Sudah terscan' : 'Belum terscan'));
             @endphp
             <tr>
-                <th scope="row">{{ $number }}@if($snapshot)<small>{{ $snapshot['part_number'] }} · {{ $snapshot['pcs_quantity'] }} PCS</small>@endif</th>
+                <th scope="row">{{ $number }}@if($snapshot)
+                    <small class="opname-document-number">Part dokumen {{ $snapshot['document_part_number'] ?: 'Belum tercatat' }} · {{ $snapshot['pcs_quantity'] }} PCS</small>
+                    @if($snapshot['document_part_number'] !== ($snapshot['part_number'] ?? ''))<small>Label / scan {{ $snapshot['part_number'] }}</small>@endif
+                    @if($snapshot['document_number_current_master'] || $snapshot['document_part_mapping'] === 'unmapped')<small>{{ $snapshot['document_number_note'] }}</small>@endif
+                @endif</th>
                 <td>{{ $snapshot['pallet'] ?? 'Tidak ditemukan' }}<small>{{ $snapshot['location'] ?? '—' }}</small>
                     @if(!$scanTable && $row->change_kind === 'changed')<small>Awal {{ $row->initial_snapshot['pallet'] }} · {{ $row->initial_snapshot['location'] }} · {{ $row->initial_snapshot['pcs_quantity'] }} PCS</small>@endif
                 </td>

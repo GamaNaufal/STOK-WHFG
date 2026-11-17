@@ -1,7 +1,39 @@
 # Reservasi Box Customer Ekspor
 
-Implementasi dan verifikasi: 16 November 2026. Berlaku pada kode checkout ini.
-Migration belum dijalankan pada database operasional atau production.
+Implementasi awal: 16 November 2026. Aktivasi lokal diverifikasi 18 November 2026.
+Database lokal checkout ini sudah diaktifkan; server production belum diaktifkan
+atau diperiksa dalam aktivasi ini.
+
+**Diagnosis dan aktivasi lokal, 18 November 2026**
+
+- Admin Utama sudah memiliki seluruh izin customer. Tombol tambah dan kontrol
+  reservasi tidak muncul karena migration customer masih Pending dan delapan
+  tabel fiturnya belum tersedia. Panduan bergambar sebelumnya memakai database
+  uji terpisah, sehingga tidak membuktikan aktivasi database aplikasi pengguna.
+- Target terverifikasi: `local`, MySQL 8.4.3, `127.0.0.1`, database `db_stock`.
+  Delapan tabel customer sekarang tersedia dan `ready()` bernilai true.
+  `EXPORT_CUSTOMER_STOCK_WRITES_ENABLED` efektif true dari konfigurasi default.
+- Pemeriksaan form juga menemukan tiga prasyarat tertunda: migration nomor part
+  dokumen, versi izin tindakan dan penggunaan ulang nomor box. Ketiganya sudah
+  diperiksa dan dijalankan secara terarah setelah rehearsal salinan database.
+  Tidak menjalankan seeder atau mengisi customer/alias/reservasi contoh.
+- Backup SQL dibuat sebelum setiap tahap dan berhasil dipulihkan ke database
+  salinan pada server MySQL yang sama. Checksum kolom bisnis dan jumlah baris
+  diperiksa sebelum/sesudah; ID, part, PCS, lokasi, tanggal, komitmen dan history
+  lama tetap. Tiga prasyarat menambahkan metadata, mengonversi satu konfigurasi
+  izin tanpa mengubah akses efektif role, dan menambahkan satu audit konversi.
+  Pemetaan dokumen historis tetap null dan box lama tetap Umum. Metadata
+  penggunaan pertama serta versi draft penerimaan mengikuti migration existing.
+- Pemeriksaan render menggunakan Admin Utama lokal berhasil untuk Tambah customer,
+  form master, Reservasi customer, pemilih customer pada penerimaan dan pemetaan
+  master pada form delivery. Pembuatan customer diperiksa pada salinan database;
+  database lokal tidak diisi data contoh. Maintenance sudah dilepas.
+- Regresi SQLite in-memory: 74 tes / 1.256 assertions lulus, meliputi reservasi,
+  migrasinya, nomor dokumen part, izin rinci/manajemen akses dan label reuse.
+  Backup dan laporan privat berada di `storage/app/private/customer-activation-*`
+  serta `storage/app/private/customer-prerequisites-*`, tidak masuk Git.
+- Status ini hanya untuk database lokal tersebut. Deployment production tetap
+  mengikuti runbook di bawah, termasuk verifikasi prasyarat dan seluruh instance.
 
 **Alur operator**
 

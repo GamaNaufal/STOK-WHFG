@@ -10,8 +10,17 @@ use Illuminate\Database\Eloquent\Builder;
 /** Reads physical stock, including expiry/QA and reservations, without applying delivery eligibility filters. */
 class StockOpnameInventory
 {
+    public function __construct(private StockOpnamePartNumbers $partNumbers) {}
+
+    public function preparePartNumbers(iterable $boxes): void
+    {
+        $this->partNumbers->primeNumbers(collect($boxes)->pluck('part_number'));
+    }
+
     public function catalogue(string $scope): Builder
     {
+        // Cache only within one inventory read, never across successive scans or refreshes.
+        $this->partNumbers->reset();
         return $scope === 'export'
             ? ExportStockBox::withTrashed()->with(['currentPallet.plannedPallet', 'expiredHandling'])
             : Box::withTrashed()->with(['pallets.stockLocation', 'expiredHandling']);
@@ -60,7 +69,8 @@ class StockOpnameInventory
 
         return ['id' => $box->id, 'identity_cycle' => (int) $box->identity_cycle, 'box_number' => $box->box_number, 'part_number' => $box->part_number,
             'pcs_quantity' => (int) $box->pcs_quantity, 'pallet' => $pallet ?: 'Belum ada pallet',
-            'location' => $location ?: 'Belum ada lokasi', 'status' => $status, 'present' => $present, 'reason' => $reason];
+            'location' => $location ?: 'Belum ada lokasi', 'status' => $status, 'present' => $present, 'reason' => $reason]
+            + $this->partNumbers->capture((string) $box->part_number);
     }
 
     public function observed(StockOpnameSession $session): array
@@ -72,8 +82,9 @@ class StockOpnameInventory
                 ->orWhere(fn ($current) => $this->onHand($current, $session->scope));
         });
         $snapshots = [];
-        foreach ($query->orderBy('id')->lazyById(500) as $box) {
-            $snapshots[$box->box_number] = $this->snapshot($box, $session->scope);
+        foreach ($query->orderBy('id')->lazyById(500)->chunk(500) as $boxes) {
+            $this->preparePartNumbers($boxes);
+            foreach ($boxes as $box) $snapshots[$box->box_number] = $this->snapshot($box, $session->scope);
         }
 
         return $snapshots;

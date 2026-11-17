@@ -133,3 +133,14 @@ Aktivasi keyboard, validasi, inisialisasi dan reduced motion tetap langsung.
 Gerak dapat dibalik dari pose saat ini, tanpa menahan aksi bisnis. Animasi tabel
 hasil, baris scan dan perpindahan input tidak ditambahkan. Before/after dan
 verifikasi: `docs/UI_CONTEXTUAL_MOTION_2026-11-15.md`.
+
+## Pergantian tampilan stok Ekspor — 18 November 2026
+
+Atas permintaan pengguna, Daftar stok dan Reservasi customer memakai satu kontrol
+dengan indikator geser 200 ms. Pertahankan posisi, ukuran dan header yang sama
+di kedua tampilan. Gerak hanya pada indikator, data tabel tetap diam. Perubahan
+halaman dapat memakai fade 120 ms. Navigasi mulai langsung, tanpa menunggu animasi.
+Keyboard dan reduced motion tetap langsung. Tautan native, Back/Forward, filter
+dan fungsi setiap halaman dipertahankan; browser tanpa View Transitions tetap
+dapat berpindah halaman. Pembatalan navigasi mengembalikan indikator ke halaman
+yang benar.

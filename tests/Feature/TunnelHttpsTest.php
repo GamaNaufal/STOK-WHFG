@@ -18,7 +18,7 @@ class TunnelHttpsTest extends TestCase
             ->withHeader('X-Forwarded-Proto', 'https')
             ->get('http://warehouse-preview.example.test/login')
             ->assertOk()
-            ->assertSee('href="https://warehouse-preview.example.test/css/login-ui.css"', false)
+            ->assertSee('href="https://warehouse-preview.example.test/css/login-ui.css?v=', false)
             ->assertSee('src="https://warehouse-preview.example.test/vendor/bootstrap-5.3.0/dist/js/bootstrap.bundle.min.js"', false)
             ->assertSee('action="https://warehouse-preview.example.test/login"', false)
             ->assertDontSee('http://warehouse-preview.example.test/', false);
@@ -44,7 +44,7 @@ class TunnelHttpsTest extends TestCase
         $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
             ->get('http://localhost:8001/login')
             ->assertOk()
-            ->assertSee('href="http://localhost:8001/css/login-ui.css"', false)
+            ->assertSee('href="http://localhost:8001/css/login-ui.css?v=', false)
             ->assertSee('action="http://localhost:8001/login"', false);
     }
 
@@ -55,6 +55,6 @@ class TunnelHttpsTest extends TestCase
             ->get('http://warehouse-preview.example.test/login')
             ->assertOk()
             ->assertSee('action="http://warehouse-preview.example.test/login"', false)
-            ->assertSee('href="http://warehouse-preview.example.test/css/login-ui.css"', false);
+            ->assertSee('href="http://warehouse-preview.example.test/css/login-ui.css?v=', false);
     }
 }

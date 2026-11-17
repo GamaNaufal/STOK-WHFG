@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exports\StockOpnameExport;
 use App\Models\StockOpnameSession;
 use App\Services\StockOpnameService;
+use App\Services\StockOpnamePartNumbers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -60,8 +61,18 @@ class StockOpnameController extends Controller
                 ->when($search !== '', fn ($q) => $q->where('box_number', 'like', '%'.$search.'%'))->orderBy('id');
         }
         $rows = $query->paginate(20)->appends(['tab' => $tab, 'q' => $search]);
+        $partNumbers = app(StockOpnamePartNumbers::class);
+        $partNumbers->primeSnapshots($rows->getCollection()->flatMap(fn ($row) => $scanTable
+            ? [$row->snapshot] : [$row->initial_snapshot, $row->current_snapshot]));
+        $usesCurrentPartMapping = false;
+        foreach ($rows as $row) {
+            $display = $partNumbers->present($scanTable ? $row->snapshot : $row->current_snapshot);
+            $row->setAttribute('display_snapshot', $display);
+            $usesCurrentPartMapping = $usesCurrentPartMapping || ($display['document_number_current_master'] ?? false);
+        }
         return ['opname' => $opname, 'summary' => $service->summary($opname),
-            'tab' => $tab, 'search' => $search, 'scanTable' => $scanTable, 'rows' => $rows];
+            'tab' => $tab, 'search' => $search, 'scanTable' => $scanTable, 'rows' => $rows,
+            'usesCurrentPartMapping' => $usesCurrentPartMapping];
     }
 
     private function filters(Request $request): array
@@ -105,7 +116,7 @@ class StockOpnameController extends Controller
         $details = $this->details($request, $opname->fresh(), $service);
         return response()->json([
             'outcome' => $scan->outcome, 'box_number' => $scan->input, 'message' => $scan->reason,
-            'snapshot' => $scan->snapshot, 'summary' => $details['summary'],
+            'snapshot' => app(StockOpnamePartNumbers::class)->present($scan->snapshot), 'summary' => $details['summary'],
             'html' => view('stock-opname.results', $context + $details)->render(),
         ])->header('Cache-Control', 'private, no-store');
     }

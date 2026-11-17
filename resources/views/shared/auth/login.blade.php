@@ -327,7 +327,7 @@
             }
         }
     </style>
-    <link rel="stylesheet" href="{{ asset('css/login-ui.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/login-ui.css') }}?v={{ filemtime(public_path('css/login-ui.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/apple-design.css') }}">
 </head>
 <body class="login-apple">
@@ -340,7 +340,7 @@
         </div>
 
         <!-- Right Side - Login Form -->
-        <div class="login-container">
+        <div @class(['login-container', 'login-error-shake' => $errors->has('email') || $errors->has('password')])>
             <!-- Header -->
             <div class="login-header">
                 <div class="icon-box">
@@ -357,7 +357,7 @@
                         <i class="bi bi-exclamation-circle-fill"></i>
                         <div>
                             <strong>Gagal Login</strong><br>
-                            {{ $errors->first('email') }}
+                            {{ $errors->first() }}
                         </div>
                     </div>
                 @endif

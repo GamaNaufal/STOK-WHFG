@@ -1,10 +1,14 @@
 @extends('shared.layouts.app')
 @section('title', 'Reservasi Customer Ekspor')
-@section('styles')<link rel="stylesheet" href="{{ asset('css/pages/export-delivery-plans.css') }}"><link rel="stylesheet" href="{{ asset('css/pages/export-customer-stock.css') }}">@endsection
+@section('styles')
+<link rel="stylesheet" href="{{ asset('css/pages/export-delivery-plans.css') }}">
+<link rel="stylesheet" href="{{ asset('css/pages/export-customer-stock.css') }}?v={{ filemtime(public_path('css/pages/export-customer-stock.css')) }}">
+<link rel="stylesheet" href="{{ asset('css/pages/export-stock-view-switch.css') }}?v={{ filemtime(public_path('css/pages/export-stock-view-switch.css')) }}">
+<script src="{{ asset('js/pages/export-stock-view-switch.js') }}?v={{ filemtime(public_path('js/pages/export-stock-view-switch.js')) }}"></script>
+@endsection
 @section('content')
 <div class="delivery-plan-page customer-stock-page">
-    <header class="plan-header"><div><span class="plan-eyebrow">Pengiriman Ekspor</span><h1>Stok ekspor</h1><p>Lihat pemilik setiap box dan kelola reservasi stok yang belum terikat proses.</p></div><a class="btn btn-outline-primary" href="{{ route('export.receiving.index') }}">Penerimaan box</a></header>
-    <nav class="customer-stock-tabs" aria-label="Tampilan stok"><a href="{{ route('export.stock.index') }}">Daftar stok</a><a href="{{ route('export.stock.index', ['customer_view'=>'reservations']) }}" aria-current="page">Reservasi customer</a></nav>
+    @include('export.stock.header', ['stockView' => 'reservations'])
     @if($errors->any())<div class="alert alert-danger" role="alert"><ul class="mb-0">@foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul></div>@endif
     <p class="alert alert-info">Pilih box untuk menetapkan customer atau melepas reservasi. Penetapan hanya untuk stok umum. Stok customer lain digunakan melalui pengecualian delivery.</p>
     <section class="plan-panel"><form method="GET" class="plan-panel-body"><input type="hidden" name="customer_view" value="reservations"><div class="row g-3 align-items-end"><div class="col-md-4"><label for="reservation-search" class="form-label">Cari box, part atau pallet</label><input class="form-control" id="reservation-search" name="q" maxlength="100" value="{{ $q }}"></div><div class="col-md-3"><label for="reservation-owner" class="form-label">Pemilik stok</label><select id="reservation-owner" name="owner" class="form-select"><option value="">Semua pemilik</option><option value="general" @selected($owner==='general')>Umum</option>@foreach($ownerCustomers as $customer)<option value="{{ $customer->id }}" @selected((string)$owner===(string)$customer->id)>{{ $customer->name }}{{ $customer->is_active ? '' : ', nonaktif' }}</option>@endforeach</select></div><div class="col-md-3"><label for="reservation-process" class="form-label">Status proses</label><select class="form-select" id="reservation-process" name="process"><option value="">Semua status</option><option value="free" @selected($process==='free')>Dapat dikelola</option><option value="locked" @selected($process==='locked')>Terikat / terkunci</option></select></div><div class="col-md-2"><button class="btn btn-outline-primary w-100">Tampilkan</button></div></div></form>

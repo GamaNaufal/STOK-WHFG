@@ -1,6 +1,70 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 16 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 18 November 2026 (pembaruan inkremental).
+
+Pengalih Daftar stok / Reservasi customer, 18 November 2026:
+
+- Header dan pengalih stok Ekspor memakai satu partial, posisi stabil pada kedua
+  tampilan. Indikator transform 200 ms memakai token easing existing; perpindahan
+  dokumen memakai native View Transitions dengan fade 120 ms pada data yang diam.
+  Tidak menunda navigasi, mengganti route, memuat ulang script melalui AJAX,
+  menambah dependency, mengubah data atau menjalankan migration.
+- Keyboard/reduced motion langsung; tautan native tetap berfungsi tanpa JS atau
+  dukungan View Transitions. Pending dibersihkan saat kembali, pembatalan dan
+  navigasi gagal. Izin tombol header dan guard kesiapan customer dipertahankan.
+- 53 tes backend / 784 assertions serta 169 frontend lulus. Chrome memakai SQLite
+  dan akun fiktif memeriksa desktop, 390/320 px, teks 200%, posisi pengalih,
+  filter/Back, keyboard, reduced motion, respons lambat dan pergantian balik.
+  Sampling frame menunjukkan translasi bertahap sampai posisi akhir 200 ms.
+  Tidak menguji scanner atau ponsel fisik dan tidak melakukan deployment production.
+
+Aktivasi lokal fitur customer dan prasyarat, 18 November 2026:
+
+- Keluhan Admin Utama tidak dapat menambah Master Customer disebabkan schema
+  belum diaktifkan, bukan kurang izin. Database lokal MySQL 8.4.3 `db_stock`
+  belum memiliki delapan tabel customer; role admin memiliki keempat izin.
+- Migration customer dan tiga prasyarat tertunda sudah dijalankan secara
+  terarah di database lokal: nomor part dokumen, versi izin rinci, dan penggunaan
+  ulang nomor box. Tidak mengaktifkan atau memverifikasi server production.
+- Backup sebelum setiap tahap berhasil dipulihkan pada database salinan MySQL
+  yang sama. Salinan uji dihapus setelah verifikasi. Pembandingan 69 tabel
+  memverifikasi 816 baris existing, dengan proyeksi kolom bisnis sebelum
+  penambahan metadata. ID/nomor box, part, PCS, lokasi, tanggal, komitmen dan
+  history lama dipertahankan. Satu konfigurasi izin dikonversi ke versi 2 dengan
+  akses efektif identik, disertai satu audit baru. Metadata penggunaan awal dan
+  draft diperiksa; pemetaan dokumen/customer lama tidak diisi otomatis.
+- Render aplikasi lokal sebagai Admin Utama memverifikasi tombol Tambah customer,
+  form master, halaman reservasi, pemilih customer penerimaan dan master customer
+  pada form delivery. Tidak menambahkan customer/box contoh pada database lokal.
+  Sebanyak 74 tes reservasi, dokumen part, izin dan label reuse / 1.256 assertions
+  lulus pada SQLite in-memory. Backup dan laporan checksum tersimpan privat di
+  `storage/app/private/customer-activation-*` dan `customer-prerequisites-*`.
+  Rincian status: docs/CUSTOMER_BOX_RESERVATIONS.md.
+
+Nomor part dokumen dan rincian Stock Opname, 18 November 2026:
+
+- Lokal dan Ekspor menampilkan seluruh nomor dokumen untuk satu part dalam satu
+  kolom pada rincian, feedback scan dan Excel. Nomor label/scan tetap tersedia
+  sebagai acuan. Banyak kode dokumen tidak menggandakan jumlah part/box/PCS.
+- Pemetaan baru dicatat pada JSON kondisi awal, saat scan dan perbandingan akhir.
+  Perubahan alias master tidak dianggap sebagai perubahan stok fisik. Hasil
+  selesai yang sudah menyimpan nomor dokumen memakai catatannya sendiri.
+- Atas pilihan pengguna, catatan lama yang belum memiliki pemetaan memakai
+  Master Part saat ini dengan keterangan eksplisit pada layar dan setiap baris
+  Excel. Pembacaan/unduhan tidak mengubah session, item atau log scan tersimpan.
+  Master yang belum ada memakai nomor label dengan keterangan; pemetaan yang
+  kemudian tersedia dapat ditampilkan sebagai pemetaan terkini.
+- Workbook bertambah dari tiga menjadi 12 tab: Ringkasan, Semua Scan,
+  Rekonsiliasi Box, Rekap per Part, Scan OK, Scan Error NG, Scan Duplikat,
+  Belum Terscan, Box Sesuai, Perubahan Data, Box Masuk, Box Keluar dan ID Diganti.
+  Waktu/operator/alasan, posisi/PCS awal-akhir serta penggunaan ID tersedia.
+- Tanpa migration/backfill, perubahan stok, pengubahan izin atau deployment.
+  Verifikasi SQLite in-memory: 40 tes opname/reuse/master dokumen, 570 assertions
+  lulus; seluruh 169 frontend dan build lulus. Browser memakai akun/SQLite
+  fiktif, desktop/390 px, unduhan XLSX nyata dan audio dimatikan hanya di browser
+  uji agar tidak ditangkap IDM. Dua XLSX dibaca OpenPyXL, 12 tab dirender, dan
+  Excel asli memverifikasi ID berawalan nol serta baris keterangan yang membungkus.
+  Rincian: docs/STOCK_OPNAME_DOCUMENT_PARTS.md.
 
 Reservasi box customer Ekspor, 16 November 2026:
 
@@ -2337,6 +2401,13 @@ Halaman `Lihat Stok` menampilkan stok fisik aktif dan expired, termasuk box tanp
 ### 1. Login, profil, dan otorisasi
 
 - User login melalui email dan password.
+- Login ditolak pada email/password menampilkan getar horizontal panel satu kali
+  selama 240 ms (18 November 2026). Hanya transform, tidak menahan input; reduced
+  motion memakai pesan error statis. Halaman awal/login sukses tidak bergetar.
+  CSS login memakai versi file untuk pembaruan cache. Tidak mengubah autentikasi.
+  Sebelas tes auth/role/HTTPS terkait lulus (245 assertions); browser SQLite
+  fiktif memeriksa password/email salah, Enter, login sukses, normal/reduced
+  motion dan viewport 390 px, tanpa error JavaScript atau overflow halaman.
 - Semua halaman utama dilindungi middleware `auth`.
 - Akun dengan `is_active = false` ditolak saat login dan pada request terautentikasi berikutnya.
 - Hak akses fitur berdasarkan role dikelola melalui `config/feature_access.php` dan tabel `role_feature_access`.

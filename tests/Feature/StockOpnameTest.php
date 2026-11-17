@@ -92,7 +92,9 @@ class StockOpnameTest extends TestCase
             ->assertSee(route('stock-opname.export', $session), false);
 
         $workbook = $this->downloadWorkbook('stock-opname', $session, ['tab' => 'ng', 'q' => 'tidak-ada', 'page' => 2]);
-        $this->assertSame(['Ringkasan', 'Semua Scan', 'Rekonsiliasi Box'], $workbook->getSheetNames());
+        $this->assertSame(['Ringkasan', 'Semua Scan', 'Rekonsiliasi Box', 'Rekap per Part', 'Scan OK',
+            'Scan Error NG', 'Scan Duplikat', 'Belum Terscan', 'Box Sesuai', 'Perubahan Data',
+            'Box Masuk', 'Box Keluar dan ID Diganti'], $workbook->getSheetNames());
         $summary = array_column($workbook->getSheet(0)->toArray(formatData: false), 1, 0);
         $this->assertSame('Lokal', $summary['Lingkup']);
         $this->assertSame(24, $summary['Total scan']);
@@ -105,6 +107,7 @@ class StockOpnameTest extends TestCase
         $this->assertSame(25, $scans->getHighestDataRow());
         $this->assertSame($this->admin->name, $scans->getCell('C2')->getValue());
         $this->assertSame('00000001', $scans->getCell('D2')->getValue());
+        $this->assertSame('@', $scans->getStyle('D2')->getNumberFormat()->getFormatCode());
         $this->assertSame('00123', $scans->getCell('G2')->getValue());
         $this->assertSame(80, $scans->getCell('H2')->getValue());
         $this->assertSame('OK', $scans->getCell('E2')->getValue());
@@ -114,7 +117,7 @@ class StockOpnameTest extends TestCase
         $this->assertSame('NG', $scans->getCell('E4')->getValue());
         $this->assertSame('ID Box harus tepat 8 angka.', $scans->getCell('F4')->getValue());
         $this->assertSame('dd/mm/yyyy hh:mm:ss', $scans->getStyle('B2')->getNumberFormat()->getFormatCode());
-        $this->assertSame('A1:M25', $scans->getAutoFilter()->getRange());
+        $this->assertSame('A1:P25', $scans->getAutoFilter()->getRange());
         $this->assertSame('A2', $scans->getFreezePane());
 
         $items = $workbook->getSheet(2);
@@ -126,6 +129,21 @@ class StockOpnameTest extends TestCase
         $this->assertSame('Belum terscan', $items->getCell('B3')->getValue());
         $this->assertSame('Keluar / ID diganti', $items->getCell('B4')->getValue());
         $this->assertSame('Masuk selama sesi', $items->getCell('C5')->getValue());
+        foreach (['Scan OK' => 3, 'Scan Error NG' => 2, 'Scan Duplikat' => 22, 'Belum Terscan' => 3,
+            'Box Sesuai' => 2, 'Perubahan Data' => 2, 'Box Masuk' => 2, 'Box Keluar dan ID Diganti' => 2] as $title => $rows) {
+            $this->assertSame($rows, $workbook->getSheetByName($title)->getHighestDataRow(), $title);
+        }
+        $this->assertSame('=1+1', $workbook->getSheetByName('Scan Error NG')->getCell('D2')->getValue());
+        $this->assertSame(DataType::TYPE_STRING, $workbook->getSheetByName('Scan Error NG')->getCell('D2')->getDataType());
+        $partSummary = $workbook->getSheetByName('Rekap per Part');
+        $this->assertSame('TOTAL', $partSummary->getCell('A4')->getValue());
+        $this->assertSame(3, $partSummary->getCell('D4')->getValue());
+        $this->assertSame(240, $partSummary->getCell('E4')->getValue());
+        $this->assertSame(3, $partSummary->getCell('F4')->getValue());
+        $this->assertSame(215, $partSummary->getCell('G4')->getValue());
+        $this->assertSame(55, $partSummary->getCell('I4')->getValue());
+        $this->assertSame(160, $partSummary->getCell('K4')->getValue());
+        $this->assertSame(1, $partSummary->getCell('P4')->getValue());
         $workbook->disconnectWorksheets();
     }
 
@@ -157,6 +175,176 @@ class StockOpnameTest extends TestCase
         $this->assertSame(1, $empty->getSheet(2)->getHighestDataRow());
         $this->assertSame(0, array_column($empty->getSheet(0)->toArray(formatData: false), 1, 0)['Total scan']);
         $empty->disconnectWorksheets();
+    }
+
+    public function test_document_numbers_are_recorded_for_both_scopes_and_master_changes_are_not_physical_changes(): void
+    {
+        $part = PartSetting::create(['part_number' => 'OP-A', 'qty_box' => 80]);
+        $part->documentNumbers()->create(['document_number' => 'DOC-001']);
+        $part->documentNumbers()->create(['document_number' => '00077']);
+        foreach (['domestic' => '00000101', 'export' => '00000102'] as $scope => $number) {
+            $box = $scope === 'export' ? $this->export($number) : $this->local($number);
+            $service = app(StockOpnameService::class);
+            $session = $service->start($scope, (string) Str::uuid(), $this->admin);
+            $base = $scope === 'export' ? 'export.stock-opname' : 'stock-opname';
+            $this->scan($session, $number)->assertJsonPath('snapshot.document_part_number', 'DOC-001 / 00077');
+            $this->get(route($base.'.show', ['opname' => $session, 'tab' => 'all']))->assertOk()
+                ->assertSee('Part dokumen DOC-001 / 00077')->assertSee('Label / scan OP-A');
+            $original = $session->items()->sole()->initial_snapshot;
+            $part->documentNumbers()->delete();
+            $part->documentNumbers()->create(['document_number' => 'DOC-AFTER-SCAN']);
+            $service->refresh($session->id);
+            $item = $session->items()->sole();
+            $this->assertSame('unchanged', $item->change_kind);
+            $this->assertSame($original, $item->initial_snapshot);
+            $this->assertSame(['DOC-AFTER-SCAN'], $item->current_snapshot['document_part_numbers']);
+            $this->assertNotNull($item->first_scanned_at);
+            $service->finish($session->id, $this->admin);
+            $part->documentNumbers()->delete();
+            $part->documentNumbers()->create(['document_number' => 'DOC-AFTER-FINISH']);
+            $workbook = $this->downloadWorkbook($base, $session->fresh());
+            $this->assertSame('DOC-001 / 00077', $workbook->getSheetByName('Semua Scan')->getCell('G2')->getValue());
+            $this->assertSame('DOC-001 / 00077', $workbook->getSheetByName('Rekonsiliasi Box')->getCell('G2')->getValue());
+            $this->assertSame('DOC-AFTER-SCAN', $workbook->getSheetByName('Rekonsiliasi Box')->getCell('L2')->getValue());
+            $this->assertSame('OP-A', $workbook->getSheetByName('Semua Scan')->getCell('N2')->getValue());
+            $this->assertSame(1, $workbook->getSheetByName('Rekap per Part')->getCell('D2')->getValue());
+            $this->assertSame(1, $workbook->getSheetByName('Rekap per Part')->getCell('F2')->getValue());
+            $this->assertSame(80, $workbook->getSheetByName('Rekap per Part')->getCell('I2')->getValue());
+            $workbook->disconnectWorksheets();
+            $part->documentNumbers()->delete();
+            $part->documentNumbers()->create(['document_number' => 'DOC-001']);
+            $part->documentNumbers()->create(['document_number' => '00077']);
+            $box->delete();
+        }
+    }
+
+    public function test_old_results_use_current_master_mappings_without_updating_saved_results(): void
+    {
+        $part = PartSetting::create(['part_number' => 'OP-A', 'qty_box' => 80]);
+        $part->documentNumbers()->create(['document_number' => 'DOC-OLD']);
+        foreach (['domestic' => '00000201', 'export' => '00000202'] as $scope => $number) {
+            $scope === 'export' ? $this->export($number) : $this->local($number);
+            $session = $this->start($scope);
+            $this->scan($session, $number)->assertOk();
+            app(StockOpnameService::class)->finish($session->id, $this->admin);
+            // A finished session written before document mappings existed.
+            $item = $session->items()->sole();
+            $old = $item->initial_snapshot;
+            unset($old['document_part_numbers'], $old['document_part_mapping']);
+            $item->update(['initial_snapshot' => $old, 'current_snapshot' => $old]);
+            $session->scans()->update(['snapshot' => json_encode($old)]);
+            $part->documentNumbers()->delete();
+            $part->documentNumbers()->create(['document_number' => 'DOC-CURRENT']);
+            $before = [
+                'session' => $session->fresh()->getAttributes(),
+                'item' => $item->fresh()->getAttributes(),
+                'scan' => $session->scans()->sole()->getAttributes(),
+            ];
+            $base = $scope === 'export' ? 'export.stock-opname' : 'stock-opname';
+            $this->get(route($base.'.show', ['opname' => $session, 'tab' => 'all']))->assertOk()
+                ->assertSee('Part dokumen DOC-CURRENT')->assertSee('Pemetaan Master Part saat ini');
+            $workbook = $this->downloadWorkbook($base, $session->fresh());
+            $this->assertSame('DOC-CURRENT', $workbook->getSheetByName('Semua Scan')->getCell('G2')->getValue());
+            $this->assertSame('DOC-CURRENT', $workbook->getSheetByName('Rekonsiliasi Box')->getCell('L2')->getValue());
+            $this->assertSame('Pemetaan Master Part saat ini', $workbook->getSheetByName('Semua Scan')->getCell('O2')->getValue());
+            $workbook->disconnectWorksheets();
+            $this->assertSame($before, [
+                'session' => $session->fresh()->getAttributes(),
+                'item' => $item->fresh()->getAttributes(),
+                'scan' => $session->scans()->sole()->getAttributes(),
+            ]);
+            // The same old session reflects a later mapping with the same explicit provenance.
+            $part->documentNumbers()->delete();
+            $part->documentNumbers()->create(['document_number' => 'DOC-NEWEST']);
+            $this->get(route($base.'.show', ['opname' => $session, 'tab' => 'scans']))->assertOk()->assertSee('Part dokumen DOC-NEWEST');
+            $scope === 'export' ? ExportStockBox::where('box_number', $number)->delete() : Box::where('box_number', $number)->delete();
+        }
+    }
+
+    public function test_same_number_and_unmapped_parts_are_explicit_and_document_codes_remain_excel_text(): void
+    {
+        $part = PartSetting::create(['part_number' => 'OP-A', 'qty_box' => 80]);
+        $part->documentNumbers()->create(['document_number' => '=DOC(1)']);
+        $part->documentNumbers()->create(['document_number' => '000123']);
+        $this->local('00000301');
+        $same = PartSetting::create(['part_number' => 'SAME-PART', 'qty_box' => 80]);
+        $this->local('00000302', ['part_number' => $same->part_number]);
+        $this->local('00000303', ['part_number' => 'NO-MASTER']);
+        $session = $this->start();
+        $this->scan($session, '00000301')->assertJsonPath('snapshot.document_part_number', '=DOC(1) / 000123');
+        $this->scan($session, '00000302')->assertJsonPath('snapshot.document_part_number', 'SAME-PART')
+            ->assertJsonPath('snapshot.document_part_mapping', 'same_as_label');
+        $this->scan($session, '00000303')->assertJsonPath('snapshot.document_part_number', 'NO-MASTER')
+            ->assertJsonPath('snapshot.document_part_mapping', 'unmapped');
+        app(StockOpnameService::class)->finish($session->id, $this->admin);
+        $workbook = $this->downloadWorkbook('stock-opname', $session->fresh());
+        foreach (['Semua Scan', 'Scan OK'] as $title) {
+            $this->assertSame('=DOC(1) / 000123', $workbook->getSheetByName($title)->getCell('G2')->getValue());
+            $this->assertSame(DataType::TYPE_STRING, $workbook->getSheetByName($title)->getCell('G2')->getDataType());
+            $this->assertStringContainsString('master belum tersedia', $workbook->getSheetByName($title)->getCell('O4')->getValue());
+        }
+        $workbook->disconnectWorksheets();
+        $newMaster = PartSetting::create(['part_number' => 'NO-MASTER', 'qty_box' => 80]);
+        $newMaster->documentNumbers()->create(['document_number' => 'DOC-NOW-MAPPED']);
+        $original = $session->items()->where('box_number', '00000303')->sole()->getAttributes();
+        $this->get(route('stock-opname.show', ['opname' => $session, 'tab' => 'all']))->assertOk()
+            ->assertSee('Part dokumen DOC-NOW-MAPPED')->assertSee('Pemetaan Master Part saat ini');
+        $this->assertSame($original, $session->items()->where('box_number', '00000303')->sole()->getAttributes());
+    }
+
+    public function test_excel_includes_every_chunk_and_preserves_one_part_group_for_multiple_document_numbers(): void
+    {
+        $session = $this->start();
+        app(StockOpnameService::class)->finish($session->id, $this->admin);
+        $part = PartSetting::create(['part_number' => '00017', 'qty_box' => 80]);
+        $part->documentNumbers()->create(['document_number' => 'DOC-A']);
+        $part->documentNumbers()->create(['document_number' => 'DOC-B']);
+        $items = [];
+        for ($i = 1; $i <= 501; $i++) {
+            $number = str_pad((string) $i, 8, '0', STR_PAD_LEFT);
+            $snapshot = json_encode(['id' => $i, 'box_number' => $number, 'part_number' => '00017', 'pcs_quantity' => 80,
+                'pallet' => 'P1', 'location' => 'L1', 'status' => 'active', 'present' => true, 'reason' => '']);
+            $items[] = ['stock_opname_session_id' => $session->id, 'box_number' => $number,
+                'initial_snapshot' => $snapshot, 'current_snapshot' => $snapshot, 'present' => true, 'change_kind' => 'unchanged'];
+        }
+        foreach (array_chunk($items, 100) as $chunk) \Illuminate\Support\Facades\DB::table('stock_opname_items')->insert($chunk);
+        $workbook = $this->downloadWorkbook('stock-opname', $session->fresh(), ['q' => 'does-not-match', 'page' => 3]);
+        $this->assertSame(502, $workbook->getSheetByName('Rekonsiliasi Box')->getHighestDataRow());
+        $this->assertSame('00000501', $workbook->getSheetByName('Rekonsiliasi Box')->getCell('A502')->getValue());
+        $this->assertSame('DOC-A / DOC-B', $workbook->getSheetByName('Belum Terscan')->getCell('L502')->getValue());
+        $this->assertSame(3, $workbook->getSheetByName('Rekap per Part')->getHighestDataRow());
+        $this->assertSame('00017', $workbook->getSheetByName('Rekap per Part')->getCell('B2')->getValue());
+        $this->assertSame(501, $workbook->getSheetByName('Rekap per Part')->getCell('J2')->getValue());
+        $this->assertSame(40080, $workbook->getSheetByName('Rekap per Part')->getCell('K2')->getValue());
+        $workbook->disconnectWorksheets();
+    }
+
+    public function test_receipts_that_leave_and_legacy_active_sessions_keep_consistent_recap_counts(): void
+    {
+        $this->local('00000401');
+        $service = app(StockOpnameService::class);
+        $session = $service->start('domestic', (string) Str::uuid(), $this->admin);
+        $service->scan($session->id, '00000401', (string) Str::uuid(), $this->admin);
+        $item = $session->items()->sole();
+        $old = $item->initial_snapshot;
+        unset($old['document_part_numbers'], $old['document_part_mapping']);
+        $item->update(['initial_snapshot' => $old, 'current_snapshot' => $old]);
+        $service->refresh($session->id);
+        $this->assertSame('unchanged', $item->fresh()->change_kind);
+        $this->assertNotNull($item->fresh()->first_scanned_at);
+        $this->local('00000402')->delete();
+        $service->finish($session->id, $this->admin);
+        $workbook = $this->downloadWorkbook('stock-opname', $session->fresh());
+        $this->assertSame('00000402', $workbook->getSheetByName('Box Masuk')->getCell('A2')->getValue());
+        $this->assertSame('00000402', $workbook->getSheetByName('Box Keluar dan ID Diganti')->getCell('A2')->getValue());
+        $part = $workbook->getSheetByName('Rekap per Part');
+        $this->assertSame(1, $part->getCell('D2')->getValue());
+        $this->assertSame(1, $part->getCell('F2')->getValue());
+        $this->assertSame(1, $part->getCell('H2')->getValue());
+        $this->assertSame(1, $part->getCell('L2')->getValue());
+        $this->assertSame(1, $part->getCell('N2')->getValue());
+        $this->assertSame(0, $part->getCell('P2')->getValue());
+        $workbook->disconnectWorksheets();
     }
 
     public function test_scopes_have_separate_single_active_sessions_and_start_is_idempotent(): void

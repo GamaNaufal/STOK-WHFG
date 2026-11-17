@@ -47,9 +47,13 @@ class StockOpnameSheet extends DefaultValueBinder implements FromGenerator, With
         foreach ($this->headings as $index => $heading) {
             $column = Coordinate::stringFromColumnIndex($index + 1);
             $sheet->getColumnDimension($column)->setWidth($this->widths[$column] ?? max(15, mb_strlen($heading) + 4));
+            if ($heading === 'ID Box' || $heading === 'Input scan / ID Box' || str_starts_with($heading, 'Nomor part')) {
+                $sheet->getStyle($column.':'.$column)->getNumberFormat()->setFormatCode('@');
+            }
         }
         $sheet->freezePane('A2');
-        $sheet->getRowDimension(1)->setRowHeight(22);
+        $sheet->getStyle($sheet->calculateWorksheetDimension())->getAlignment()->setWrapText(true)->setVertical('top');
+        $sheet->getRowDimension(1)->setRowHeight(32);
         if (count($this->headings) > 2) {
             $sheet->setAutoFilter($sheet->calculateWorksheetDimension());
         }

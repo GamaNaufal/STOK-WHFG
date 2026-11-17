@@ -88,7 +88,7 @@ if (page) {
                 feedback.querySelector('[data-opname-outcome]').textContent = {ok: 'OK', ng: 'NG', duplicate: 'Duplikat'}[data.outcome];
                 feedback.querySelector('[data-opname-message]').textContent = data.box_number+' · '+data.message;
                 feedback.querySelector('[data-opname-snapshot]').textContent = data.snapshot
-                    ? data.snapshot.part_number+' · '+data.snapshot.pcs_quantity+' PCS · '+data.snapshot.pallet+' · '+data.snapshot.location : '';
+                    ? (data.snapshot.document_part_number ?? data.snapshot.part_number)+' · '+data.snapshot.pcs_quantity+' PCS · '+data.snapshot.pallet+' · '+data.snapshot.location : '';
                 window.ScanFeedback?.[data.outcome === 'ng' ? 'error' : 'success']();
                 if (data.viewVersion === viewVersion && !results.contains(document.activeElement)) results.innerHTML = data.html;
                 updateSummary(data.summary);
