@@ -47,7 +47,7 @@
                             <i class="bi bi-search" aria-hidden="true"></i> Cari
                         </button>
                     </div>
-                    <div id="palletCodeHint" class="form-text">{{ $exportMove ? 'Pakai kode pallet fisik seperti EX-000001. Picking yang sudah dimulai atau issue picking yang masih terbuka mengunci pallet.' : 'Box assigned atau not-full boleh ikut dipindahkan. Sesi picking berstatus scanning, blocked, atau approved tetap mengunci pallet.' }}</div>
+                    <div id="palletCodeHint" class="form-text">{{ $exportMove ? 'Pakai kode pallet fisik seperti PLT-EXP-001. Picking yang sudah dimulai atau issue picking yang masih terbuka mengunci pallet.' : 'Box assigned atau not-full boleh ikut dipindahkan. Sesi picking berstatus scanning, blocked, atau approved tetap mengunci pallet.' }}</div>
                     <div id="palletSearchStatus" class="move-pallet-search-status d-none" role="status" aria-live="polite"></div>
                     <div id="palletSummary" class="move-pallet-summary mt-4 d-none" aria-live="polite">
                         <div class="move-pallet-summary-head">

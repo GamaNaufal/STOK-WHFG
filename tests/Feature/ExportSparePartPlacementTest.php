@@ -65,6 +65,229 @@ class ExportSparePartPlacementTest extends TestCase
             'request_token' => (string) Str::uuid(), 'destination' => $destinations[$i]])->all();
     }
 
+    private function storedPallet(array $counts, string $code, ?int $limit): ExportStockPallet
+    {
+        $location = ExportMasterLocation::create(['code' => $code]);
+        $rows = $this->boxes($this->batch($counts))->map(fn ($box) => [
+            'id' => $box->id, 'revision' => $box->revision, 'request_token' => (string) Str::uuid(),
+            'location_id' => $location->id, 'box_limit' => $limit,
+        ])->all();
+        app(ExportStockReceivingService::class)->placeMany($rows, $this->operator);
+
+        return $location->stockPallet;
+    }
+
+    public function test_first_part_placement_is_manual_and_next_receipt_recommends_the_same_pallet_without_writing_stock(): void
+    {
+        $batch = $this->batch([1, 0]);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertSee('Pilih penempatan pertama untuk part ini')
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_recommendation'] === null
+                && $groups[0]['spare_default_destination'] === '');
+        $location = ExportMasterLocation::create(['code' => 'RECOMMEND-A1']);
+        $box = $this->boxes($batch)->sole();
+        app(ExportStockReceivingService::class)->place($box->id, ['revision' => $box->revision,
+            'request_token' => (string) Str::uuid(), 'location_id' => $location->id, 'box_limit' => 3], $this->operator);
+        $next = $this->batch([2, 0]);
+        $audits = AuditLog::count();
+        $dates = $this->boxes($next)->pluck('first_received_at')->all();
+
+        $this->get(route('export.receiving.transactions.show', $next))->assertOk()
+            ->assertSee('Tujuan wajib, RECOMMEND-A1')
+            ->assertDontSee('data-spare-use-previous', false)
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_default_destination'] === 'pallet:'.$location->stockPallet->id
+                && $groups[0]['spare_recommendation']['current'] === 1 && $groups[0]['spare_recommendation']['limit'] === 3);
+        $this->assertSame($audits, AuditLog::count());
+        $this->assertDatabaseCount('export_stock_movements', 1);
+        $this->assertEquals($dates, $this->boxes($next)->pluck('first_received_at')->all());
+        $this->assertSame(['received', 'received'], $this->boxes($next)->pluck('state')->all());
+    }
+
+    public function test_overflow_can_fill_previous_pallet_and_split_the_remainder_with_identical_print_and_confirmation(): void
+    {
+        $pallet = $this->storedPallet([2, 1], 'RECOMMEND-MIXED', 4);
+        // Expired stock still takes physical space, including stock of another part.
+        $pallet->boxes()->where('part_setting_id', $this->b->id)->update(['first_received_at' => now()->subMonths(13)]);
+        $batch = $this->batch([3, 0]);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_default_destination'] === ''
+                && $groups[0]['spare_recommendation']['current'] === 3 && $groups[0]['spare_recommendation']['limit'] === 4);
+        $next = ExportMasterLocation::create(['code' => 'RECOMMEND-REMAINDER']);
+        $rows = $this->rows($this->boxes($batch), ['pallet:'.$pallet->id, 'location:'.$next->id, 'location:'.$next->id]);
+        $rows[1]['box_limit'] = $rows[2]['box_limit'] = 2;
+        $this->post(route('export.receiving.transactions.print', $batch), ['spare_placements_json' => json_encode($rows)])
+            ->assertOk()->assertViewHas('guideWarning', null)
+            ->assertViewHas('printGroups', fn ($groups) => count($groups) === 2
+                && count($groups[0]['rows']) === 1 && $groups[0]['load'] === 4 && count($groups[1]['rows']) === 2);
+        $payload = ['return_batch' => $batch->id, 'placements_json' => json_encode($rows)];
+        $this->post(route('export.receiving.place-bulk'), $payload)->assertRedirect();
+        $this->post(route('export.receiving.place-bulk'), $payload)->assertRedirect();
+        $this->assertSame(4, $pallet->boxes()->count());
+        $this->assertSame(2, $next->stockPallet->boxes()->count());
+        $this->assertDatabaseCount('export_stock_movements', 6);
+    }
+
+    public function test_operator_can_use_a_new_pallet_and_next_receipt_follows_its_current_location(): void
+    {
+        $old = $this->storedPallet([1, 0], 'RECOMMEND-OLD', 1);
+        $this->travel(1)->seconds();
+        $new = $this->storedPallet([1, 0], 'RECOMMEND-NEW', 5);
+        $move = app(ExportPalletMoveService::class);
+        $moved = ExportMasterLocation::create(['code' => 'RECOMMEND-MOVED']);
+        $move->move(['pallet_id' => $new->id, 'location_id' => $moved->id,
+            'fingerprint' => $move->inspect($new)['fingerprint'], 'request_token' => (string) Str::uuid()], $this->operator);
+        $batch = $this->batch([1, 0]);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_default_destination'] === 'pallet:'.$new->id
+                && $groups[0]['spare_recommendation']['location'] === 'RECOMMEND-MOVED');
+        $this->assertSame(1, $old->boxes()->count());
+        $this->assertSame(1, $new->boxes()->count());
+        $this->travelBack();
+    }
+
+    public function test_defaults_share_capacity_across_parts_and_a_full_pallet_is_explained_without_selecting_it(): void
+    {
+        $pallet = $this->storedPallet([1, 1], 'RECOMMEND-SHARED', 3);
+        $batch = $this->batch([1, 1]);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_default_destination'] === 'pallet:'.$pallet->id
+                && $groups[1]['spare_default_destination'] === '' && $groups[1]['spare_recommendation']['current'] === 2);
+        $box = $this->boxes($batch)->first();
+        app(ExportStockReceivingService::class)->place($box->id, ['revision' => $box->revision,
+            'request_token' => (string) Str::uuid(), 'pallet_id' => $pallet->id], $this->operator);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertSee('3/3 box · Penuh')
+            ->assertViewHas('groups', fn ($groups) => $groups[1]['spare_default_destination'] === ''
+                && $groups[1]['spare_recommendation']['current'] === 3);
+    }
+
+    public function test_capacity_is_rechecked_if_another_receipt_fills_the_recommended_pallet(): void
+    {
+        $pallet = $this->storedPallet([1, 0], 'RECOMMEND-STALE', 2);
+        $batch = $this->batch([1, 0]);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_default_destination'] === 'pallet:'.$pallet->id);
+        $other = $this->boxes($this->batch([1, 0]))->sole();
+        app(ExportStockReceivingService::class)->place($other->id, ['revision' => $other->revision,
+            'request_token' => (string) Str::uuid(), 'pallet_id' => $pallet->id], $this->operator);
+        $rows = $this->rows($this->boxes($batch), ['pallet:'.$pallet->id]);
+        $this->postJson(route('export.receiving.place-bulk'), ['return_batch' => $batch->id, 'placements_json' => json_encode($rows)])
+            ->assertUnprocessable()->assertJsonValidationErrors('destination');
+        $this->assertSame('received', $this->boxes($batch)->sole()->state);
+        $this->assertDatabaseCount('export_stock_movements', 2);
+    }
+
+    public function test_soft_deleted_stock_does_not_create_a_previous_part_recommendation(): void
+    {
+        $pallet = $this->storedPallet([1, 1], 'RECOMMEND-DELETED', null);
+        $pallet->boxes()->where('part_setting_id', $this->a->id)->firstOrFail()->delete();
+        $batch = $this->batch([1, 1]);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_recommendation'] === null
+                && $groups[1]['spare_default_destination'] === 'pallet:'.$pallet->id
+                && $groups[1]['spare_recommendation']['limit'] === null);
+    }
+
+    public function test_all_boxes_that_fit_must_use_previous_pallet_through_bulk_single_modal_and_print(): void
+    {
+        $pallet = $this->storedPallet([2, 1], 'MANDATORY-A1', 5);
+        $batch = $this->batch([2, 0]);
+        $boxes = $this->boxes($batch);
+        $other = ExportMasterLocation::create(['code' => 'MANDATORY-A2']);
+        $rows = $this->rows($boxes, ['location:'.$other->id, 'location:'.$other->id]);
+        $url = route('export.receiving.place-bulk');
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()->assertSee('Tujuan wajib, MANDATORY-A1')
+            ->assertDontSee('data-spare-new-pallet', false)
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_recommendation']['required'] === true);
+        $this->postJson($url, ['return_batch' => $batch->id, 'placements_json' => json_encode($rows)])
+            ->assertUnprocessable()->assertJsonValidationErrors('destination');
+        $split = $rows;
+        $split[0]['destination'] = 'pallet:'.$pallet->id;
+        $this->postJson($url, ['return_batch' => $batch->id, 'placements_json' => json_encode($split)])
+            ->assertUnprocessable()->assertJsonValidationErrors('destination');
+        // Omitting the receipt context or submitting only one box must not bypass the rule.
+        $this->postJson($url, ['placements_json' => json_encode([$rows[0]])])->assertUnprocessable();
+        $this->postJson(route('export.receiving.place', $boxes[0]), ['revision' => $boxes[0]->revision,
+            'request_token' => (string) Str::uuid(), 'destination' => 'location:'.$other->id])->assertUnprocessable();
+        $html = $this->getJson(route('export.stock.show', $boxes[0]))->assertOk()->json('html');
+        $this->assertStringContainsString('Tujuan wajib', $html);
+        $this->assertStringContainsString('Seluruh 2 box', $html);
+        $this->post(route('export.receiving.transactions.print', $batch), ['spare_placements_json' => json_encode($rows)])
+            ->assertOk()->assertSee('wajib ditempatkan')->assertDontSee('LOKASI: MANDATORY-A2');
+        $this->get(route('export.receiving.transactions.print', $batch))->assertOk()
+            ->assertSee('LOKASI: MANDATORY-A1')->assertViewHas('guideWarning', null);
+        $this->assertFalse($other->fresh()->is_occupied);
+        $this->assertDatabaseCount('export_stock_pallets', 1);
+        $valid = $this->rows($boxes, ['pallet:'.$pallet->id, 'pallet:'.$pallet->id]);
+        $payload = ['return_batch' => $batch->id, 'placements_json' => json_encode($valid)];
+        $this->postJson($url, $payload)->assertRedirect();
+        $this->postJson($url, $payload)->assertRedirect();
+        $this->assertSame(5, $pallet->boxes()->count());
+        $this->assertDatabaseCount('export_stock_movements', 5);
+    }
+
+    public function test_overflow_allows_every_box_to_use_a_new_pallet_in_one_atomic_confirmation(): void
+    {
+        $old = $this->storedPallet([2, 1], 'OVERFLOW-A1', 5);
+        $batch = $this->batch([5, 0]);
+        $target = ExportMasterLocation::create(['code' => 'OVERFLOW-A2']);
+        $rows = $this->rows($this->boxes($batch), array_fill(0, 5, 'location:'.$target->id));
+        $rows = array_map(fn ($row) => $row + ['box_limit' => 5], $rows);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertSee('data-spare-new-pallet', false)
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_recommendation']['required'] === false);
+        $payload = ['return_batch' => $batch->id, 'placements_json' => json_encode($rows)];
+        $this->postJson(route('export.receiving.place-bulk'), $payload)->assertRedirect();
+        $this->postJson(route('export.receiving.place-bulk'), $payload)->assertRedirect();
+        $this->assertSame(3, $old->boxes()->count());
+        $this->assertSame(5, $target->stockPallet->boxes()->count());
+        $this->assertSame('PLT-EXP-002', $target->stockPallet->number);
+        $this->assertDatabaseCount('export_stock_movements', 8);
+    }
+
+    public function test_subset_of_overflow_receipt_uses_the_entire_pending_part_quantity(): void
+    {
+        $old = $this->storedPallet([2, 1], 'SUBSET-A1', 5);
+        $batch = $this->batch([5, 0]);
+        $target = ExportMasterLocation::create(['code' => 'SUBSET-A2']);
+        $boxes = $this->boxes($batch)->take(2);
+        $rows = $this->rows($boxes, array_fill(0, 2, 'location:'.$target->id));
+        $this->postJson(route('export.receiving.place-bulk'), ['placements_json' => json_encode($rows)])->assertRedirect();
+        $this->assertSame(3, $old->boxes()->count());
+        $this->assertSame(2, $target->stockPallet->boxes()->count());
+        $this->assertSame(3, $this->boxes($batch)->where('state', 'received')->count());
+    }
+
+    public function test_new_capacity_is_rechecked_before_an_overflow_choice_is_accepted(): void
+    {
+        $old = $this->storedPallet([2, 1], 'STALE-RULE-A1', 4);
+        $batch = $this->batch([2, 0]);
+        $target = ExportMasterLocation::create(['code' => 'STALE-RULE-A2']);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_recommendation']['required'] === false);
+        $old->update(['box_limit' => 5]);
+        $rows = $this->rows($this->boxes($batch), array_fill(0, 2, 'location:'.$target->id));
+        $this->postJson(route('export.receiving.place-bulk'), ['return_batch' => $batch->id, 'placements_json' => json_encode($rows)])
+            ->assertUnprocessable()->assertJsonValidationErrors('destination');
+        $this->assertFalse($target->fresh()->is_occupied);
+        $this->assertSame(3, $old->boxes()->count());
+    }
+
+    public function test_legacy_receipt_with_unlimited_previous_pallet_is_also_mandatory(): void
+    {
+        $pallet = $this->storedPallet([1, 0], 'LEGACY-RULE-A1', null);
+        $service = app(ExportStockReceivingService::class);
+        $box = $service->receive(['box_number' => (string) ++$this->sequence, 'part_number' => $this->a->part_number,
+            'receive_token' => (string) Str::uuid()], $this->operator);
+        $target = ExportMasterLocation::create(['code' => 'LEGACY-RULE-A2']);
+        $this->get(route('export.receiving.transactions.legacy', $box))->assertOk()->assertSee('Tujuan wajib');
+        $this->postJson(route('export.receiving.place', $box), ['revision' => $box->revision,
+            'request_token' => (string) Str::uuid(), 'destination' => 'location:'.$target->id])->assertUnprocessable();
+        $this->postJson(route('export.receiving.place', $box), ['revision' => $box->revision,
+            'request_token' => (string) Str::uuid(), 'destination' => 'pallet:'.$pallet->id])->assertRedirect();
+        $this->assertSame(2, $pallet->boxes()->count());
+    }
+
     public function test_spare_limit_is_shared_across_parts_and_survives_pallet_move(): void
     {
         $batch = $this->batch([2, 1]);
@@ -158,7 +381,9 @@ class ExportSparePartPlacementTest extends TestCase
         $this->assertDatabaseCount('export_stock_movements', 8);
         $this->get(route('export.receiving.index'))->assertViewHas('transactions', fn ($rows) => $rows->isEmpty());
         $next = $this->batch([1, 0]);
-        $this->get(route('export.receiving.transactions.show', $next))->assertSee('Belum dipilih')->assertDontSee('Seluruh box pada transaksi ini sudah ditempatkan.');
+        $this->get(route('export.receiving.transactions.show', $next))->assertSee('Tujuan wajib, SPARE-ONE')
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['spare_default_destination'] === 'pallet:'.$one->stockPallet->id)
+            ->assertDontSee('Seluruh box pada transaksi ini sudah ditempatkan.');
     }
 
     public function test_confirming_one_part_exposes_the_new_pallet_to_the_remaining_part_in_that_batch(): void
@@ -238,6 +463,9 @@ class ExportSparePartPlacementTest extends TestCase
             'pallets' => [['master_location_id' => $target->id, 'items' => [['part_setting_id' => $this->a->id, 'box_quantity' => 1]]]]], $this->operator);
         $batch = $this->batch([1, 1]);
         $boxes = $this->boxes($batch);
+        $this->get(route('export.receiving.transactions.show', $batch))->assertOk()
+            ->assertViewHas('groups', fn ($groups) => $groups[0]['planned'] !== null
+                && ! array_key_exists('spare_recommendation', $groups[0]));
         $spare = ExportMasterLocation::create(['code' => 'SPARE']);
         $rows = $this->rows($boxes, ['location:'.$spare->id, 'location:'.$spare->id]);
         $this->postJson(route('export.receiving.place-bulk'), ['return_batch' => $batch->id, 'placements_json' => json_encode($rows)])->assertUnprocessable();

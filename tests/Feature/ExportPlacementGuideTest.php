@@ -54,7 +54,7 @@ class ExportPlacementGuideTest extends TestCase
         $first = \App\Models\ExportStockBox::where('box_number', '00000201')->firstOrFail();
         $source = ExportMasterLocation::create(['code' => 'GUIDE-SOURCE']);
         $target = ExportMasterLocation::create(['code' => 'GUIDE-TARGET']);
-        app(ExportStockReceivingService::class)->place($first->id, ['revision' => $first->revision, 'request_token' => (string) Str::uuid(), 'location_id' => $source->id], $actor);
+        app(ExportStockReceivingService::class)->place($first->id, ['revision' => $first->revision, 'request_token' => (string) Str::uuid(), 'location_id' => $source->id, 'box_limit' => 1], $actor);
         $audits = AuditLog::count();
         $this->get(route('export.receiving.transactions.print', ['batch' => $batch->id, 'spare_destination' => 'location:'.$target->id]))
             ->assertOk()->assertSee('LOKASI: GUIDE-TARGET')->assertSee('LOKASI: GUIDE-SOURCE')->assertViewHas('guideWarning', null)

@@ -2,11 +2,23 @@
     $placementTokens=collect($group['placements'])->keyBy('id');
     $spareBoxes=$group['actionable']->map(fn($box)=>['id'=>$box->id,'revision'=>$box->revision,
         'request_token'=>$placementTokens[$box->id]['request_token'],'box_number'=>$box->box_number,'part_number'=>$box->part_number])->values();
+    $recommendation = $group['spare_recommendation'] ?? null;
+    $mandatory = $recommendation['required'] ?? false;
 @endphp
 <div class="receiving-spare-placement" data-spare-placement data-part="{{ $group['part_number'] }}" data-key="{{ $group['key'] }}" data-warning-at="{{ \App\Support\ExportPalletLoad::WARNING_AT }}" data-danger-at="{{ \App\Support\ExportPalletLoad::DANGER_AT }}">
     <div class="receiving-split-heading"><div><label class="form-label" for="group-destination-{{ $group['key'] }}">Tujuan {{ $group['pending']->count() }} box · {{ $group['part_number'] }}</label><p class="plan-help mb-0">Urutan box mengikuti penerimaan pertama. Konfirmasi setelah peletakan fisik sesuai pembagian.</p></div><button type="button" class="btn btn-outline-primary" data-split-toggle hidden aria-expanded="false">Bagi ke beberapa tujuan</button></div>
+    <div class="receiving-spare-recommendation" data-spare-recommendation-panel>
+        <strong>{{ $recommendation ? ($mandatory ? 'Tujuan wajib, ' : 'Lokasi part sebelumnya, ').$recommendation['location'] : 'Pilih penempatan pertama untuk part ini' }}</strong>
+        <p class="plan-help mb-0" data-spare-recommendation-message role="status">@if($recommendation)Part {{ $group['part_number'] }} sebelumnya ditempatkan pada {{ $recommendation['number'] }} di {{ $recommendation['location'] }}. Isi {{ $recommendation['current'] }} box, {{ $recommendation['limit'] === null ? 'tanpa batas box' : 'maksimal '.$recommendation['limit'].' box' }}. Batas menghitung seluruh nomor part dalam pallet.@if($mandatory) Seluruh tambahan masih muat, wajib ditempatkan pada pallet ini.@endif @else Belum ada pallet cadangan berisi part ini. Pilih lokasi kosong dan atur maksimal box pallet baru, atau pilih pallet ekspor yang tersedia.@endif</p>
+        @if($recommendation && !$mandatory)
+            <div class="plan-inline-actions mt-3" data-spare-recommendation-actions hidden>
+                <button type="button" class="btn btn-outline-primary" data-spare-use-previous></button>
+                <button type="button" class="btn btn-outline-primary" data-spare-new-pallet>Pallet baru untuk seluruh {{ $spareBoxes->count() }} box</button>
+            </div>
+        @endif
+    </div>
     <div data-spare-single data-spare-destination>
-        <select class="form-select mb-3" id="group-destination-{{ $group['key'] }}" name="destination" required data-incoming-count="{{ $group['pending']->count() }}" data-spare-single-select><option value="">Pilih lokasi kosong atau pallet ekspor</option>@include('export.receiving.destination-options')</select>
+        <select class="form-select mb-3" id="group-destination-{{ $group['key'] }}" name="destination" required data-incoming-count="{{ $group['pending']->count() }}" data-spare-single-select><option value="" @disabled($mandatory)>Pilih lokasi kosong atau pallet ekspor</option>@include('export.receiving.destination-options', ['selectedDestination' => $group['spare_default_destination'] ?? '', 'requiredDestination' => $mandatory ? $recommendation['destination'] : null])</select>
         @include('export.receiving.box-limit-field')
     </div>
     <div data-spare-split hidden><div data-spare-allocation-rows></div><button type="button" class="btn btn-outline-primary mb-3" data-add-spare-destination>Tambah tujuan</button></div>
@@ -15,4 +27,5 @@
     <details class="receiving-spare-preview" data-spare-preview hidden><summary>Rincian box dan tujuan pilihan</summary><div class="plan-table-scroll" role="region" tabindex="0" aria-label="Pembagian box {{ $group['part_number'] }}"><table class="table plan-table"><thead><tr><th>ID Box</th><th>Nomor part</th><th>Pallet / lokasi tujuan</th></tr></thead><tbody data-spare-preview-rows></tbody></table></div></details>
     <template data-spare-allocation-template><div class="receiving-spare-allocation"><div><label data-allocation-qty-label>Jumlah box</label><input class="form-control" type="number" min="1" step="1" inputmode="numeric" data-spare-quantity></div><div data-spare-destination><label data-allocation-target-label>Lokasi / pallet tujuan</label><select class="form-select" data-spare-target></select>@include('export.receiving.box-limit-field')</div><button type="button" class="btn btn-outline-danger" data-remove-spare-destination aria-label="Hapus tujuan">Hapus</button></div></template>
     <script type="application/json" data-spare-boxes>{!! json_encode($spareBoxes,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
+    <script type="application/json" data-spare-recommendation>{!! json_encode($recommendation,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) !!}</script>
 </div>

@@ -51,9 +51,10 @@ class ExportStockController extends Controller
         $spareCount = $stockCounts['spare'];
         $customers = $readiness->customers();
         $choices = $selected && !$selected->fulfillment && $request->user()->canAccessRoute('export.receiving.place') ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
+        $sparePlacementRule = $selected ? app(\App\Services\ExportSparePlacementPolicy::class)->forReceipts(collect([$selected]), $choices['pallets'])->get($selected->id) : null;
         $selectedLoad = $selected?->fulfillment ? $view->groups(collect([$selected]))->first()['load'] : null;
         return response()->view('export.stock.index', $results + $readinessData
-            + compact('selected', 'selectedLoad', 'storedCount', 'spareCount', 'stockCounts', 'customers', 'search', 'status', 'filterLocations') + $choices)
+            + compact('selected', 'selectedLoad', 'sparePlacementRule', 'storedCount', 'spareCount', 'stockCounts', 'customers', 'search', 'status', 'filterLocations') + $choices)
             ->header('Cache-Control', 'private, no-store')->header('Vary', 'Accept');
     }
 
@@ -90,8 +91,9 @@ class ExportStockController extends Controller
     {
         $stockBox->load($view::RELATIONS);
         $choices = !$stockBox->fulfillment && $request->user()->canAccessRoute('export.receiving.place') ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
+        $sparePlacementRule = app(\App\Services\ExportSparePlacementPolicy::class)->forReceipts(collect([$stockBox]), $choices['pallets'])->get($stockBox->id);
         $selectedLoad = $stockBox->fulfillment ? $view->groups(collect([$stockBox]))->first()['load'] : null;
-        return response()->json(['html' => view('export.stock.box-detail', ['selected' => $stockBox, 'selectedLoad' => $selectedLoad] + $choices)->render()])
+        return response()->json(['html' => view('export.stock.box-detail', ['selected' => $stockBox, 'selectedLoad' => $selectedLoad, 'sparePlacementRule' => $sparePlacementRule] + $choices)->render()])
             ->header('Cache-Control', 'private, no-store');
     }
 }

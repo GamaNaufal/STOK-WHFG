@@ -87,6 +87,7 @@ class ExportReceivingTransactionController extends Controller
         $receipt['placed'] = $receipt['total'] - $receipt['pending'] - $receipt['redirected'] - $receipt['qa'];
         $needsChoices = $groups->contains(fn ($group) => ! $group['planned'] && $group['actionable']->isNotEmpty());
         $choices = $needsChoices ? $view->choices() : ['pallets' => collect(), 'locations' => collect()];
+        $groups = $view->recommendSpareLocations($groups, $choices['pallets']);
 
         return view('export.receiving.transaction', compact('batch', 'groups', 'receipt', 'returnBox') + $choices);
     }

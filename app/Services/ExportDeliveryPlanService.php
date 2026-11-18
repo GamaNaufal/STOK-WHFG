@@ -65,6 +65,28 @@ class ExportDeliveryPlanService
             $customerReady = app(ExportCustomerStockPolicy::class)->ready();
             $customerId = ! empty($data['customer_id']) ? (int) $data['customer_id'] : null;
             $previousCustomerId = $id ? app(ExportCustomerStockPolicy::class)->customerId($plan) : null;
+            $requiresMaster = $customerReady && (int) ($data['customer_reference_version'] ?? 0) === 1
+                && (! $id || $previousCustomerId || trim($data['customer_name']) !== $plan->customer_name);
+            $nameMatch = null;
+            if (! $customerId && $requiresMaster) {
+                // Resolve the submitted name/alias on the server as well. A restored
+                // form or an older browser bundle may not have filled its hidden ID.
+                $nameMatch = $previousCustomerId && trim($data['customer_name']) === $plan->customer_name
+                    ? ['status' => 'matched', 'customer_id' => $previousCustomerId]
+                    : app(ExportCustomerService::class)->resolve($data['customer_name']);
+                if ($nameMatch['status'] !== 'matched') {
+                    throw ValidationException::withMessages(['customer_id' => 'Nama, kode atau alias customer belum cocok dengan master aktif. Pilih customer master sebelum menyimpan rencana.']);
+                }
+                $customerId = (int) $nameMatch['customer_id'];
+                $data['customer_id'] = $customerId;
+            }
+            if ($customerId && $customerReady && (int) ($data['customer_reference_version'] ?? 0) === 1
+                && ! ($id && $previousCustomerId === $customerId && trim($data['customer_name']) === $plan->customer_name)) {
+                $nameMatch ??= app(ExportCustomerService::class)->resolve($data['customer_name']);
+                if ($nameMatch['status'] === 'matched' && (int) $nameMatch['customer_id'] !== $customerId) {
+                    throw ValidationException::withMessages(['customer_id' => 'Nama atau alias customer tidak sesuai dengan pilihan master. Pilih ulang customer sebelum menyimpan.']);
+                }
+            }
             if (! array_key_exists('customer_id', $data) && $previousCustomerId) {
                 $customerId = $previousCustomerId;
                 if (trim($data['customer_name']) !== $plan->customer_name) throw ValidationException::withMessages(['customer_id' => 'Pilih identitas master untuk mengganti customer rencana yang sudah dipetakan.']);
@@ -73,7 +95,7 @@ class ExportDeliveryPlanService
             if ($customerId) {
                 if (! $customerReady) throw ValidationException::withMessages(['customer_id' => 'Master customer belum tersedia.']);
                 $masterCustomer = $customerId === $previousCustomerId ? \App\Models\ExportCustomer::findOrFail($customerId) : app(ExportCustomerService::class)->active($customerId);
-            } elseif ($customerReady && (int) ($data['customer_reference_version'] ?? 0) === 1 && (! $id || $previousCustomerId || trim($data['customer_name']) !== $plan->customer_name)) {
+            } elseif ($requiresMaster) {
                 throw ValidationException::withMessages(['customer_id' => 'Pilih customer master sebelum menyimpan rencana.']);
             }
             if ($id && $previousCustomerId !== $customerId && \App\Models\ExportFulfillmentBox::whereHas('plannedItem.pallet.palletPlan', fn ($q) => $q->where('export_delivery_plan_id', $plan->id))->exists()) {
@@ -143,7 +165,8 @@ class ExportDeliveryPlanService
                 'created_by' => $id ? $plan->created_by : $actor->id, 'updated_by' => $actor->id,
             ])->save();
             if ($customerReady && array_key_exists('customer_id', $data)) {
-                if ($customerId) $plan->customerLink()->updateOrCreate([], ['export_customer_id' => $customerId, 'source_name' => $data['customer_source_name'] ?? trim($data['customer_name'])]);
+                if ($customerId) $plan->customerLink()->updateOrCreate([], ['export_customer_id' => $customerId,
+                    'source_name' => trim($data['customer_source_name'] ?? '') !== '' ? $data['customer_source_name'] : trim($data['customer_name'])]);
                 elseif (! $previousCustomerId) { /* Legacy unlinked plans remain unlinked. */ }
                 else throw ValidationException::withMessages(['customer_id' => 'Hubungan customer tidak boleh dihapus dari rencana yang sudah dipetakan.']);
             }

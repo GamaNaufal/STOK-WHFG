@@ -72,7 +72,11 @@ class ExportPalletLoadTest extends TestCase
         $yellow = $this->pallet(34); $red = $this->pallet(70); $batch = $this->batch(2); $audits = AuditLog::count();
         $this->get(route('export.receiving.transactions.show',$batch))->assertOk()->assertSee('data-incoming-count="2"',false)
             ->assertSee('data-box-count="34"',false)->assertSee('data-box-count="70"',false);
-        foreach ([[$yellow,36],[$red,72]] as [$target,$total]) $this->get(route('export.receiving.transactions.print',[
+        // The newer same-part pallet is compulsory while it has room. The older
+        // choice is rejected by the guide instead of showing an invalid target.
+        $this->get(route('export.receiving.transactions.print', ['batch' => $batch->id, 'spare_destination' => 'pallet:'.$yellow->id]))
+            ->assertOk()->assertSee('wajib ditempatkan')->assertDontSee('LOKASI: '.$yellow->location_code);
+        foreach ([[$red,72]] as [$target,$total]) $this->get(route('export.receiving.transactions.print',[
             'batch' => $batch->id,'spare_destination' => 'pallet:'.$target->id,
         ]))->assertOk()->assertViewHas('printGroups',fn ($groups) => $groups[0]['load'] === $total)->assertSee($total.' box');
         $box = ExportStockBox::whereNull('current_pallet_id')->firstOrFail();

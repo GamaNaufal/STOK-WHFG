@@ -26,6 +26,7 @@ use Tests\TestCase;
 class ExportRecommendationTransactionsTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\SeedsExistingExportStock;
 
     private User $operator;
 
@@ -62,14 +63,8 @@ class ExportRecommendationTransactionsTest extends TestCase
 
     private function store($boxes, ?int $sourceId = null): int
     {
-        $location = $sourceId ? null : $this->location();
-        foreach ($boxes as $box) {
-            app(ExportStockReceivingService::class)->place($box->id, ['revision' => $box->fresh()->revision,
-                'request_token' => (string) Str::uuid()] + ($sourceId ? ['pallet_id' => $sourceId] : ['location_id' => $location->id]), $this->operator);
-            $sourceId ??= $box->fresh()->current_pallet_id;
-        }
-
-        return $sourceId;
+        $destination = $sourceId ? \App\Models\ExportStockPallet::findOrFail($sourceId) : $this->location();
+        return $this->storeExistingExportBoxes(collect($boxes), $this->operator, $destination)->id;
     }
 
     private function batch(int $count)

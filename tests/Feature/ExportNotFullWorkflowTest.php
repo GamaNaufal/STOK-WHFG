@@ -30,6 +30,7 @@ use Tests\TestCase;
 class ExportNotFullWorkflowTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\SeedsExistingExportStock;
 
     private User $admin;
 
@@ -90,7 +91,8 @@ class ExportNotFullWorkflowTest extends TestCase
         $box = $s->receive(['box_number' => str_pad((string) ++$this->sequence, 8, '0', STR_PAD_LEFT), 'part_number' => '99', 'receive_token' => (string) Str::uuid()], $this->operator, false, now()->subDays($days));
         $loc = ExportMasterLocation::create(['code' => 'SPARE-'.++$this->places]);
 
-        return $s->place($box->id, ['revision' => $box->revision, 'request_token' => (string) Str::uuid(), 'location_id' => $loc->id], $this->operator);
+        $this->storeExistingExportBoxes(collect([$box]), $this->operator, $loc);
+        return $box->fresh();
     }
 
     private function nf(ExportDeliveryPlan $d): ExportNotFullRequest
@@ -258,7 +260,7 @@ class ExportNotFullWorkflowTest extends TestCase
             $b = ExportStockBox::create(['box_number' => '8000000'.($i + 1), 'part_setting_id' => $this->part->id, 'part_number' => '99', 'pcs_quantity' => 20,
                 'standard_pcs_quantity' => 80, 'is_not_full' => true, 'origin' => 'external', 'state' => 'received', 'receive_token' => (string) Str::uuid(), 'first_received_at' => now()->subDays($days), 'received_by' => $this->admin->id]);
             $loc = ExportMasterLocation::create(['code' => 'PARTIAL-'.$i]);
-            app(ExportStockReceivingService::class)->place($b->id, ['revision' => 1, 'request_token' => (string) Str::uuid(), 'location_id' => $loc->id], $this->admin);
+            $this->storeExistingExportBoxes(collect([$b]), $this->admin, $loc);
         }
         $d = $this->finalize($this->delivery());
         $r = $this->nf($d);

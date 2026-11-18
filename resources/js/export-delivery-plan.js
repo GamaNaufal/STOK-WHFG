@@ -1,6 +1,7 @@
 import { parseCount, checkRows } from './export-delivery/document-parser.mjs';
 import {attachSuggestions} from './components/search-suggestions.mjs';
 import {createSurfaceMotion, animateCue} from '../../public/js/ui-motion.js';
+import {createCustomerReference} from './export-delivery/customer-reference.mjs';
 
 const page=document.getElementById('delivery-plan-editor');
 if(page) {
@@ -10,14 +11,14 @@ if(page) {
     const planCode=byId('plan-code'),customer=byId('plan-customer'),deadline=byId('plan-deadline'),sourceType=byId('plan-source-type'),sourceName=byId('plan-source-name');
     const customerId=byId('plan-customer-id'),customerSource=byId('plan-customer-source');
     const customerCatalog=JSON.parse(byId('plan-customer-bootstrap')?.textContent ?? '[]');
-    const initialCustomerId=customerId?.value ?? '';
-    const normalizeCustomer=value=>value.trim().replace(/\s+/gu,' ').toLocaleLowerCase();
-    const resolveCustomer=()=>{
-        if(!customerId)return;
-        const matches=customerCatalog.filter(c=>c.labels.includes(normalizeCustomer(customer.value))&&(c.active||String(c.id)===initialCustomerId));
-        customerId.value=matches.length===1?String(matches[0].id):'';
-        byId('plan-customer-match').textContent=matches.length===1?'Terhubung ke '+matches[0].name:customer.value===customerId.dataset.legacyName?'Customer historis belum dipetakan, stok umum tetap dapat dipakai.':'Belum cocok, pilih customer master pada kolom ini.';
-    };
+    const customerReference=createCustomerReference({input:customer,idInput:customerId,sourceInput:customerSource,
+        status:byId('plan-customer-match'),catalog:customerCatalog,onChange:()=>refresh(),
+        lookup:page.dataset.customerMatchUrl ? async (name,{signal})=>{
+            const url=new URL(page.dataset.customerMatchUrl,document.baseURI);url.searchParams.set('q',name);
+            const response=await fetch(url,{signal,headers:{Accept:'application/json'}});
+            if(!response.ok)throw new Error('Customer belum dapat diperiksa.');
+            return response.json();
+        } : null});
     const reviewed=byId('plan-reviewed'),reviewPanel=byId('plan-review'),save=byId('plan-save');
     const status=byId('plan-import-status');
     const statusMessage=status.querySelector('[data-import-message]'),statusIcon=status.querySelector('[data-import-icon]');
@@ -87,19 +88,11 @@ if(page) {
         form.setAttribute('aria-busy',String(value));
         refresh();
     };
-    const capture=()=>({plan_code:planCode.value,customer_name:customer.value,customer_id:customerId?.value ?? '',customer_source_name:customerSource?.value ?? '',delivery_deadline:deadline.value,items:rows(),source_type:sourceType.value,source_name:sourceName.value,reviewed:reviewed.checked,warnings:[...importWarnings]});
+    const capture=()=>({plan_code:planCode.value,...customerReference.capture(),delivery_deadline:deadline.value,items:rows(),source_type:sourceType.value,source_name:sourceName.value,reviewed:reviewed.checked,warnings:[...importWarnings]});
     const apply=(data,type,name)=>{
         undo=capture();
         planCode.value=data.plan_code ?? '';
-        customer.value=data.customer_name ?? '';
-        if(customerSource)customerSource.value=data.customer_name ?? '';
-        if(customerId){
-            resolveCustomer();
-            if(data.customer_match?.status==='matched'){
-                customerId.value=String(data.customer_match.customer_id);customer.value=data.customer_match.customer_name;
-                byId('plan-customer-match').textContent='Terhubung ke '+data.customer_match.customer_name;
-            }else if(data.customer_match){customerId.value='';byId('plan-customer-match').textContent=data.customer_match.message ?? 'Pilih customer master.';}
-        }
+        customerReference.applyImport(data);
         if(data.delivery_deadline) deadline.value=data.delivery_deadline;
         body.replaceChildren();data.items.forEach(row=>addRow(row,true));
         sourceType.value=type;sourceName.value=String(name).slice(0,255);reviewed.checked=false;dirty=true;
@@ -124,12 +117,12 @@ if(page) {
         addRow();dirty=true;reviewed.checked=false;refresh();body.lastElementChild.querySelector('.plan-part').focus();
     });
     [planCode,customer,deadline].forEach(input=>input.addEventListener('input',()=>{dirty=true;if(sourceType.value!=='manual')reviewed.checked=false;refresh();}));
-    customer.addEventListener('input',()=>{resolveCustomer();refresh();});
+    customer.addEventListener('input',()=>customerReference.sync({edited:true,lookupMissing:true}));
+    customer.addEventListener('change',()=>customerReference.sync({edited:true,lookupMissing:true,immediate:true}));
     reviewed.addEventListener('change',refresh);
     byId('plan-undo-import').addEventListener('click',()=>{
-        if(!undo)return;planCode.value=undo.plan_code;customer.value=undo.customer_name;deadline.value=undo.delivery_deadline;
-        if(customerId)customerId.value=undo.customer_id;if(customerSource)customerSource.value=undo.customer_source_name;
-        if(customerId)byId('plan-customer-match').textContent=customerId.value?'Pemetaan customer sebelumnya dipulihkan.':'Customer belum dipetakan.';
+        if(!undo)return;planCode.value=undo.plan_code;deadline.value=undo.delivery_deadline;
+        customerReference.restore(undo);
         body.replaceChildren();undo.items.forEach(row=>addRow(row,true));
         sourceType.value=undo.source_type;sourceName.value=undo.source_name;reviewed.checked=undo.reviewed;
         displayWarnings(undo.warnings);
@@ -161,10 +154,11 @@ if(page) {
     });
     form.addEventListener('submit',event=>{
         if(submitting){event.preventDefault();return;}
+        customerReference.sync({lookupMissing:true,immediate:true});
         refresh();if(save.disabled || !form.reportValidity()){event.preventDefault();return;}
         submitting=true;save.disabled=true;save.textContent='Menyimpan…';form.setAttribute('aria-busy','true');
     });
-    window.addEventListener('pageshow',()=>{submitting=false;save.textContent='Simpan rencana';form.setAttribute('aria-busy',String(busy));refresh();});
+    window.addEventListener('pageshow',()=>{submitting=false;save.textContent='Simpan rencana';form.setAttribute('aria-busy',String(busy));customerReference.sync({lookupMissing:true,immediate:true});refresh();});
     window.addEventListener('beforeunload',event=>{if(dirty&&!submitting){event.preventDefault();event.returnValue='';}});
-    initial.rows.forEach(row=>addRow(row,Boolean(row.part_number)));refresh();
+    initial.rows.forEach(row=>addRow(row,Boolean(row.part_number)));customerReference.sync({lookupMissing:true,immediate:true});refresh();
 }

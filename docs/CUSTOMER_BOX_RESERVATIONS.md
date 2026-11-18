@@ -4,6 +4,12 @@ Implementasi awal: 16 November 2026. Aktivasi lokal diverifikasi 18 November 202
 Database lokal checkout ini sudah diaktifkan; server production belum diaktifkan
 atau diperiksa dalam aktivasi ini.
 
+Pembaruan pencocokan nama/alias 18 November 2026, form customer kini menyelaraskan
+ID dan memeriksa master yang baru ditambahkan, backend form versi 1 juga dapat
+mencocokkan nama/kode/alias saat hidden ID kosong. Konflik Excel dan kompatibilitas
+integrasi lama tetap dijaga. Diagnosis perangkat lain, verifikasi dan paket
+penerapan: [Perbaikan pencocokan customer](EXPORT_CUSTOMER_MATCHING_FIX_2026-11-18.md).
+
 **Diagnosis dan aktivasi lokal, 18 November 2026**
 
 - Admin Utama sudah memiliki seluruh izin customer. Tombol tambah dan kontrol

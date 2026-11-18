@@ -8,6 +8,7 @@
             $canMoveSpare = $selected->state === 'stored' && !$commitment;
             $waitingForReview = $commitment?->awaitsQueueAcknowledgment() ?? false;
             $needsPicking = $needsPlacement && $selected->current_pallet_id && ($commitment?->requires_scan ?? $commitment?->picking_required) && !$commitment?->picking_ready;
+            $requiredSpare = $sparePlacementRule['required'] ?? false;
         @endphp
         <div class="receiving-box-heading"><div><span class="plan-eyebrow">Box ekspor</span><h3>{{ $selected->box_number }}</h3><p>{{ $selected->part_number }} · {{ number_format($selected->pcs_quantity, 0, ',', '.') }} PCS</p></div><div>@include(($stockContext ?? false) ? 'export.stock.box-status' : 'export.receiving.box-status', ['box' => $selected])</div></div>
         @if($selected->currentPallet)<p class="plan-help mb-3">Posisi saat ini: {{ $selected->currentPallet->display_name }} · lokasi {{ $selected->currentPallet->location_code }}.</p>@endif
@@ -16,7 +17,11 @@
             @if($selectedLoad ?? null)<div class="mb-3"><p class="plan-help mb-2">Isi pallet {{ $selectedLoad['current'] }} box + {{ $selectedLoad['incoming'] }} box masuk. Total setelah penempatan:</p><x-export-pallet-load :boxes="$selectedLoad['total']" /></div>@endif
             <p class="plan-help mb-3">Tujuan sudah direservasi. Konfirmasikan setelah box benar-benar berada di lokasi ini.</p>
         @elseif($needsPlacement)
-            <p class="plan-help mb-3">Box ini belum memiliki reservasi kebutuhan. Pilih lokasi kosong atau pallet ekspor yang sudah ada untuk stok cadangan.</p>
+            @if($requiredSpare)
+                <div class="receiving-target"><span>Tujuan wajib</span><strong>{{ $sparePlacementRule['number'] }} · {{ $sparePlacementRule['location'] }}</strong><p>Seluruh {{ $sparePlacementRule['quantity'] }} box part ini pada penerimaan masih muat. Wajib memakai pallet sebelumnya, tujuan tidak dapat diganti.</p></div>
+            @else
+                <p class="plan-help mb-3">Box ini belum memiliki reservasi kebutuhan. Pilih lokasi kosong atau pallet ekspor yang sudah ada untuk stok cadangan.</p>
+            @endif
         @else
             <p class="receiving-complete">Penempatan sudah dikonfirmasi.</p>
         @endif
@@ -27,8 +32,8 @@
             <form method="POST" action="{{ route('export.receiving.place', $selected) }}" id="export-place-form">
                 @csrf<input type="hidden" name="revision" value="{{ $selected->revision }}"><input type="hidden" name="request_token" value="{{ (string) \Illuminate\Support\Str::uuid() }}">
                 @unless($commitment)
-                    <label class="form-label" for="receiving-destination">Penempatan stok cadangan</label><select class="form-select mb-3" id="receiving-destination" name="destination" required data-pallet-load-select data-incoming-count="1"><option value="">Pilih lokasi atau pallet ekspor</option>@include('export.receiving.destination-options', ['excludePalletId' => $selected->current_pallet_id])</select>
-                    @include('export.receiving.box-limit-field', ['named' => true])
+                    <label class="form-label" for="receiving-destination">Penempatan stok cadangan</label><select class="form-select mb-3" id="receiving-destination" name="destination" required data-pallet-load-select data-incoming-count="1"><option value="" @disabled($requiredSpare)>Pilih lokasi atau pallet ekspor</option>@include('export.receiving.destination-options', ['excludePalletId' => $selected->current_pallet_id, 'selectedDestination' => $requiredSpare ? $sparePlacementRule['destination'] : null, 'requiredDestination' => $requiredSpare ? $sparePlacementRule['destination'] : null])</select>
+                    @unless($requiredSpare) @include('export.receiving.box-limit-field', ['named' => true]) @endunless
                     @include('export.receiving.destination-load')
                 @endunless
                 <button class="btn btn-primary w-100" type="submit" id="confirm-placement">Konfirmasi box sudah ditempatkan</button>

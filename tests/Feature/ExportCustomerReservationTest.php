@@ -13,6 +13,7 @@ use Tests\TestCase;
 class ExportCustomerReservationTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\SeedsExistingExportStock;
     private User $admin;
     private PartSetting $part;
     private ExportCustomer $a;
@@ -37,7 +38,8 @@ class ExportCustomerReservationTest extends TestCase
         $box = app(ExportStockReceivingService::class)->receive(['box_number' => $number, 'part_number' => $this->part->part_number,
             'receive_token' => (string) Str::uuid(), 'customer_id' => $owner?->id], $this->admin, false, new \DateTimeImmutable($date));
         $location = ExportMasterLocation::create(['code' => 'CS-'.$number]);
-        return app(ExportStockReceivingService::class)->place($box->id, ['revision' => $box->revision, 'request_token' => (string) Str::uuid(), 'location_id' => $location->id], $this->admin);
+        $this->storeExistingExportBoxes(collect([$box]), $this->admin, $location);
+        return $box->fresh();
     }
 
     private function plan(ExportCustomer $customer, int $quantity = 3, string $deadline = '2026-11-20'): ExportDeliveryPlan

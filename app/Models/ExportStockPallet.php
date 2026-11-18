@@ -44,7 +44,14 @@ class ExportStockPallet extends Model
     {
         return $q->whereRaw('(SELECT COUNT(DISTINCT source_box.part_setting_id) FROM export_stock_boxes source_box WHERE source_box.current_pallet_id = export_stock_pallets.id AND source_box.deleted_at IS NULL) > 1');
     }
-    public function getNumberAttribute(): string { return 'EX-'.str_pad((string) $this->id, 6, '0', STR_PAD_LEFT); }
+    public static function formatNumber(int $id): string
+    {
+        // The database allocates the primary key atomically, including concurrent
+        // receipts, merges and picking returns. Never derive a number from MAX.
+        return 'PLT-EXP-'.str_pad((string) $id, 3, '0', STR_PAD_LEFT);
+    }
+
+    public function getNumberAttribute(): string { return static::formatNumber($this->id); }
     public function getDisplayNameAttribute(): string
     {
         return $this->plannedPallet ? 'Pallet '.$this->plannedPallet->position : 'Pallet cadangan';

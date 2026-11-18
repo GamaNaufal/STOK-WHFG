@@ -29,6 +29,11 @@ class ExportStockViewService
         ];
     }
 
+    public function recommendSpareLocations(Collection $groups, Collection $pallets): Collection
+    {
+        return app(ExportSparePlacementPolicy::class)->forGroups($groups, $pallets);
+    }
+
     public function groups(Collection $boxes, bool $receiptOnly = false): Collection
     {
         $commitments = new \Illuminate\Database\Eloquent\Collection($boxes->map(fn ($b) => $b->fulfillment)->filter()->all());

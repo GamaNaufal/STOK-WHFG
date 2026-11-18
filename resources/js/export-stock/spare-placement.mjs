@@ -1,4 +1,5 @@
 import {palletCapacity, updatePalletLoad} from './pallet-load.mjs';
+import {spareRecommendationState, assertSpareDestination} from './spare-recommendation.mjs';
 
 export function distributeSpareBoxes(boxes, allocations, {requireDestination = true} = {}) {
     if (!allocations.length || allocations.some(row => !Number.isSafeInteger(Number(row.quantity)) || Number(row.quantity) < 1)) {
@@ -26,6 +27,7 @@ export function readSparePlacement(block, options = {}) {
         ? [...block.querySelectorAll('[data-spare-allocation]')].map(row => allocation(
             row.querySelector('[data-spare-target]'), row.querySelector('[data-spare-quantity]').value))
         : [allocation(block.querySelector('[data-spare-single-select]'), boxes.length)];
+    assertSpareDestination(JSON.parse(block.querySelector('[data-spare-recommendation]')?.textContent || 'null'), allocations);
     return distributeSpareBoxes(boxes, allocations, options);
 }
 
@@ -79,6 +81,9 @@ export function initSparePlacements({documentRef = globalThis.document, windowRe
     const limits = new Map(Object.entries(draft.limits || {}));
     const invalidLimits = new Set(Array.isArray(draft.invalidLimits) ? draft.invalidLimits : []);
     const restoreNotices = new Map();
+    const recommendations = new Map(blocks.map(block => [block,
+        JSON.parse(block.querySelector('[data-spare-recommendation]')?.textContent || 'null')]));
+    const recommendationStates = new Map();
     const captureDraft = [];
     const saveDraft = () => {
         captureDraft.forEach(capture => capture());
@@ -103,6 +108,22 @@ export function initSparePlacements({documentRef = globalThis.document, windowRe
         const totals = spareIncoming(plans, plannedGroups.map(group => ({destination:group.dataset.plannedTarget ? `pallet:${group.dataset.plannedTarget}` : '', incoming:Number(group.dataset.plannedIncoming)})));
         blocks.forEach((block, index) => {
             const form = block.closest('form'), status = block.querySelector('[data-spare-allocation-status]');
+            const previous = recommendations.get(block);
+            if (previous) {
+                const ownIncoming = plans[index].filter(row => row.destination === previous.destination).length;
+                const state = spareRecommendationState(previous, JSON.parse(block.querySelector('[data-spare-boxes]').textContent).length,
+                    Math.max(0, (totals.get(previous.destination) || 0) - ownIncoming));
+                recommendationStates.set(block, state);
+                block.querySelector('[data-spare-recommendation-message]').textContent = state.message;
+                block.querySelector('[data-spare-recommendation-panel]').dataset.capacity = state.overflow ? 'overflow' : 'available';
+                const actions = block.querySelector('[data-spare-recommendation-actions]');
+                if (actions) actions.hidden = false;
+                const usePrevious = block.querySelector('[data-spare-use-previous]');
+                if (usePrevious) {
+                    usePrevious.hidden = state.count === 0;
+                    usePrevious.textContent = state.overflow ? `Isi sisa ${fmt(state.count)} box di ${previous.location}` : `Gunakan ${previous.location} untuk ${fmt(state.count)} box`;
+                }
+            }
             const targets = [...new Set(plans[index].map(row => row.destination).filter(Boolean))];
             const capacities = targets.map(destination => {
                 const option = optionFor(block, destination);
@@ -192,7 +213,8 @@ export function initSparePlacements({documentRef = globalThis.document, windowRe
         };
         // Per-box destinations are encoded in JSON. Never submit a competing common destination.
         single.removeAttribute('name');
-        toggle.hidden = boxes.length < 2;
+        const mandatory = recommendations.get(block)?.required === true;
+        toggle.hidden = boxes.length < 2 || mandatory;
 
         const key = block.dataset.key;
         const boxVersion = boxes.map(box => `${box.id}:${box.revision}`).join(',');
@@ -223,7 +245,16 @@ export function initSparePlacements({documentRef = globalThis.document, windowRe
                 restoreNotices.set(block, 'Tujuan sebelumnya sudah tidak tersedia. Pilih ulang lokasi atau pallet.');
             }
         } else if (saved) {
+            single.value = '';
             restoreNotices.set(block, 'Daftar box untuk part ini berubah. Tinjau ulang pembagian sebelum konfirmasi.');
+        }
+
+        if (mandatory) {
+            // Older drafts may still contain a now forbidden custom destination.
+            single.value = recommendations.get(block).destination;
+            rows.replaceChildren();
+            setSplit(false);
+            restoreNotices.delete(block);
         }
 
         captureDraft.push(() => {
@@ -239,6 +270,31 @@ export function initSparePlacements({documentRef = globalThis.document, windowRe
             }
         });
         const updateDraft = () => { refresh(); saveDraft(); };
+        block.querySelector('[data-spare-use-previous]')?.addEventListener('click', () => {
+            const previous = recommendations.get(block), state = recommendationStates.get(block);
+            if (!state?.count) return;
+            rows.replaceChildren();
+            if (state.overflow) {
+                add(state.count, previous.destination);
+                add(state.overflow);
+                setSplit(true);
+                rows.lastElementChild.querySelector('[data-spare-target]').focus();
+            } else {
+                single.value = previous.destination;
+                setSplit(false);
+                single.focus();
+            }
+            restoreNotices.delete(block);
+            updateDraft();
+        });
+        block.querySelector('[data-spare-new-pallet]')?.addEventListener('click', () => {
+            single.value = '';
+            rows.replaceChildren();
+            setSplit(false);
+            restoreNotices.delete(block);
+            updateDraft();
+            single.focus();
+        });
         toggle.addEventListener('click', () => {
             const split = block.dataset.split !== 'true';
             if (split && !rows.children.length) { add(boxes.length - 1, single.value); add(1); }

@@ -8,6 +8,21 @@ class ExportPlacementGuideService
     {
         $warnings = [];
         $assigned = collect($assignments)->keyBy('id');
+        $destinationFor = function (array $group, $box) use ($assigned, $destination, &$warnings): ?string {
+            $value = $assigned->has($box->id) ? $assigned->get($box->id)['destination'] : $destination;
+            $rule = $group['spare_recommendation'] ?? null;
+            if ($rule['required'] ?? false) {
+                if ($value && $value !== $rule['destination']) {
+                    $warnings[] = 'Part '.$box->part_number.' wajib ditempatkan pada '.$rule['number'].' di '.$rule['location']
+                        .', seluruh tambahan masih muat. Perbaiki tujuan sebelum menempatkan box.';
+
+                    return null;
+                }
+                $value = $rule['destination'];
+            }
+
+            return $value;
+        };
         $limits = $assigned->filter(fn ($row) => str_starts_with($row['destination'] ?? '', 'location:'))
             ->groupBy('destination')->map(fn ($rows) => $rows->map(fn ($row) => (int) ($row['box_limit'] ?? 0))->unique());
         $resolve = function (?string $value) use ($data, $limits): ?array {
@@ -35,7 +50,7 @@ class ExportPlacementGuideService
                 continue;
             }
             foreach ($group['pending'] as $box) {
-                $value = $assigned->has($box->id) ? $assigned->get($box->id)['destination'] : $destination;
+                $value = $destinationFor($group, $box);
                 if ($value) {
                     $incoming[$value] = ($incoming[$value] ?? 0) + 1;
                 }
@@ -60,7 +75,7 @@ class ExportPlacementGuideService
                     $load = $targetId ? $group['load']['current'] + ($incoming['pallet:'.$targetId] ?? 0) : $group['load']['total'];
                     $place = ['pallet' => 'Pallet '.$group['planned']->position, 'location' => $group['planned']->location_code, 'load' => $load];
                 } elseif ($pending) {
-                    $value = $assigned->has($box->id) ? $assigned->get($box->id)['destination'] : $destination;
+                    $value = $destinationFor($group, $box);
                     $target = $resolve($value);
                     $key = 'pending-'.$group['key'].'-'.($value ?: 'unassigned');
                     $load = $target ? $target['current'] + ($incoming[$value] ?? 0) : null;

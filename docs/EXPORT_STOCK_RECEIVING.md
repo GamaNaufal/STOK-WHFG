@@ -2,6 +2,17 @@
 
 Verifikasi identitas/master 3 November 2026; alur penerimaan 30 Oktober 2026 pada branch aktif Export-plan.
 
+Pembaruan 18 November 2026: kode fisik pallet ekspor memakai PLT-EXP-001,
+berasal dari ID database yang aman terhadap pembuatan bersamaan. Penerimaan
+cadangan wajib memakai pallet sebelumnya yang masih berisi part sama bila
+seluruh tambahan muat. Jika tambahan melebihi ruang tersisa, operator
+mendapat penjelasan kapasitas serta pilihan mengisi sebagian atau memakai pallet
+baru untuk seluruh tambahan. Rincian aturan dan verifikasi:
+[Rekomendasi lokasi part cadangan](EXPORT_SPARE_LOCATION_RECOMMENDATIONS.md).
+Pembaruan ini menggantikan aturan tujuan awal selalu kosong pada penerimaan
+berikutnya. Pilihan tujuan manual tersedia untuk penempatan pertama dan saat
+tambahan tidak seluruhnya muat, alokasi delivery tetap mengikuti rencana.
+
 ## Keputusan dan alur operator
 
 - Scan ID Box delapan digit, lalu nomor part. PCS diambil ulang di server
@@ -116,8 +127,10 @@ dari `boxes`. Nomor unik, part/PCS snapshot, receive_token, aktor, tanggal perta
 revision dan current_pallet_id disimpan di sini. Tidak ada penghapusan box atau
 penimpaan tanggal FIFO lewat formulir penerimaan.
 
-`export_stock_pallets` adalah pallet fisik ekspor dengan nomor internal EX-000001
-berbasis ID. UI memakai display_name dari nomor 1..N pada rencana terkait,
+`export_stock_pallets` adalah pallet fisik ekspor dengan kode PLT-EXP-001
+berbasis ID database, minimal tiga digit dan bertambah tanpa reset setelah 999.
+Label EX-000001 lama tetap diterima pada pencarian pindah pallet.
+UI memakai display_name dari nomor 1..N pada rencana terkait,
 atau Pallet cadangan; identifier/FK existing dipertahankan. Satu lokasi
 hanya mempunyai satu pallet fisik aktif. Lokasi awal dan snapshot kode disimpan
 sebagai histori; pallet kosong dilepas dari lokasi dan ditandai retired.

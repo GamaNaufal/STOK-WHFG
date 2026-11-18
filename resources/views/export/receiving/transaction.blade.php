@@ -51,7 +51,7 @@
         <p class="alert alert-warning"><strong>{{ $receipt['qa'] }} box terkait penanganan QA.</strong> Untuk box yang masih berstatus expired, hubungi Admin Warehouse agar ditangani melalui Expired Box dan Handle.</p>
     @endif
     @if($sparePending->isNotEmpty())
-        <p class="plan-help mb-3">Pilih satu tujuan atau bagi box per nomor part. Pilihan part yang masih menunggu akan dipulihkan di tab ini setelah konfirmasi.</p>
+        <p class="plan-help mb-3">Ikuti tujuan wajib jika seluruh tambahan masih muat. Jika tambahan tidak muat, pilih tujuan baru atau bagi box per nomor part. Pilihan yang masih sesuai aturan akan dipulihkan di tab ini setelah konfirmasi.</p>
         <form method="POST" action="{{ $receipt['print_url'] }}" target="_blank" data-spare-print-form hidden>@csrf<input type="hidden" name="spare_placements_json" value="[]"></form>
     @endif
     <h2 class="visually-hidden">Daftar box dan tujuan penempatan</h2>

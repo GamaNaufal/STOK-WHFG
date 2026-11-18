@@ -18,7 +18,7 @@
         <div class="receiving-destination {{ !$group['planned'] && $group['pending']->isNotEmpty() ? 'is-unassigned' : '' }}" @if(!$group['planned'] && $group['pending']->isNotEmpty()) data-spare-guide-destination aria-live="polite" @endif>
             <p>{{ $group['pending']->isNotEmpty() ? 'Antarkan box ke' : ($group['redirected']->isNotEmpty() ? 'Melalui transaksi rekomendasi' : 'Penempatan selesai') }}</p>
             <div class="receiving-destination-values"><div><span>Pallet tujuan</span><strong data-guide-pallet>{{ $group['planned'] ? 'Pallet '.$group['planned']->position : 'Pallet cadangan' }}</strong></div><div><span>Lokasi tujuan</span><strong data-guide-location>{{ $group['planned']?->location_code ?? ($group['pending']->isNotEmpty() ? 'Belum dipilih' : 'Lihat posisi masing-masing box') }}</strong></div></div>
-            @if(!$group['planned'] && $group['pending']->isNotEmpty())<small>Pilih lokasi atau pallet cadangan di bawah. Pilihan ini akan disertakan saat mencetak panduan.</small>@endif
+            @if(!$group['planned'] && $group['pending']->isNotEmpty())<small>{{ ($group['spare_recommendation']['required'] ?? false) ? 'Seluruh tambahan masih muat, wajib mengikuti tujuan pallet di bawah. Tujuan ini disertakan saat mencetak panduan.' : 'Pilih lokasi atau pallet cadangan di bawah. Pilihan ini akan disertakan saat mencetak panduan.' }}</small>@endif
         </div>
     @endif
     @if($group['load'])<div class="receiving-group-load"><p class="plan-help mb-2" data-planned-load-summary>Isi pallet {{ $group['load']['current'] }} box + {{ $group['load']['incoming'] }} box masuk. Total setelah penempatan:</p><x-export-pallet-load :boxes="$group['load']['total']" /></div>@endif

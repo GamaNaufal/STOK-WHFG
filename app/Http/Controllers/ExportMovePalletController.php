@@ -25,8 +25,9 @@ class ExportMovePalletController extends Controller
     {
         $data = $request->validate(['code' => 'required|string|max:32']);
         $code = strtoupper(trim($data['code']));
-        abort_unless(preg_match('/^EX-(\d{6,18})$/D', $code, $match), 404, 'Pallet ekspor tidak ditemukan. Gunakan kode fisik seperti EX-000001.');
-        $pallet = ExportStockPallet::findOrFail((int) $match[1]);
+        // Old printed labels remain searchable, responses always use the new code.
+        abort_unless(preg_match('/^(?:PLT-EXP-(\d{3,18})|EX-(\d{6,18}))$/D', $code, $match), 404, 'Pallet ekspor tidak ditemukan. Gunakan kode fisik seperti PLT-EXP-001.');
+        $pallet = ExportStockPallet::findOrFail((int) ($match[1] !== '' ? $match[1] : $match[2]));
 
         return response()->json(['success' => true, 'pallet' => $service->inspect($pallet) + [
             'request_token' => (string) Str::uuid(),

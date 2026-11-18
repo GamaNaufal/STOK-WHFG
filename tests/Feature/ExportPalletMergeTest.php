@@ -31,6 +31,7 @@ use Tests\TestCase;
 class ExportPalletMergeTest extends TestCase
 {
     use RefreshDatabase;
+    use \Tests\Concerns\SeedsExistingExportStock;
 
     private User $operator;
 
@@ -73,7 +74,12 @@ class ExportPalletMergeTest extends TestCase
 
     private function spare(?PartSetting $part = null, ?int $pcs = null): ExportStockBox
     {
-        return $this->place($this->box($part, $pcs), ['location_id' => $this->location()->id]);
+        // Existing inventory may span pallets from before mandatory consolidation.
+        $location = $this->location();
+        $box = $this->box($part, $pcs);
+        $this->storeExistingExportBoxes(collect([$box]), $this->operator, $location);
+
+        return $box->fresh();
     }
 
     private function plan(array $counts = [2, 2], ?int $notFull = null): ExportDeliveryPlan
@@ -250,7 +256,8 @@ class ExportPalletMergeTest extends TestCase
         $a = $this->spare();
         $b = $this->spare();
         $data = $this->data([$a->current_pallet_id, $b->current_pallet_id]);
-        $this->place($this->box(), ['pallet_id' => $a->current_pallet_id]);
+        $extraPart = PartSetting::create(['part_number' => 'MERGE-EXTRA', 'qty_box' => 80]);
+        $this->place($this->box($extraPart), ['pallet_id' => $a->current_pallet_id]);
         $this->invalid(fn () => app(ExportPalletMergeService::class)->merge($data, $this->operator), 'sudah berubah');
         $data = $this->data([$a->current_pallet_id, $b->current_pallet_id]);
         app(ExportPalletMergeService::class)->merge($data, $this->operator);
@@ -498,7 +505,8 @@ class ExportPalletMergeTest extends TestCase
         $a = $this->spare();
         $b = $this->spare();
         $data = $this->data([$a->current_pallet_id, $b->current_pallet_id]);
-        $this->place($this->box(), ['pallet_id' => $a->current_pallet_id]);
+        $extraPart = PartSetting::create(['part_number' => 'MERGE-EXTRA', 'qty_box' => 80]);
+        $this->place($this->box($extraPart), ['pallet_id' => $a->current_pallet_id]);
         $this->from(route('export.merge.preview'))->post(route('export.merge.store'), $data)
             ->assertRedirect(route('export.merge.index'))->assertSessionHasErrors('merge');
         $this->get(route('export.merge.index'))->assertOk()->assertSee('Merge belum diproses.')->assertSee('sudah berubah');

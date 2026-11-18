@@ -6,6 +6,7 @@ use App\Models\AuditLog;
 use App\Models\ExportDeliveryPlan;
 use App\Models\ExportPickingScan;
 use App\Models\ExportStockBox;
+use App\Models\ExportStockPallet;
 use App\Models\User;
 use App\Support\AuditLogPresenter;
 use Illuminate\Support\Collection;
@@ -51,7 +52,7 @@ class ExportStockHistoryService
                 'label' => $move->from_pallet_id ? 'Dipindahkan' : 'Penempatan awal',
                 'actor' => $move->actor?->name,
                 'description' => ($move->from_location_code ?? 'Belum ditempatkan').' → '.$move->to_location_code,
-                'detail' => $move->to_pallet_id ? 'ID pallet tujuan EX-'.str_pad((string) $move->to_pallet_id, 6, '0', STR_PAD_LEFT) : null,
+                'detail' => $move->to_pallet_id ? 'ID pallet tujuan '.ExportStockPallet::formatNumber($move->to_pallet_id) : null,
                 'order' => $move->id, 'priority' => 2,
             ]);
         }

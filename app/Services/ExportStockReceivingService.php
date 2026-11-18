@@ -125,6 +125,15 @@ class ExportStockReceivingService
     public function place(int $boxId, array $data, User $actor, array $reusableLocations = [], bool $allowExpiredReturn = false): ExportStockBox
     {
         return app(ExportInventoryService::class)->transaction(function () use ($boxId, $data, $actor, $reusableLocations, $allowExpiredReturn) {
+            app(ExportSparePlacementPolicy::class)->assertPlacements([['id' => $boxId] + $data]);
+
+            return $this->placeValidated($boxId, $data, $actor, $reusableLocations, $allowExpiredReturn);
+        });
+    }
+
+    private function placeValidated(int $boxId, array $data, User $actor, array $reusableLocations = [], bool $allowExpiredReturn = false): ExportStockBox
+    {
+        return app(ExportInventoryService::class)->transaction(function () use ($boxId, $data, $actor, $reusableLocations, $allowExpiredReturn) {
             $locationId = ! empty($data['location_id']) ? (int) $data['location_id'] : null;
             $palletId = ! empty($data['pallet_id']) ? (int) $data['pallet_id'] : null;
             $boxLimit = (int) ($data['box_limit'] ?? 0) ?: null;
@@ -278,9 +287,12 @@ class ExportStockReceivingService
     public function placeMany(array $rows, User $actor): array
     {
         return app(ExportInventoryService::class)->transaction(function () use ($rows, $actor) {
+            // Evaluate the whole receipt before mutating it. Overflow remains a
+            // choice for this confirmation, including after its first box moves.
+            app(ExportSparePlacementPolicy::class)->assertPlacements($rows);
             $reusable = [];
             foreach ($rows as $row) {
-                $this->place((int) $row['id'], $row, $actor, $reusable);
+                $this->placeValidated((int) $row['id'], $row, $actor, $reusable);
                 if (! empty($row['location_id'])) {
                     $movement = ExportStockMovement::where('request_token', $row['request_token'])->firstOrFail();
                     $pallet = ExportStockPallet::findOrFail($movement->to_pallet_id);

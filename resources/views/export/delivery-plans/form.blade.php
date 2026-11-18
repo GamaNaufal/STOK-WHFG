@@ -9,7 +9,7 @@
     $initialRows = old('items', $rows) ?: [['part_number' => '', 'pcs_quantity' => '']];
     $initialSource = old('source_type', $plan?->source_type ?? 'manual');
 @endphp
-<div class="delivery-plan-page" id="delivery-plan-editor" data-import-url="{{ route('export.delivery-plans.import-excel') }}">
+<div class="delivery-plan-page" id="delivery-plan-editor" data-import-url="{{ route('export.delivery-plans.import-excel') }}" @if($customerReady) data-customer-match-url="{{ route('export.customers.options') }}" @endif>
     <header class="plan-header">
         <div>
             <a class="plan-back" href="{{ route('export.delivery-plans.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Rencana delivery</a>

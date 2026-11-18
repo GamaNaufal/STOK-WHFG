@@ -2,6 +2,77 @@
 
 Terakhir diverifikasi dari source code: 18 November 2026 (pembaruan inkremental).
 
+Pencocokan nama/alias customer rencana Ekspor, 18 November 2026:
+
+- Bug direproduksi pada perangkat lain melalui tunnel pengguna, master dan
+  katalog nama/alias tersedia tetapi input tidak mengisi customer_id. Bundle
+  yang dimuat berbeda dari checkout. Database lokal checkout masih tanpa master
+  customer saat diagnosis, tidak diisi contoh untuk meniru perangkat lain.
+- Form kini menyelaraskan ID pada init/input/change/pageshow/submit/impor/undo,
+  lookup existing membaca master yang ditambahkan setelah form dibuka dan
+  menolak respons lambat yang stale. Konflik kode/nama Excel tetap diblokir
+  sampai koreksi operator. Snapshot existing dan legacy belum dipetakan dijaga.
+- Backend mencocokkan nama/kode/alias pasti bila form customer versi 1 tidak
+  mengirim ID. Integrasi legacy tetap tanpa pemetaan otomatis, customer tidak
+  dikenal/nonaktif tetap ditolak, retry dibaca sebelum perubahan master.
+  Nama sumber kosong memakai input aslinya, alias manual tetap tercatat.
+- 78 tes backend / 663 assertions dan seluruh 180 frontend lulus, build, PHP,
+  Pint tes baru dan diff --check lulus. Browser SQLite terpisah benar-benar
+  menyimpan tiga rencana dari alias manual, XLSX, serta master baru setelah
+  form dibuka, ID/source/PCS diverifikasi. Desktop/390 px, tanpa console error.
+- Tidak ada migration/database operasional/deployment perangkat lain. Paket
+  customer-match-fix.zip menyediakan empat source, dua aset dan penggabungan
+  manifest terkait saja, dengan backup/checksum dan installer yang sudah diuji
+  pada project probe. Perangkat tunnel masih memerlukan penerapan paket atau
+  sinkronisasi source dan build. Rincian: docs/EXPORT_CUSTOMER_MATCHING_FIX_2026-11-18.md.
+
+Penomoran dan penempatan wajib part cadangan Ekspor, 18 November 2026:
+
+- Kode fisik pallet menjadi PLT-EXP-001, minimal tiga digit, setelah 999 lanjut
+  1000. Nomor memakai PK auto-increment database ekspor, tidak memakai MAX+1
+  atau counter browser. Lokal tetap PLT-001 dengan urutannya sendiri. ID/FK,
+  posisi perencanaan 1..N dan snapshot audit lama dipertahankan, tanpa migration.
+  Pencarian pindah pallet menerima kode baru dan alias label EX-000001 lama,
+  respons memakai kode baru. Pencarian stok dan riwayat mengikuti format baru.
+
+- Penerimaan tanpa alokasi rencana merekomendasikan pallet cadangan yang masih
+  berisi part sama, mengikuti penempatan part paling baru dan lokasi pallet saat
+  ini. Penempatan pertama tetap dipilih operator. Pallet rencana, pallet pensiun,
+  box terhapus dan lokasi yang tidak tersedia tidak dijadikan default.
+- Jika seluruh tambahan muat, tujuan sebelumnya WAJIB dipakai, operator tidak
+  dapat menggantinya atau membaginya ke tujuan lain. Ini menggantikan aturan
+  pilihan bebas pada implementasi awal. Batas menghitung seluruh isi fisik
+  pallet, termasuk part lain dan expired, ditambah pilihan kelompok lain dalam
+  transaksi. Null/0 tetap berarti tanpa batas, peringatan 36/72 tetap terpisah.
+- Jika tidak seluruhnya muat, tampilkan lokasi/pallet sebelumnya, isi, maksimal,
+  ruang tersisa dan jumlah kelebihan. Isi sisa N box membuat pembagian ke pallet
+  tersebut dan meminta tujuan sisanya. Pallet baru untuk seluruh N box membuka
+  pilihan lokasi dan batas pallet baru. Pallet penuh hanya menawarkan tujuan
+  lain, tidak dipilih otomatis. Draft pilihan bebas hanya dipulihkan bila masih
+  sesuai aturan, tujuan wajib menggantikan pilihan bebas lama yang tidak valid.
+- ExportSparePlacementPolicy dipakai halaman transaksi, modal satu box, cetak
+  dan validasi server. Seluruh box part yang masih menunggu dalam receipt dibaca
+  dari database, bukan dari subset payload atau return_batch client. Pilihan
+  overflow dinilai sekali sebelum mutasi satu konfirmasi di bawah mutex inventory.
+  Retry, perubahan kapasitas dan dua operator diperiksa ulang. Relokasi stok
+  tersimpan, QA/packing, Not Full dan tujuan alokasi rencana tetap lewat alurnya.
+- Rekomendasi tidak menyimpan master default atau menempatkan stok otomatis.
+  Konfirmasi fisik, cetak per box, FIFO, reservasi customer, hak akses, mutex,
+  revision/token dan pemeriksaan kapasitas server tetap melalui alur existing.
+  Tidak ada migration, perubahan database operasional atau deployment.
+- Verifikasi: 362 tes terkait ekspor / 3.928 assertions lulus dari suite penuh
+  772 tes / 8.199 assertions, 765 lulus dan tujuh kegagalan baseline laporan,
+  binder Excel, seeder dan preview dashboard yang sudah tercatat, tanpa error.
+  Tambahan pemeriksaan split tujuan wajib lulus 1 tes / 27 assertions. Seluruh
+  172 frontend, build, sintaks PHP dan diff --check lulus. MySQL 8.4.3 pada port
+  dan data terpisah memverifikasi dua proses menghasilkan kode berbeda, rebutan
+  dua ruang terakhir menolak satu receipt secara utuh, dan satu lokasi kosong
+  tidak mendapat dua pallet. Instance dihentikan dan data sementara dibersihkan.
+  Browser SQLite in-memory memeriksa tujuan wajib, draft lama yang dialihkan,
+  overflow 2+3 atau seluruh 5 box ke pallet baru, refresh, keyboard, 1366/390 px,
+  tanpa console error. Bukan uji scanner fisik atau database operasional. Rincian:
+  docs/EXPORT_SPARE_LOCATION_RECOMMENDATIONS.md.
+
 Pengalih Daftar stok / Reservasi customer, 18 November 2026:
 
 - Header dan pengalih stok Ekspor memakai satu partial, posisi stabil pada kedua

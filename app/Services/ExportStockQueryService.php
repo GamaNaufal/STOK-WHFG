@@ -51,6 +51,9 @@ class ExportStockQueryService
                             $p->orWhereNull('export_planned_pallet_id');
                         }
                     });
+                if (preg_match('/^(?:PLT-EXP-(\d{3,18})|EX-(\d{6,18}))$/iD', $search, $palletCode)) {
+                    $s->orWhere('current_pallet_id', (int) ($palletCode[1] !== '' ? $palletCode[1] : $palletCode[2]));
+                }
             }))
             ->when($filters['pcs_per_box'] ?? null, fn ($q, $pcs) => $q->where('pcs_quantity', $pcs))
             ->when(($filters['part_number'] ?? '') !== '', fn ($q) => ($filters['pcs_per_box'] ?? null)
