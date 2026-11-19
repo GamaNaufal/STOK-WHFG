@@ -7,11 +7,13 @@
 <span class="fulfillment-status {{ $box->expiry_label === 'Expired' ? 'text-danger' : 'text-warning' }}">{{ $box->expiry_label }}</span>
 @endif
 <span class="fulfillment-status {{ $stored ? 'fulfillment-status-complete' : ($reservation ? 'fulfillment-status-partial' : '') }}">{{ $box->stock_category_label }}</span>
+<small class="fulfillment-customer">Customer pemilik · {{ $box->customer_owner_label }}</small>
 @if($reservation)
     <small class="fulfillment-customer">
         {{ $stored ? 'Rencana delivery' : 'Memiliki reservasi' }} · {{ $target?->palletPlan?->deliveryPlan?->plan_code ?? 'Rencana delivery' }}
         · Pallet {{ $target?->position }} · Lokasi {{ $target?->location_code ?? 'belum ditentukan' }}
     </small>
+    <small class="fulfillment-customer">Customer delivery · {{ $target?->palletPlan?->deliveryPlan?->customer_name ?? 'Belum dipetakan' }}</small>
     @unless($stored)
         <small class="fulfillment-customer">
             @if($reservation->placed_at)
@@ -24,5 +26,8 @@
         </small>
     @endunless
 @elseif($box->state === 'received')
+    <small class="fulfillment-customer">Tanpa delivery</small>
     <small class="fulfillment-customer">Menunggu penempatan cadangan</small>
+@else
+    <small class="fulfillment-customer">Tanpa delivery</small>
 @endif

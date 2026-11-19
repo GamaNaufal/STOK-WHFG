@@ -1,6 +1,66 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 18 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 19 November 2026 (pembaruan inkremental).
+
+Fokus scan setelah pergantian customer penerimaan Ekspor, 19 November 2026:
+
+- Mengganti Reservasi customer, termasuk kembali ke Umum, memakai reset input
+  existing dan langsung memfokuskan Scan ID Box tanpa jeda. ID/part yang belum
+  ditambahkan disiapkan ulang, pending check dilepas, tanggal masuk dipertahankan.
+  Baris draft server tetap memakai pemilik awal. Bantuan pada layar menjelaskan
+  perilaku ini. Pilihan customer dinonaktifkan sementara selama request scan
+  berjalan agar pergantian tidak bertabrakan dengan validasi/penambahan box.
+- Tidak mengubah payload, reservasi tersimpan, FIFO, izin atau database operasional.
+  Seluruh 180 tes frontend, pemeriksaan sintaks JS dan build Vite lulus. Browser
+  dengan fixture SQLite terpisah memverifikasi Umum ke Alpha, Alpha ke Beta
+  dengan input belum ditambahkan, dan Beta ke Umum, fokus selalu ke ID Box yang
+  writable, tanpa error konsol. Bukan uji scanner fisik. Bukti privat:
+  storage/app/private/receiving-customer-scan-focus.jpg.
+
+Filter customer dan nomor part pada Lihat Stok Ekspor, 19 November 2026:
+
+- Pilihan customer kini hanya dari Master Customer, termasuk yang belum punya
+  delivery dan customer nonaktif berlabel untuk membaca reservasi existing.
+  Identitas memakai customer:ID dan relasi tersimpan. Nama/snapshot delivery
+  legacy tidak dicocokkan otomatis, bookmark nama lama perlu memilih master lagi.
+- Sesuai jawaban pengguna, daftar customer memuat gabungan box milik customer
+  dan box yang terikat delivery customer itu, termasuk stok Umum yang sudah
+  dialokasikan. Box yang memenuhi keduanya dihitung sekali. Stok umum bebas dan
+  stok customer lain tidak disertakan hanya karena nomor part sama. Pengecualian
+  lintas customer mempertahankan pemilik asal dan penerima delivery-nya.
+- Ringkasan total terkait, terikat delivery dan tanpa delivery memuat box/PCS.
+  Ringkasan fisik dan total mengikuti customer, part, pencarian serta lokasi,
+  sebelum filter kategori/keterikatan delivery. Progres delivery tetap menampilkan
+  seluruh kebutuhan aktif customer. Pembanding stok bersih hanya menghitung
+  reservasi customer itu yang belum terikat delivery, sesuai cakupan daftar.
+- Toolbar mempunyai kolom ketik sebagian atau seluruh nomor part, sesuai koreksi pengguna
+  tanggal 19 November, serta pilihan keterikatan delivery. Filter part diterapkan
+  otomatis setelah jeda ketik 250 ms atau langsung dengan Enter, tanpa dropdown
+  atau saran. Nomor yang diketik dipertahankan saat customer berganti, nomor yang
+  tidak memiliki stok terkait menghasilkan daftar kosong.
+  Pencocokan mulai satu karakter, mencari teks di awal/tengah/akhir tanpa
+  membedakan kapitalisasi. Karakter %, _ dan ! dicari sebagai teks literal.
+  Tautan kebutuhan dengan PCS/box tetap memakai satu part persis, pengetikan
+  manual membersihkan PCS/box tersebut sebelum memakai pencarian sebagian.
+  Pencarian q tetap mendukung potongan nomor part. Reset mempertahankan customer,
+  pilihan Semua customer menampilkan seluruh stok sesuai filter lainnya.
+- Daftar Box/Pallet, isi pallet, pagination, filter cepat dan Excel memakai query
+  yang sama. Baris box menunjukkan customer pemilik, customer delivery dan tanpa
+  delivery. Tidak mengubah reservasi, alokasi, FIFO, izin atau database operasional,
+  tidak menambah migration. Build aset lokal sudah diperbarui.
+- Verifikasi SQLite in-memory, 80 tes backend terkait / 1.237 assertions dan
+  seluruh 180 frontend lulus, build, sintaks PHP/JS dan diff --check lulus.
+  Browser memakai SQLite terpisah dengan enam box fiktif. Customer, part persis,
+  kombinasi tanpa delivery, pallet campuran/modal, customer kosong, Reset/Semua,
+  keyboard dan viewport 1366/390 px diperiksa, tanpa overflow halaman atau error
+  konsol. Bukan scanner atau ponsel fisik, tidak melakukan deployment.
+  Koreksi kolom ketik diverifikasi ulang, 18 tes backend / 384 assertions dan
+  enam tes frontend terkait lulus, build/diff --check lulus. Browser memeriksa
+  ketik otomatis, Enter, hapus input, fokus tetap, dan lebar 390 px tanpa overflow.
+  Koreksi pencarian sebagian lulus 19 tes backend / 424 assertions. Browser
+  memverifikasi P langsung menampilkan empat box dan extra menampilkan satu,
+  tetap pada customer terpilih dan tanpa error konsol.
+  Rincian: docs/EXPORT_STOCK_CUSTOMER_FILTERS.md.
 
 Pencocokan nama/alias customer rencana Ekspor, 18 November 2026:
 

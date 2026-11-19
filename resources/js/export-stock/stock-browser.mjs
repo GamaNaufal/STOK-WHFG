@@ -46,6 +46,7 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
     const readiness = documentRef.getElementById('stock-customer-readiness');
     const customer = documentRef.getElementById('stock-customer');
     const summary = documentRef.getElementById('export-stock-summary');
+    const totals = documentRef.getElementById('stock-customer-totals');
     const reset = documentRef.querySelector('[data-stock-reset]');
     const partFilter = form.querySelector('[data-stock-part-filter]');
     let timer, lastUrl = windowRef.location.href, historyMode = 'replace';
@@ -60,6 +61,11 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
         results.innerHTML = data.html;
         count.textContent = format(data.count);
         if (readiness && typeof data.readiness === 'string') readiness.innerHTML = data.readiness;
+        if (totals && data.stockCounts) {
+            for (const value of totals.querySelectorAll('[data-stock-total]')) {
+                value.textContent = format(data.stockCounts[value.dataset.stockTotal]);
+            }
+        }
         if (summary && data.stockCounts) {
             for (const link of summary.querySelectorAll('[data-stock-quick-status]')) {
                 const category = link.dataset.stockQuickStatus;
@@ -78,11 +84,12 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
         return url.href;
     };
     const summaryUrl = category => {
-        const url = new URL(form.action);
+        const url = new URL(category ? filterUrl() : form.action);
         if (customer?.value) url.searchParams.set('customer', customer.value);
         if (category) {
             url.searchParams.set('status', category);
             url.searchParams.set('mode', form.elements.namedItem('mode').value);
+            url.searchParams.delete('delivery_status');
             url.hash = 'export-stock-results';
         }
         return url.href;
@@ -100,25 +107,36 @@ export function initStockBrowser({documentRef = globalThis.document, windowRef =
     };
     const syncForm = url => {
         const params = new URL(url).searchParams;
-        for (const name of ['q', 'part_number', 'pcs_per_box', 'status', 'location_id', 'mode', 'customer']) {
+        for (const name of ['q', 'part_number', 'pcs_per_box', 'status', 'delivery_status', 'location_id', 'mode', 'customer']) {
             const field = form.elements.namedItem(name);
             if (!field) continue;
             let value = params.get(name) ?? (name === 'mode' ? 'box' : '');
             if (name === 'status' && ['pending', 'reserved'].includes(value)) value = 'spare';
-            if (name === 'customer') value = value.trim().toLowerCase();
             field.value = value;
         }
+        syncPartFilter();
+    };
+    const syncPartFilter = () => {
         const part = form.elements.namedItem('part_number').value;
         const pcs = form.elements.namedItem('pcs_per_box')?.value;
         partFilter.hidden = !part && !pcs;
         partFilter.querySelector('[data-stock-part-label]').textContent = [part && `Nomor part ${part}`, pcs && `${pcs} PCS/box`].filter(Boolean).join(' · ');
     };
 
-    form.addEventListener('input', event => { if (event.target.name === 'q') apply(true); });
-    form.addEventListener('change', event => { if (event.target.matches('select') || event.target.name === 'mode') apply(false); });
+    form.addEventListener('input', event => {
+        if (event.target.name === 'part_number') {
+            const pcs = form.elements.namedItem('pcs_per_box');
+            if (pcs) pcs.value = '';
+            syncPartFilter();
+        }
+        if (['q', 'part_number'].includes(event.target.name)) apply(true);
+    });
+    form.addEventListener('change', event => {
+        if (event.target.matches('select') || event.target.name === 'mode') apply(false);
+    });
     customer?.addEventListener('change', () => apply(false));
     form.addEventListener('keydown', event => {
-        if (event.key === 'Enter' && event.target.name === 'q') { event.preventDefault(); apply(false); }
+        if (event.key === 'Enter' && ['q', 'part_number'].includes(event.target.name)) { event.preventDefault(); apply(false); }
     });
     form.addEventListener('click', event => {
         if (event.target.closest('[data-stock-clear-part]')) {

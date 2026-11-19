@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\{ExportMasterLocation, ExportPalletPlan, PartSetting, ExportPlannedPallet, ExportStockBox, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
-use App\Services\{ExportDeliveryPlanService, ExportFulfillmentCompletionService, ExportPalletPlanningService, ExportStockReceivingService};
+use App\Models\{ExportCustomer, ExportDeliveryCustomerLink, ExportFulfillmentBox, ExportMasterLocation, ExportPalletPlan, PartSetting, ExportPlannedPallet, ExportStockBox, ExportStockPallet, MasterLocation, RoleFeatureAccess, User};
+use App\Services\{ExportCustomerReservationService, ExportDeliveryPlanService, ExportFulfillmentCompletionService, ExportPalletPlanningService, ExportStockReceivingService};
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -71,12 +71,35 @@ class ExportStockFilterExportTest extends TestCase
         return $workbook;
     }
 
+    private function customer(string $code, string $name): ExportCustomer
+    {
+        return ExportCustomer::create(['code' => $code, 'name' => $name, 'is_active' => true]);
+    }
+
+    private function own(ExportStockBox $box, ExportCustomer $customer): ExportStockBox
+    {
+        app(ExportCustomerReservationService::class)->attach($box, $customer->id, $this->operator, 'Reservasi fixture.');
+        return $box;
+    }
+
+    private function commit(ExportStockBox $box, ExportCustomer $customer, string $code): void
+    {
+        $pallet = $this->plannedPallet($code)->plannedPallet;
+        $delivery = $pallet->palletPlan->deliveryPlan;
+        ExportDeliveryCustomerLink::create(['export_delivery_plan_id' => $delivery->id, 'export_customer_id' => $customer->id, 'source_name' => 'Nama historis']);
+        $item = $pallet->items()->create(['part_setting_id' => $box->part_setting_id, 'part_number' => $box->part_number,
+            'pcs_per_box' => $box->pcs_quantity, 'box_quantity' => 1]);
+        ExportFulfillmentBox::create(['export_stock_box_id' => $box->id, 'box_number' => $box->box_number,
+            'export_planned_pallet_item_id' => $item->id, 'part_setting_id' => $box->part_setting_id, 'pcs_quantity' => $box->pcs_quantity,
+            'first_received_at' => $box->first_received_at, 'reserved_at' => now(), 'reserved_by' => $this->operator->id]);
+    }
+
     public function test_physical_filters_combine_with_search_and_status_and_remain_in_pagination(): void
     {
         $first = $this->pallet('EX-A1'); $second = $this->pallet('EX-A2');
         for ($i = 1; $i <= 21; $i++) $this->box(str_pad((string) $i, 8, '0', STR_PAD_LEFT), $first);
         $this->box('00000100', $second); $this->box('00000101');
-        $filters = ['location_id' => $first->master_location_id, 'status' => 'spare', 'q' => '00123-001', 'part_number' => '00123'];
+        $filters = ['location_id' => $first->master_location_id, 'status' => 'spare', 'q' => '00123-001', 'part_number' => '00123-001'];
         $response = $this->get(route('export.stock.index', $filters))->assertOk()
             ->assertViewHas('boxes', fn ($boxes) => $boxes->total() === 21 && $boxes->count() === 20)
             ->assertSee('Export Excel')->assertSee('id="stock-mode"', false)->assertSee('id="stock-location"', false)
@@ -84,7 +107,7 @@ class ExportStockFilterExportTest extends TestCase
         $document = new \DOMDocument();
         @$document->loadHTML($response->getContent());
         $xpath = new \DOMXPath($document);
-        $this->assertSame(1, $xpath->query('//form[@id="export-stock-filters"]//input[@type="search"]')->length);
+        $this->assertSame(2, $xpath->query('//form[@id="export-stock-filters"]//input[@type="search"]')->length);
         $this->assertSame(2, $xpath->query('//fieldset[@id="stock-mode"]//input[@type="radio"]')->length);
         $this->assertSame(1, $xpath->query('//input[@name="q" and contains(@placeholder, "nomor part")]')->length);
         $this->assertStringContainsString('location_id='.$first->master_location_id, $response->viewData('boxes')->nextPageUrl());
@@ -240,7 +263,7 @@ class ExportStockFilterExportTest extends TestCase
         $first = $this->pallet('A1'); $second = $this->pallet('A2');
         $this->box('00000001', $first); $this->box('00000002', $first, ['part_number' => 'OTHER']);
         $this->box('00000003', $second);
-        $filters = ['mode' => 'pallet', 'q' => 'A1', 'part_number' => '00123', 'status' => 'spare', 'location_id' => $first->master_location_id];
+        $filters = ['mode' => 'pallet', 'q' => 'A1', 'part_number' => '00123-001', 'status' => 'spare', 'location_id' => $first->master_location_id];
         $groups = $this->getJson(route('export.stock.index', $filters))->assertOk()->assertJsonPath('count', 1)->json('html');
         $this->assertStringContainsString('dari 2 box fisik di pallet', $groups);
         $html = $this->getJson(route('export.stock.pallet-boxes', ['pallet' => $first->id] + $filters))->assertOk()->json('html');
@@ -248,7 +271,7 @@ class ExportStockFilterExportTest extends TestCase
         $this->assertStringNotContainsString('00000002', $html);
         $this->assertStringNotContainsString('00000003', $html);
         $this->get(route('export.stock.index', $filters))->assertOk()->assertSee('id="stock-part-number"', false)
-            ->assertViewHas('filters', fn ($values) => $values['part_number'] === '00123');
+            ->assertViewHas('filters', fn ($values) => $values['part_number'] === '00123-001');
         $sheet = $this->workbook($filters)->getActiveSheet();
         $this->assertSame(2, $sheet->getHighestRow());
         $this->assertSame('00000001', $sheet->getCell('A2')->getValue());
@@ -261,7 +284,9 @@ class ExportStockFilterExportTest extends TestCase
     public function test_only_confirmed_ready_pallets_are_stored_and_reopening_returns_boxes_to_spare(): void
     {
         $location = ExportMasterLocation::create(['code' => 'READY-TARGET']);
+        $customer = $this->customer('C-READY', 'Customer Ready');
         $delivery = app(ExportDeliveryPlanService::class)->save(['plan_code' => 'RD-READY-CATEGORY', 'customer_name' => 'Customer Ready',
+            'customer_id' => $customer->id,
             'delivery_deadline' => '2026-11-10', 'source_type' => 'manual',
             'items' => [['part_number' => $this->part->part_number, 'pcs_quantity' => 100]]], $this->operator);
         $plan = app(ExportPalletPlanningService::class)->save($delivery->id, ['revision' => 0, 'delivery_revision' => 1, 'action' => 'finalize',
@@ -271,7 +296,7 @@ class ExportStockFilterExportTest extends TestCase
             'part_number' => $this->part->part_number, 'receive_token' => (string) Str::uuid()], $this->operator);
         $this->box('00000002');
         $this->box('00000003', $this->pallet('SPARE-SOURCE'));
-        $customerUrl = route('export.stock.index', ['customer' => 'customer ready']);
+        $customerUrl = route('export.stock.index', ['customer' => 'customer:'.$customer->id]);
         $this->get($customerUrl)->assertOk()->assertViewHas('deliveries',
             fn ($rows) => $rows->sole()['reserved'] === 1 && $rows->sole()['ready'] === 0);
         $this->get(route('export.stock.index', ['status' => 'spare']))->assertOk()
@@ -311,17 +336,18 @@ class ExportStockFilterExportTest extends TestCase
         $this->get(route('export.stock.index', ['status' => 'spare']))->assertOk()->assertViewHas('resultCount', 3);
     }
 
-    public function test_customer_gap_uses_shared_free_stock_once_and_matches_exact_box_capacity(): void
+    public function test_customer_gap_uses_own_free_stock_once_and_matches_exact_box_capacity(): void
     {
+        $alpha = $this->customer('C-A', 'Customer A'); $beta = $this->customer('C-B', 'Customer B');
         $save = fn ($code, $customer, $pcs, $deadline) => app(ExportDeliveryPlanService::class)->save([
-            'plan_code' => $code, 'customer_name' => $customer, 'delivery_deadline' => $deadline, 'source_type' => 'manual',
+            'plan_code' => $code, 'customer_name' => $customer->name, 'customer_id' => $customer->id, 'delivery_deadline' => $deadline, 'source_type' => 'manual',
             'items' => [['part_number' => $this->part->part_number, 'pcs_quantity' => $pcs]],
         ], $this->operator);
 
-        $save('RD-A2', 'CUSTOMER A', 220, '2026-11-11');
-        $save('RD-A1', 'Customer A', 120, '2026-11-10');
-        $save('RD-CANCELLED', 'Customer A', 100, '2026-11-09')->update(['status' => 'cancelled']);
-        $other = $save('RD-B', 'Customer B', 100, '2026-11-08');
+        $save('RD-A2', $alpha, 220, '2026-11-11');
+        $save('RD-A1', $alpha, 120, '2026-11-10');
+        $save('RD-CANCELLED', $alpha, 100, '2026-11-09')->update(['status' => 'cancelled']);
+        $other = $save('RD-B', $beta, 100, '2026-11-08');
         $source = $this->pallet('FREE-SOURCE');
         $this->box('00000001', $source);
         $target = ExportMasterLocation::create(['code' => 'OTHER-TARGET']);
@@ -329,13 +355,14 @@ class ExportStockFilterExportTest extends TestCase
             'revision' => 0, 'delivery_revision' => 1, 'action' => 'finalize',
             'pallets' => [['master_location_id' => $target->id, 'items' => [['part_setting_id' => $this->part->id, 'box_quantity' => 1]]]],
         ], $this->operator);
-        $this->box('00000002', $source);
-        $this->box('00000003', $source);
-        $this->box('00000004', $source, ['pcs_quantity' => 20, 'is_not_full' => true]);
-        $this->box('00000005', $source, ['first_received_at' => now()->subMonths(13)]);
-        $this->box('00000006');
+        $this->own($this->box('00000002', $source), $alpha);
+        $this->own($this->box('00000003', $source), $alpha);
+        $this->own($this->box('00000004', $source, ['pcs_quantity' => 20, 'is_not_full' => true]), $alpha);
+        $this->own($this->box('00000005', $source, ['first_received_at' => now()->subMonths(13)]), $alpha);
+        $this->own($this->box('00000006'), $alpha);
+        $this->box('00000007', $source);
 
-        $params = ['customer' => 'CUSTOMER A'];
+        $params = ['customer' => 'customer:'.$alpha->id];
         $this->get(route('export.stock.index', $params))->assertOk()
             ->assertViewHas('customers', fn ($customers) => $customers->count() === 2)
             ->assertViewHas('deliveries', fn ($rows) => $rows->pluck('delivery.plan_code')->all() === ['RD-A1', 'RD-A2'])
@@ -345,10 +372,131 @@ class ExportStockFilterExportTest extends TestCase
             ->assertSee('20 PCS/box · Not Full');
         $response = $this->getJson(route('export.stock.index', $params + [
             'status' => 'free', 'part_number' => $this->part->part_number, 'pcs_per_box' => 20,
-        ]))->assertOk()->assertJsonPath('count', 1)->assertJsonPath('stockCounts.free', 3)
-            ->assertJsonPath('stockCounts.in_progress', 2);
+        ]))->assertOk()->assertJsonPath('count', 1)->assertJsonPath('stockCounts.free', 1)
+            ->assertJsonPath('stockCounts.in_progress', 0);
         $this->assertStringContainsString('00000004', $response->json('html'));
         $this->assertStringNotContainsString('RD-B', $response->json('readiness'));
+    }
+
+    public function test_customer_choices_are_only_master_records_including_customers_without_delivery_and_inactive_owners(): void
+    {
+        $alpha = $this->customer('C-A', 'Customer Alpha');
+        $inactive = $this->customer('C-I', 'Customer Inactive');
+        $source = $this->pallet('MASTER-SOURCE');
+        $this->own($this->box('00000001', $source), $alpha);
+        $this->own($this->box('00000002', $source), $inactive);
+        $inactive->update(['is_active' => false]);
+        $this->box('00000003', $source);
+        $this->plannedPallet('LEGACY-NAME');
+
+        $this->get(route('export.stock.index'))->assertOk()
+            ->assertViewHas('customers', fn ($customers) => $customers->all() === [
+                'customer:'.$alpha->id => 'C-A · Customer Alpha', 'customer:'.$inactive->id => 'C-I · Customer Inactive (Nonaktif)',
+            ])->assertViewHas('resultCount', 3)->assertSee('Semua customer');
+        foreach ([$alpha, $inactive] as $customer) {
+            $this->get(route('export.stock.index', ['customer' => 'customer:'.$customer->id]))->assertOk()
+                ->assertViewHas('resultCount', 1)->assertViewHas('deliveries', fn ($rows) => $rows->isEmpty())
+                ->assertViewHas('stockCounts', fn ($counts) => $counts['total'] === 1 && $counts['without_delivery'] === 1 && $counts['total_pcs'] === 100)
+                ->assertSee('Tidak ada rencana delivery aktif untuk customer ini. Reservasi stok customer tetap ditampilkan pada daftar.');
+        }
+    }
+
+    public function test_customer_filter_unites_owner_and_delivery_without_duplicates_and_scopes_pallet_contents_and_excel(): void
+    {
+        $alpha = $this->customer('C-A', 'Customer Alpha'); $beta = $this->customer('C-B', 'Customer Beta');
+        $source = $this->pallet('MIXED-SOURCE');
+        $own = $this->own($this->box('00000001', $source), $alpha);
+        $both = $this->own($this->box('00000002', $source), $alpha);
+        $commonDelivery = $this->box('00000003', $source);
+        $this->own($this->box('00000004', $source), $beta);
+        $this->box('00000005', $source);
+        $this->commit($both, $alpha, 'ALPHA-OWN');
+        $this->commit($commonDelivery, $alpha, 'ALPHA-GENERAL');
+        $this->own($this->box('00000006', $source, ['state' => 'removed']), $alpha);
+        $this->own($this->box('00000007', $source), $alpha)->delete();
+        $alpha->update(['name' => 'Customer Alpha Baru']);
+        $snapshot = ExportStockBox::withTrashed()->get()->toArray();
+        $filters = ['customer' => 'customer:'.$alpha->id];
+
+        $this->get(route('export.stock.index', $filters))->assertOk()
+            ->assertViewHas('boxes', fn ($boxes) => $boxes->pluck('id')->all() === [$own->id, $both->id, $commonDelivery->id])
+            ->assertViewHas('stockCounts', fn ($counts) => $counts['total'] === 3 && $counts['with_delivery'] === 2
+                && $counts['without_delivery'] === 1 && $counts['total_pcs'] === 300 && $counts['with_delivery_pcs'] === 200)
+            ->assertSee('Customer pemilik · Customer Alpha Baru')->assertSee('Customer pemilik · Umum')->assertSee('Tanpa delivery');
+        $groups = $this->getJson(route('export.stock.index', $filters + ['mode' => 'pallet']))->assertOk()
+            ->assertJsonPath('count', 3)->json('html');
+        $this->assertStringContainsString('3 box · 300 PCS', $groups);
+        $this->assertStringContainsString('customer%3A'.$alpha->id, $groups);
+        $contents = $this->getJson(route('export.stock.pallet-boxes', ['pallet' => $source->id] + $filters))->assertOk()->json('html');
+        foreach (['00000001', '00000002', '00000003'] as $number) $this->assertStringContainsString($number, $contents);
+        foreach (['00000004', '00000005', '00000006', '00000007'] as $number) $this->assertStringNotContainsString($number, $contents);
+        $this->getJson(route('export.stock.index', $filters + ['delivery_status' => 'with_delivery']))->assertOk()->assertJsonPath('count', 2);
+        $this->getJson(route('export.stock.index', $filters + ['delivery_status' => 'without_delivery']))->assertOk()->assertJsonPath('count', 1);
+        $sheet = $this->workbook($filters + ['delivery_status' => 'with_delivery', 'mode' => 'pallet'])->getActiveSheet();
+        $this->assertSame(3, $sheet->getHighestRow());
+        $this->assertSame('00000002', $sheet->getCell('A2')->getValue());
+        $this->assertSame('00000003', $sheet->getCell('A3')->getValue());
+        $this->assertSame('Umum', $sheet->getCell('K3')->getValue());
+        $this->getJson(route('export.stock.index'))->assertOk()->assertJsonPath('count', 5);
+        $this->assertEquals($snapshot, ExportStockBox::withTrashed()->get()->toArray());
+    }
+
+    public function test_typed_part_filter_preserves_customer_scope_and_pagination(): void
+    {
+        $alpha = $this->customer('C-A', 'Customer Alpha'); $beta = $this->customer('C-B', 'Customer Beta');
+        $source = $this->pallet('PART-SOURCE');
+        for ($i = 1; $i <= 21; $i++) $this->own($this->box(str_pad((string) $i, 8, '0', STR_PAD_LEFT), $source), $alpha);
+        $this->own($this->box('00000101', $source, ['part_number' => $this->part->part_number.'-EXTRA']), $alpha);
+        $this->own($this->box('00000102', $source, ['part_number' => 'BETA-ONLY']), $beta);
+        $filters = ['customer' => 'customer:'.$alpha->id, 'part_number' => '123', 'delivery_status' => 'without_delivery'];
+        $this->get(route('export.stock.index', $filters))->assertOk()
+            ->assertViewHas('boxes', fn ($boxes) => $boxes->total() === 22 && str_contains($boxes->nextPageUrl(), 'customer%3A'.$alpha->id))
+            ->assertSee('id="stock-part-number" name="part_number" type="search"', false)
+            ->assertDontSee('<select class="form-select" id="stock-part-number"', false);
+        $this->getJson(route('export.stock.index', $filters + ['stock_page' => 2]))->assertOk()
+            ->assertJsonPath('count', 22)->assertJsonPath('stockCounts.total', 22)->assertJsonPath('stockCounts.total_pcs', 2200);
+        $this->getJson(route('export.stock.index', ['customer' => 'customer:'.$beta->id, 'part_number' => $this->part->part_number]))->assertOk()
+            ->assertJsonPath('count', 0);
+        $sheet = $this->workbook($filters + ['stock_page' => 2])->getActiveSheet();
+        $this->assertSame(23, $sheet->getHighestRow());
+        $this->getJson(route('export.stock.index'))->assertOk()->assertJsonPath('count', 23);
+    }
+
+    public function test_typed_part_matches_one_or_more_characters_anywhere_and_keeps_customer_scope(): void
+    {
+        $alpha = $this->customer('C-A', 'Customer Alpha'); $beta = $this->customer('C-B', 'Customer Beta');
+        $source = $this->pallet('PART-PARTIAL');
+        foreach (['P7105-001', 'XP71-SUFFIX', 'ABC', 'P_100', 'P%200', 'P!300'] as $index => $number) {
+            $this->own($this->box('0000000'.($index + 1), $source, ['part_number' => $number]), $alpha);
+        }
+        $this->own($this->box('00000007', $source, ['part_number' => 'P7105-BETA']), $beta);
+        $this->box('00000008', $source, ['part_number' => 'P7105-GENERAL']);
+        $filters = ['customer' => 'customer:'.$alpha->id];
+        foreach (['P' => 5, 'p71' => 2, '105' => 1, 'suffix' => 1, 'P_' => 1, 'P%' => 1, 'P!' => 1, 'missing' => 0] as $text => $count) {
+            $this->getJson(route('export.stock.index', $filters + ['part_number' => (string) $text]))->assertOk()
+                ->assertJsonPath('count', $count)->assertJsonPath('stockCounts.total', $count);
+        }
+        $this->getJson(route('export.stock.index', $filters + ['part_number' => 'p71', 'mode' => 'pallet']))->assertOk()->assertJsonPath('count', 2);
+        $contents = $this->getJson(route('export.stock.pallet-boxes', ['pallet' => $source->id, 'part_number' => 'p71'] + $filters))->assertOk()->json('html');
+        $this->assertStringContainsString('00000001', $contents);
+        $this->assertStringContainsString('00000002', $contents);
+        $this->assertStringNotContainsString('00000007', $contents);
+        $this->assertStringNotContainsString('00000008', $contents);
+        $sheet = $this->workbook($filters + ['part_number' => 'p71'])->getActiveSheet();
+        $this->assertSame(3, $sheet->getHighestRow());
+        // Links from readiness must still show exactly one part and capacity.
+        $this->getJson(route('export.stock.index', $filters + ['part_number' => 'P7105-001', 'pcs_per_box' => 100]))->assertOk()->assertJsonPath('count', 1);
+        $this->getJson(route('export.stock.index', $filters + ['part_number' => 'P71', 'pcs_per_box' => 100]))->assertOk()->assertJsonPath('count', 0);
+    }
+
+    public function test_customer_and_delivery_filters_are_validated_for_list_contents_and_excel(): void
+    {
+        foreach (['export.stock.index', 'export.stock.export', 'export.stock.pallet-boxes'] as $route) {
+            foreach ([['customer' => 'Customer legacy'], ['customer' => 'customer:999999'], ['customer' => ['bad']], ['delivery_status' => 'bad']] as $filters) {
+                $this->getJson(route($route, ($route === 'export.stock.pallet-boxes' ? ['pallet' => 'unplaced'] : []) + $filters))
+                    ->assertUnprocessable()->assertJsonValidationErrors(array_key_first($filters));
+            }
+        }
     }
 
     public function test_ajax_list_does_not_load_layout_location_choices_or_destination_catalogs(): void

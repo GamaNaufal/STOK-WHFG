@@ -1,5 +1,5 @@
 @if($customer === '' || $deliveries->isEmpty())
-    <p class="stock-readiness-message">{{ $customer === '' ? 'Pilih customer untuk menampilkan rencana delivery yang masih aktif.' : 'Tidak ada rencana delivery aktif untuk customer ini.' }}</p>
+    <p class="stock-readiness-message">{{ $customer === '' ? 'Seluruh stok ditampilkan. Pilih customer untuk melihat stok terkait dan progres delivery-nya.' : 'Tidak ada rencana delivery aktif untuk customer ini. Reservasi stok customer tetap ditampilkan pada daftar.' }}</p>
 @else
     <div class="stock-readiness-grid">
         <section aria-labelledby="stock-readiness-deliveries">
@@ -31,11 +31,11 @@
             </div>
         </section>
         <section aria-labelledby="stock-readiness-shortages">
-            <h3 id="stock-readiness-shortages">Kebutuhan vs stok bersih</h3>
+            <h3 id="stock-readiness-shortages">Kebutuhan vs stok customer</h3>
             @if($shortages->isEmpty())
                 <p class="stock-readiness-message">Semua kebutuhan sudah memiliki alokasi.</p>
             @else
-                <p class="stock-readiness-note">Gabungan kebutuhan yang belum dialokasikan untuk customer ini. Stok bersih memperhitungkan reservasi seluruh customer.</p>
+                <p class="stock-readiness-note">Gabungan kebutuhan yang belum dialokasikan untuk customer ini. Stok cocok hanya menghitung reservasi customer ini yang masih bersih dan tanpa delivery.</p>
                 <div class="plan-table-scroll stock-readiness-table" role="region" tabindex="0" aria-label="Kebutuhan dan stok bersih per part">
                     <table class="table plan-table">
                         <thead><tr><th scope="col">Nomor part</th><th scope="col">Belum dialokasi</th><th scope="col">Stok bersih cocok</th><th scope="col">Masih kurang</th></tr></thead>
@@ -57,7 +57,7 @@
                         </tbody>
                     </table>
                 </div>
-                <p class="stock-readiness-note">Semua angka dalam box. Stok yang cocok belum direservasi.</p>
+                <p class="stock-readiness-note">Semua angka dalam box. Stok yang cocok belum terikat delivery.</p>
             @endif
         </section>
     </div>

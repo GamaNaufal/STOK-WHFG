@@ -88,6 +88,7 @@ if (form) {
     };
     const setBusy = value => {
         busy = value; box.readOnly = value || pendingBox !== null; part.readOnly = value;
+        if (customer) customer.disabled = value;
         form.querySelectorAll('button').forEach(button => { button.disabled = value; });
         form.setAttribute('aria-busy', String(value)); render();
     };
@@ -160,6 +161,9 @@ if (form) {
     box.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); checkBox(); } });
     document.getElementById('scan-box-button').addEventListener('click', checkBox);
     document.getElementById('reset-scan-input').addEventListener('click', resetInput);
+    customer?.addEventListener('change', () => {
+        if (!busy) resetInput();
+    });
     box.addEventListener('input', () => {
         const value = box.value, digits = value.replace(/[^0-9]/g, '').slice(0, 8);
         if (value !== digits) {

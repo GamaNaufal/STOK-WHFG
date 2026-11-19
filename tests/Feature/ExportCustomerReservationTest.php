@@ -103,11 +103,17 @@ class ExportCustomerReservationTest extends TestCase
         $this->assertSame($delivery->id, $exception->export_delivery_plan_id);
         $this->assertSame($this->b->id, app(ExportCustomerStockPolicy::class)->ownerId($beta));
         $this->assertNotNull($beta->fresh()->fulfillment);
+        $this->getJson(route('export.stock.index', ['customer' => 'customer:'.$this->a->id]))->assertOk()
+            ->assertJsonPath('count', 3)->assertJsonPath('stockCounts.with_delivery', 3);
+        $this->getJson(route('export.stock.index', ['customer' => 'customer:'.$this->b->id]))->assertOk()
+            ->assertJsonPath('count', 1)->assertJsonPath('stockCounts.with_delivery', 1);
         $service->cancel($delivery->id, $exception->id, ['request_token' => (string) Str::uuid(), 'revision' => $exception->revision], $this->admin);
         $this->assertSame('cancelled', $exception->fresh()->status);
         $this->assertNull($beta->fresh()->fulfillment);
         $this->assertSame($this->b->id, app(ExportCustomerStockPolicy::class)->ownerId($beta));
         $this->assertSame(2, ExportFulfillmentBox::count());
+        $this->getJson(route('export.stock.index', ['customer' => 'customer:'.$this->b->id, 'delivery_status' => 'without_delivery']))->assertOk()
+            ->assertJsonPath('count', 1)->assertJsonPath('stockCounts.with_delivery', 0);
     }
 
     public function test_exception_rechecks_fifo_and_rejects_a_box_committed_to_beta(): void

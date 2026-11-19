@@ -58,11 +58,13 @@ test('a stale failed request does not overwrite the success state of newer filte
 });
 
 test('unified search and radio grouping apply filters and restore them through reset and browser history', async t => {
-    const fields = Object.fromEntries(['q', 'part_number', 'status', 'location_id', 'mode'].map(name => [name, {value: name === 'mode' ? 'box' : ''}]));
+    const fields = Object.fromEntries(['q', 'part_number', 'pcs_per_box', 'status', 'delivery_status', 'location_id', 'mode', 'customer'].map(name => [name, {value: name === 'mode' ? 'box' : ''}]));
     const formEvents = {}, windowEvents = {}, requests = [];
     const partLabel = {textContent: ''};
     const partChip = {hidden: true, querySelector: () => partLabel};
-    let scheduled, resetFilter;
+    let scheduled, resetFilter, changeCustomer;
+    fields.customer.addEventListener = (_event, handler) => { changeCustomer = handler; };
+    const totals = ['total', 'total_pcs', 'with_delivery', 'without_delivery'].map(key => ({dataset: {stockTotal: key}, textContent: ''}));
     const form = {
         action: 'http://localhost/export/stock',
         elements: {namedItem: name => fields[name]},
@@ -76,6 +78,8 @@ test('unified search and radio grouping apply filters and restore them through r
         'stock-request-status': {textContent: ''},
         'stock-request-retry': {addEventListener() {}, hidden: true},
         'stock-result-count': {textContent: '0'},
+        'stock-customer': fields.customer,
+        'stock-customer-totals': {querySelectorAll: () => totals},
     };
     const windowRef = {
         location: {href: form.action},
@@ -90,7 +94,11 @@ test('unified search and radio grouping apply filters and restore them through r
     initStockBrowser({
         documentRef: {getElementById: id => elements[id], querySelector: () => ({addEventListener: (_name, handler) => { resetFilter = handler; }})},
         windowRef,
-        fetcher: async url => { requests.push(new URL(url)); return reply('STOCK', 2); },
+        fetcher: async url => {
+            const parsed = new URL(url); requests.push(parsed);
+            return {ok: true, json: async () => ({html: 'STOCK', count: 2,
+                stockCounts: {total: 2, total_pcs: 1200, with_delivery: 1, without_delivery: 1}})};
+        },
     });
     const flush = () => new Promise(resolve => setImmediate(resolve));
 
@@ -122,10 +130,51 @@ test('unified search and radio grouping apply filters and restore them through r
     assert.equal(requests.at(-1).searchParams.has('part_number'), false);
     assert.equal(partChip.hidden, true);
 
+    fields.customer.value = 'customer:1';
+    changeCustomer(); await flush();
+    assert.equal(requests.at(-1).searchParams.get('customer'), 'customer:1');
+    assert.equal(totals[1].textContent, '1.200');
+
+    fields.part_number.value = '7105'; fields.pcs_per_box.value = '50';
+    const beforeTyping = requests.length;
+    formEvents.input({target: {name: 'part_number'}});
+    assert.equal(requests.length, beforeTyping);
+    await scheduled();
+    assert.equal(fields.pcs_per_box.value, '');
+    assert.equal(partChip.hidden, false);
+    assert.equal(partLabel.textContent, 'Nomor part 7105');
+    assert.equal(requests.at(-1).searchParams.get('part_number'), '7105');
+    fields.part_number.value = '7105-OTHER';
+    formEvents.input({target: {name: 'part_number'}});
+    let prevented = false;
+    formEvents.keydown({key: 'Enter', target: {name: 'part_number'}, preventDefault() { prevented = true; }});
+    await flush();
+    assert.equal(prevented, true);
+    assert.equal(scheduled, null);
+    assert.equal(requests.at(-1).searchParams.get('part_number'), '7105-OTHER');
+
+    fields.delivery_status.value = 'without_delivery';
+    formEvents.change({target: {name: 'delivery_status', matches: () => true}}); await flush();
+    assert.equal(requests.at(-1).searchParams.get('delivery_status'), 'without_delivery');
+
+    fields.customer.value = 'customer:2'; changeCustomer(); await flush();
+    assert.equal(requests.at(-1).searchParams.get('customer'), 'customer:2');
+    assert.equal(fields.part_number.value, '7105-OTHER');
+
+    windowRef.location.href = form.action+'?customer=customer:1&part_number=7105-OTHER&delivery_status=with_delivery';
+    windowEvents.popstate(); await flush();
+    assert.equal(fields.customer.value, 'customer:1');
+    assert.equal(fields.part_number.value, '7105-OTHER');
+    assert.equal(fields.delivery_status.value, 'with_delivery');
+
     resetFilter({preventDefault() {}});
     await flush();
     assert.equal(fields.q.value, '');
     assert.equal(fields.mode.value, 'box');
     assert.equal(fields.status.value, '');
+    assert.equal(fields.delivery_status.value, '');
+    assert.equal(fields.customer.value, 'customer:1');
     assert.equal(requests.at(-1).searchParams.has('q'), false);
+    fields.customer.value = ''; changeCustomer(); await flush();
+    assert.equal(requests.at(-1).searchParams.has('customer'), false);
 });

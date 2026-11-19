@@ -17,10 +17,9 @@ class ExportStockController extends Controller
     {
         if ($request->query('customer_view') === 'reservations') return app(ExportCustomerStockController::class)->index($request);
         $filters = $stock->filters($request);
-        $selection = $request->validate(['customer' => 'nullable|string|max:255']);
-        $customer = mb_strtolower(trim($selection['customer'] ?? ''));
+        $customer = $filters['customer'];
         $readinessData = $readiness->forCustomer($customer);
-        $stockCounts = $stock->overviewCounts();
+        $stockCounts = $stock->overviewCounts($filters);
         $boxes = $palletGroups = null;
         $reservationGroups = collect();
         if ($filters['mode'] === 'pallet') {
@@ -31,7 +30,7 @@ class ExportStockController extends Controller
             $boxes = $stock->boxes($filters)->paginate(20, ['*'], 'stock_page')->withQueryString();
             $resultCount = $boxes->total();
         }
-        $hasFilters = $filters['q'] !== '' || $filters['part_number'] !== '' || $filters['status'] !== '' || $filters['location_id'] || $filters['pcs_per_box'];
+        $hasFilters = $customer !== '' || $filters['delivery_status'] !== '' || $filters['q'] !== '' || $filters['part_number'] !== '' || $filters['status'] !== '' || $filters['location_id'] || $filters['pcs_per_box'];
         $results = compact('filters', 'boxes', 'palletGroups', 'reservationGroups', 'resultCount', 'hasFilters');
         if ($request->expectsJson()) {
             return response()->json([

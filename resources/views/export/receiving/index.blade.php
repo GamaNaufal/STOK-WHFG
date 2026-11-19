@@ -13,7 +13,7 @@
         @if($customerReady)
         <section class="plan-panel mb-3 customer-receipt-context" aria-labelledby="receipt-customer-title"><div class="plan-panel-heading"><h2 id="receipt-customer-title">Pemilik stok untuk scan berikutnya</h2></div><div class="plan-panel-body">
             <label class="form-label" for="receiving-customer">Reservasi customer</label><select class="form-select" id="receiving-customer" aria-describedby="receiving-customer-help"><option value="">Umum, tidak dikhususkan untuk customer</option>@foreach($masterCustomers as $masterCustomer)<option value="{{ $masterCustomer->id }}">{{ $masterCustomer->code }} · {{ $masterCustomer->name }}</option>@endforeach</select>
-            <p class="plan-help mb-0" id="receiving-customer-help">Pilihan melekat per box saat ditambahkan. Mengganti pilihan tidak mengubah customer pada baris yang sudah ada. Customer disimpan sebelum alokasi FIFO.</p>
+            <p class="plan-help mb-0" id="receiving-customer-help">Pilihan melekat per box saat ditambahkan. Mengganti pilihan menyiapkan ulang kolom scan dan mengarahkan fokus ke ID Box, baris yang sudah ada tetap memakai customer awal. Customer disimpan sebelum alokasi FIFO.</p>
         </div></section>
         @endif
         <div class="receiving-workspace receiving-bulk-workspace">

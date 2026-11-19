@@ -3,12 +3,14 @@
 namespace App\Services;
 
 use App\Models\ExportMasterLocation;
+use App\Models\ExportCustomer;
 use App\Models\ExportPickingIssue;
 use App\Models\ExportPlannedPalletItem;
 use App\Models\ExportStockBox;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class ExportStockQueryService
 {
@@ -19,11 +21,19 @@ class ExportStockQueryService
         $data = $request->validate([
             'q' => 'nullable|string|max:100',
             'part_number' => 'nullable|string|max:100',
+            'customer' => ['nullable', 'string', 'regex:/^customer:([1-9][0-9]*)$/D', 'max:100'],
+            'delivery_status' => ['nullable', Rule::in(['with_delivery', 'without_delivery'])],
             'pcs_per_box' => 'nullable|integer|min:1|max:4294967295',
             'status' => ['nullable', Rule::in(['stored', 'pending', 'spare', 'reserved', 'free', 'in_progress'])],
             'mode' => ['nullable', Rule::in(['box', 'pallet'])],
             'location_id' => ['nullable', 'integer', 'min:1', Rule::exists('master_locations', 'id')->where('scope', ExportMasterLocation::MASTER_SCOPE)],
-        ]);
+        ], ['customer.regex' => 'Pilih customer dari Master Customer.']);
+
+        $customer = $data['customer'] ?? '';
+        if ($customer !== '' && (! app(ExportCustomerStockPolicy::class)->ready()
+            || ! ExportCustomer::whereKey(substr($customer, 9))->exists())) {
+            throw ValidationException::withMessages(['customer' => 'Customer tidak ditemukan di Master Customer. Pilih kembali customer.']);
+        }
 
         // Older bookmarked reservation/placement filters belong to spare stock.
         $status = $data['status'] ?? '';
@@ -32,13 +42,17 @@ class ExportStockQueryService
         }
 
         return ['q' => trim($data['q'] ?? ''), 'part_number' => trim($data['part_number'] ?? ''), 'pcs_per_box' => $data['pcs_per_box'] ?? null, 'status' => $status,
+            'customer' => $customer, 'delivery_status' => $data['delivery_status'] ?? '',
             'mode' => $data['mode'] ?? 'box',
             'location_id' => ! empty($data['location_id']) ? (int) $data['location_id'] : null];
     }
 
     public function boxes(array $filters): Builder
     {
-        return ExportStockBox::query()->whereIn('state', ['received', 'stored'])->with(self::LIST_RELATIONS)
+        $query = ExportStockBox::query()->whereIn('state', ['received', 'stored'])->with(self::LIST_RELATIONS);
+        if (app(ExportCustomerStockPolicy::class)->ready()) $query->with('customerReservation.customer');
+
+        return $this->forCustomer($query, $filters['customer'] ?? '')
             ->when($filters['q'] !== '', fn ($q) => $q->where(function ($s) use ($filters) {
                 $search = $filters['q'];
                 $s->where('box_number', 'like', '%'.$search.'%')->orWhere('part_number', 'like', '%'.$search.'%')
@@ -56,13 +70,30 @@ class ExportStockQueryService
                 }
             }))
             ->when($filters['pcs_per_box'] ?? null, fn ($q, $pcs) => $q->where('pcs_quantity', $pcs))
-            ->when(($filters['part_number'] ?? '') !== '', fn ($q) => ($filters['pcs_per_box'] ?? null)
-                ? $q->where('part_number', $filters['part_number'])
-                : $q->where('part_number', 'like', '%'.$filters['part_number'].'%'))
+            ->when(($filters['part_number'] ?? '') !== '', function ($query) use ($filters) {
+                // Readiness links identify one part/capacity, typing clears pcs_per_box in the browser.
+                if ($filters['pcs_per_box'] ?? null) return $query->where('part_number', $filters['part_number']);
+                $text = strtr(mb_strtolower($filters['part_number']), ['!' => '!!', '%' => '!%', '_' => '!_']);
+
+                return $query->whereRaw("LOWER(export_stock_boxes.part_number) LIKE ? ESCAPE '!'", ['%'.$text.'%']);
+            })
             ->when($filters['status'] !== '', fn ($q) => $this->applyStatus($q, $filters['status']))
+            ->when(($filters['delivery_status'] ?? '') !== '', fn ($q) => ($filters['delivery_status'] === 'with_delivery')
+                ? $q->whereHas('fulfillment') : $q->whereDoesntHave('fulfillment'))
             // A reservation is a future destination; it must not change physical stock filters.
             ->when($filters['location_id'], fn ($q, $id) => $q->whereHas('currentPallet', fn ($p) => $p->where('master_location_id', $id)))
             ->orderBy('first_received_at')->orderBy('id');
+    }
+
+    /** Customer ownership and a delivery commitment are independent, count their union once. */
+    public function forCustomer(Builder $query, string $customer): Builder
+    {
+        if ($customer === '') return $query;
+        $id = (int) substr($customer, 9);
+
+        return $query->where(fn ($q) => $q
+            ->whereHas('customerReservation', fn ($reservation) => $reservation->where('export_customer_id', $id))
+            ->orWhereHas('fulfillment.plannedItem.pallet.palletPlan.deliveryPlan.customerLink', fn ($link) => $link->where('export_customer_id', $id)));
     }
 
     public function freeBoxes(Builder $query): Builder
@@ -85,14 +116,23 @@ class ExportStockQueryService
         };
     }
 
-    public function overviewCounts(): array
+    public function overviewCounts(array $filters): array
     {
-        $active = ExportStockBox::whereIn('state', ['received', 'stored']);
+        // Keep the customer, part, search and physical location, count before category selection.
+        $active = $this->boxes(array_replace($filters, ['status' => '', 'delivery_status' => '']))->withoutEagerLoads()->reorder();
         $stored = $this->applyStatus(clone $active, 'stored')->count();
+        $totals = (clone $active)->selectRaw('COUNT(*) AS box_count, COALESCE(SUM(pcs_quantity), 0) AS pcs')->first();
+        $committed = (clone $active)->whereHas('fulfillment')->selectRaw('COUNT(*) AS box_count, COALESCE(SUM(pcs_quantity), 0) AS pcs')->first();
 
         return [
+            'total' => (int) $totals->box_count,
+            'total_pcs' => (int) $totals->pcs,
+            'with_delivery' => (int) $committed->box_count,
+            'with_delivery_pcs' => (int) $committed->pcs,
+            'without_delivery' => (int) $totals->box_count - (int) $committed->box_count,
+            'without_delivery_pcs' => (int) $totals->pcs - (int) $committed->pcs,
             'stored' => $stored,
-            'spare' => (clone $active)->count() - $stored,
+            'spare' => (int) $totals->box_count - $stored,
             'free' => $this->applyStatus(clone $active, 'free')->count(),
             'in_progress' => $this->applyStatus(clone $active, 'in_progress')->count(),
         ];
