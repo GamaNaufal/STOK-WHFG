@@ -4,6 +4,8 @@ Panduan di bawah untuk instalasi baru. Untuk production existing dengan migratio
 sampai 15 Oktober 2026, gunakan [panduan upgrade](PRODUCTION_UPGRADE_FROM_2026_10_15.md).
 Pertahankan database, .env dan APP_KEY existing. Jangan menjalankan key:generate
 atau membuat ulang database sebagai bagian upgrade.
+Hasil pemeriksaan rilis terbaru dan prasyarat yang belum selesai tercatat di
+[kesiapan production 24 November 2026](PRODUCTION_READINESS_2026-11-24.md).
 
 ## Target: Ubuntu VPS (Nginx/Apache)
 
@@ -17,7 +19,7 @@ atau membuat ulang database sebagai bagian upgrade.
 
 - Clone repo dari GitHub ke `/var/www/your-app`.
 - `composer install --no-dev --optimize-autoloader`
-- `npm install` lalu `npm run build`
+- `npm ci` lalu `npm run build`
 
 ### 3. Environment
 

@@ -9,7 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // This registry survives permanent QA rejection; a barcode is never reusable.
+        // This registry survives permanent QA rejection; later migrations add reuse cycles.
         Schema::create('box_identities', function (Blueprint $table) {
             $table->string('box_number')->primary();
         });
@@ -40,14 +40,14 @@ return new class extends Migration
             $table->string('destination_location')->nullable();
             $table->timestamps();
         });
-        // Old reactivations must go through QA. Preserve their former deadline for review.
+        // Preserve granted reactivation periods during upgrade (business decision 2026-11-24).
+        // This snapshot does not shorten, extend or reactivate any existing inventory.
         Schema::table('boxes', function (Blueprint $table) {
             $table->dateTime('legacy_reactivated_until')->nullable();
         });
         DB::table('boxes')->whereNotNull('reactivated_until')->where('is_withdrawn', false)
             ->whereNull('deleted_at')->update([
                 'legacy_reactivated_until' => DB::raw('reactivated_until'),
-                'reactivated_until' => now(),
             ]);
     }
 

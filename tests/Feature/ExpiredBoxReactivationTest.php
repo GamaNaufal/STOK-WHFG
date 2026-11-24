@@ -408,7 +408,7 @@ class ExpiredBoxReactivationTest extends TestCase
         }
     }
 
-    public function test_cutover_preserves_old_deadline_but_requires_qa_before_reuse(): void
+    public function test_upgrade_preserves_a_valid_legacy_deadline_until_its_original_expiry(): void
     {
         [, , $box] = $this->inventory();
         $box->update(['reactivated_until' => now()->addMonthNoOverflow()]);
@@ -417,11 +417,16 @@ class ExpiredBoxReactivationTest extends TestCase
         $migration->down();
         $migration->up();
         $this->assertSame($previousDeadline, $box->fresh()->legacy_reactivated_until);
+        $this->assertSame($previousDeadline, $box->fresh()->reactivated_until->toDateTimeString());
+        $this->assertTrue(Box::active()->whereKey($box->id)->exists());
+        app(ExpiredBoxService::class)->syncStatuses();
+        $this->assertSame('active', $box->fresh()->expired_status);
+        $this->assertDatabaseCount('expired_box_handlings', 0);
+        $this->assertDatabaseHas('box_identities', ['box_number' => $box->box_number]);
+        $this->travelTo($box->fresh()->reactivated_until);
         $this->assertFalse(Box::active()->whereKey($box->id)->exists());
         app(ExpiredBoxService::class)->syncStatuses();
         $this->assertSame('expired', $box->fresh()->expired_status);
-        $this->assertDatabaseCount('expired_box_handlings', 0);
-        $this->assertDatabaseHas('box_identities', ['box_number' => $box->box_number]);
     }
 
     public function test_expired_renewal_is_rejected_without_verification_lock_but_blocks_final_scan(): void

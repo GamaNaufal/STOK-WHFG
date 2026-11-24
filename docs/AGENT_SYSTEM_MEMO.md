@@ -1,6 +1,33 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 19 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 24 November 2026 (pembaruan inkremental).
+
+Persiapan upgrade production dan preservasi reaktivasi, 24 November 2026:
+
+- Baseline production dari daftar pengguna: 33 migration sudah Ran sampai
+  15 Oktober; checkout b0bbc60 memiliki 30 tambahan sampai reservasi customer
+  16 November. Status server belum dibaca langsung. Docker/Compose dan backup
+  production belum diverifikasi; belum melakukan deployment.
+- Keputusan pengguna: pertahankan deadline reaktivasi yang masih berlaku.
+  Migration QA 23 Oktober yang masih pending pada baseline tersebut direvisi
+  agar hanya mengisi legacy_reactivated_until tanpa mengubah reactivated_until
+  atau expired_status. Deadline habis tetap habis, handled tetap nonaktif.
+  Berlaku untuk penerapan baru migration; server yang telah menjalankan versi
+  pemotongan deadline memerlukan pemeriksaan/perbaikan terarah tersendiri.
+- Tes baseline berisi enam kondisi box, master/user, delivery processing, sesi
+  picking dan audit menjalankan semua pending pada SQLite in-memory. Kolom
+  bisnis/PK/count lama, deadline, registry serta relasi picking terjaga. Bersama
+  tes reaktivasi: 24 tes / 238 assertions lulus. Seluruh 180 frontend, build,
+  validasi Composer/platform lokal dan pemeriksaan sintaks PHP/Bash lulus.
+  Regresi penuh final: 787 tes / 8.450 assertions, 780 lulus dan tujuh kegagalan
+  pada rentang laporan, binder Excel, snapshot seeder serta preview dashboard
+  yang sebelumnya tercatat, tanpa error. Tidak memperbaiki area tersebut di sesi ini.
+  Ini bukan rehearsal MySQL/MariaDB salinan production.
+- Panduan upgrade diperbarui, skrip production-preflight.sh/.php hanya membaca
+  konfigurasi aman dan SELECT database dalam transaksi READ ONLY. Tidak mencetak
+  credential/data bisnis rinci, tidak menjalankan migration/restart/scheduler.
+  Perintah deploy/backup spesifik menunggu laporan operator. Status rilis dan
+  batas pengujian: docs/PRODUCTION_READINESS_2026-11-24.md.
 
 Fokus scan setelah pergantian customer penerimaan Ekspor, 19 November 2026:
 
@@ -3007,7 +3034,7 @@ Penanganan per transaksi (revisi UX 23 Oktober 2026):
 
 `box_identities` menyimpan semua nomor yang pernah dipakai, termasuk soft-delete dan penolakan QA permanen. Sejak 15 November, registry menjadi pengunci global dan penghitung penggunaan. Pembuatan melalui model Box mengklaim penggunaan atomik bersama box, pemeriksaan pemilik aktif serta unique nomor/penggunaan mencegah duplikasi. Stock Input, direct Delivery Assign, dan pengajuan Not Full memeriksa pemilik/proses aktif. Jangan membuat box melalui raw insert yang melewati model.
 
-Transisi data lama: migration `2026_10_23_000001_create_expired_box_handlings` menyimpan deadline lama pada `legacy_reactivated_until` lalu mengakhiri deadline reaktivasi box non-withdrawn/non-deleted pada saat cutover. Box tersebut langsung tidak eligible delivery; sinkronisasi expiry memasukkannya ke daftar QA. Riwayat `expired_box_reports` lama tetap dipisahkan dari proses QA baru. Tidak ada transaksi QA fiktif yang dibuat. Data handled legacy yang tidak memiliki deadline tetap nonaktif.
+Transisi data lama (revisi sesuai keputusan pengguna 24 November 2026): migration `2026_10_23_000001_create_expired_box_handlings` menyimpan deadline lama pada `legacy_reactivated_until` untuk box non-withdrawn/non-deleted tanpa mengubah deadline atau status existing. Masa reaktivasi valid tetap berlaku sampai batas asal, bukan dipotong saat deploy; deadline habis tetap tidak eligible. Riwayat `expired_box_reports` lama tetap dipisahkan dari proses QA baru. Tidak ada transaksi QA fiktif yang dibuat. Data handled legacy tetap nonaktif. Server yang sudah menjalankan versi lama tidak otomatis pulih hanya dengan perubahan file migration.
 
 Scheduler `expired-box:sync-statuses` memperbarui Lokal dan Ekspor setiap menit. Ringkasan harian `expired-box:send-summary` pukul 07.00 WIB mengirim satu email dengan bagian Lokal dan Ekspor terpisah. Penerima default adalah akun Supervisi. `EXPIRED_BOX_SUMMARY_TO` dapat mengarahkan ringkasan ke satu alamat uji di development. Query expiry mencakup box orphan; status handled tidak diaktifkan ulang oleh scheduler. Cek deadline pada query stok/FIFO/scan tetap berlaku sebelum scheduler berjalan. Setelah masa satu bulan habis, ID pengganti masuk siklus QA baru.
 
@@ -3160,14 +3187,14 @@ Status yang digunakan:
 - Backup sebelum migration terbaru tersimpan di `storage/app/backups/db_stock_before_integrity_hardening_2026-06-19_082641.sql`.
 - Audit data aktif tidak menemukan duplicate stock location, lokasi tanpa master link, mismatch `pallet_items`, box aktif tanpa lokasi, session pending yatim, assignment invalid, lebih dari satu session picking aktif, maupun mismatch PCS Master Part tanpa approval not-full.
 - Full regression suite branch QA/packing diverifikasi 23 Oktober 2026 menggunakan SQLite in-memory: 272 test lulus (2.076 assertions), termasuk 22 test expiry/QA/packing dan 18 test proses beberapa box/pengelompokan transaksi. Cakupan tambahan: 3 box menjadi 1 header, siklus lengkap dengan hasil QA campuran, seluruh anggota ditolak, penolakan payload sebagian/lintas transaksi, start tumpang tindih, permission, dan backfill yang dijalankan ulang. Daftar satu baris per transaksi, navigasi langsung ke tahap QA, pilihan awal, hasil QA berbeda, tahap packing/selesai, dan simulasi viewport 390px diperiksa di browser dengan HTML hasil render Laravel dari database test. Ini bukan pengujian perangkat scanner fisik atau rehearsal MySQL production. Database kerja MySQL belum dimigrasikan dalam pengerjaan ini.
-- Migration QA/packing belum dinyatakan siap production: cutover deadline masih perlu preflight box assigned/picking, pemisahan perubahan schema dan cutover, serta prosedur pemulihan jika DDL terhenti sebagian. `down()` menolak rollback jika penanganan sudah ada dan bukan pemulihan deadline lama. Perlu rehearsal pada salinan MySQL production, backup/restore teruji, serta penghentian sementara write/worker/scheduler ketika backfill dan cutover. Penambahan proses massal tidak menyelesaikan risiko migration tersebut.
+- Migration QA/packing belum dinyatakan siap production. Revisi 24 November menghapus pemotongan deadline sesuai keputusan pengguna; tes populated baseline SQLite mempertahankan deadline dan relasi picking. Masih perlu rehearsal salinan MySQL/MariaDB production, backup/restore teruji, penghentian semua write/worker/scheduler dan prosedur pemulihan DDL sebagian. `down()` menolak rollback jika penanganan sudah ada. Lihat docs/PRODUCTION_READINESS_2026-11-24.md untuk hasil dan prasyarat terbaru.
 - Verifikasi UI umur setelah revisi di atas: 40 tes expiry/transaksi lulus (384 assertions). Render dengan data contoh memastikan umur 13 bulan 5 hari / 10 bulan 3 hari, batas aktif terpisah, serta hasil pencarian kosong; daftar expired/warning diperiksa pada desktop dan simulasi lebar 390px. Revisi tampilan ini tidak menambah migration.
 - Verifikasi poles UI 23 Oktober 2026: 40 tes expiry/transaksi lulus (384 assertions), sintaks controller dan JavaScript valid, serta pratinjau browser desktop memeriksa filter yang mempertahankan pilihan lintas pencarian, pemilihan massal hasil tampil, feedback QA, urutan daftar utama, dan ringkasan packing. Preview memakai HTML dari SQLite test; belum diuji dengan perangkat scanner fisik atau browser ponsel nyata. Tidak ada migration tambahan.
 - Kolom `audit_logs.type` menggunakan string terindeks, bukan enum tertutup, sehingga audit fitur baru seperti `delivery_assignment` dapat disimpan tanpa melanggar constraint.
 
 ## Catatan yang Belum Diputuskan
 
-Alur QA/packing memakai pencatatan internal; revisi 5 November 2026 tidak mewajibkan pengantar fisik ke packing. Metode penyampaian hasil QA tetap perlu diverifikasi operasional. Migration QA awal memiliki cutover masa aktif Handle lama; migration penerimaan bertahap hanya menambah riwayat tanpa mengubah deadline existing. Rincian keputusan ada pada bagian 17 dan revisi di awal memo.
+Alur QA/packing memakai pencatatan internal; revisi 5 November 2026 tidak mewajibkan pengantar fisik ke packing. Metode penyampaian hasil QA tetap perlu diverifikasi operasional. Keputusan 24 November mempertahankan deadline Handle lama saat upgrade; migration QA dan penerimaan bertahap tidak memotong deadline existing. Rincian keputusan ada pada bagian 17 dan revisi di awal memo.
 
 ## Panduan Agent Saat Menerima Tugas
 

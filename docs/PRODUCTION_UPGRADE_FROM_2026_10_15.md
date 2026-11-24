@@ -1,25 +1,84 @@
 # Upgrade production dari migration 15 Oktober 2026
 
-Disusun 15 November 2026 berdasarkan source checkout saat ini dan log pengguna.
+Ditinjau ulang 24 November 2026 berdasarkan checkout `b0bbc60` beserta perubahan
+lokal panduan/preflight dan preservasi reaktivasi. Commit rilis final harus dicatat
+setelah perubahan tersebut disimpan dan diperiksa.
 Dokumen ini panduan untuk pengelola server, bukan catatan bahwa deploy telah dilakukan.
 
 ## Acuan dan status kesiapan
 
-- Pengguna memilih seluruh fitur terbaru beserta perbaikan keamanan.
+- Cakupan panduan: upgrade project terbaru beserta fitur Ekspor, QA/packing,
+  hak akses rinci, penggunaan ulang ID box dan reservasi customer.
 - Daftar status terbaru yang disampaikan: migration sampai
   `2026_10_15_000001_create_role_feature_access_table` sudah Ran.
 - Log pull lebih lama: `6fb73cf` menuju `9451407`, branch main, container aplikasi
   `fifowhfg_app`. Pada log lama tersebut tiga migration terakhir masih Pending.
   Daftar terbaru menjadi acuan sementara, bukan bukti kondisi server saat deploy.
-- Dibanding acuan 15 Oktober, checkout ini mempunyai **29 migration tambahan**.
+- Dibanding acuan 15 Oktober, checkout ini mempunyai **30 migration tambahan**.
   Laravel hanya menjalankan migration yang belum tercatat; tidak perlu membuat
   ulang database atau menjalankan kembali migration yang sudah Ran.
 - OS, versi PHP/DB aktual, nama container database, Compose/Dockerfile dan pola
   mount/image production belum diverifikasi. File Dockerfile/Compose production
   tidak tersedia pada checkout yang diperiksa. Perintah rebuild tidak boleh ditebak.
-- Perbaikan keamanan terbaru lulus pemeriksaan sintaks, tetapi tes aplikasi dan
-  rehearsal upgrade MySQL/MariaDB salinan production belum dilakukan pada sesi ini.
-  Belum ada dasar untuk menyatakan rilis siap langsung dijalankan di production.
+- Keputusan pengguna 24 November: **pertahankan deadline reaktivasi yang masih
+  berlaku**. Migration QA yang masih pending pada baseline ini telah disesuaikan:
+  hanya menyalin deadline ke metadata legacy, tanpa mengubah deadline/status box.
+  Jangan memakai versi migration lama yang memotong deadline ke waktu deploy.
+- Status: **BELUM SIAP untuk langsung dieksekusi di production**. Struktur
+  migration mendukung upgrade database berisi, tetapi rehearsal pada salinan
+  production dengan engine/versi sama, uji restore, hasil tes yang belum lulus,
+  serta pola deployment aktual masih harus dituntaskan. Lihat
+  [hasil pemeriksaan](PRODUCTION_READINESS_2026-11-24.md).
+
+## 0. Permintaan pertama kepada operator: laporan baca-saja
+
+Jalankan tahap ini dahulu; tahap ini tidak menjalankan migration, build, clear
+cache, restart container atau maintenance. Jangan melakukan `git pull` seluruh
+source ke bind mount aplikasi yang sedang dipakai hanya untuk mengambil skrip.
+
+Pengelola mengirim paket panduan/preflight kepada operator, lalu operator
+mengekstraknya di HOST, misalnya `/tmp/stok-whfg-preflight/`, sehingga tersedia:
+
+- `scripts/production-preflight.sh`
+- `scripts/production-preflight.php`
+
+Keduanya boleh berada di luar checkout. Dari folder repository production yang
+sekarang digunakan, jalankan dengan Bash Linux:
+
+```sh
+# Ganti path ini dengan folder project production yang sekarang digunakan.
+cd /path/ke/STOK-WHFG
+umask 077
+set -o pipefail
+bash /tmp/stok-whfg-preflight/scripts/production-preflight.sh fifowhfg_app 2>&1 | tee /tmp/stok-whfg-preflight/laporan-server.txt
+```
+
+Jika operator sudah berada pada prompt `www-data@...`, jalankan `exit` dahulu
+untuk kembali ke host. Jika Docker memerlukan sudo, jalankan skrip memakai
+`sudo bash ...`; jangan mengubah permission socket Docker untuk melewatinya.
+Jika WorkingDir container kosong/salah, minta PIC menentukan root Laravel, lalu
+ulangi dengan `APP_DIR=/path/di/container bash ...`. Nilai path bukan path host.
+
+Skrip membaca image, mount, nama proses tanpa argumen, versi PHP/Composer/Node,
+environment aman tanpa APP_KEY/password, keberadaan build, versi/collation/ukuran
+DB, daftar migration, jumlah record, status delivery/sesi dan jumlah deadline.
+Query database dijalankan di transaksi **READ ONLY** MySQL/MariaDB. Perhitungan
+jumlah pada DB besar tetap dapat menambah beban baca: lakukan pada waktu sepi.
+Deteksi cron/proses hanya petunjuk, tidak mencakup user/host lain dan tidak
+membuktikan scheduler benar-benar berjalan. Skrip tidak menampilkan `.env`,
+password, token, isi customer atau dump database; periksa laporan sebelum dikirim.
+
+Kirim laporan itu kepada pengelola project. Sertakan jawaban manual:
+
+1. Lokasi Dockerfile/Compose; kirim versi yang menghapus semua nilai secret,
+   atau jelaskan service, build/image, volume, command worker/scheduler dan proxy.
+   Jangan membagikan `docker inspect` penuh atau `docker compose config` mentah.
+2. Semua instance/worker/scheduler, termasuk cron user lain dan server lain.
+3. Lokasi/tanggal backup, bukti restore berhasil, dan ketersediaan DB uji terpisah.
+4. PIC server/restore, waktu maintenance yang diperbolehkan dan akses build/registry.
+
+Perintah backup/restore, stop/start service dan rebuild/deploy akan ditentukan
+dari hasil tersebut. Nama container database atau service Compose tidak ditebak.
 
 ## 1. Pengelola mencatat kondisi server, tanpa mengubah data
 
@@ -70,16 +129,19 @@ penggabungan yang memang direncanakan; simpan pemetaan ID dan alasan perubahanny
 
 | Migration | Dampak yang harus diperiksa pada salinan database |
 | --- | --- |
-| 2026_10_23_000001_create_expired_box_handlings | Membuat registry dan QA. Untuk box aktif, tidak terhapus, yang reactivated_until-nya terisi, source menyalin deadline lama ke legacy_reactivated_until lalu mengubah reactivated_until menjadi waktu migration. Box terkait dapat kehilangan masa reaktivasi yang masih tersisa dan memerlukan QA. Ini perubahan operasional, bukan sekadar tambah tabel. |
+| 2026_10_23_000001_create_expired_box_handlings | Membuat registry dan QA. Versi revisi 24 November menyalin reactivated_until ke legacy_reactivated_until untuk box non-withdrawn/non-deleted tanpa mengubah deadline/status. Box yang masih eligible tetap dapat dipakai sampai deadline asal; deadline yang habis tidak diperpanjang. Status handled tetap handled. Bandingkan deadline/assignment sebelum dan sesudah. |
 | 2026_11_03_000001_unify_part_master_and_box_identity | Menyatukan master Lokal/Ekspor, memindahkan FK ke ID acuan dan menghapus master duplikat setelah pemeriksaan, menormalkan kode delivery serta membangun registry. Tinjau konflik dan pasangan part dengan perbedaan huruf besar/kecil sesuai identitas yang benar. Jangan menyamakan dua part berbeda secara manual. |
 | 2026_11_12_000001_add_part_document_numbers | Menambah tabel mapping nomor dokumen dan kolom snapshot. Tidak otomatis mengimpor file master_product atau menebak pasangan part_no/part_no_label. Mapping harus disiapkan/divalidasi melalui fitur master jika belum terdaftar. |
 | Migration penambahan fitur dan 2026_11_12_000002_version_granular_feature_permissions | Beberapa migration menambah grant fitur Ekspor/QA/opname ke role tertentu, lalu mengonversi izin menu menjadi tindakan. Bandingkan izin efektif sebelum/sesudah; jangan hanya mengecek apakah admin dapat login. |
 | 2026_11_15_000001_allow_box_number_reuse | Menambah nomor penggunaan, mengubah unique/index serta backfill draft Ekspor. History menggunakan PK lama, tetapi aturan label/scan dan Redo berubah. Uji generated column dan indeks pada engine production; beberapa migration tidak mendukung downgrade otomatis. |
+| 2026_11_16_000001_create_export_customer_stock_reservations | Membuat delapan tabel, tanpa backfill stok/delivery lama. Box existing tetap Umum; pemetaan customer dilakukan eksplisit setelah verifikasi. Hentikan semua instance/worker lama sebelum aktivasi fitur. |
 
-Jika bisnis mengharuskan masa reaktivasi yang sudah diberikan tetap berlaku,
-perlakuan migration QA di atas perlu diputuskan dan disesuaikan SEBELUM deploy.
-Jangan menjalankan seluruh migration lalu baru memutuskan setelah box terblokir.
-Jangan mengubah tanggal/quantity/history production sebagai cara melewati konflik.
+Revisi preservasi deadline berlaku bagi server yang **belum menjalankan** migration
+QA 23 Oktober, seperti baseline pengguna. Pada server yang sudah menjalankan versi
+lama, perubahan file tidak diputar ulang oleh Laravel. Jangan mengembalikan deadline
+secara massal dari metadata legacy: sebagian box mungkin sudah diproses/dikirim/QA.
+Kasus tersebut memerlukan penilaian data dan perbaikan terarah tersendiri.
+Jangan mengubah tanggal/quantity/history production untuk melewati konflik.
 
 ## 4. Rehearsal seluruh upgrade dan persiapan release
 
@@ -89,7 +151,7 @@ npm update. composer.json mengharuskan PHP ^8.2; lockfile Vite 7.3.7 mensyaratka
 Node ^20.19.0 atau >=22.12.0 pada mesin build. Node tidak harus dipasang pada server
 production bila public/build dihasilkan di mesin build dan disertakan pada release.
 
-Rehearsal menjalankan 29 migration dari baseline salinan production, bukan dari
+Rehearsal menjalankan 30 migration dari baseline salinan production, bukan dari
 database kosong saja. Catat durasi dan log setiap migration. `--pretend` bukan
 pengganti rehearsal: beberapa migration membaca tabel/data yang dibuat migration
 sebelumnya sehingga simulasi pada schema lama tidak membuktikan kelulusan upgrade.
@@ -114,6 +176,23 @@ dengan lockfile dan opsi production; periksa platform requirement di image PHP
 target. Pertahankan .env/APP_KEY server existing. Jangan memakai composer setup
 untuk upgrade karena script itu juga membuat key, menjalankan migration dan build.
 
+Perintah persiapan di workspace build/release terpisah, **bukan pada source bind
+mount yang sedang melayani production**:
+
+```sh
+composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
+composer check-platform-reqs --no-dev
+npm ci
+npm run build
+```
+
+`vendor` dan `public/build` diabaikan Git pada project ini. `git pull` tidak
+menyediakan keduanya. Kirim manifest beserta seluruh file yang dirujuknya dan
+seluruh aset statis `public/js`, `public/css`, `public/vendor`, `public/audio`
+yang digunakan rilis. Pastikan `public/hot` development tidak ikut rilis.
+Perintah Composer dijalankan pada PHP/image target yang kompatibel; Node diperlukan
+pada mesin build. Jangan mengganti lockfile melalui update dependency saat deploy.
+
 ## 5. Window maintenance dan backup final
 
 Pilih waktu sepi berdasarkan durasi rehearsal, tanpa menjanjikan menit yang belum
@@ -134,6 +213,8 @@ lama saja belum membuktikan container baru tidak menerima traffic.
 
 Setelah semua penulis berhenti, buat backup final konsisten dan catat cutoff.
 Jangan mengambil baseline perbandingan ketika transaksi lain masih mengubah stok.
+Pastikan tidak ada request lama yang masih berjalan, termasuk koneksi persisten
+dan integrasi. Maintenance web saja tidak menghentikan cron/worker/integrasi.
 
 ## 6. Pasang release dan jalankan migration
 
@@ -141,6 +222,17 @@ Pasang source/vendor/assets menurut pola deployment Docker yang sudah diverifika
 bind mount dan image-built mempunyai cara update berbeda. Volume database dan
 storage harus tetap menunjuk data existing. Jangan menghapus volume atau membuat
 database baru kosong untuk menggantikan production.
+
+Pastikan konfigurasi release memakai `APP_ENV=production`, `APP_DEBUG=false`,
+APP_KEY dan DB existing. Tambahkan `EXPORT_CUSTOMER_STOCK_WRITES_ENABLED=false`
+melalui sumber konfigurasi yang sebenarnya (Compose environment dapat menimpa
+file .env). Pertahankan false sampai seluruh instance/worker memakai rilis baru.
+Aturan reservasi existing tetap dilindungi meskipun flag false.
+
+Untuk bind mount: perubahan checkout langsung terlihat oleh aplikasi, sehingga
+pemasangan source hanya dilakukan setelah seluruh penulis/traffic dihentikan.
+Untuk image-built: pull repository di host saja tidak memperbarui source dalam
+container; gunakan image/tag/digest final. Rincian perintah mengikuti Compose aktual.
 
 Perintah berikut dilakukan satu per satu pada container RELEASE BARU yang benar,
 hanya setelah rehearsal lulus dan backup final tersedia. Bila nama container
@@ -171,6 +263,8 @@ Setelah migration berhasil:
 ```sh
 docker exec fifowhfg_app php artisan migrate:status
 docker exec fifowhfg_app php artisan inventory:unification-check
+
+docker exec fifowhfg_app php artisan health:concurrency
 docker exec fifowhfg_app php artisan config:cache
 docker exec fifowhfg_app php artisan route:cache
 docker exec fifowhfg_app php artisan view:cache
@@ -183,6 +277,22 @@ jumlah/ID box dan transaksi, PCS per part, lokasi, order/sesi pending, permissio
 deadline reaktivasi, snapshot historis, mapping dokumen, dan history laporan.
 Pastikan tabel/kolom/indeks baru ada dan seluruh migration yang dirilis sudah Ran.
 Periksa log aplikasi dan akses baca memakai akun/role yang tepat.
+Jumlah audit dapat bertambah dari migration; bandingkan record historis existing
+berdasarkan PK/proyeksi kolom bisnis, bukan mensyaratkan semua count identik.
+Metadata identity_cycle/legacy dan konversi izin harus sesuai ekspektasi.
+
+Deadline reaktivasi harus persis sama dengan cutoff. Deadline yang secara alami
+melewati batas saat maintenance dapat menjadi expired; jangan memajukannya untuk
+menyamakan angka stok aktif. Jangan mengosongkan delivery/sesi pending supaya
+migration terlihat berhasil. Uji kelanjutan picking/scan existing pada rehearsal.
+
+Sebelum membuka reservasi customer, Admin Utama meninjau izin baru
+`export_customers_manage`, `export_stock_customer_manage`, dan
+`export_stock_customer_exception` melalui Hak Akses. Tidak perlu menjalankan seeder.
+Setelah semua instance/worker lama benar-benar berhenti dan data lulus pemeriksaan,
+aktifkan `EXPORT_CUSTOMER_STOCK_WRITES_ENABLED=true` bila fitur akan digunakan,
+perbarui config cache pada semua instance dan reload proses lama. Master customer
+mulai kosong; delivery/nama lama tidak otomatis dianggap customer master.
 
 Uji mutasi lengkap dan skenario error dilakukan di staging. Pemeriksaan production
 sebelum buka difokuskan pada baca/konsistensi; setiap transaksi uji production harus
@@ -198,6 +308,11 @@ docker exec fifowhfg_app php artisan up
 
 Pantau transaksi pertama dan log. Pengguna perlu memuat ulang halaman scanner/draft;
 draft lama yang diminta scan ulang jangan dipaksa masuk dengan mengedit database.
+Scheduler harus menjalankan `schedule:run` setiap menit dengan satu penjadwal yang
+dikelola: timeout verifikasi dan sinkronisasi expiry berjalan setiap menit,
+ringkasan expiry pukul 07.00 Asia/Jakarta. `schedule:list` hanya memeriksa daftar
+jadwal; buktikan eksekusi melalui pengelola cron/proses dan log. Jangan menjalankan
+`schedule:run` sebagai pemeriksaan baca-saja karena ia dapat mengubah stok/sesi.
 
 ## 8. Jika gagal
 
@@ -215,7 +330,7 @@ Tidak digunakan dalam upgrade ini: migrate:fresh, migrate:refresh, migrate:reset
 db:wipe, db:seed/UAT, key:generate, docker compose down -v, atau docker volume prune.
 Jangan menyalin .env.example menimpa .env existing.
 
-## Lampiran: 29 migration setelah baseline yang disampaikan
+## Lampiran: 30 migration setelah baseline yang disampaikan
 
 ```text
 2026_10_20_000001_add_partial_to_existing_delivery_order_status
@@ -247,6 +362,7 @@ Jangan menyalin .env.example menimpa .env existing.
 2026_11_12_000001_add_part_document_numbers
 2026_11_12_000002_version_granular_feature_permissions
 2026_11_15_000001_allow_box_number_reuse
+2026_11_16_000001_create_export_customer_stock_reservations
 ```
 
 Referensi prosedur: [Laravel migrations](https://laravel.com/docs/12.x/migrations),
