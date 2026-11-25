@@ -54,7 +54,9 @@ class ExportMasterDataTest extends TestCase
         $this->put($url, ['part_number' => 'CAPACITY', 'qty_box' => 20])->assertSessionHasNoErrors();
         $this->assertSame(20, $part->fresh()->qty_box);
         $this->assertSame(10, $plan->items()->sole()->pcs_per_box);
-        $this->delete(route('part-settings.destroy', $part))->assertSessionHas('error');
+        $this->delete(route('part-settings.destroy', $part))->assertSessionHas('success');
+        $this->assertSoftDeleted($part);
+        $this->assertSame($part->id, $plan->items()->sole()->partSetting()->sole()->id);
     }
 
     public function test_shared_part_lookup_is_available_without_granting_master_management(): void

@@ -25,7 +25,7 @@ class StockOpnamePartNumbers
         }
         foreach (array_chunk(array_values($missing), 500) as $chunk) {
             foreach ($chunk as $number) $this->masters['part:'.$number] = null;
-            foreach (PartSetting::with(['documentNumbers' => fn ($query) => $query->orderBy('id')])
+            foreach (PartSetting::withTrashed()->with(['documentNumbers' => fn ($query) => $query->orderBy('id')])
                 ->whereIn('part_number', $chunk)->get(['id', 'part_number']) as $part) {
                 $numbers = $part->documentNumbers->pluck('document_number')->map(fn ($number) => (string) $number)->all();
                 $this->masters['part:'.$part->part_number] = [

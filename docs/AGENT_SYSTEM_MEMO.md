@@ -1,6 +1,24 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 24 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 26 November 2026 (pembaruan inkremental).
+
+Penghapusan Master Part dengan histori saja, 26 November 2026:
+
+- Tombol Hapus mengarsipkan master dari katalog aktif bila tidak ada stok atau
+  proses yang masih berjalan. Histori transaksi selesai, FK Ekspor, pemetaan
+  dokumen, dan ID master tetap tersimpan. Nomor part dan alias yang diarsipkan
+  tetap dilindungi dari duplikasi. Rename master yang pernah dipakai tetap ditolak.
+- Stok fisik termasuk box expired yang masih tersimpan, delivery aktif/draft,
+  picking, permintaan Not Full, draft penerimaan, QA/packing, dan Redo Lokal
+  yang masih berlaku tetap dapat memblokir pengarsipan. Pesan Hapus menyebut
+  alasan aktif. Scan baru dan draft Lokal yang mencoba membuat box dengan part
+  yang sudah diarsipkan ditolak saat simpan.
+- Migration `2026_11_26_000001_allow_archiving_part_settings` menambah kolom
+  nullable tanpa mengubah riwayat. Ini satu tambahan setelah kandidat produksi
+  `806a092` di panduan 24 November dan belum diterapkan di produksi.
+- Regresi terarah SQLite in-memory 107 tes / 878 assertions dan seluruh 180
+  tes frontend lulus. Uji mencakup histori Lokal/Ekspor, window Redo, pencarian
+  master, dan penolakan simpan draft scan yang part-nya sudah diarsipkan.
 
 Persiapan upgrade production dan preservasi reaktivasi, 24 November 2026:
 
@@ -646,7 +664,7 @@ Kode label dan dokumen Master Part, 12 November 2026:
   alias; beberapa kode diisi satu per baris, maksimal 100 kode x 100 karakter.
   Tanda / diperlakukan literal, tidak dipecah atau dipetakan otomatis dari Excel.
 - Pencarian master mencakup kode dokumen dan mengembalikan kode label existing.
-  Izin CRUD, larangan rename/hapus master terpakai, serta perlindungan perubahan
+  Izin CRUD, larangan rename master terpakai, serta perlindungan perubahan
   kapasitas pada delivery aktif tetap berlaku. Master dan pemetaan disimpan
   atomik di mutex inventory ekspor, beserta snapshot audit sebelum/sesudah.
   Kode dokumen tidak boleh bertabrakan dengan kode label/alias master lain.
@@ -3156,7 +3174,9 @@ Status yang digunakan:
 - Undo withdrawal memulihkan pallet soft-deleted dan `stock_locations`; undo ditolak jika lokasi asal sudah ditempati pallet lain.
 - Soft delete digunakan untuk box, palet, stock input, withdrawal, dan delivery agar histori tetap dapat diaudit.
 - User dinonaktifkan melalui `is_active`, bukan dihapus, sehingga foreign key dan histori tetap utuh.
-- Master part yang sudah digunakan histori/transaksi tidak boleh diubah nomor part-nya atau dihapus.
+- Nomor Master Part yang pernah dipakai tidak boleh diubah. Master Part dapat
+  diarsipkan dari katalog aktif bila hanya tersisa histori. Stok dan proses aktif
+  tetap memblokir pengarsipan, dan seluruh rujukan histori dipertahankan.
 - Sales hanya boleh mengubah order berstatus `correction`; PPC hanya boleh memutuskan order berstatus `pending`.
 - Delivery yang sudah memiliki completion atau withdrawal tidak boleh dihapus.
 - Picklist PDF/print hanya dapat diakses role warehouse; Warehouse Operator hanya dapat mengakses session miliknya.

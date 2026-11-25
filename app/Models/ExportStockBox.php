@@ -104,7 +104,7 @@ class ExportStockBox extends Model
 
     public function part()
     {
-        return $this->belongsTo(PartSetting::class, 'part_setting_id');
+        return $this->belongsTo(PartSetting::class, 'part_setting_id')->withTrashed();
     }
 
     public function currentPallet()

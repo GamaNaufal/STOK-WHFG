@@ -204,6 +204,8 @@ class DeliveryOrderController extends Controller
 
         $partSettings = PartSetting::query()
             ->whereIn('part_number', $partNumbers->all())
+            ->orderBy('id')
+            ->lockForUpdate()
             ->get()
             ->keyBy('part_number');
 
@@ -834,13 +836,6 @@ class DeliveryOrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        $invalidPart = $this->findInvalidMasterPartNumber($request->input('items', []));
-        if ($invalidPart !== null) {
-            return redirect()->back()
-                ->with('error', "No Part {$invalidPart} tidak ditemukan di Master Part.")
-                ->withInput();
-        }
-
         DB::beginTransaction();
         try {
             $order = DeliveryOrder::with('items')->whereKey($id)->lockForUpdate()->firstOrFail();
@@ -851,6 +846,12 @@ class DeliveryOrderController extends Controller
 
             if ((string) $order->status !== 'correction') {
                 throw new \RuntimeException('Order hanya dapat diedit saat berstatus correction.');
+            }
+
+            if (($invalidPart = $this->findInvalidMasterPartNumber($request->input('items'))) !== null) {
+                DB::rollBack();
+
+                return back()->with('error', "No Part {$invalidPart} tidak ditemukan di Master Part.")->withInput();
             }
 
             $order->customer_name = $request->customer_name;
@@ -896,18 +897,13 @@ class DeliveryOrderController extends Controller
             'items.*.quantity' => 'required|integer|min:1',
         ]);
 
-        $invalidPart = $this->findInvalidMasterPartNumber($request->input('items', []));
-        if ($invalidPart !== null) {
-            return redirect()->back()
-                ->with('error', "No Part {$invalidPart} tidak ditemukan di Master Part.")
-                ->withInput();
-        }
-
         DB::beginTransaction();
         try {
-            // Check if updating existing (resubmit correction) or new
-            // Implementation note: User didn't ask for edit/resubmit UI yet, just status flow.
-            // For now, assume this creates NEW. Editing requires ID.
+            if (($invalidPart = $this->findInvalidMasterPartNumber($request->input('items'))) !== null) {
+                DB::rollBack();
+
+                return back()->with('error', "No Part {$invalidPart} tidak ditemukan di Master Part.")->withInput();
+            }
 
             $order = DeliveryOrder::create([
                 'sales_user_id' => Auth::id(),

@@ -287,7 +287,7 @@ class ExportDeliveryPlanTest extends TestCase
         $this->assertDatabaseHas('export_not_full_requests',['pcs_quantity'=>10,'fixed_qty'=>30]);
     }
 
-    public function test_archive_keeps_history_and_prevents_master_identity_change_or_delete(): void
+    public function test_archived_plan_keeps_history_when_master_part_is_removed(): void
     {
         $part = PartSetting::create(['part_number' => 'EXP-001', 'qty_box' => 20]);
         $this->actingAs($this->operator())->post(route('export.delivery-plans.store'), $this->payload())->assertRedirect();
@@ -299,7 +299,9 @@ class ExportDeliveryPlanTest extends TestCase
         $this->assertSoftDeleted('export_delivery_plans', ['id' => $plan->id]);
         $this->assertDatabaseCount('export_delivery_plan_items', 1);
         $this->get(route('export.delivery-plans.show', $plan))->assertNotFound();
-        $this->delete(route('part-settings.destroy', $part))->assertSessionHas('error');
+        $this->delete(route('part-settings.destroy', $part))->assertSessionHas('success');
+        $this->assertSoftDeleted($part);
+        $this->assertDatabaseHas('export_delivery_plan_items', ['part_setting_id' => $part->id, 'part_number' => 'EXP-001']);
         $this->assertSame(1, AuditLog::where('type', 'export_delivery_plan')->where('action', 'deleted')->count());
     }
 

@@ -47,6 +47,6 @@ class PalletItem extends Model
      */
     public function partSetting()
     {
-        return $this->hasOne(PartSetting::class, 'part_number', 'part_number');
+        return $this->hasOne(PartSetting::class, 'part_number', 'part_number')->withTrashed();
     }
 }

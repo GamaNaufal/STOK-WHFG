@@ -35,7 +35,7 @@ class DeliveryAnnouncementController extends Controller
     {
         $data = $request->validate($this->contentRules() + [
             'customer_name' => 'required|string|max:255',
-            'part_number' => ['required', 'string', 'max:100', Rule::exists('part_settings', 'part_number')],
+            'part_number' => ['required', 'string', 'max:100', Rule::exists('part_settings', 'part_number')->withoutTrashed()],
             'quota_type' => 'required|in:box,delivery',
         ], [], $this->labels());
 

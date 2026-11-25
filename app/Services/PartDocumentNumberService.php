@@ -29,7 +29,7 @@ class PartDocumentNumberService
             if (mb_strlen($number) > 100) {
                 $this->fail('Setiap kode dokumen maksimal 100 karakter.');
             }
-            if (PartSetting::where('part_number', $number)->where('id', '!=', $part->id)->exists()
+            if (PartSetting::withTrashed()->where('part_number', $number)->where('id', '!=', $part->id)->exists()
                 || PartDocumentNumber::where('document_number', $number)->where('part_setting_id', '!=', $part->id)->exists()) {
                 $this->fail('Kode dokumen '.$number.' sudah mengacu ke master lain. Periksa identitas produk dan stok sebelum memetakan.');
             }

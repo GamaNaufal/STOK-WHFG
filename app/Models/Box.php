@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Validation\ValidationException;
 
 /**
  * @property int $id
@@ -28,6 +29,17 @@ class Box extends Model
     use \App\Models\Concerns\ClaimsGlobalBoxIdentity;
 
     public const INVENTORY_SCOPE = 'domestic';
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $box) {
+            // The identity insert already wraps this event and the new box in a transaction.
+            $part = PartSetting::withTrashed()->where('part_number', $box->part_number)->lockForUpdate()->first();
+            if ($part?->trashed()) {
+                throw ValidationException::withMessages(['part_number' => 'No Part sudah dihapus dari Master Part. Pilih part yang masih aktif.']);
+            }
+        });
+    }
 
     public function scopeIdentityHeld($query)
     {

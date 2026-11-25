@@ -270,7 +270,7 @@ class RemainingIntegrityRegressionTest extends TestCase
         $this->assertDatabaseHas('delivery_orders', ['id' => $order->id, 'deleted_at' => null]);
     }
 
-    public function test_referenced_master_part_cannot_be_renamed_or_deleted(): void
+    public function test_master_part_with_only_local_box_history_can_be_archived_and_not_renamed(): void
     {
         $adminWarehouse = User::factory()->create(['role' => 'admin_warehouse']);
         $part = PartSetting::create(['part_number' => 'P-MASTER-GUARD', 'qty_box' => 10]);
@@ -284,8 +284,10 @@ class RemainingIntegrityRegressionTest extends TestCase
 
         $this->actingAs($adminWarehouse)
             ->delete(route('part-settings.destroy', $part))
-            ->assertSessionHas('error');
+            ->assertSessionHas('success');
 
+        $this->assertSoftDeleted($part);
+        $this->assertSoftDeleted($box);
         $this->assertDatabaseHas('part_settings', [
             'id' => $part->id,
             'part_number' => 'P-MASTER-GUARD',

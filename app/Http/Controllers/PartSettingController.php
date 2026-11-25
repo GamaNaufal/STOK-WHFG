@@ -6,6 +6,7 @@ use App\Models\PartSetting;
 use App\Services\AuditService;
 use App\Services\ExportInventoryService;
 use App\Services\PartDocumentNumberService;
+use App\Services\PartRetirementService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -108,20 +109,24 @@ class PartSettingController extends Controller
         return redirect()->route('part-settings.index')->with('success', 'No Part berhasil diperbarui.');
     }
 
-    public function destroy(string $partSetting)
+    public function destroy(Request $request, string $partSetting, PartRetirementService $retirement)
     {
-        $deleted = app(ExportInventoryService::class)->transaction(function () use ($partSetting) {
+        $blocker = app(ExportInventoryService::class)->transaction(function () use ($partSetting, $request, $retirement) {
             $part = PartSetting::whereKey($partSetting)->lockForUpdate()->firstOrFail();
-            if ($this->isPartReferenced($part)) {
-                return false;
+            if ($blocker = $retirement->blocker($part)) {
+                return $blocker;
             }
+
             $before = $this->snapshot($part);
             $part->delete();
-            AuditService::record('master_part', 'deleted', 'PartSetting', $part->id, request()->user()->id, $before, [], 'Master part bersama dihapus.');
+            AuditService::record('master_part', 'deleted', 'PartSetting', $part->id, $request->user()->id, $before,
+                ['deleted_at' => $part->deleted_at->toDateTimeString()], 'Master part diarsipkan, riwayat transaksi tetap tersimpan.');
 
-            return true;
+            return null;
         });
 
-        return $deleted ? redirect()->route('part-settings.index')->with('success','No Part berhasil dihapus.') : back()->with('error','No Part sudah dipakai dalam transaksi/histori dan tidak dapat dihapus.');
+        return $blocker
+            ? back()->with('error', 'No Part belum dapat dihapus karena '.$blocker.'.')
+            : redirect()->route('part-settings.index')->with('success', 'No Part dihapus dari daftar Master Part. Riwayat transaksi tetap tersimpan.');
     }
 }

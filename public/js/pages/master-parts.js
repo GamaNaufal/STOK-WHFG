@@ -115,8 +115,8 @@
             title: 'Hapus No Part?',
             itemName: `No Part <strong>${safePartNumber}</strong>`,
             warningItems: [
-                'Nomor part yang sudah dipakai dalam transaksi atau histori tidak dapat dihapus.',
-                'Penghapusan yang berhasil tidak dapat dibatalkan.'
+                'Hanya nomor part tanpa stok dan proses yang masih berjalan yang bisa dihapus.',
+                'Nomor part dihapus dari daftar aktif. Riwayat transaksi tetap tersimpan.'
             ],
             confirmText: 'Ya, Hapus',
             onConfirm: () => {

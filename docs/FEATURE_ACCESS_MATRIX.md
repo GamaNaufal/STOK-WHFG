@@ -238,7 +238,7 @@ pada lingkungan local/testing, mengikuti perilaku sebelumnya.
 | Master Nomor Part Bersama<br>`parts` | Menu / akses dasar modul. | — | Admin Warehouse | Dapat diatur per peran |
 | Tambah master part<br>`parts_create` | Mendaftarkan kode label, kode dokumen dan kapasitas dalam satu simpan. | `parts` | Admin Warehouse | Dapat diatur per peran |
 | Ubah master part dan pemetaan<br>`parts_edit` | Mengubah kapasitas/pemetaan, identitas yang dipakai transaksi tetap dilindungi. | `parts` | Admin Warehouse | Dapat diatur per peran |
-| Hapus master part<br>`parts_delete` | Hanya master yang belum direferensikan transaksi atau histori. | `parts` | Admin Warehouse | Dapat diatur per peran |
+| Hapus master part<br>`parts_delete` | Arsipkan master tanpa stok atau proses aktif. Histori dan nomor part tetap tercatat. | `parts` | Admin Warehouse | Dapat diatur per peran |
 
 ### Master Data Ekspor
 
