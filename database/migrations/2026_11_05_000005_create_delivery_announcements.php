@@ -56,8 +56,8 @@ return new class extends Migration
             $table->string('delivery_reference', 100);
             $table->text('message');
             $table->json('box_numbers');
-            $table->timestamp('first_seen_at');
-            $table->timestamp('last_seen_at');
+            $table->timestamp('first_seen_at')->useCurrent();
+            $table->timestamp('last_seen_at')->useCurrent();
         });
 
         $this->grantAccess(true);

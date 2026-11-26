@@ -2,6 +2,22 @@
 
 Terakhir diverifikasi dari source code: 26 November 2026 (pembaruan inkremental).
 
+Insiden migrasi V2.0 dengan MySQL legacy, 26 November 2026:
+
+- Log production: 9 migrasi selesai, migrasi `2026_10_29_000001` gagal 1067 pada
+  `reserved_at`. Kolom `entered_fulfillment` dan backfill dapat sudah tersimpan
+  karena DDL MySQL tidak atomik untuk seluruh migrasi. Laporan operator telah
+  mengonfirmasi MySQL 5.7.42, default timestamp 0 dengan NO_ZERO_DATE, kolom
+  awal ada, tabel target belum ada, status 42 Ran dan 22 Pending.
+- Patch menambah default eksplisit untuk timestamp wajib pada migrasi terkait,
+  tanpa default auto-update. Migrasi melanjutkan bila hanya kolom awal yang telah
+  ada, dan menolak tabel target yang sudah ada saat status masih Pending. Tidak
+  ada migration baru atau perubahan konfigurasi global server.
+- MySQL 8.4.3 terisolasi dengan aturan timestamp lama mereproduksi error dan
+  kondisi parsial, lalu melewati 22 migrasi tersisa. FK, indeks, backfill, serta
+  nilai timestamp eksplisit tetap benar. Belum diuji pada salinan MySQL 5.7
+  production. Panduan: docs/PRODUCTION_MIGRATION_1067_2026-11-26.md.
+
 Penghapusan Master Part dengan histori saja, 26 November 2026:
 
 - Tombol Hapus mengarsipkan master dari katalog aktif bila tidak ada stok atau

@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('status', 16)->default('active');
             $table->unsignedBigInteger('source_max_id')->default(0);
             $table->foreignId('started_by')->constrained('users')->restrictOnDelete();
-            $table->timestamp('started_at');
+            $table->timestamp('started_at')->useCurrent();
             $table->foreignId('finished_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->timestamp('finished_at')->nullable();
             $table->json('summary')->nullable();
@@ -47,7 +47,7 @@ return new class extends Migration
             $table->string('reason');
             $table->json('snapshot')->nullable();
             $table->foreignId('scanned_by')->constrained('users')->restrictOnDelete();
-            $table->timestamp('scanned_at');
+            $table->timestamp('scanned_at')->useCurrent();
             $table->index(['stock_opname_session_id', 'outcome', 'id'], 'opname_scan_result');
         });
         $grants = [

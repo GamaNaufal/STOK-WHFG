@@ -10,10 +10,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('export_pallet_plans', function (Blueprint $table) {
-            $table->boolean('entered_fulfillment')->default(false);
-        });
-        DB::table('export_pallet_plans')->where(function ($query) {
+        // MySQL commits DDL separately. A failed CREATE TABLE may leave this column behind.
+        // An existing target table is a different recovery state: its constraints may be incomplete.
+        if (Schema::hasTable('export_fulfillment_boxes')) {
+            throw new RuntimeException('export_fulfillment_boxes sudah ada saat migrasi masih Pending. Periksa schema dan foreign key sebelum melanjutkan.');
+        }
+
+        if (! Schema::hasColumn('export_pallet_plans', 'entered_fulfillment')) {
+            Schema::table('export_pallet_plans', function (Blueprint $table) {
+                $table->boolean('entered_fulfillment')->default(false);
+            });
+        }
+
+        DB::table('export_pallet_plans')->where('entered_fulfillment', false)->where(function ($query) {
             $query->where('status', 'final')->orWhereExists(fn ($q) => $q->selectRaw('1')
                 ->from('export_pallet_location_reservations as claim')
                 ->whereColumn('claim.export_pallet_plan_id', 'export_pallet_plans.id'))
@@ -29,8 +38,9 @@ return new class extends Migration
             $table->foreignId('export_planned_pallet_item_id')->constrained('export_planned_pallet_items')->restrictOnDelete();
             $table->foreignId('part_setting_id')->constrained('part_settings')->restrictOnDelete();
             $table->unsignedInteger('pcs_quantity');
-            $table->timestamp('first_received_at');
-            $table->timestamp('reserved_at');
+            // With legacy MySQL defaults, omitted DEFAULT can imply ON UPDATE or a zero date.
+            $table->timestamp('first_received_at')->useCurrent();
+            $table->timestamp('reserved_at')->useCurrent();
             $table->foreignId('reserved_by')->constrained('users')->restrictOnDelete();
             $table->timestamp('placed_at')->nullable();
             $table->foreignId('placed_by')->nullable()->constrained('users')->restrictOnDelete();

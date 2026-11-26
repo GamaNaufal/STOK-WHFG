@@ -33,7 +33,7 @@ return new class extends Migration
             $table->string('state', 16)->default('received');
             $table->unsignedInteger('revision')->default(1);
             $table->uuid('receive_token')->unique();
-            $table->timestamp('first_received_at');
+            $table->timestamp('first_received_at')->useCurrent();
             $table->foreignId('received_by')->constrained('users')->restrictOnDelete();
             $table->foreignId('current_pallet_id')->nullable()->constrained('export_stock_pallets')->restrictOnDelete();
             $table->timestamp('stored_at')->nullable();
@@ -56,7 +56,7 @@ return new class extends Migration
             $table->string('from_location_code')->nullable();
             $table->string('to_location_code');
             $table->foreignId('placed_by')->constrained('users')->restrictOnDelete();
-            $table->timestamp('placed_at');
+            $table->timestamp('placed_at')->useCurrent();
             $table->timestamps();
         });
         DB::transaction(function () {

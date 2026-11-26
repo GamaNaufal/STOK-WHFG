@@ -24,7 +24,7 @@ return new class extends Migration
             $t->foreignId('created_by')->constrained('users')->restrictOnDelete();
             $t->foreignId('result_pallet_id')->constrained('export_stock_pallets')->restrictOnDelete();
             $t->json('snapshot');
-            $t->timestamp('created_at');
+            $t->timestamp('created_at')->useCurrent();
         });
         // Extend enabled workflows only; an explicitly disabled base workflow stays disabled.
         foreach (['export_operator' => 'export_stock_input', 'admin_warehouse' => 'merge_pallet'] as $role => $base) {

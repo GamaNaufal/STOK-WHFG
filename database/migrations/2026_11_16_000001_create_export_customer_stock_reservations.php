@@ -74,14 +74,14 @@ return new class extends Migration
             $t->json('before');
             $t->json('after');
             $t->text('reason');
-            $t->timestamp('created_at');
+            $t->timestamp('created_at')->useCurrent();
         });
         // Created last, also acts as the complete-schema readiness marker.
         Schema::create('export_customer_stock_requests', function (Blueprint $t) {
             $t->uuid('token')->primary();
             $t->string('request_hash', 64);
             $t->json('result');
-            $t->timestamp('created_at');
+            $t->timestamp('created_at')->useCurrent();
         });
     }
 

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->foreignId('export_delivery_plan_id')->constrained()->restrictOnDelete();
             $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
             $table->string('action', 16);
-            $table->timestamp('created_at');
+            $table->timestamp('created_at')->useCurrent();
         });
     }
 
