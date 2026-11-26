@@ -2,7 +2,7 @@
 @section('title', 'Detail Pengumuman Delivery')
 @section('announcement-content')
 @php($usage = $announcement->usage())
-<a class="plan-back" href="{{ route('delivery-announcements.index') }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Daftar pengumuman</a>
+<a class="plan-back" href="{{ route('delivery-announcements.index', $announcement->enabled ? [] : ['status' => 'inactive']) }}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Daftar pengumuman</a>
 <header class="plan-header">
     <div><span class="plan-eyebrow">Lokal dan Ekspor</span><h1>{{ $announcement->customer_name }}</h1><p>Part {{ $announcement->part_number }} · Kuota per {{ $announcement->unit }}</p></div>
     <div class="plan-inline-actions">

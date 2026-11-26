@@ -13,11 +13,16 @@ use Illuminate\Validation\Rule;
 
 class DeliveryAnnouncementController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $announcements = DeliveryAnnouncement::with('targets')->latest('id')->paginate(16);
+        $showInactive = $request->query('status') === 'inactive';
+        $announcements = DeliveryAnnouncement::with('targets')
+            ->where('enabled', ! $showInactive)
+            ->latest('id')
+            ->paginate(16)
+            ->appends($showInactive ? ['status' => 'inactive'] : []);
 
-        return view('admin.delivery-announcements.index', compact('announcements'));
+        return view('admin.delivery-announcements.index', compact('announcements', 'showInactive'));
     }
 
     public function create()

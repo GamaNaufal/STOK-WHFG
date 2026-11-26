@@ -184,15 +184,46 @@ class DeliveryAnnouncementTest extends TestCase
         $order = $this->local();
         $rule = $this->rule('delivery', 1);
         $this->assertDatabaseHas('delivery_announcement_targets', ['scope' => 'domestic', 'delivery_id' => $order->id, 'delivery_granted' => true]);
+        $activeList = route('delivery-announcements.index');
+        $inactiveList = route('delivery-announcements.index', ['status' => 'inactive']);
         $supervisor = User::factory()->create(['role' => 'supervisi']);
         $this->actingAs($supervisor)->get(route('delivery-announcements.create'))->assertOk()->assertSee('Jumlah delivery');
         $this->get(route('delivery-announcements.edit', $rule))->assertOk()->assertSee('Tempelkan stiker hijau');
+        $this->get($activeList)->assertOk()->assertSee($rule->message)->assertSee('Kuota teralokasi');
+        $this->get($inactiveList)->assertOk()->assertSee('Belum ada pengumuman nonaktif')->assertDontSee($rule->message);
         $this->patch(route('delivery-announcements.status', $rule), ['enabled' => 0])->assertRedirect();
         $this->assertFalse($rule->fresh()->enabled);
         $warehouse = User::factory()->create(['role' => 'warehouse_operator']);
         $this->actingAs($warehouse)->get(route('delivery.index'))->assertOk()->assertDontSee('Tempelkan stiker hijau');
+        $this->get($inactiveList)->assertForbidden();
         $this->patch(route('delivery-announcements.status', $rule), ['enabled' => 1])->assertForbidden();
-        $this->actingAs(User::factory()->create(['role' => 'admin']))->get(route('delivery-announcements.index'))
-            ->assertOk()->assertSee('Nonaktif');
+        $this->actingAs(User::factory()->create(['role' => 'admin']))->get($activeList)
+            ->assertOk()->assertSee('Belum ada pengumuman aktif')->assertDontSee($rule->message);
+        $this->get($inactiveList)->assertOk()->assertSee($rule->message);
+        $this->get(route('delivery-announcements.show', $rule))->assertOk()->assertSee('href="'.$inactiveList.'"', false);
+        $this->patch(route('delivery-announcements.status', $rule), ['enabled' => 1])->assertRedirect();
+        $this->get($activeList)->assertOk()->assertSee($rule->message);
+        $this->get($inactiveList)->assertOk()->assertDontSee($rule->message);
+    }
+
+    public function test_pagination_keeps_the_inactive_filter(): void
+    {
+        $active = $this->rule('box', 1);
+        for ($number = 1; $number <= 17; $number++) {
+            $active->replicate()->fill([
+                'enabled' => false,
+                'message' => 'Instruksi nonaktif #'.$number.'.',
+            ])->save();
+        }
+
+        $inactiveList = route('delivery-announcements.index', ['status' => 'inactive']);
+        $pageTwo = route('delivery-announcements.index', ['status' => 'inactive', 'page' => 2]);
+
+        $this->get($inactiveList)->assertOk()->assertSee($pageTwo)->assertSee('Instruksi nonaktif #17.')
+            ->assertDontSee('Instruksi nonaktif #1.')->assertDontSee($active->message);
+        $this->get($pageTwo)->assertOk()->assertSee('Instruksi nonaktif #1.')
+            ->assertDontSee('Instruksi nonaktif #17.')->assertDontSee($active->message);
+        $this->get(route('delivery-announcements.index'))->assertOk()->assertSee($active->message)
+            ->assertDontSee('Instruksi nonaktif #17.');
     }
 }

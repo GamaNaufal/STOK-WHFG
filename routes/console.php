@@ -83,6 +83,8 @@ Artisan::command('health:concurrency', function () {
 
     $duplicateWithdrawals = DB::table('stock_withdrawals')
         ->whereNotNull('pick_session_id')
+        // Match the unique index: a missing box reference does not identify a box.
+        ->whereNotNull('box_id')
         ->select('pick_session_id', 'box_id', DB::raw('COUNT(*) as total'))
         ->groupBy('pick_session_id', 'box_id')
         ->havingRaw('COUNT(*) > 1')

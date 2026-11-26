@@ -5,7 +5,11 @@
     <div><span class="plan-eyebrow">Lokal dan Ekspor</span><h1>Pengumuman Delivery</h1><p>Instruksi untuk customer dan nomor part tertentu. Satu kuota berlaku di kedua lingkup.</p></div>
     <a href="{{ route('delivery-announcements.create') }}" class="btn btn-primary"><i class="bi bi-plus-lg" aria-hidden="true"></i> Buat pengumuman</a>
 </header>
-<section class="announcement-grid" aria-label="Daftar pengumuman">
+<nav class="announcement-status-switch" aria-label="Status pengumuman">
+    <a href="{{ route('delivery-announcements.index') }}" @if(!$showInactive) aria-current="page" @endif>Aktif</a>
+    <a href="{{ route('delivery-announcements.index', ['status' => 'inactive']) }}" @if($showInactive) aria-current="page" @endif>Nonaktif</a>
+</nav>
+<section class="announcement-grid" aria-label="{{ $showInactive ? 'Pengumuman nonaktif' : 'Pengumuman aktif' }}">
     @forelse($announcements as $announcement)
         @php($usage = $announcement->usage())
         <article class="plan-panel">
@@ -22,7 +26,9 @@
             </div>
         </article>
     @empty
-        <div class="plan-panel plan-empty"><strong>Belum ada pengumuman</strong><span>Buat instruksi pertama untuk customer dan nomor part yang akan dikirim.</span></div>
+        <div class="plan-panel plan-panel-body plan-empty">
+            <strong>{{ $showInactive ? 'Belum ada pengumuman nonaktif' : 'Belum ada pengumuman aktif' }}</strong>
+        </div>
     @endforelse
 </section>
 <div class="mt-3">{{ $announcements->links('pagination::bootstrap-5') }}</div>

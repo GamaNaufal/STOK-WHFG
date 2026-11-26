@@ -2,6 +2,17 @@
 
 Terakhir diverifikasi dari source code: 26 November 2026 (pembaruan inkremental).
 
+Koreksi pemeriksaan duplikasi pengambilan, 26 November 2026:
+
+- `health:concurrency` hanya menghitung duplikat withdrawal untuk pasangan
+  `pick_session_id` dan `box_id` yang keduanya terisi, selaras dengan unique
+  index. `box_id` nullable untuk histori dan FK `ON DELETE SET NULL`. Versi
+  lama mengelompokkan beberapa NULL dan mencetaknya sebagai ID `0`.
+- Laporan production menampilkan 4 kelompok dengan tampilan ID `0`.
+  Query baca-saja perlu mengonfirmasi nilai mentahnya sebelum menyimpulkan.
+  Koreksi hanya mengubah diagnostik. Uji SQLite terisolasi lulus, histori NULL
+  tetap utuh dan duplikat ID box yang terisi tetap terdeteksi. Tanpa migrasi.
+
 Insiden migrasi V2.0 dengan MySQL legacy, 26 November 2026:
 
 - Log production: 9 migrasi selesai, migrasi `2026_10_29_000001` gagal 1067 pada
@@ -775,6 +786,10 @@ Pengumuman delivery Lokal dan Ekspor, 5 November 2026
 - Nonaktif menyembunyikan instruksi pada delivery aktif dan menghentikan
   alokasi baru. Pengaktifan kembali memakai sisa kuota dan kandidat aktif.
   Riwayat penayangan serta pemakaian sebelumnya tetap tersimpan.
+- Sejak 26 November 2026, daftar membuka tampilan Aktif secara default.
+  Pemilih Nonaktif menampilkan pengumuman yang dinonaktifkan, termasuk pada
+  halaman berikutnya. Pengumuman yang masih aktif dengan kuota habis atau
+  teralokasi tetap memakai label kuota yang sesuai di tampilan Aktif.
 - Migration 2026_11_05_000005 dijalankan di MySQL development lokal.
   Regresi 623 tes Laravel lulus. Tes fitur pengumuman dan verifikasi
   Chrome mencakup kuota bersama, picking Lokal, penyelesaian Ekspor,
