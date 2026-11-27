@@ -1,6 +1,21 @@
 # Memo Sistem STOK WHFG untuk Agent
 
-Terakhir diverifikasi dari source code: 26 November 2026 (pembaruan inkremental).
+Terakhir diverifikasi dari source code: 27 November 2026 (pembaruan inkremental).
+
+Kompatibilitas ID Box legacy pada Stock Opname, 27 November 2026:
+
+- Log produksi Stock Opname Lokal menunjukkan MySQL 1406 saat menyalin
+  snapshot awal. Row 434 pada batch berisi ID Box 9 digit, sementara
+  `stock_opname_items.box_number` sebelumnya bertipe CHAR(8).
+- Migration 2026_11_27_000001 memperlebar kolom snapshot menjadi VARCHAR(255)
+  sesuai kapasitas ID Box Lokal. Acuan awal, refresh, dan penyelesaian tetap
+  menyimpan ID lengkap. Pengecekan scan tetap mensyaratkan tepat 8 digit,
+  sehingga ID legacy yang tidak sesuai masih termasuk dalam daftar belum
+  terscan. Rollback kolom ditolak jika histori berisi ID lebih dari 8 karakter.
+- 16 tes Stock Opname SQLite lulus (379 assertions). MySQL 8.4.3 terisolasi
+  dengan strict mode dan default TIMESTAMP legacy mereproduksi MySQL 1406,
+  lalu mengonfirmasi migrasi, histori dan indeks unik tetap utuh, serta
+  sesi dapat dimulai, diperbarui, dan ditutup. Belum diterapkan di produksi.
 
 Koreksi pemeriksaan duplikasi pengambilan, 26 November 2026:
 

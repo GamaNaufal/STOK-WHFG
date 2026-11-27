@@ -386,6 +386,29 @@ class StockOpnameTest extends TestCase
             ->assertJsonPath('summary.departed', 1)->assertJsonPath('summary.missing', 0);
     }
 
+    public function test_legacy_box_numbers_are_preserved_in_baseline_and_reconciliation(): void
+    {
+        $legacy = $this->local('010000001');
+        $standard = $this->local('01000000');
+        $session = $this->start();
+        $legacyItem = $session->items()->where('box_number', $legacy->box_number)->sole();
+        $this->assertSame('010000001', $legacyItem->initial_snapshot['box_number']);
+        $this->assertSame('010000001', $legacyItem->current_snapshot['box_number']);
+        $this->scan($session, $legacy->box_number)->assertOk()->assertJsonPath('outcome', 'ng');
+        $this->scan($session, $standard->box_number)->assertOk()->assertJsonPath('outcome', 'ok');
+
+        $arrival = $this->local('LEGACY-ARRIVAL-00001');
+        $this->post(route('stock-opname.refresh', $session))->assertRedirect()->assertSessionHasNoErrors();
+        $arrivalItem = $session->items()->where('box_number', $arrival->box_number)->sole();
+        $this->assertNull($arrivalItem->initial_snapshot);
+        $this->assertSame($arrival->box_number, $arrivalItem->current_snapshot['box_number']);
+
+        $this->post(route('stock-opname.finish', $session), ['confirmed' => 1])->assertRedirect()->assertSessionHasNoErrors();
+        $this->assertSame(3, $session->fresh()->summary['present']);
+        $this->assertSame(2, $session->fresh()->summary['missing']);
+        $this->assertSame($legacy->box_number, $legacy->fresh()->box_number);
+    }
+
     public function test_live_movements_arrivals_and_archives_are_reconciled_and_history_is_immutable(): void
     {
         $first = $this->local('00000001');
